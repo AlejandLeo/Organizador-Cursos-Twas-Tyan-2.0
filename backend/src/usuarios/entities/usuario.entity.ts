@@ -1,12 +1,10 @@
-import {Column, CreateDateColumn,Entity, JoinTable, ManyToMany, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn,} from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
-@Entity('usuario')
+@Entity('usuarios')
 export class Usuario {
+
   @PrimaryGeneratedColumn('uuid')
   id_usuario: string;
-
-  @Column({ unique: true })
-  ci: string;
 
   @Column({ unique: true })
   email: string;
@@ -15,31 +13,9 @@ export class Usuario {
   password: string;
 
   @Column()
-  nombres: string;
-
-  @Column()
-  paterno: string;
+  estado: string;
 
   @Column({ nullable: true })
-  materno: string;
+  id_certificado: string;
 
-  @Column({ nullable: true })
-  telefono: string;
-
-  @Column({ type: 'date', nullable: true })
-  fec_naci: string | null;
-
-  @Column({ nullable: true })
-  genero: string;
-
-  @Column({ nullable: true, default: 'image/Usuarios/default-user.png' })
-  imagen: string;
-
-
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
 }
