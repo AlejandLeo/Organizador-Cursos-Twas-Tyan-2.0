@@ -1,10 +1,12 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { Evento } from '../../eventos/entities/evento.entity';
 import { Certificado } from '../../certificados/entities/certificado.entity';
@@ -42,7 +44,12 @@ export class InfoCertificado {
   @JoinColumn({ name: 'id_evento' })
   evento: Evento;
 
-  /** Los certificados generados usando esta plantilla. */
   @OneToMany(() => Certificado, (cert) => cert.infoCertificado)
   certificados: Certificado[];
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  fecha_creacion: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  fecha_actualizacion: Date;
 }

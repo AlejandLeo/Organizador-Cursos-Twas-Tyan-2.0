@@ -1,10 +1,12 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { Inscripcion } from '../../inscripciones/entities/inscripcion.entity';
 import { CursoModalidad } from '../../curso-modalidades/entities/curso-modalidad.entity';
@@ -57,7 +59,12 @@ export class InscripcionModalidad {
   @JoinColumn({ name: 'id_curso_modalidad' })
   cursoModalidad: CursoModalidad;
 
-  /** Las asistencias registradas en sesiones de esta modalidad. */
   @OneToMany(() => Asistencia, (asistencia) => asistencia.inscripcionModalidad)
   asistencias: Asistencia[];
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  fecha_creacion: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  fecha_actualizacion: Date;
 }

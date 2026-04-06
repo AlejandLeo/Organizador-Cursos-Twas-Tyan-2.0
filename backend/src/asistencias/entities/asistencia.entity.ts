@@ -1,9 +1,11 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { InscripcionModalidad } from '../../inscripcion-modalidades/entities/inscripcion-modalidad.entity';
 import { SesionAcademica } from '../../sesiones-academicas/entities/sesion-academica.entity';
@@ -48,8 +50,13 @@ export class Asistencia {
   @JoinColumn({ name: 'id_inscripcion_modalidad' })
   inscripcionModalidad: InscripcionModalidad;
 
-  /** La sesión de clase a la que asistió. */
   @ManyToOne(() => SesionAcademica, (sesion) => sesion.asistencias)
   @JoinColumn({ name: 'id_sesion_academica' })
   sesionAcademica: SesionAcademica;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  fecha_creacion: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  fecha_actualizacion: Date;
 }

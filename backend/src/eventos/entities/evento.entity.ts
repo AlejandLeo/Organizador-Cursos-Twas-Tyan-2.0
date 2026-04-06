@@ -1,8 +1,10 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   OneToMany,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { ActividadAcademica } from '../../actividades-academicas/entities/actividad-academica.entity';
 import { CoordinacionEvento } from '../../coordinaciones/entities/coordinacion.entity';
@@ -68,7 +70,12 @@ export class Evento {
   @OneToMany(() => InfoCertificado, (ic) => ic.evento)
   infosCertificados: InfoCertificado[];
 
-  /** Docentes que imparten actividades en este evento. */
   @OneToMany(() => Imparticion, (imp) => imp.evento)
   imparticiones: Imparticion[];
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  fecha_creacion: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  fecha_actualizacion: Date;
 }
