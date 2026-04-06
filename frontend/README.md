@@ -46,3 +46,13 @@ npm run build
 ```sh
 npm run lint
 ```
+
+## Project Structure
+
+For a detailed explanation of the project structure and data model, see [STRUCTURE.md](./STRUCTURE.md).
+
+To generate the directory structure:
+
+```sh
+node ../create_dirs.js
+```

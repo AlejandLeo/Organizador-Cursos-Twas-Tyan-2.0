@@ -1,7 +1,6 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, IsDateString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { CreatePerfilDto } from './create-perfil.dto';
+import { CreateUsuarioRolDto } from 'src/usuarios-roles/dto/create-usuario-rol.dto';
 
 export class CreateUsuarioDto {
   
@@ -25,13 +24,5 @@ export class CreateUsuarioDto {
   @IsOptional()
   @IsString()
   id_certificado?: string;
-
-  // --- DATOS DEL PERFIL ---
-  
-  @ApiProperty({ type: CreatePerfilDto, description: 'Datos del perfil del usuario' })
-  @IsNotEmpty()
-  @ValidateNested()
-  @Type(() => CreatePerfilDto)
-  perfil: CreatePerfilDto;
 
 }
