@@ -1,0 +1,76 @@
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  OneToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { Usuario } from '../../usuarios/entities/usuario.entity';
+
+/**
+ * PERSONAS — datos personales del usuario.
+ *
+ * ¿Por qué separar PERSONAS de USUARIOS?
+ * USUARIOS guarda *credenciales* (email + password).
+ * PERSONAS guarda *datos personales* (nombre, DNI, etc.).
+ * Así, si mañana cambias el sistema de login, los datos personales
+ * no se ven afectados.
+ *
+ * Relación 1-a-1 con USUARIOS: un usuario = una persona.
+ * ON DELETE CASCADE: si se elimina el usuario, su perfil se elimina también.
+ *
+ * firma_dig: UUID que apunta al archivo de firma digital en el servidor.
+ * No se guarda la ruta directa por seguridad.
+ */
+@Entity('personas')
+export class Persona {
+  @PrimaryGeneratedColumn()
+  id_perfil: number;
+
+  @Column({ length: 100, nullable: true })
+  nombres: string;
+
+  @Column({ length: 100, nullable: true })
+  primer_apellido: string;
+
+  @Column({ length: 100, nullable: true })
+  segundo_apellido: string;
+
+  @Column({ length: 50, nullable: true })
+  documento_identidad: string;
+
+  @Column({ length: 20, nullable: true })
+  genero: string;
+
+  @Column({ length: 100, nullable: true })
+  pais_origen: string;
+
+  @Column({ length: 100, nullable: true })
+  pais_residencia: string;
+
+  @Column({ type: 'date', nullable: true })
+  fecha_nacimiento: Date;
+
+  @Column({ length: 20, nullable: true })
+  celular: string;
+
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  fecha_registro: Date;
+
+  /** UUID para localizar el archivo de firma digital en el servidor. */
+  @Column({ length: 255, nullable: true })
+  firma_dig: string;
+
+  // ── Relación ─────────────────────────────────────────────────────────────
+
+  /**
+   * OneToOne con UNIQUE en la FK garantiza la relación 1-a-1.
+   * @JoinColumn indica que la columna id_usuario vive en esta tabla (PERSONAS).
+   * onDelete: 'CASCADE' → si se borra el usuario, se borra la persona.
+   */
+  @OneToOne(() => Usuario, (usuario) => usuario.persona, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'id_usuario' })
+  usuario: Usuario;
+}

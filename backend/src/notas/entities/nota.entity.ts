@@ -1,13 +1,8 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+// Entidad obsoleta (NOTAS eliminada en v2, nota_principal vive en INSCRIPCIONES). No usar.
+import { Entity, PrimaryGeneratedColumn } from 'typeorm';
 
-@Entity('notas')
+@Entity('notas_obsoletas')
 export class Nota {
-  @PrimaryGeneratedColumn('uuid')
-  id_nota: string;
-
-  @Column('decimal') // or int, depending on grading system. Decimal is safer.
-  nota_principal: number;
-
-  @Column()
-  id_inscripcion: string;
+  @PrimaryGeneratedColumn()
+  id_nota: number;
 }

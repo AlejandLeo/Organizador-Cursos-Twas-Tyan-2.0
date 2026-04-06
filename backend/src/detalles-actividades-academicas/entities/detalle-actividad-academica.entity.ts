@@ -1,19 +1,8 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+// Entidad obsoleta (DETALLES_ACTIVIDADES renombrado a CURSO_MODALIDADES en v2). No usar.
+import { Entity, PrimaryGeneratedColumn } from 'typeorm';
 
-@Entity('detalles_actividades_academicas')
+@Entity('detalles_actividades_obsoletas')
 export class DetalleActividadAcademica {
-  @PrimaryGeneratedColumn('uuid')
-  id_detalle_actividad_academica: string;
-
-  @Column()
-  tipo: string;
-
-  @Column()
-  min_nota: string;
-
-  @Column()
-  min_asistencia: string;
-
-  @Column()
-  id_actividad_academica: string;
+  @PrimaryGeneratedColumn()
+  id_detalle_actividad_academica: number;
 }
