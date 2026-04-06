@@ -1,24 +1,15 @@
-import { IsNotEmpty, IsString, IsDateString } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsOptional, IsString } from 'class-validator';
 
 export class CreateCertificadoDto {
-  @ApiProperty()
-  @IsNotEmpty()
-  @IsDateString()
-  fecha_emision: string;
-
-  @ApiProperty()
-  @IsNotEmpty()
   @IsString()
-  estado: string;
+  codigo_certificado: string;
 
-  @ApiProperty()
-  @IsNotEmpty()
   @IsString()
-  id_info_certificado: string;
+  uuid_archivo: string;
 
-  @ApiProperty()
-  @IsNotEmpty()
-  @IsString()
-  id_actividad_academica: string;
+  @IsOptional()
+  hash_integridad?: string;
+
+  @IsOptional()
+  tipo?: number;
 }

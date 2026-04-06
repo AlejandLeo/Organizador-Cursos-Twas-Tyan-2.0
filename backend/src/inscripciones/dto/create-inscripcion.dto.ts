@@ -1,24 +1,9 @@
-import { IsNotEmpty, IsString, IsDateString } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsOptional } from 'class-validator';
 
 export class CreateInscripcionDto {
-  @ApiProperty()
-  @IsNotEmpty()
-  @IsString()
-  estado: string;
+  @IsOptional()
+  miembro_tyan?: number;
 
-  @ApiProperty()
-  @IsNotEmpty()
-  @IsDateString()
-  fecha_registro: string;
-
-  @ApiProperty()
-  @IsNotEmpty()
-  @IsString()
-  id_usuario: string;
-
-  @ApiProperty()
-  @IsNotEmpty()
-  @IsString()
-  id_detalle_actividad_academica: string;
+  @IsOptional()
+  razon?: string;
 }
