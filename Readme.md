@@ -132,6 +132,7 @@ FRONTEND_URL=http://localhost:5173
 
 ### Paso 3: Sincronización de la Base de Datos
 
+
 El sistema está configurado para que TypeORM genere y actualice las tablas automáticamente en el entorno de desarrollo. Solo necesitas crear la base de datos vacía en PostgreSQL.
 
 ```bash
@@ -139,7 +140,12 @@ El sistema está configurado para que TypeORM genere y actualice las tablas auto
 psql -U postgres
 
 # 2. Crea la base de datos (dentro de psql)
-CREATE DATABASE eventos_academicos_db;
+CREATE DATABASE eventos_academicos_db
+WITH 
+    OWNER = tu_usuario
+    ENCODING = 'UTF8'
+    LC_COLLATE = 'en_US.UTF-8'
+    LC_CTYPE = 'en_US.UTF-8';
 ```
 
 > **Sincronización Automática:** Al ejecutar `npm run start:dev`, TypeORM comparará tus entidades con la base de datos y aplicará los cambios necesarios automáticamente. No es obligatorio ejecutar scripts SQL manuales fuera de casos de prueba interna.
