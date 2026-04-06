@@ -1,9 +1,11 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   OneToMany,
   OneToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { Persona } from '../../personas/entities/persona.entity';
 import { UsuarioRol } from '../../usuarios-roles/entities/usuario-rol.entity';
@@ -75,4 +77,10 @@ export class Usuario {
   /** Actividades que imparte. */
   @OneToMany(() => Imparticion, (imp) => imp.usuario)
   imparticiones: Imparticion[];
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  fecha_creacion: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  fecha_actualizacion: Date;
 }

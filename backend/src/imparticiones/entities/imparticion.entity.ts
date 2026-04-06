@@ -1,8 +1,10 @@
 import {
+  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { ActividadAcademica } from '../../actividades-academicas/entities/actividad-academica.entity';
@@ -41,4 +43,10 @@ export class Imparticion {
   @ManyToOne(() => Evento, (evento) => evento.imparticiones)
   @JoinColumn({ name: 'id_evento' })
   evento: Evento;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  fecha_creacion: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  fecha_actualizacion: Date;
 }

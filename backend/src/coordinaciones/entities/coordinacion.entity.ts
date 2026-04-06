@@ -1,8 +1,10 @@
 import {
+  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { Evento } from '../../eventos/entities/evento.entity';
@@ -30,4 +32,10 @@ export class CoordinacionEvento {
   @ManyToOne(() => Evento, (evento) => evento.coordinaciones)
   @JoinColumn({ name: 'id_evento' })
   evento: Evento;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  fecha_creacion: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  fecha_actualizacion: Date;
 }

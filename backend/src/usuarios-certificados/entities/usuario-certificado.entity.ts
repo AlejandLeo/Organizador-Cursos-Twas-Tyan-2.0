@@ -1,9 +1,11 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { Certificado } from '../../certificados/entities/certificado.entity';
@@ -49,4 +51,10 @@ export class UsuarioCertificado {
   @ManyToOne(() => Certificado, (cert) => cert.usuariosCertificados)
   @JoinColumn({ name: 'id_certificado' })
   certificado: Certificado;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  fecha_creacion: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  fecha_actualizacion: Date;
 }

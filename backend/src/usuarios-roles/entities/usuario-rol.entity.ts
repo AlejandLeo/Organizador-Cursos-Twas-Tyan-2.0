@@ -1,9 +1,11 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { Rol } from '../../roles/entities/rol.entity';
@@ -21,7 +23,12 @@ export class UsuarioRol {
   @JoinColumn({ name: 'id_usuario' })
   usuario: Usuario;
 
-  @ManyToOne(() => Rol, (rol) => rol.usuariosRoles)
   @JoinColumn({ name: 'id_rol' })
   rol: Rol;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  fecha_creacion: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  fecha_actualizacion: Date;
 }

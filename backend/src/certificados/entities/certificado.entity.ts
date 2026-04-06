@@ -1,10 +1,12 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { InfoCertificado } from '../../info-certificados/entities/info-certificado.entity';
 import { ActividadAcademica } from '../../actividades-academicas/entities/actividad-academica.entity';
@@ -49,7 +51,7 @@ export class Certificado {
   @Column({ length: 255, nullable: true })
   hash_integridad: string;
 
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   fecha_emision: Date;
 
   /** 1: Asistente | 2: Expositor | 3: Organizador | 4: Docente */
@@ -77,7 +79,12 @@ export class Certificado {
   @JoinColumn({ name: 'id_usuario' })
   usuario: Usuario;
 
-  /** Relaciones extendidas (firmantes, coordinadores, etc.) */
   @OneToMany(() => UsuarioCertificado, (uc) => uc.certificado)
   usuariosCertificados: UsuarioCertificado[];
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  fecha_creacion: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  fecha_actualizacion: Date;
 }
