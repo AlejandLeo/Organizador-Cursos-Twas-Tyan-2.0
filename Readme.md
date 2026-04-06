@@ -256,7 +256,9 @@ La base de datos se estructura en 5 bloques modulares (Modelo v2.0):
 * `main`: Código en producción, siempre estable.
 * `dev`: Rama principal de integración.
 * `feature/*`: Nuevas funcionalidades.
-* `fix/*` o `hotfix/*`: Correcciones de errores.
+* `fix/*`: Correcciones de errores.
+* `hotfix/*`: Correcciones de errores críticos.
+* `chore/*`: Tareas de mantenimiento, configuración, dependencias, infraestructura, etc.
 
 ---
 
