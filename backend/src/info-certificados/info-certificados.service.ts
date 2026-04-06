@@ -2,33 +2,32 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InfoCertificado } from './entities/info-certificado.entity';
-import { CreateInfoCertificadoDto } from './dto/create-info-certificado.dto';
-import { UpdateInfoCertificadoDto } from './dto/update-info-certificado.dto';
 
 @Injectable()
 export class InfoCertificadosService {
   constructor(
     @InjectRepository(InfoCertificado)
-    private readonly infoCertificadoRepository: Repository<InfoCertificado>,
+    private readonly infoRepository: Repository<InfoCertificado>,
   ) {}
 
-  create(createInfoCertificadoDto: CreateInfoCertificadoDto) {
-    return this.infoCertificadoRepository.save(createInfoCertificadoDto);
+  create(data: Partial<InfoCertificado>) {
+    const info = this.infoRepository.create(data);
+    return this.infoRepository.save(info);
   }
 
   findAll() {
-    return this.infoCertificadoRepository.find();
+    return this.infoRepository.find();
   }
 
-  findOne(id: string) {
-    return this.infoCertificadoRepository.findOneBy({ id_info_certificado: id });
+  findOne(id: number) {
+    return this.infoRepository.findOneBy({ id_info_certificado: id });
   }
 
-  update(id: string, updateInfoCertificadoDto: UpdateInfoCertificadoDto) {
-    return this.infoCertificadoRepository.update(id, updateInfoCertificadoDto);
+  update(id: number, data: Partial<InfoCertificado>) {
+    return this.infoRepository.update(id, data);
   }
 
-  remove(id: string) {
-    return this.infoCertificadoRepository.delete(id);
+  remove(id: number) {
+    return this.infoRepository.delete(id);
   }
 }

@@ -2,33 +2,32 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SesionAcademica } from './entities/sesion-academica.entity';
-import { CreateSesionAcademicaDto } from './dto/create-sesion-academica.dto';
-import { UpdateSesionAcademicaDto } from './dto/update-sesion-academica.dto';
 
 @Injectable()
 export class SesionesAcademicasService {
   constructor(
     @InjectRepository(SesionAcademica)
-    private readonly sesionAcademicaRepository: Repository<SesionAcademica>,
+    private readonly sesionRepository: Repository<SesionAcademica>,
   ) {}
 
-  create(createSesionAcademicaDto: CreateSesionAcademicaDto) {
-    return this.sesionAcademicaRepository.save(createSesionAcademicaDto);
+  create(data: Partial<SesionAcademica>) {
+    const sesion = this.sesionRepository.create(data);
+    return this.sesionRepository.save(sesion);
   }
 
   findAll() {
-    return this.sesionAcademicaRepository.find();
+    return this.sesionRepository.find();
   }
 
-  findOne(id: string) {
-    return this.sesionAcademicaRepository.findOneBy({ id_sesion_academica: id });
+  findOne(id: number) {
+    return this.sesionRepository.findOneBy({ id_sesion_academica: id });
   }
 
-  update(id: string, updateSesionAcademicaDto: UpdateSesionAcademicaDto) {
-    return this.sesionAcademicaRepository.update(id, updateSesionAcademicaDto);
+  update(id: number, data: Partial<SesionAcademica>) {
+    return this.sesionRepository.update(id, data);
   }
 
-  remove(id: string) {
-    return this.sesionAcademicaRepository.delete(id);
+  remove(id: number) {
+    return this.sesionRepository.delete(id);
   }
 }

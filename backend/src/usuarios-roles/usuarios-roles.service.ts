@@ -2,8 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UsuarioRol } from './entities/usuario-rol.entity';
-import { CreateUsuarioRolDto } from './dto/create-usuario-rol.dto';
-import { UpdateUsuarioRolDto } from './dto/update-usuario-rol.dto';
 
 @Injectable()
 export class UsuariosRolesService {
@@ -12,23 +10,24 @@ export class UsuariosRolesService {
     private readonly usuarioRolRepository: Repository<UsuarioRol>,
   ) {}
 
-  create(createUsuarioRolDto: CreateUsuarioRolDto) {
-    return this.usuarioRolRepository.save(createUsuarioRolDto);
+  create(data: Partial<UsuarioRol>) {
+    const ur = this.usuarioRolRepository.create(data);
+    return this.usuarioRolRepository.save(ur);
   }
 
   findAll() {
     return this.usuarioRolRepository.find();
   }
 
-  findOne(id: string) {
+  findOne(id: number) {
     return this.usuarioRolRepository.findOneBy({ id_usuario_rol: id });
   }
 
-  update(id: string, updateUsuarioRolDto: UpdateUsuarioRolDto) {
-    return this.usuarioRolRepository.update(id, updateUsuarioRolDto);
+  update(id: number, data: Partial<UsuarioRol>) {
+    return this.usuarioRolRepository.update(id, data);
   }
 
-  remove(id: string) {
+  remove(id: number) {
     return this.usuarioRolRepository.delete(id);
   }
 }

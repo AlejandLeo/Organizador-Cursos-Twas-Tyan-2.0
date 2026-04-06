@@ -1,15 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
 import { ImparticionesService } from './imparticiones.service';
-import { CreateImparticionDto } from './dto/create-imparticion.dto';
-import { UpdateImparticionDto } from './dto/update-imparticion.dto';
+import { Imparticion } from './entities/imparticion.entity';
 
 @Controller('imparticiones')
 export class ImparticionesController {
   constructor(private readonly imparticionesService: ImparticionesService) {}
 
   @Post()
-  create(@Body() createImparticionDto: CreateImparticionDto) {
-    return this.imparticionesService.create(createImparticionDto);
+  create(@Body() data: Partial<Imparticion>) {
+    return this.imparticionesService.create(data);
   }
 
   @Get()
@@ -18,17 +17,17 @@ export class ImparticionesController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ParseIntPipe) id: number) {
     return this.imparticionesService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateImparticionDto: UpdateImparticionDto) {
-    return this.imparticionesService.update(id, updateImparticionDto);
+  update(@Param('id', ParseIntPipe) id: number, @Body() data: Partial<Imparticion>) {
+    return this.imparticionesService.update(id, data);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
+  remove(@Param('id', ParseIntPipe) id: number) {
     return this.imparticionesService.remove(id);
   }
 }

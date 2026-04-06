@@ -1,15 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
 import { InfoCertificadosService } from './info-certificados.service';
-import { CreateInfoCertificadoDto } from './dto/create-info-certificado.dto';
-import { UpdateInfoCertificadoDto } from './dto/update-info-certificado.dto';
+import { InfoCertificado } from './entities/info-certificado.entity';
 
 @Controller('info-certificados')
 export class InfoCertificadosController {
   constructor(private readonly infoCertificadosService: InfoCertificadosService) {}
 
   @Post()
-  create(@Body() createInfoCertificadoDto: CreateInfoCertificadoDto) {
-    return this.infoCertificadosService.create(createInfoCertificadoDto);
+  create(@Body() data: Partial<InfoCertificado>) {
+    return this.infoCertificadosService.create(data);
   }
 
   @Get()
@@ -18,17 +17,17 @@ export class InfoCertificadosController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ParseIntPipe) id: number) {
     return this.infoCertificadosService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateInfoCertificadoDto: UpdateInfoCertificadoDto) {
-    return this.infoCertificadosService.update(id, updateInfoCertificadoDto);
+  update(@Param('id', ParseIntPipe) id: number, @Body() data: Partial<InfoCertificado>) {
+    return this.infoCertificadosService.update(id, data);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
+  remove(@Param('id', ParseIntPipe) id: number) {
     return this.infoCertificadosService.remove(id);
   }
 }

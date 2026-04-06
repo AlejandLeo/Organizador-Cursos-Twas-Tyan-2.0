@@ -1,16 +1,27 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { Usuario } from '../../usuarios/entities/usuario.entity';
+import { Rol } from '../../roles/entities/rol.entity';
+
 
 @Entity('usuarios_roles')
 export class UsuarioRol {
-  @PrimaryGeneratedColumn('uuid')
-  id_usuario_rol: string;
+  @PrimaryGeneratedColumn()
+  id_usuario_rol: number;
 
-  @Column()
-  estado: string;
+  @Column({ type: 'integer', default: 1 })
+  estado: number;
 
-  @Column()
-  id_usuario: string;
+  @ManyToOne(() => Usuario, (usuario) => usuario.usuariosRoles)
+  @JoinColumn({ name: 'id_usuario' })
+  usuario: Usuario;
 
-  @Column()
-  id_rol: string;
+  @ManyToOne(() => Rol, (rol) => rol.usuariosRoles)
+  @JoinColumn({ name: 'id_rol' })
+  rol: Rol;
 }

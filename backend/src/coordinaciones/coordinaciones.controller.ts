@@ -1,15 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
 import { CoordinacionesService } from './coordinaciones.service';
-import { CreateCoordinacionDto } from './dto/create-coordinacion.dto';
-import { UpdateCoordinacionDto } from './dto/update-coordinacion.dto';
+import { CoordinacionEvento } from './entities/coordinacion.entity';
 
 @Controller('coordinaciones')
 export class CoordinacionesController {
   constructor(private readonly coordinacionesService: CoordinacionesService) {}
 
   @Post()
-  create(@Body() createCoordinacionDto: CreateCoordinacionDto) {
-    return this.coordinacionesService.create(createCoordinacionDto);
+  create(@Body() data: Partial<CoordinacionEvento>) {
+    return this.coordinacionesService.create(data);
   }
 
   @Get()
@@ -18,17 +17,17 @@ export class CoordinacionesController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ParseIntPipe) id: number) {
     return this.coordinacionesService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateCoordinacionDto: UpdateCoordinacionDto) {
-    return this.coordinacionesService.update(id, updateCoordinacionDto);
+  update(@Param('id', ParseIntPipe) id: number, @Body() data: Partial<CoordinacionEvento>) {
+    return this.coordinacionesService.update(id, data);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
+  remove(@Param('id', ParseIntPipe) id: number) {
     return this.coordinacionesService.remove(id);
   }
 }

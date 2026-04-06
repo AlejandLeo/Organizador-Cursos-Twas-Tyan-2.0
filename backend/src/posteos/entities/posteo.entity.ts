@@ -1,19 +1,8 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+// Entidad obsoleta (POSTEOS eliminada en v2). No usar.
+import { Entity, PrimaryGeneratedColumn } from 'typeorm';
 
-@Entity('posteos')
+@Entity('posteos_obsoletos')
 export class Posteo {
-  @PrimaryGeneratedColumn('uuid')
-  id_posteo: string;
-
-  @Column()
-  titulo: string;
-
-  @Column('text')
-  contenido: string;
-
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  fecha_registro: Date;
-
-  @Column()
-  estado: string;
+  @PrimaryGeneratedColumn()
+  id_posteo: number;
 }

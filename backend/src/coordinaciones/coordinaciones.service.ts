@@ -1,34 +1,33 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Coordinacion } from './entities/coordinacion.entity';
-import { CreateCoordinacionDto } from './dto/create-coordinacion.dto';
-import { UpdateCoordinacionDto } from './dto/update-coordinacion.dto';
+import { CoordinacionEvento } from './entities/coordinacion.entity';
 
 @Injectable()
 export class CoordinacionesService {
   constructor(
-    @InjectRepository(Coordinacion)
-    private readonly coordinacionRepository: Repository<Coordinacion>,
+    @InjectRepository(CoordinacionEvento)
+    private readonly coordinacionRepository: Repository<CoordinacionEvento>,
   ) {}
 
-  create(createCoordinacionDto: CreateCoordinacionDto) {
-    return this.coordinacionRepository.save(createCoordinacionDto);
+  create(data: Partial<CoordinacionEvento>) {
+    const coordinacion = this.coordinacionRepository.create(data);
+    return this.coordinacionRepository.save(coordinacion);
   }
 
   findAll() {
     return this.coordinacionRepository.find();
   }
 
-  findOne(id: string) {
+  findOne(id: number) {
     return this.coordinacionRepository.findOneBy({ id_coordinacion: id });
   }
 
-  update(id: string, updateCoordinacionDto: UpdateCoordinacionDto) {
-    return this.coordinacionRepository.update(id, updateCoordinacionDto);
+  update(id: number, data: Partial<CoordinacionEvento>) {
+    return this.coordinacionRepository.update(id, data);
   }
 
-  remove(id: string) {
+  remove(id: number) {
     return this.coordinacionRepository.delete(id);
   }
 }

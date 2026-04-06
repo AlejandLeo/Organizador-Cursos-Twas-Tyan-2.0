@@ -1,31 +1,9 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+// Entidad obsoleta (VERSIONES_EVENTOS eliminada en v2).
+// Se deja vacía para no perder la carpeta. No usar.
+import { Entity, PrimaryGeneratedColumn } from 'typeorm';
 
-@Entity('versiones_eventos')
+@Entity('versiones_eventos_obsoleta')
 export class VersionEvento {
-  @PrimaryGeneratedColumn('uuid')
-  id_version_evento: string;
-
-  @Column()
-  descripcion: string;
-
-  @Column()
-  gestion: string;
-
-  @Column()
-  ubicacion: string;
-
-  @Column()
-  direccion: string;
-
-  @Column({ type: 'date' })
-  fecha_inicio: Date;
-
-  @Column({ type: 'date' })
-  fecha_fin: Date;
-
-  @Column()
-  estado: string;
-
-  @Column()
-  id_evento: string;
+  @PrimaryGeneratedColumn()
+  id_version_evento: number;
 }

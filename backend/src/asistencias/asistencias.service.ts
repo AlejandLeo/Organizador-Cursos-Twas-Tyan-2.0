@@ -1,34 +1,34 @@
+
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Asistencia } from './entities/asistencia.entity';
-import { CreateAsistenciaDto } from './dto/create-asistencia.dto';
-import { UpdateAsistenciaDto } from './dto/update-asistencia.dto';
 
 @Injectable()
 export class AsistenciasService {
   constructor(
     @InjectRepository(Asistencia)
     private readonly asistenciaRepository: Repository<Asistencia>,
-  ) {}
+  ) { }
 
-  create(createAsistenciaDto: CreateAsistenciaDto) {
-    return this.asistenciaRepository.save(createAsistenciaDto);
+  create(data: Partial<Asistencia>) {
+    const asistencia = this.asistenciaRepository.create(data);
+    return this.asistenciaRepository.save(asistencia);
   }
 
   findAll() {
     return this.asistenciaRepository.find();
   }
 
-  findOne(id: string) {
+  findOne(id: number) {
     return this.asistenciaRepository.findOneBy({ id_asistencia: id });
   }
 
-  update(id: string, updateAsistenciaDto: UpdateAsistenciaDto) {
-    return this.asistenciaRepository.update(id, updateAsistenciaDto);
+  update(id: number, data: Partial<Asistencia>) {
+    return this.asistenciaRepository.update(id, data);
   }
 
-  remove(id: string) {
+  remove(id: number) {
     return this.asistenciaRepository.delete(id);
   }
 }
