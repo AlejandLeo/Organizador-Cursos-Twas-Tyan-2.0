@@ -2,8 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Inscripcion } from './entities/inscripcion.entity';
-import { CreateInscripcionDto } from './dto/create-inscripcion.dto';
-import { UpdateInscripcionDto } from './dto/update-inscripcion.dto';
 
 @Injectable()
 export class InscripcionesService {
@@ -12,23 +10,24 @@ export class InscripcionesService {
     private readonly inscripcionRepository: Repository<Inscripcion>,
   ) {}
 
-  create(createInscripcionDto: CreateInscripcionDto) {
-    return this.inscripcionRepository.save(createInscripcionDto);
+  create(data: Partial<Inscripcion>) {
+    const inscripcion = this.inscripcionRepository.create(data);
+    return this.inscripcionRepository.save(inscripcion);
   }
 
   findAll() {
     return this.inscripcionRepository.find();
   }
 
-  findOne(id: string) {
+  findOne(id: number) {
     return this.inscripcionRepository.findOneBy({ id_inscripcion: id });
   }
 
-  update(id: string, updateInscripcionDto: UpdateInscripcionDto) {
-    return this.inscripcionRepository.update(id, updateInscripcionDto);
+  update(id: number, data: Partial<Inscripcion>) {
+    return this.inscripcionRepository.update(id, data);
   }
 
-  remove(id: string) {
+  remove(id: number) {
     return this.inscripcionRepository.delete(id);
   }
 }

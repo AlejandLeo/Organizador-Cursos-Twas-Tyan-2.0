@@ -13,22 +13,23 @@ export class UsuariosService {
   ) {}
 
   create(createUsuarioDto: CreateUsuarioDto) {
-    return this.usuarioRepository.save(createUsuarioDto);
+    const usuario = this.usuarioRepository.create(createUsuarioDto);
+    return this.usuarioRepository.save(usuario);
   }
 
   findAll() {
     return this.usuarioRepository.find();
   }
 
-  findOne(id: string) {
+  findOne(id: number) {
     return this.usuarioRepository.findOneBy({ id_usuario: id });
   }
 
-  update(id: string, updateUsuarioDto: UpdateUsuarioDto) {
+  update(id: number, updateUsuarioDto: UpdateUsuarioDto) {
     return this.usuarioRepository.update(id, updateUsuarioDto);
   }
 
-  remove(id: string) {
+  remove(id: number) {
     return this.usuarioRepository.delete(id);
   }
 }

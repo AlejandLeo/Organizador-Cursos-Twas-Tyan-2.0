@@ -2,8 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Evento } from './entities/evento.entity';
-import { CreateEventoDto } from './dto/create-evento.dto';
-import { UpdateEventoDto } from './dto/update-evento.dto';
 
 @Injectable()
 export class EventosService {
@@ -12,23 +10,24 @@ export class EventosService {
     private readonly eventoRepository: Repository<Evento>,
   ) {}
 
-  create(createEventoDto: CreateEventoDto) {
-    return this.eventoRepository.save(createEventoDto);
+  create(data: Partial<Evento>) {
+    const evento = this.eventoRepository.create(data);
+    return this.eventoRepository.save(evento);
   }
 
   findAll() {
     return this.eventoRepository.find();
   }
 
-  findOne(id: string) {
-    return this.eventoRepository.findOneBy({ id_evento: id });
+  findOne(id: number) {
+    return this.eventoRepository.findOneBy({ id_eventos: id });
   }
 
-  update(id: string, updateEventoDto: UpdateEventoDto) {
-    return this.eventoRepository.update(id, updateEventoDto);
+  update(id: number, data: Partial<Evento>) {
+    return this.eventoRepository.update(id, data);
   }
 
-  remove(id: string) {
+  remove(id: number) {
     return this.eventoRepository.delete(id);
   }
 }

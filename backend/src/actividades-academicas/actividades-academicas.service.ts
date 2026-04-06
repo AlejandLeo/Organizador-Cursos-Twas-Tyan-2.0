@@ -2,33 +2,32 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ActividadAcademica } from './entities/actividad-academica.entity';
-import { CreateActividadAcademicaDto } from './dto/create-actividad-academica.dto';
-import { UpdateActividadAcademicaDto } from './dto/update-actividad-academica.dto';
 
 @Injectable()
 export class ActividadesAcademicasService {
   constructor(
     @InjectRepository(ActividadAcademica)
-    private readonly actividadAcademicaRepository: Repository<ActividadAcademica>,
+    private readonly actividadRepository: Repository<ActividadAcademica>,
   ) {}
 
-  create(createActividadAcademicaDto: CreateActividadAcademicaDto) {
-    return this.actividadAcademicaRepository.save(createActividadAcademicaDto);
+  create(data: Partial<ActividadAcademica>) {
+    const actividad = this.actividadRepository.create(data);
+    return this.actividadRepository.save(actividad);
   }
 
   findAll() {
-    return this.actividadAcademicaRepository.find();
+    return this.actividadRepository.find();
   }
 
-  findOne(id: string) {
-    return this.actividadAcademicaRepository.findOneBy({ id_actividad_academica: id });
+  findOne(id: number) {
+    return this.actividadRepository.findOneBy({ id_actividad_academica: id });
   }
 
-  update(id: string, updateActividadAcademicaDto: UpdateActividadAcademicaDto) {
-    return this.actividadAcademicaRepository.update(id, updateActividadAcademicaDto);
+  update(id: number, data: Partial<ActividadAcademica>) {
+    return this.actividadRepository.update(id, data);
   }
 
-  remove(id: string) {
-    return this.actividadAcademicaRepository.delete(id);
+  remove(id: number) {
+    return this.actividadRepository.delete(id);
   }
 }

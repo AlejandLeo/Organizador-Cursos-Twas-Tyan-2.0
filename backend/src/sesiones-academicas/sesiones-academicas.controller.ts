@@ -1,15 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
 import { SesionesAcademicasService } from './sesiones-academicas.service';
-import { CreateSesionAcademicaDto } from './dto/create-sesion-academica.dto';
-import { UpdateSesionAcademicaDto } from './dto/update-sesion-academica.dto';
+import { SesionAcademica } from './entities/sesion-academica.entity';
 
 @Controller('sesiones-academicas')
 export class SesionesAcademicasController {
   constructor(private readonly sesionesAcademicasService: SesionesAcademicasService) {}
 
   @Post()
-  create(@Body() createSesionAcademicaDto: CreateSesionAcademicaDto) {
-    return this.sesionesAcademicasService.create(createSesionAcademicaDto);
+  create(@Body() data: Partial<SesionAcademica>) {
+    return this.sesionesAcademicasService.create(data);
   }
 
   @Get()
@@ -18,17 +17,17 @@ export class SesionesAcademicasController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ParseIntPipe) id: number) {
     return this.sesionesAcademicasService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateSesionAcademicaDto: UpdateSesionAcademicaDto) {
-    return this.sesionesAcademicasService.update(id, updateSesionAcademicaDto);
+  update(@Param('id', ParseIntPipe) id: number, @Body() data: Partial<SesionAcademica>) {
+    return this.sesionesAcademicasService.update(id, data);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
+  remove(@Param('id', ParseIntPipe) id: number) {
     return this.sesionesAcademicasService.remove(id);
   }
 }

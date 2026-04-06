@@ -2,8 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Imparticion } from './entities/imparticion.entity';
-import { CreateImparticionDto } from './dto/create-imparticion.dto';
-import { UpdateImparticionDto } from './dto/update-imparticion.dto';
 
 @Injectable()
 export class ImparticionesService {
@@ -12,23 +10,24 @@ export class ImparticionesService {
     private readonly imparticionRepository: Repository<Imparticion>,
   ) {}
 
-  create(createImparticionDto: CreateImparticionDto) {
-    return this.imparticionRepository.save(createImparticionDto);
+  create(data: Partial<Imparticion>) {
+    const imparticion = this.imparticionRepository.create(data);
+    return this.imparticionRepository.save(imparticion);
   }
 
   findAll() {
     return this.imparticionRepository.find();
   }
 
-  findOne(id: string) {
+  findOne(id: number) {
     return this.imparticionRepository.findOneBy({ id_imparticion: id });
   }
 
-  update(id: string, updateImparticionDto: UpdateImparticionDto) {
-    return this.imparticionRepository.update(id, updateImparticionDto);
+  update(id: number, data: Partial<Imparticion>) {
+    return this.imparticionRepository.update(id, data);
   }
 
-  remove(id: string) {
+  remove(id: number) {
     return this.imparticionRepository.delete(id);
   }
 }
