@@ -66,7 +66,7 @@ const eventosAgrupados = computed(() => {
           <div class="md:w-auto text-right md:border-l border-slate-100 dark:border-gray-800 md:pl-6">
             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Aperturas Totales</p>
             <div class="flex items-center md:justify-end gap-2 mt-1">
-              <span class="text-3xl font-black text-umsa-gold">{{ evento.gestiones.length }}</span>
+              <span class="text-3xl font-black text-emerald-500">{{ evento.gestiones.length }}</span>
               <span class="text-xs font-bold text-slate-500">Gestiones</span>
             </div>
           </div>

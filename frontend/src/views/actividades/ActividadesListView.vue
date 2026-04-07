@@ -24,7 +24,8 @@ const activities = ref([
     students: 45,
     modules: 4,
     color: 'bg-primary-dark',
-    icon: 'science'
+    icon: 'science',
+    image: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80'
   },
   {
     id: 2,
@@ -34,8 +35,9 @@ const activities = ref([
     date: '10 Abr - 15 Abr 2026',
     students: 120,
     modules: 1,
-    color: 'bg-umsa-gold',
-    icon: 'edit_document'
+    color: 'bg-emerald-500',
+    icon: 'edit_document',
+    image: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80'
   },
   {
     id: 3,
@@ -46,7 +48,8 @@ const activities = ref([
     students: 75,
     modules: 6,
     color: 'bg-slate-400',
-    icon: 'water_drop'
+    icon: 'water_drop',
+    image: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=800&q=80'
   }
 ]);
 
@@ -103,7 +106,7 @@ const changeStep = (delta: number) => {
           <p class="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Gestión de programas del evento actual</p>
         </div>
         
-        <button v-if="route.name === 'coordinador-actividades'" @click="isCreating = true; currentStep = 1;" class="bg-umsa-gold hover:bg-[#a38628] text-white font-black px-6 py-3.5 rounded-xl text-[11px] uppercase tracking-widest shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2">
+        <button v-if="route.name === 'coordinador-actividades'" @click="isCreating = true; currentStep = 1;" class="bg-emerald-500 hover:bg-[#a38628] text-white font-black px-6 py-3.5 rounded-xl text-[11px] uppercase tracking-widest shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2">
           <span class="material-symbols-outlined text-[18px]">add_circle</span> Crear Actividad
         </button>
       </div>
@@ -116,39 +119,38 @@ const changeStep = (delta: number) => {
         </h3>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div v-for="act in activities" :key="act.id" @click="openDetalleCurso(act.id)" class="bg-white dark:bg-gray-900 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-gray-800 hover:shadow-md hover:-translate-y-1 transition-all group cursor-pointer flex flex-col relative overflow-hidden">
-        
-        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-white/0 to-slate-50/50 dark:to-white/5 rounded-bl-full -z-0"></div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">        
+      <div v-for="act in activities" :key="act.id" @click="openDetalleCurso(act.id)" class="bg-white dark:bg-gray-900 rounded-3xl overflow-hidden shadow-sm border border-slate-100 dark:border-gray-800 hover:shadow-xl hover:border-umsa-blue transition-all group cursor-pointer flex flex-col h-full relative">
 
-        <div class="flex justify-between items-start mb-6 relative z-10">
-          <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-md shadow-slate-200 dark:shadow-none" :class="act.color">
-            <span class="material-symbols-outlined text-2xl">{{ act.icon }}</span>
-          </div>
-          <span class="text-[9px] font-black uppercase px-3 py-1 rounded-full tracking-widest" :class="getStatusColor(act.status)">
-            {{ act.status }}
-          </span>
-        </div>
-
-        <div class="flex-1 relative z-10">
-          <p class="text-[9px] font-bold text-umsa-gold dark:text-blue-400 uppercase tracking-widest mb-2">{{ act.type }}</p>
-          <h3 class="text-xl font-black text-primary-dark dark:text-white leading-tight mb-2 group-hover:text-umsa-blue transition-colors">{{ act.title }}</h3>
-        </div>
-
-        <div class="mt-6 space-y-3 pt-5 border-t border-slate-100 dark:border-gray-800 relative z-10">
-          <div class="flex items-center text-slate-500 dark:text-gray-400 bg-slate-50 dark:bg-gray-800/50 p-2 rounded-lg">
-            <span class="material-symbols-outlined text-[16px] mr-3 text-slate-400">calendar_today</span>
-            <span class="text-xs font-bold">{{ act.date }}</span>
-          </div>
-          
-          <div class="flex justify-between items-center px-1 mt-4">
-            <div class="flex items-center text-slate-500 dark:text-gray-400">
-              <span class="material-symbols-outlined text-[18px] mr-2 text-umsa-blue">groups</span>
-              <span class="text-xs font-black">{{ act.students }} <span class="font-bold text-[10px] uppercase tracking-widest ml-1">Inscritos</span></span>
+        <div class="relative h-44 w-full overflow-hidden">
+            <div class="absolute inset-0 bg-primary-dark/20 dark:bg-black/40 group-hover:bg-transparent transition-colors z-10"></div>
+            <img :src="act.image" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" :alt="act.title">   
+            <span class="absolute top-4 right-4 z-20 bg-white/90 backdrop-blur-md text-[9px] font-black uppercase px-3 py-1.5 rounded-lg tracking-widest shadow-sm" :class="getStatusColor(act.status)">
+              {{ act.status }}
+            </span>
+            <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent z-20">
+              <p class="text-[10px] font-bold text-umsa-blue mb-1 uppercase tracking-widest bg-white/10 w-fit px-2 py-0.5 rounded-md backdrop-blur-sm">{{ act.type }}</p>
             </div>
-            <div class="flex items-center text-slate-500 dark:text-gray-400">
-              <span class="material-symbols-outlined text-[18px] mr-2 text-umsa-gold">view_module</span>
-              <span class="text-xs font-black">{{ act.modules }} <span class="font-bold text-[10px] uppercase tracking-widest ml-1">Mód.</span></span>
+        </div>
+
+        <div class="p-5 flex-1 flex flex-col">
+          <h3 class="text-base font-black text-primary-dark dark:text-white leading-tight mb-2 group-hover:text-umsa-blue transition-colors line-clamp-2">{{ act.title }}</h3> 
+
+          <div class="mt-auto space-y-3 pt-4 border-t border-slate-100 dark:border-gray-800">
+            <div class="flex items-center text-slate-500 dark:text-gray-400 bg-slate-50 dark:bg-gray-800/50 p-2 rounded-lg">
+              <span class="material-symbols-outlined text-[16px] mr-2 text-slate-400">calendar_today</span>
+              <span class="text-xs font-bold">{{ act.date }}</span>
+            </div>
+
+            <div class="flex justify-between items-center px-1 mt-2">
+              <div class="flex items-center text-slate-500 dark:text-gray-400">   
+                <span class="material-symbols-outlined text-[16px] mr-1.5 text-umsa-blue">groups</span>
+                <span class="text-xs font-black">{{ act.students }} <span class="font-bold text-[9px] uppercase tracking-widest ml-0.5">Inscritos</span></span>    
+              </div>
+              <div class="flex items-center text-slate-500 dark:text-gray-400">   
+                <span class="material-symbols-outlined text-[16px] mr-1.5 text-emerald-500">view_module</span>
+                <span class="text-xs font-black">{{ act.modules }} <span class="font-bold text-[9px] uppercase tracking-widest ml-0.5">Mód.</span></span>
+              </div>
             </div>
           </div>
         </div>
@@ -275,7 +277,7 @@ const changeStep = (delta: number) => {
                   </div>
                   <div class="p-6 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-[2rem] shadow-inner">
                       <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-3 block flex items-center gap-2">
-                        <span class="material-symbols-outlined text-sm text-umsa-gold">event_available</span> Fecha de Finalización (Cierre)
+                        <span class="material-symbols-outlined text-sm text-emerald-500">event_available</span> Fecha de Finalización (Cierre)
                       </label>
                       <input type="date" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-sm text-primary-dark dark:text-gray-200 focus:ring-2 focus:ring-umsa-blue outline-none transition-all cursor-pointer" />
                   </div>
@@ -303,7 +305,7 @@ const changeStep = (delta: number) => {
                       <label class="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase mb-2 block">Hora Fin</label>
                       <input type="time" class="w-full border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-xl px-4 py-3 font-bold text-sm text-primary-dark dark:text-gray-200 focus:ring-2 focus:ring-umsa-blue outline-none transition-all cursor-pointer">
                   </div>
-                  <button title="Añadir Horario" class="w-12 h-[46px] flex items-center justify-center bg-primary-dark dark:bg-blue-600 hover:bg-umsa-gold dark:hover:bg-blue-500 text-white rounded-xl shadow-md transition-all mb-[1px]">
+                  <button title="Añadir Horario" class="w-12 h-[46px] flex items-center justify-center bg-primary-dark dark:bg-blue-600 hover:bg-emerald-500 dark:hover:bg-blue-500 text-white rounded-xl shadow-md transition-all mb-[1px]">
                       <span class="material-symbols-outlined text-[20px]">add</span>
                   </button>
               </div>
@@ -327,7 +329,7 @@ const changeStep = (delta: number) => {
               Siguiente Paso <span class="material-symbols-outlined text-sm">arrow_forward</span>
           </button>
 
-          <button v-else @click="isCreating = false" class="px-8 py-3 bg-umsa-gold dark:bg-yellow-600 text-white font-black text-[11px] uppercase rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center gap-2">
+          <button v-else @click="isCreating = false" class="px-8 py-3 bg-emerald-500 dark:bg-yellow-600 text-white font-black text-[11px] uppercase rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center gap-2">
               Publicar Actividad <span class="material-symbols-outlined text-sm">publish</span>
           </button>
       </div>
@@ -335,4 +337,6 @@ const changeStep = (delta: number) => {
     </div>
   </div>
 </template>
+
+
 

@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
@@ -17,7 +17,7 @@ const navigate = (routeName: string) => {
     </div>
 
     <nav class="space-y-1 flex-1">
-      <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 mt-2 pl-2">MenÃÂº Principal</p>
+      <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 mt-2 pl-2">Menú Principal</p>
 
       <button @click="navigate('coordinador-dashboard')"
         :class="[ $route.name === 'coordinador-dashboard' ? 'nav-active bg-umsa-blue text-white shadow-md shadow-umsa-blue/20' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500' ]"
@@ -29,8 +29,15 @@ const navigate = (routeName: string) => {
       <button @click="navigate('coordinador-actividades')"
         :class="[ $route.name === 'coordinador-actividades' ? 'nav-active bg-umsa-blue text-white shadow-md shadow-umsa-blue/20' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500' ]"
         class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group mt-2">
-        <span class="text-xs uppercase tracking-widest font-bold">Actividades</span>
+        <span class="text-xs uppercase tracking-widest font-bold">Actividades Académicas</span>
         <span class="material-symbols-outlined text-[20px] transition-colors" :class="[ $route.name === 'coordinador-actividades' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">school</span>
+      </button>
+
+      <button @click="navigate('coordinador-eventos')"
+        :class="[ $route.name === 'coordinador-eventos' ? 'nav-active bg-umsa-blue text-white shadow-md shadow-umsa-blue/20' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500' ]"
+        class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group mt-2">
+        <span class="text-xs uppercase tracking-widest font-bold">Gestión de Eventos</span>
+        <span class="material-symbols-outlined text-[20px] transition-colors" :class="[ $route.name === 'coordinador-eventos' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">corporate_fare</span>
       </button>
 
       <button @click="navigate('coordinador-certificados')"
@@ -40,19 +47,9 @@ const navigate = (routeName: string) => {
         <span class="material-symbols-outlined text-[20px] transition-colors" :class="[ $route.name === 'coordinador-certificados' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">workspace_premium</span>
       </button>
 
-      <div class="my-6 border-t border-slate-200 dark:border-gray-800"></div>
-      <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 pl-2">Gestión de Institución</p>
-      
-      <button @click="navigate('coordinador-eventos')"
-        :class="[ $route.name === 'coordinador-eventos' ? 'nav-active bg-umsa-blue text-white shadow-md shadow-umsa-blue/20' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500' ]"
-        class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group mt-2">
-        <span class="text-xs uppercase tracking-widest font-bold">Gestión de Eventos</span>
-        <span class="material-symbols-outlined text-[20px] transition-colors" :class="[ $route.name === 'coordinador-eventos' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">corporate_fare</span>  
-      </button>
-
-      <div class="my-6 border-t border-slate-200 dark:border-gray-800"></div>
+      <div class="my-6 border-t border-slate-200 dark:border-gray-800"></div>   
       <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 pl-2">Directorio y CRUD</p>
-      
+
       <button @click="navigate('coordinador-usuarios')"
         :class="[ $route.name === 'coordinador-usuarios' ? 'nav-active bg-umsa-blue text-white shadow-md shadow-umsa-blue/20' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500' ]"
         class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group mt-2">

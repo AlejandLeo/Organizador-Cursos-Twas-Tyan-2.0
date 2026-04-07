@@ -6,7 +6,7 @@ import AppFooter from './layouts/AppFooter.vue'
 
 const showVideos = ref(false)
 const route = useRoute()
-const isDashboard = computed(() => route.path.startsWith('/coordinador'))
+const isDashboard = computed(() => route.path.startsWith('/coordinador') || route.path.startsWith('/ponente') || route.path.startsWith('/estudiante'))
 </script>
 
 <template>

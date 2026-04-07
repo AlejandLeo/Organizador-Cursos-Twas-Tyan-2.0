@@ -38,10 +38,10 @@ const closeModal = (modalId: string) => {
       <div class="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-20 -mt-20"></div>
       <div class="relative z-10">
         <h2 id="titulo-curso" class="text-3xl md:text-4xl font-black text-white italic uppercase tracking-tight">Especialidad en Biofertilizantes</h2>
-        <p class="text-umsa-gold text-[10px] font-black uppercase tracking-[0.3em] mt-2">Panel de Administración Integral</p>
+        <p class="text-emerald-500 text-[10px] font-black uppercase tracking-[0.3em] mt-2">Panel de Administración Integral</p>
       </div>
       <div class="relative z-10 flex gap-4 mt-6 md:mt-0">
-        <button class="bg-umsa-gold text-primary-dark px-6 py-3 rounded-2xl text-[10px] font-black shadow-lg hover:brightness-110 transition-all uppercase tracking-widest flex items-center gap-2">
+        <button class="bg-emerald-500 text-primary-dark px-6 py-3 rounded-2xl text-[10px] font-black shadow-lg hover:brightness-110 transition-all uppercase tracking-widest flex items-center gap-2">
           <span class="material-symbols-outlined text-sm">settings</span> Configuración
         </button>
       </div>
@@ -60,7 +60,7 @@ const closeModal = (modalId: string) => {
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic">Nómina de Inscritos</h3>
             <div class="flex gap-3">
-                <button @click="openModal('modal-estudiante')" class="bg-primary-dark text-white px-5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-md hover:bg-umsa-gold transition-all flex items-center gap-2"><span class="material-symbols-outlined text-sm">person_add</span> Inscribir</button>
+                <button @click="openModal('modal-estudiante')" class="bg-primary-dark text-white px-5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-md hover:bg-emerald-500 transition-all flex items-center gap-2"><span class="material-symbols-outlined text-sm">person_add</span> Inscribir</button>
                 <button class="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-primary-dark dark:text-white px-5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-gray-700 transition-all flex items-center gap-2"><span class="material-symbols-outlined text-sm">upload_file</span> Importar Notas</button>
             </div>
         </div>
@@ -89,7 +89,7 @@ const closeModal = (modalId: string) => {
     <div v-if="activeTab === 'ponentes'" class="tab-content block space-y-6 animate-in fade-in">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic">Plantel Docente</h3>
-            <button @click="openModal('modal-ponente')" class="bg-primary-dark text-white px-5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-md hover:bg-umsa-gold transition-all flex items-center gap-2"><span class="material-symbols-outlined text-sm">person_add</span> Asignar Ponente</button>
+            <button @click="openModal('modal-ponente')" class="bg-primary-dark text-white px-5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-md hover:bg-emerald-500 transition-all flex items-center gap-2"><span class="material-symbols-outlined text-sm">person_add</span> Asignar Ponente</button>
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden">
             <table class="w-full text-left">
@@ -131,7 +131,7 @@ const closeModal = (modalId: string) => {
                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Proyectar Código QR</h3>
                 <div class="relative bg-slate-50 dark:bg-gray-800 p-6 rounded-3xl border-2 border-dashed border-umsa-gold mb-6 flex justify-center">
                     <span class="material-symbols-outlined text-[150px] text-primary-dark dark:text-white">qr_code_2</span>
-                    <div class="absolute top-0 left-0 w-full h-[3px] bg-umsa-gold shadow-[0_0_15px_#BC9C31] animate-[scan_2s_infinite_linear]"></div>
+                    <div class="absolute top-0 left-0 w-full h-[3px] bg-emerald-500 shadow-[0_0_15px_#BC9C31] animate-[scan_2s_infinite_linear]"></div>
                 </div>
                 <p class="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-2">O ingresa el PIN:</p>
                 <div class="bg-slate-100 dark:bg-gray-800 px-8 py-3 rounded-2xl border border-slate-200 dark:border-gray-700 mb-6">
@@ -165,13 +165,13 @@ const closeModal = (modalId: string) => {
             <div class="bg-white dark:bg-gray-900 p-10 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 flex flex-col items-center text-center group cursor-pointer hover:border-umsa-gold transition-colors">
                 <span class="material-symbols-outlined text-6xl text-primary-dark dark:text-white mb-4 group-hover:scale-110 transition-transform">description</span>
                 <h4 class="font-black text-primary-dark dark:text-white uppercase text-sm">Acta de Calificaciones</h4>
-                <button class="mt-6 w-full py-3 bg-primary-dark text-white text-[10px] font-black rounded-xl uppercase hover:bg-umsa-gold transition-colors">Generar PDF</button>
+                <button class="mt-6 w-full py-3 bg-primary-dark text-white text-[10px] font-black rounded-xl uppercase hover:bg-emerald-500 transition-colors">Generar PDF</button>
             </div>
             
             <div class="bg-white dark:bg-gray-900 p-10 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 flex flex-col items-center text-center group cursor-pointer hover:border-umsa-gold transition-colors">
                 <span class="material-symbols-outlined text-6xl text-primary-dark dark:text-white mb-4 group-hover:scale-110 transition-transform">checklist</span>
                 <h4 class="font-black text-primary-dark dark:text-white uppercase text-sm">Reporte de Asistencias</h4>
-                <button class="mt-6 w-full py-3 bg-primary-dark text-white text-[10px] font-black rounded-xl uppercase hover:bg-umsa-gold transition-colors">Generar Excel</button>
+                <button class="mt-6 w-full py-3 bg-primary-dark text-white text-[10px] font-black rounded-xl uppercase hover:bg-emerald-500 transition-colors">Generar Excel</button>
             </div>
         </div>
     </div>
@@ -198,7 +198,7 @@ const closeModal = (modalId: string) => {
           </div>
           <div class="mt-8 flex justify-end gap-4 pt-4 border-t border-slate-100 dark:border-gray-800">
               <button @click="closeModal('modal-estudiante')" class="px-6 py-3 text-slate-500 font-black uppercase text-[10px] hover:bg-slate-50 dark:hover:bg-gray-800 rounded-xl">Cancelar</button>
-              <button @click="closeModal('modal-estudiante')" class="px-8 py-3 bg-primary-dark text-white rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-umsa-gold shadow-lg transition-all">Guardar</button>
+              <button @click="closeModal('modal-estudiante')" class="px-8 py-3 bg-primary-dark text-white rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-500 shadow-lg transition-all">Guardar</button>
           </div>
       </div>
   </div>
@@ -223,7 +223,7 @@ const closeModal = (modalId: string) => {
           </div>
           <div class="mt-8 flex justify-end gap-4 pt-4 border-t border-slate-100 dark:border-gray-800">
               <button @click="closeModal('modal-ponente')" class="px-6 py-3 text-slate-500 font-black uppercase text-[10px] hover:bg-slate-50 dark:hover:bg-gray-800 rounded-xl">Cancelar</button>
-              <button @click="closeModal('modal-ponente')" class="px-8 py-3 bg-primary-dark text-white rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-umsa-gold shadow-lg transition-all">Guardar</button>
+              <button @click="closeModal('modal-ponente')" class="px-8 py-3 bg-primary-dark text-white rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-500 shadow-lg transition-all">Guardar</button>
           </div>
       </div>
   </div>
