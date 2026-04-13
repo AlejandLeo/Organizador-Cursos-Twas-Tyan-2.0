@@ -30,6 +30,9 @@ import { InfoCertificadosModule } from './info-certificados/info-certificados.mo
 import { CertificadosModule } from './certificados/certificados.module';
 import { UsuariosCertificadosModule } from './usuarios-certificados/usuarios-certificados.module';
 
+// --- Auth ---
+import { AuthModule } from './auth/auth.module';
+
 @Module({
   imports: [
     TypeOrmModule.forRoot({
@@ -69,6 +72,9 @@ import { UsuariosCertificadosModule } from './usuarios-certificados/usuarios-cer
     InfoCertificadosModule,
     CertificadosModule,
     UsuariosCertificadosModule,
+
+    // --- Auth ---
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
