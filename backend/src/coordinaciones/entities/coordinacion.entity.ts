@@ -20,8 +20,8 @@ import { Evento } from '../../eventos/entities/evento.entity';
  */
 @Entity('coordinacion_eventos')
 export class CoordinacionEvento {
-  @PrimaryGeneratedColumn()
-  id_coordinacion: number;
+  @PrimaryGeneratedColumn({ name: 'id' })
+  id: number;
 
   // ── Relaciones ────────────────────────────────────────────────────────────
 

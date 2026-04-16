@@ -25,8 +25,8 @@ import { Certificado } from '../../certificados/entities/certificado.entity';
  */
 @Entity('usuarios_certificados')
 export class UsuarioCertificado {
-  @PrimaryGeneratedColumn()
-  id_usuario_certificado: number;
+  @PrimaryGeneratedColumn({ name: 'id' })
+  id: number;
 
   /**
    * Ej: 'Beneficiario', 'Firmante', 'Coordinador', 'Docente'

@@ -26,8 +26,8 @@ import { InscripcionModalidad } from '../../inscripcion-modalidades/entities/ins
  */
 @Entity('curso_modalidades')
 export class CursoModalidad {
-  @PrimaryGeneratedColumn()
-  id_curso_modalidad: number;
+  @PrimaryGeneratedColumn({ name: 'id' })
+  id: number;
 
   /** "Presencial", "Virtual", "Híbrido" */
   @Column({ length: 50, nullable: true })

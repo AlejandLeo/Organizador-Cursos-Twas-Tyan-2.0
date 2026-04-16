@@ -24,8 +24,8 @@ import { Evento } from '../../eventos/entities/evento.entity';
  */
 @Entity('imparticiones')
 export class Imparticion {
-  @PrimaryGeneratedColumn()
-  id_imparticion: number;
+  @PrimaryGeneratedColumn({ name: 'id' })
+  id: number;
 
   // ── Relaciones ────────────────────────────────────────────────────────────
 

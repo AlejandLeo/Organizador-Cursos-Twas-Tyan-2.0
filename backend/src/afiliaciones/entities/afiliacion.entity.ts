@@ -21,8 +21,8 @@ import { Usuario } from '../../usuarios/entities/usuario.entity';
  */
 @Entity('afiliaciones')
 export class Afiliacion {
-  @PrimaryGeneratedColumn()
-  id_afiliacion: number;
+  @PrimaryGeneratedColumn({ name: 'id' })
+  id: number;
 
   /** Nombre de la institución, ej: "Universidad Mayor de San Andrés" */
   @Column({ length: 255, nullable: true })

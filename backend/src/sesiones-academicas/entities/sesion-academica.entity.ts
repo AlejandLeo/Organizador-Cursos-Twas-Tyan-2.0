@@ -24,8 +24,8 @@ import { Asistencia } from '../../asistencias/entities/asistencia.entity';
  */
 @Entity('sesiones_academicas')
 export class SesionAcademica {
-  @PrimaryGeneratedColumn()
-  id_sesion_academica: number;
+  @PrimaryGeneratedColumn({ name: 'id' })
+  id: number;
 
   @Column({ type: 'date', nullable: true })
   fecha: Date;

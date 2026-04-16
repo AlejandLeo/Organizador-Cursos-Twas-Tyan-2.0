@@ -10,12 +10,18 @@ import {
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { Rol } from '../../roles/entities/rol.entity';
 
-
+/**
+ * USUARIOS_ROLES — tabla pivote que relaciona un usuario con uno o más roles.
+ *
+ * Un usuario puede tener varios roles simultáneamente (ej: Ponente + Coordinador).
+ * estado: 1 = activo (el rol está vigente), 0 = revocado.
+ */
 @Entity('usuarios_roles')
 export class UsuarioRol {
-  @PrimaryGeneratedColumn()
-  id_usuario_rol: number;
+  @PrimaryGeneratedColumn({ name: 'id' })
+  id: number;
 
+  /** 1 = Activo | 0 = Revocado */
   @Column({ type: 'integer', default: 1 })
   estado: number;
 
@@ -23,6 +29,8 @@ export class UsuarioRol {
   @JoinColumn({ name: 'id_usuario' })
   usuario: Usuario;
 
+  /** Faltaba el @ManyToOne — sin él TypeORM no genera el JOIN correctamente. */
+  @ManyToOne(() => Rol, (rol) => rol.usuariosRoles)
   @JoinColumn({ name: 'id_rol' })
   rol: Rol;
 

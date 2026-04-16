@@ -26,8 +26,8 @@ import { Usuario } from '../../usuarios/entities/usuario.entity';
  */
 @Entity('personas')
 export class Persona {
-  @PrimaryGeneratedColumn()
-  id_perfil: number;
+  @PrimaryGeneratedColumn({ name: 'id' })
+  id: number;
 
   @Column({ length: 100, nullable: true })
   nombres: string;

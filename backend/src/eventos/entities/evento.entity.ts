@@ -26,8 +26,8 @@ import { Imparticion } from '../../imparticiones/entities/imparticion.entity';
 @Entity('eventos')
 export class Evento {
   /** El SQL usa id_eventos (plural), lo respetamos aquí. */
-  @PrimaryGeneratedColumn()
-  id_eventos: number;
+  @PrimaryGeneratedColumn({ name: 'id' })
+  id: number;
 
   @Column({ type: 'text', nullable: true })
   descripcion: string;
