@@ -8,16 +8,10 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
+import { GradoAcademico } from '../../grados-academicos/entities/grado-academico.entity';
 
 /**
  * AFILIACIONES — datos institucionales/académicos del usuario.
- *
- * ¿Por qué una tabla separada y no en PERSONAS?
- * Porque un usuario puede tener *múltiples* afiliaciones.
- * Ejemplo: un investigador que trabaja en dos universidades al mismo tiempo.
- * Si los datos de afiliación estuvieran en PERSONAS, solo podría tener una.
- *
- * Relación ManyToOne: muchas afiliaciones → un usuario.
  */
 @Entity('afiliaciones')
 export class Afiliacion {
@@ -25,8 +19,8 @@ export class Afiliacion {
   id: number;
 
   /** Nombre de la institución, ej: "Universidad Mayor de San Andrés" */
-  @Column({ length: 255, nullable: true })
-  afiliacion: string;
+  @Column({ name: 'afiliacion', length: 255, nullable: true })
+  institucion: string;
 
   /** Tipo de institución: "Universidad", "Centro de Investigación", etc. */
   @Column({ length: 100, nullable: true })
@@ -40,11 +34,15 @@ export class Afiliacion {
   @Column({ length: 100, nullable: true })
   disciplina_cientifica: string;
 
-  /** Nivel académico, ej: "Licenciatura", "Maestría", "Doctorado" */
-  @Column({ length: 100, nullable: true })
-  grado_academico: string;
-
   // ── Relación ─────────────────────────────────────────────────────────────
+
+  /** Sustiuye al antiguo campo de texto por una relación formal */
+  @Column({ name: 'id_grado_academico', nullable: true })
+  id_grado_academico: number;
+
+  @ManyToOne(() => GradoAcademico, (ga) => ga.afiliaciones, { nullable: true })
+  @JoinColumn({ name: 'id_grado_academico' })
+  gradoAcademico: GradoAcademico;
 
   /** Muchas afiliaciones pueden pertenecer al mismo usuario. */
   @ManyToOne(() => Usuario, (usuario) => usuario.afiliaciones)

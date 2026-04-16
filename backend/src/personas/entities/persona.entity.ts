@@ -41,8 +41,15 @@ export class Persona {
   @Column({ length: 50, nullable: true })
   documento_identidad: string;
 
-  @Column({ length: 20, nullable: true })
-  genero: string;
+  /**
+   * Género del usuario:
+   * 0: Masculino
+   * 1: Femenino
+   * 2: Otro
+   * 3: Prefiero no decir
+   */
+  @Column({ type: 'integer', nullable: true })
+  genero: number;
 
   @Column({ length: 100, nullable: true })
   pais_origen: string;

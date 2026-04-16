@@ -12,6 +12,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { UsuariosService } from 'src/usuarios/usuarios.service';
 import { LoginDto } from 'src/usuarios/dto/login.dto';
+import { RegisterDto } from 'src/usuarios/dto/register.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { ExtractJwt } from 'passport-jwt';
 
@@ -35,6 +36,23 @@ export class AuthController {
     const usuario = await this.usuariosService.login(loginDto);
     // 2. Genera y devuelve el access_token JWT
     return this.authService.generarToken(usuario);
+  }
+
+  @Post('register')
+  @ApiOperation({
+    summary:
+      'Registro unificado (Persona + Usuario + Rol + Afiliación) y login automático',
+  })
+  async register(@Body() registerDto: RegisterDto) {
+    // 1. Crea todo en una sola transacción
+    const usuario = await this.usuariosService.register(registerDto);
+    // 2. Genera token de inmediato
+    const token = await this.authService.generarToken(usuario);
+    // 3. Devuelve ambos
+    return {
+      usuario,
+      ...token,
+    };
   }
 
   // ══════════════════════════════════════════════════════════

@@ -1,4 +1,12 @@
-import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class CreatePersonaDto {
   @IsOptional()
@@ -18,11 +26,10 @@ export class CreatePersonaDto {
   documento_identidad?: string;
 
   @IsOptional()
-  @IsEnum(['Masculino', 'Femenino', 'Otro', 'Prefiero no decir'], {
-    message:
-      'Género inválido. Opciones: Masculino, Femenino, Otro, Prefiero no decir.',
-  })
-  genero?: string;
+  @IsInt({ message: 'El género debe ser un número entero (0-3).' })
+  @Min(0)
+  @Max(3)
+  genero?: number;
 
   @IsOptional()
   @IsString()

@@ -10,6 +10,7 @@ import { PersonasModule } from './personas/personas.module';
 import { RolesModule } from './roles/roles.module';
 import { UsuariosRolesModule } from './usuarios-roles/usuarios-roles.module';
 import { AfiliacionesModule } from './afiliaciones/afiliaciones.module';
+import { GradosAcademicosModule } from './grados-academicos/grados-academicos.module';
 
 // --- Eventos y Actividades ---
 import { EventosModule } from './eventos/eventos.module';
@@ -58,6 +59,7 @@ import { AuthModule } from './auth/auth.module';
     RolesModule,
     UsuariosRolesModule,
     AfiliacionesModule,
+    GradosAcademicosModule,
 
     // --- Eventos y Actividades ---
     EventosModule,
