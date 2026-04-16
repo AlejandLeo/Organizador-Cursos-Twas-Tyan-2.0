@@ -14,83 +14,41 @@ const currentStep = ref(1);
 const tipoActividad = ref('Diplomado');
 const nuevoTipoActividad = ref('');
 
-
-const eventosPublicados = ref([
+const activities = ref([
   {
     id: 1,
-    nombreCorto: 'TWAS',
-    nombreLargo: 'The World Academy of Sciences',
-    version: 'Versión 2026',
-    descripcion: 'Eventos del The World Academy of Sciences incluyendo diversas ramas de especialización.',
-    imagen: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80',
-    estado: 'Evento Activo',
-    colorEstado: 'bg-emerald-500 text-white border-emerald-400/30',
-    inscripcionesAbiertas: true,
-    mostrarActividades: true,
-    actividades: [
-      {
-        id: 1,
-        title: 'Programa de Especialidad en Biofertilizantes',
-        status: 'En curso',
-        type: 'Especialidad',
-        date: '15 Mar - 20 Jul 2026',
-        students: 45,
-        modules: 4,
-        image: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80'
-      },
-      {
-        id: 2,
-        title: 'Taller de Redacción APA 7ma Edición',
-        status: 'Inscripciones',
-        type: 'Taller',
-        date: '10 Abr - 15 Abr 2026',
-        students: 120,
-        modules: 1,
-        image: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80'
-      }
-    ]
+    title: 'Especialidad en Biofertilizantes',
+    status: 'En curso',
+    type: 'Especialidad',
+    date: '15 Mar - 20 Jul 2026',
+    students: 45,
+    modules: 4,
+    color: 'bg-primary-dark',
+    icon: 'science'
   },
   {
     id: 2,
-    nombreCorto: 'Innovación Tecnológica',
-    nombreLargo: 'Congreso Internacional de Innovación y Tecnología',
-    version: 'Versión 2026',
-    descripcion: 'El congreso anual sobre los últimos avances en tecnología global e investigación.',
-    imagen: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1600&q=80',
-    estado: 'Próximamente',
-    colorEstado: 'bg-umsa-gold text-white border-yellow-400/30',
-    inscripcionesAbiertas: false,
-    mostrarActividades: true,
-    actividades: [
-      {
-        id: 3,
-        title: 'Diplomado en Riego Tecnificado',
-        status: 'Finalizado',
-        type: 'Diplomado',
-        date: '01 Ene - 28 Feb 2026',
-        students: 75,
-        modules: 6,
-        image: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=800&q=80'
-      }
-    ]
+    title: 'Taller de Redacción APA 7ma Edición',
+    status: 'Inscripciones',
+    type: 'Taller',
+    date: '10 Abr - 15 Abr 2026',
+    students: 120,
+    modules: 1,
+    color: 'bg-umsa-gold',
+    icon: 'edit_document'
+  },
+  {
+    id: 3,
+    title: 'Diplomado en Riego Tecnificado',
+    status: 'Finalizado',
+    type: 'Diplomado',
+    date: '01 Ene - 28 Feb 2026',
+    students: 75,
+    modules: 6,
+    color: 'bg-slate-400',
+    icon: 'water_drop'
   }
 ]);
-
-const toggleActividades = (evento) => {
-  evento.mostrarActividades = !evento.mostrarActividades;
-};
-
-// Agrupar actividades por Tipo para la vista estilo Netflix
-const getActividadesAgrupadas = (actividades) => {
-  const grupos = {};
-  actividades.forEach(act => {
-    if (!grupos[act.type]) {
-      grupos[act.type] = [];
-    }
-    grupos[act.type].push(act);
-  });
-  return grupos;
-};
 
 const getStatusColor = (status: string) => {
   if (status === 'En curso') return 'text-green-600 bg-green-50 dark:bg-green-900/40 border border-green-200 dark:border-green-800';
@@ -120,7 +78,7 @@ const changeStep = (delta: number) => {
   <div class="animate-in fade-in duration-500 max-w-7xl mx-auto space-y-8">
     
     <!-- VISTA: LISTADO -->
-    <div v-show="!isCreating" id="view-listado" class="space-y-8">
+    <div v-if="!isCreating" id="view-listado" class="space-y-8">
       <div class="flex justify-center mb-8">
         <div class="relative w-full max-w-2xl group">
           <label class="absolute -top-3 left-6 px-2 bg-[#f8f9fc] dark:bg-black z-10 text-[9px] font-black text-slate-400 uppercase tracking-widest italic transition-colors">Buscador Inteligente de Cursos</label>
@@ -145,109 +103,62 @@ const changeStep = (delta: number) => {
           <p class="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Gestión de programas del evento actual</p>
         </div>
         
-        <button v-if="route.name === 'coordinador-actividades'" @click="isCreating = true; currentStep = 1;" class="bg-emerald-500 hover:bg-[#a38628] text-white font-black px-6 py-3.5 rounded-xl text-[11px] uppercase tracking-widest shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2">
+        <button v-if="route.name === 'coordinador-actividades'" @click="isCreating = true; currentStep = 1;" class="bg-umsa-gold hover:bg-[#a38628] text-white font-black px-6 py-3.5 rounded-xl text-[11px] uppercase tracking-widest shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2">
           <span class="material-symbols-outlined text-[18px]">add_circle</span> Crear Actividad
         </button>
       </div>
 
-      
-      <div v-for="evento in eventosPublicados" :key="evento.id" class="w-full bg-white dark:bg-gray-900 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 dark:border-gray-800 mb-12 flex flex-col group/card">
+      <!-- Título de sección superpuesto estilo Netflix -->
+      <div class="mb-5 pl-3 border-l-4 border-umsa-gold dark:border-blue-500">
+        <h3 class="text-xl md:text-2xl font-black text-primary-dark dark:text-white tracking-tight leading-none">
+          {{ eventoStore.selectedEventoNombre }}
+          <span class="text-slate-400 dark:text-gray-500 text-lg font-medium ml-2 tracking-normal">/ Gestión {{ eventoStore.activeEvento?.gestion }}</span>
+        </h3>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div v-for="act in activities" :key="act.id" @click="openDetalleCurso(act.id)" class="bg-white dark:bg-gray-900 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-gray-800 hover:shadow-md hover:-translate-y-1 transition-all group cursor-pointer flex flex-col relative overflow-hidden">
         
-        <!-- Header Evento Banner (Estilo Netflix) -->
-        <div class="relative w-full h-[320px] overflow-hidden">
-          <img :src="evento.imagen" :alt="evento.nombreCorto" class="w-full h-full object-cover object-center group-hover/card:scale-105 transition-transform duration-[1.5s] ease-out">
-          <div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent"></div>
-          
-          <div class="absolute bottom-0 left-0 right-0 p-8 pt-24 z-20 flex flex-col">
-            <span class="mb-3" :class="[evento.colorEstado, 'text-[8px] font-black uppercase px-3 py-1 rounded-full tracking-widest w-fit shadow-lg backdrop-blur-md border']">
-              {{ evento.estado }}
-            </span>
-            <div class="flex items-end justify-between">
-              <div>
-                <p class="text-xs font-bold text-umsa-gold dark:text-blue-400 uppercase tracking-widest mb-2">{{ evento.version }}</p>
-                <h1 class="text-4xl md:text-5xl font-black text-white tracking-tighter leading-none mb-4">{{ evento.nombreCorto }}</h1>
-                <p class="text-sm font-medium text-gray-300 max-w-2xl line-clamp-2 leading-relaxed">{{ evento.descripcion }}</p>
-              </div>
+        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-white/0 to-slate-50/50 dark:to-white/5 rounded-bl-full -z-0"></div>
 
-              <!-- Accordion Toggle Button -->
-              <button @click="toggleActividades(evento)" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 px-6 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 group/btn cursor-pointer z-30 relative">
-                <span class="text-xs font-bold uppercase tracking-widest">{{ evento.mostrarActividades ? 'Ocultar' : 'Ver' }} Actividades</span>
-                <span class="material-symbols-outlined text-[16px] transition-transform duration-300" :class="evento.mostrarActividades ? 'rotate-180' : ''">expand_more</span>
-              </button>
+        <div class="flex justify-between items-start mb-6 relative z-10">
+          <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-md shadow-slate-200 dark:shadow-none" :class="act.color">
+            <span class="material-symbols-outlined text-2xl">{{ act.icon }}</span>
+          </div>
+          <span class="text-[9px] font-black uppercase px-3 py-1 rounded-full tracking-widest" :class="getStatusColor(act.status)">
+            {{ act.status }}
+          </span>
+        </div>
+
+        <div class="flex-1 relative z-10">
+          <p class="text-[9px] font-bold text-umsa-gold dark:text-blue-400 uppercase tracking-widest mb-2">{{ act.type }}</p>
+          <h3 class="text-xl font-black text-primary-dark dark:text-white leading-tight mb-2 group-hover:text-umsa-blue transition-colors">{{ act.title }}</h3>
+        </div>
+
+        <div class="mt-6 space-y-3 pt-5 border-t border-slate-100 dark:border-gray-800 relative z-10">
+          <div class="flex items-center text-slate-500 dark:text-gray-400 bg-slate-50 dark:bg-gray-800/50 p-2 rounded-lg">
+            <span class="material-symbols-outlined text-[16px] mr-3 text-slate-400">calendar_today</span>
+            <span class="text-xs font-bold">{{ act.date }}</span>
+          </div>
+          
+          <div class="flex justify-between items-center px-1 mt-4">
+            <div class="flex items-center text-slate-500 dark:text-gray-400">
+              <span class="material-symbols-outlined text-[18px] mr-2 text-umsa-blue">groups</span>
+              <span class="text-xs font-black">{{ act.students }} <span class="font-bold text-[10px] uppercase tracking-widest ml-1">Inscritos</span></span>
+            </div>
+            <div class="flex items-center text-slate-500 dark:text-gray-400">
+              <span class="material-symbols-outlined text-[18px] mr-2 text-umsa-gold">view_module</span>
+              <span class="text-xs font-black">{{ act.modules }} <span class="font-bold text-[10px] uppercase tracking-widest ml-1">Mód.</span></span>
             </div>
           </div>
         </div>
 
-        <!-- Grid de Actividades Académicas (Estilo Catálogo Horizontal) -->
-        <div v-show="evento.mostrarActividades" class="py-8 bg-slate-50 dark:bg-gray-950/50 w-full animate-in slide-in-from-top-4 duration-500 fade-in border-t border-slate-100 dark:border-gray-900">
-          
-          <!-- Botón Superior General Crear Actividad y Certificados -->
-          <div class="px-8 pb-6 flex justify-end lg:justify-between items-center mb-8">
-            <h3 class="hidden lg:block text-lg font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest italic">Actividades Académicas del Evento</h3>
-            <button @click="isCreating = true; tipoActividad = 'Diplomado'; currentStep = 1;" class="bg-gradient-to-r from-primary-light to-primary-dark dark:from-blue-600 dark:to-blue-800 text-white font-black px-6 py-3 rounded-xl text-[11px] uppercase tracking-widest shadow-[0_8px_15px_rgb(0,0,0,0.1)] dark:shadow-none hover:shadow-[0_12px_25px_rgb(0,0,0,0.15)] hover:-translate-y-1 transition-all flex items-center gap-2 z-20 relative">
-              <span class="material-symbols-outlined text-[18px]">add_circle</span> Crear Nueva Actividad
-            </button>
-          </div>
-
-          <div v-for="(acts, categoria) in getActividadesAgrupadas(evento.actividades)" :key="categoria" class="mb-10 w-full overflow-hidden">
-            <!-- Row Header -->
-            <div class="flex items-end justify-between px-8 mb-4">
-              <div>
-                <h3 class="text-xl md:text-2xl font-black text-primary-dark dark:text-white uppercase tracking-tighter">{{ categoria }}</h3>
-                <p class="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest mt-1">Explorar {{ acts.length }} disponibles</p>
-              </div>
-              <button @click="isCreating = true; tipoActividad = String(categoria); currentStep = 1;" class="text-[10px] font-black uppercase tracking-widest bg-white dark:bg-gray-800 hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 border border-slate-200 dark:border-gray-700 px-4 py-2 rounded-xl transition-all flex items-center gap-2 relative z-20 cursor-pointer shadow-sm hover:shadow-md">
-                <span class="material-symbols-outlined text-[14px]">add</span> Crear {{ categoria }}
-              </button>
-            </div>
-
-            <!-- Horizontal Scroll Row -->
-            <div class="flex overflow-x-auto gap-6 px-8 pb-8 pt-2 snap-x snap-mandatory flex-nowrap" style="scrollbar-width: none; -ms-overflow-style: none;">
-              <!-- Tarjeta -->
-              <div v-for="act in acts" :key="act.id" @click="openDetalleCurso(act.id)" class="flex-none w-[280px] md:w-[320px] bg-white dark:bg-gray-900 rounded-[1.5rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none border border-slate-200/60 dark:border-gray-800 hover:border-primary-light/50 dark:hover:border-gray-600 transition-all hover:-translate-y-1 hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] cursor-pointer group flex flex-col snap-start relative">
-                
-                <div class="relative h-48 w-full overflow-hidden shrink-0">
-                  <div class="absolute inset-0 bg-primary-dark/10 group-hover:bg-transparent transition-colors z-10"></div>
-                  <img :src="act.image" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" :alt="act.title">   
-                  <span class="absolute top-3 right-3 z-20 text-[8px] font-black uppercase px-2 py-1 rounded-md tracking-widest shadow-sm bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm" :class="getStatusColor(act.status)">
-                    {{ act.status }}
-                  </span>
-                  <!-- Suave sombra inferior para que conecte con la tarjeta blanca -->
-                  <div class="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-white dark:from-gray-900 to-transparent z-10 opacity-60"></div>
-                </div>
-
-                <div class="p-5 flex flex-col flex-1 relative z-20 bg-white dark:bg-gray-900">
-                  <h3 class="text-sm font-black text-slate-800 dark:text-white leading-tight mb-3 group-hover:text-primary-light dark:group-hover:text-blue-400 transition-colors line-clamp-2 block h-[2.5rem]">{{ act.title }}</h3> 
-
-                  <div class="mt-auto flex flex-col gap-3 pt-3 border-t border-slate-100 dark:border-gray-800">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <span class="text-[9px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest border border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-800 px-2 py-0.5 rounded-md">{{ act.date }}</span>
-                    </div>
-                    <div class="flex justify-between items-center text-slate-500 dark:text-gray-400">
-                      <div class="flex items-center">   
-                        <span class="material-symbols-outlined text-[16px] mr-1.5 text-primary-light dark:text-blue-400">groups</span>
-                        <span class="text-[10px] font-bold">{{ act.students }} Inscritos</span>    
-                      </div>
-                      <div class="flex items-center">   
-                        <span class="material-symbols-outlined text-[16px] mr-1.5 text-emerald-500">view_module</span>
-                        <span class="text-[10px] font-bold">{{ act.modules }} Mód.</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          </div>
-          
-          <div v-if="Object.keys(getActividadesAgrupadas(evento.actividades)).length === 0" class="px-8 py-10 text-center">
-            <p class="text-sm font-bold text-gray-500 uppercase tracking-widest">No hay actividades publicadas para esta categoría.</p>
-          </div>
-        </div>
       </div>
     </div>
-    
-    <div v-show="isCreating" id="view-creacion" class="space-y-10 animate-in fade-in duration-500">
+    </div>
+
+    <!-- VISTA: CREACIÓN (WIZARD) -->
+    <div v-else id="view-creacion" class="space-y-10 animate-in fade-in duration-500">
       
       <div class="flex items-center justify-between border-b border-slate-200 dark:border-gray-800 pb-6">
           <div>
@@ -364,7 +275,7 @@ const changeStep = (delta: number) => {
                   </div>
                   <div class="p-6 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-[2rem] shadow-inner">
                       <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-3 block flex items-center gap-2">
-                        <span class="material-symbols-outlined text-sm text-emerald-500">event_available</span> Fecha de Finalización (Cierre)
+                        <span class="material-symbols-outlined text-sm text-umsa-gold">event_available</span> Fecha de Finalización (Cierre)
                       </label>
                       <input type="date" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-sm text-primary-dark dark:text-gray-200 focus:ring-2 focus:ring-umsa-blue outline-none transition-all cursor-pointer" />
                   </div>
@@ -392,7 +303,7 @@ const changeStep = (delta: number) => {
                       <label class="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase mb-2 block">Hora Fin</label>
                       <input type="time" class="w-full border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-xl px-4 py-3 font-bold text-sm text-primary-dark dark:text-gray-200 focus:ring-2 focus:ring-umsa-blue outline-none transition-all cursor-pointer">
                   </div>
-                  <button title="Añadir Horario" class="w-12 h-[46px] flex items-center justify-center bg-primary-dark dark:bg-blue-600 hover:bg-emerald-500 dark:hover:bg-blue-500 text-white rounded-xl shadow-md transition-all mb-[1px]">
+                  <button title="Añadir Horario" class="w-12 h-[46px] flex items-center justify-center bg-primary-dark dark:bg-blue-600 hover:bg-umsa-gold dark:hover:bg-blue-500 text-white rounded-xl shadow-md transition-all mb-[1px]">
                       <span class="material-symbols-outlined text-[20px]">add</span>
                   </button>
               </div>
@@ -416,7 +327,7 @@ const changeStep = (delta: number) => {
               Siguiente Paso <span class="material-symbols-outlined text-sm">arrow_forward</span>
           </button>
 
-          <button v-else @click="isCreating = false" class="px-8 py-3 bg-emerald-500 dark:bg-yellow-600 text-white font-black text-[11px] uppercase rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center gap-2">
+          <button v-else @click="isCreating = false" class="px-8 py-3 bg-umsa-gold dark:bg-yellow-600 text-white font-black text-[11px] uppercase rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center gap-2">
               Publicar Actividad <span class="material-symbols-outlined text-sm">publish</span>
           </button>
       </div>
@@ -424,6 +335,4 @@ const changeStep = (delta: number) => {
     </div>
   </div>
 </template>
-
-
 

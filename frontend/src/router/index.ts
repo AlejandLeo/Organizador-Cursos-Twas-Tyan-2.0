@@ -42,11 +42,6 @@ const router = createRouter({
           component: () => import('../views/actividades/ActividadDetalleView.vue'),
         },
         {
-          path: 'actividades/:id/certificado/workplace',
-          name: 'coordinador-certificado-workplace',
-          component: () => import('../views/actividades/CertificadoWorkplaceView.vue'),
-        },
-        {
           path: 'estudiantes',
           name: 'coordinador-estudiantes-global',
           component: () => import('../views/directorios/EstudiantesGlobalView.vue'),
@@ -69,92 +64,7 @@ const router = createRouter({
           name: 'coordinador-eventos',
           component: () => import('../views/eventos/EventosView.vue'),
         },
-      ]
-    },
-    {
-      path: '/ponente',
-      component: () => import('../layouts/PonenteLayout.vue'),
-      children: [
-        {
-          path: '',
-          redirect: '/ponente/catalogo'
-        },
-        {
-          path: 'catalogo',
-          name: 'ponente-catalogo',
-          component: () => import('../views/ponente/PonenteCatalogoView.vue'),
-        },
-        {
-          path: 'datos',
-          name: 'ponente-datos',
-          component: () => import('../views/ponente/PonenteDatosView.vue'),
-        },
-        {
-          path: 'eventos',
-          name: 'ponente-eventos',
-          component: () => import('../views/ponente/PonenteEventosView.vue'),
-        },
-        {
-          path: 'eventos/:evento_id/curso',
-          name: 'ponente-curso',
-          component: () => import('../views/ponente/PonenteCursosView.vue'),
-        },
-        {
-          path: 'curso/:id',
-          name: 'ponente-curso-detalle',
-          component: () => import('../views/ponente/PonenteCursoDetalleView.vue'),
-        },
-        {
-          path: 'calificacion',
-          name: 'ponente-calificacion',
-          component: () => import('../views/ponente/PonenteCalificacionesView.vue'),
-        },
-        {
-          path: 'certificados',
-          name: 'ponente-certificados',
-          component: () => import('../views/ponente/PonenteCertificadosView.vue'),
-        }
-      ]
-    },
-    {
-      path: '/estudiante',
-      component: () => import('../layouts/EstudianteLayout.vue'),
-      children: [
-        {
-          path: '',
-          name: 'estudiante-dashboard',
-          component: () => import('../views/estudiante/EstudianteDashboard.vue'),
-        },
-        {
-          path: 'catalogo',
-          name: 'estudiante-catalogo',
-          component: () => import('../views/estudiante/EstudianteCatalogoView.vue'),
-        },
-        {
-          path: 'eventos',
-          name: 'estudiante-eventos',
-          component: () => import('../views/estudiante/EstudianteEventosView.vue'),
-        },
-        {
-          path: 'actividades',
-          name: 'estudiante-actividades',
-          component: () => import('../views/estudiante/EstudianteActividadesView.vue'),
-        },
-        {
-          path: 'actividades/:id',
-          name: 'estudiante-actividades-detalle',
-          component: () => import('../views/estudiante/EstudianteActividadDetalleView.vue'),
-        },
-        {
-          path: 'calificaciones',
-          name: 'estudiante-calificaciones',
-          component: () => import('../views/estudiante/EstudianteCalificacionesView.vue'),
-        },
-        {
-          path: 'certificados',
-          name: 'estudiante-certificados',
-          component: () => import('../views/estudiante/EstudianteCertificadosView.vue'),
-        }
+
       ]
     },
     // ... otras rutas
