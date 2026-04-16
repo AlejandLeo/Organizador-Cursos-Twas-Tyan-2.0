@@ -37,8 +37,10 @@ export class SeedTestUsers1776400000000 implements MigrationInterface {
             // 3. Asignar Rol
             await queryRunner.query(`
                 INSERT INTO "usuarios_roles" ("id_usuario", "id_rol", "estado", "fecha_creacion", "fecha_actualizacion")
-                VALUES ($1, $2, 1, NOW(), NOW())
-                ON CONFLICT ("id_usuario", "id_rol") DO NOTHING
+                SELECT $1, $2, 1, NOW(), NOW()
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM "usuarios_roles" WHERE "id_usuario" = $1 AND "id_rol" = $2
+                )
             `, [usuarioId, u.rolId]);
         }
     }
