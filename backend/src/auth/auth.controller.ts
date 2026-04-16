@@ -8,12 +8,14 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { UsuariosService } from 'src/usuarios/usuarios.service';
 import { LoginDto } from 'src/usuarios/dto/login.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { ExtractJwt } from 'passport-jwt';
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -26,6 +28,7 @@ export class AuthController {
   //  Verifica email + contraseña y devuelve el JWT de acceso.
   // ══════════════════════════════════════════════════════════
   @Post('login')
+  @ApiOperation({ summary: 'Iniciar sesión y obtener JWT' })
   @HttpCode(HttpStatus.OK)
   async login(@Body() loginDto: LoginDto) {
     // 1. Valida credenciales (lanza 401 si son incorrectas o cuenta inactiva)
@@ -40,6 +43,8 @@ export class AuthController {
   //  usuario autenticado con sus roles (para decidir dashboard).
   // ══════════════════════════════════════════════════════════
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Obtener datos del usuario autenticado (perfil)' })
   @Get('perfil')
   async perfil(@Request() req: any) {
     // req.user viene de JwtStrategy.validate() → { id, email, roles }
@@ -48,6 +53,8 @@ export class AuthController {
 
   // Alias /auth/me → mismo comportamiento que /auth/perfil
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Alias de /perfil' })
   @Get('me')
   async me(@Request() req: any) {
     return this.usuariosService.getPerfil(req.user.id);
@@ -60,6 +67,8 @@ export class AuthController {
   //  recibirá 401 aunque el JWT no haya expirado.
   // ══════════════════════════════════════════════════════════
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cerrar sesión (invalidar token)' })
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   logout(@Request() req: any) {
