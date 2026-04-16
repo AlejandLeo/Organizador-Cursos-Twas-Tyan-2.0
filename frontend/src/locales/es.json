@@ -1,0 +1,21 @@
+{
+  "navbar": {
+    "home": "Inicio",
+    "info": "Información",
+    "organization": "Organización",
+    "location": "Ubicación",
+    "contact": "Contacto",
+    "login": "Ingresar",
+    "language": "ESPAÑOL"
+  },
+  "footer": {
+    "where_we_are": "Dónde estamos",
+    "address": "Cota Cota, Calle 27, Edif. Facultad de Ciencias Puras y Naturales - La Paz, Bolivia",
+    "contact_us": "Contáctanos",
+    "phone": "Teléfono de referencia",
+    "email": "Email",
+    "organization": "Organización y Auspicio",
+    "rights": "© 2025 - Todos los derechos reservados",
+    "developed_by": "Desarrollado por"
+  }
+}

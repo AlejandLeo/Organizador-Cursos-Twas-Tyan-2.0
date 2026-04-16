@@ -91,6 +91,10 @@ const navigateToCalificaciones = () => {
         Control de Asistencia
         <span v-if="activeTab !== 'qr'" class="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
       </button>
+      <button @click="activeTab = 'certificados'" :class="[activeTab === 'certificados' ? 'bg-white dark:bg-gray-800 text-umsa-blue dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700']" class="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all flex items-center gap-2 flex-shrink-0">
+        <span class="material-symbols-outlined text-[18px]" :class="{'text-umsa-gold': activeTab === 'certificados'}">workspace_premium</span>
+        Certificados
+      </button>
     </div>
 
     <!-- Contenido: Panel Central -->
@@ -223,5 +227,43 @@ const navigateToCalificaciones = () => {
             </div>
         </div>
     </div>
+
+    <!-- Contenido: Mi Certificado de Ponente -->
+    <div v-if="activeTab === 'certificados'" class="animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-[2rem] shadow-sm overflow-hidden p-2">
+            <div class="p-6 flex justify-between items-center bg-slate-50/50 dark:bg-gray-900 rounded-t-[1.5rem] border-b border-slate-100 dark:border-gray-800">
+              <h3 class="font-black text-lg text-slate-800 dark:text-white uppercase tracking-tight flex items-center gap-2">
+                <span class="material-symbols-outlined text-umsa-gold">workspace_premium</span> Mi Certificado
+              </h3>
+            </div>
+            
+            <div class="p-12 flex flex-col items-center justify-center max-w-3xl mx-auto text-center">
+                <div class="w-32 h-32 rounded-full bg-slate-50 dark:bg-gray-800 border-4 border-slate-100 dark:border-gray-700 flex items-center justify-center mb-8 shadow-inner relative">
+                  <span class="material-symbols-outlined text-[64px] text-slate-300 dark:text-gray-600">workspace_premium</span>
+                  <div class="absolute -bottom-2 -right-2 w-10 h-10 bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-full border-4 border-white dark:border-gray-900 flex items-center justify-center">
+                      <span class="material-symbols-outlined text-sm">lock</span>
+                  </div>
+                </div>
+                
+                <h3 class="text-2xl font-black text-primary-dark dark:text-white uppercase tracking-tight mb-4">Certificado de Docencia</h3>
+                <p class="text-slate-500 dark:text-gray-400 max-w-lg mb-10 leading-relaxed font-medium">
+                    Su certificado como Expositor/Ponente de la actividad <span class="font-bold text-umsa-blue">"{{ curso.evento }}"</span> se generará automáticamente una vez que el coordinador finalice el evento y cierre las actas académicas.
+                </p>
+                
+                <div class="bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700 rounded-2xl p-6 w-full flex items-center justify-between text-left">
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-gray-500 mb-1">Estado de Emisión</p>
+                        <p class="text-sm font-bold text-slate-700 dark:text-gray-300 flex items-center gap-2">
+                             <span class="w-2 h-2 rounded-full bg-rose-500"></span> Pendiente de Cierre de Evento
+                        </p>
+                    </div>
+                    <button disabled class="bg-slate-200 dark:bg-gray-800 text-slate-400 dark:text-gray-600 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm cursor-not-allowed flex items-center gap-2">
+                       <span class="material-symbols-outlined text-[16px]">download</span> Descargar PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
   </div>
 </template>
