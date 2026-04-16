@@ -123,7 +123,7 @@ const router = createRouter({
         {
           path: '',
           name: 'estudiante-dashboard',
-          redirect: { name: 'estudiante-eventos' },
+          component: () => import('../views/estudiante/EstudianteDashboard.vue'),
         },
         {
           path: 'catalogo',
@@ -136,9 +136,9 @@ const router = createRouter({
           component: () => import('../views/estudiante/EstudianteEventosView.vue'),
         },
         {
-          path: 'eventos/:evento_id/actividades',
+          path: 'actividades',
           name: 'estudiante-actividades',
-          redirect: { name: 'estudiante-eventos' }
+          component: () => import('../views/estudiante/EstudianteActividadesView.vue'),
         },
         {
           path: 'actividades/:id',
@@ -148,12 +148,12 @@ const router = createRouter({
         {
           path: 'calificaciones',
           name: 'estudiante-calificaciones',
-          redirect: { name: 'estudiante-eventos' }
+          component: () => import('../views/estudiante/EstudianteCalificacionesView.vue'),
         },
         {
           path: 'certificados',
           name: 'estudiante-certificados',
-          component: () => import('../views/estudiante/EstudianteCertificadosView.vue')
+          component: () => import('../views/estudiante/EstudianteCertificadosView.vue'),
         }
       ]
     },
