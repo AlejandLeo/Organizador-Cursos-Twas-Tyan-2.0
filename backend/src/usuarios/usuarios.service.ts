@@ -18,6 +18,13 @@ import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RegisterDto } from './dto/register.dto';
 
+// Entidades adicionales para registro y roles
+import { Rol } from '../roles/entities/rol.entity';
+import { UsuarioRol } from '../usuarios-roles/entities/usuario-rol.entity';
+import { Afiliacion } from '../afiliaciones/entities/afiliacion.entity';
+import { GradoAcademico } from '../grados-academicos/entities/grado-academico.entity';
+import { RoleId } from './constants/user-roles.constants';
+
 @Injectable()
 export class UsuariosService {
   constructor(
@@ -204,15 +211,12 @@ export class UsuariosService {
   }
 
   // ══════════════════════════════════════════════════════════
-  //  REGISTRO COMPLETO (Usuario + Persona en transacción)
+  //  REGISTRO COMPLETO (Usuario + Persona + Rol + Afiliación)
   // ══════════════════════════════════════════════════════════
 
   /**
-   * Registro completo: crea un usuario Y su persona en una sola transacción.
-   *
-   * Si algo falla en la mitad (ej: error de BD al crear persona),
-   * el rollback deshace también la creación del usuario.
-   * Esto garantiza que nunca quede un usuario sin persona ni viceversa.
+   * Registro unificado: crea un usuario, su perfil de persona,
+   * le asigna el rol de Estudiante (ID 4) y opcionalmente su primera afiliación.
    */
   async register(dto: RegisterDto): Promise<Omit<Usuario, 'password'>> {
     const existe = await this.usuarioRepository.findOneBy({ email: dto.email });
@@ -222,7 +226,6 @@ export class UsuariosService {
       );
     }
 
-    // Usamos QueryRunner para la transacción
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -239,28 +242,100 @@ export class UsuariosService {
       });
       const usuarioGuardado = await queryRunner.manager.save(usuario);
 
-      // 3️⃣ Crear persona vinculada al usuario
-      const { email, password, ...datoPersona } = dto;
+      // 3️⃣ Crear persona vinculada
+      const {
+        email,
+        password,
+        institucion,
+        tipo_afiliacion,
+        area_tematica,
+        disciplina_cientifica,
+        id_grado_academico,
+        ...datoPersona
+      } = dto;
+
       const persona = queryRunner.manager.create(Persona, {
         ...datoPersona,
         usuario: usuarioGuardado,
       });
       await queryRunner.manager.save(persona);
 
-      // 4️⃣ Commit: si llegamos aquí, todo salió bien
+      // 4️⃣ Asignar Rol de Estudiante por defecto
+      const estudianteRol = await queryRunner.manager.findOne(Rol, {
+        where: { id: RoleId.ESTUDIANTE },
+      });
+
+      if (estudianteRol) {
+        const usuarioRol = queryRunner.manager.create(UsuarioRol, {
+          usuario: usuarioGuardado,
+          rol: estudianteRol,
+          estado: 1,
+        });
+        await queryRunner.manager.save(usuarioRol);
+      }
+
+      // 5️⃣ Crear Afiliación Inicial (si se proveen datos)
+      if (institucion) {
+        const afiliacion = queryRunner.manager.create(Afiliacion, {
+          institucion,
+          tipo_afiliacion,
+          area_tematica,
+          disciplina_cientifica,
+          id_grado_academico,
+          usuario: usuarioGuardado,
+          estado: 1,
+        });
+        await queryRunner.manager.save(afiliacion);
+      }
+
       await queryRunner.commitTransaction();
 
-      // Devolver sin password
-      const { password: _, ...result } = usuarioGuardado;
-      return result as Omit<Usuario, 'password'>;
+      // Devolvemos el perfil cargado (usando el método existente)
+      return this.getPerfil(usuarioGuardado.id);
     } catch (error) {
-      // Rollback: deshace AMBAS inserciones si algo falló
       await queryRunner.rollbackTransaction();
       throw error;
     } finally {
-      // Siempre liberar la conexión
       await queryRunner.release();
     }
+  }
+
+  /**
+   * Asigna un nuevo rol a un usuario existente verificando que no lo tenga ya.
+   */
+  async asignarRol(
+    usuarioId: number,
+    rolId: number,
+  ): Promise<Omit<Usuario, 'password'>> {
+    const usuario = await this.findOne(usuarioId);
+    const rol = await this.dataSource
+      .getRepository(Rol)
+      .findOneBy({ id: rolId });
+
+    if (!rol) {
+      throw new NotFoundException(`Rol con id ${rolId} no encontrado.`);
+    }
+
+    // Verificar si ya tiene el rol
+    const existeRelacion = await this.dataSource
+      .getRepository(UsuarioRol)
+      .findOne({
+        where: {
+          usuario: { id: usuarioId },
+          rol: { id: rolId },
+        },
+      });
+
+    if (!existeRelacion) {
+      const nuevaRelacion = this.dataSource.getRepository(UsuarioRol).create({
+        usuario: usuario,
+        rol: rol,
+        estado: 1,
+      });
+      await this.dataSource.getRepository(UsuarioRol).save(nuevaRelacion);
+    }
+
+    return this.getPerfil(usuarioId);
   }
 
   // ══════════════════════════════════════════════════════════
@@ -282,6 +357,7 @@ export class UsuariosService {
         'usuariosRoles',
         'usuariosRoles.rol',
         'afiliaciones',
+        'afiliaciones.gradoAcademico',
       ],
     });
 

@@ -2,9 +2,12 @@ import {
   IsDateString,
   IsEmail,
   IsEnum,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
+  Max,
+  Min,
   MinLength,
 } from 'class-validator';
 
@@ -40,11 +43,10 @@ export class RegisterDto {
   documento_identidad?: string;
 
   @IsOptional()
-  @IsEnum(['Masculino', 'Femenino', 'Otro', 'Prefiero no decir'], {
-    message:
-      'Género inválido. Opciones: Masculino, Femenino, Otro, Prefiero no decir.',
-  })
-  genero?: string;
+  @IsInt({ message: 'El género debe ser un número entero (0-3).' })
+  @Min(0)
+  @Max(3)
+  genero?: number;
 
   @IsOptional()
   @IsString()
@@ -64,4 +66,25 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   celular?: string;
+
+  // --- Datos académicos/institucionales (tabla: afiliaciones) ---
+  @IsOptional()
+  @IsString()
+  institucion?: string;
+
+  @IsOptional()
+  @IsString()
+  tipo_afiliacion?: string;
+
+  @IsOptional()
+  @IsString()
+  area_tematica?: string;
+
+  @IsOptional()
+  @IsString()
+  disciplina_cientifica?: string;
+
+  @IsOptional()
+  @IsInt({ message: 'El id_grado_academico debe ser un número entero.' })
+  id_grado_academico?: number;
 }

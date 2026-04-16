@@ -20,7 +20,9 @@ import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RegisterDto } from './dto/register.dto';
-import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @ApiTags('Usuarios')
 @Controller('usuarios')
@@ -137,5 +139,28 @@ export class UsuariosController {
   @ApiOperation({ summary: 'Eliminar un usuario' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.usuariosService.remove(id);
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  GESTIÓN DE ROLES
+  // ══════════════════════════════════════════════════════════
+
+  /**
+   * POST /usuarios/:id/roles
+   * Asigna un rol adicional a un usuario.
+   * Solo accesible por el Super Usuario o Admin.
+   */
+  @Roles('Super Usuario')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Post(':id/roles')
+  @ApiOperation({
+    summary: 'Asignar un rol adicional a un usuario (Solo Admin)',
+  })
+  async asignarRol(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('rolId', ParseIntPipe) rolId: number,
+  ) {
+    return this.usuariosService.asignarRol(id, rolId);
   }
 }
