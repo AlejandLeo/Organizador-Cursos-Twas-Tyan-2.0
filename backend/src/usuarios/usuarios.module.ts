@@ -3,10 +3,19 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsuariosService } from './usuarios.service';
 import { UsuariosController } from './usuarios.controller';
 import { Usuario } from './entities/usuario.entity';
+import { Persona } from '../personas/entities/persona.entity';
 
+/**
+ * El módulo importa TAMBIÉN la entidad Persona porque el servicio
+ * necesita el repositorio de Persona para el registro completo (transacción).
+ *
+ * DataSource se inyecta automáticamente por NestJS/TypeORM cuando
+ * el módulo importa TypeOrmModule — no hay que declararlo explícitamente.
+ */
 @Module({
-  imports: [TypeOrmModule.forFeature([Usuario])],
+  imports: [TypeOrmModule.forFeature([Usuario, Persona])],
   controllers: [UsuariosController],
   providers: [UsuariosService],
+  exports: [UsuariosService],
 })
 export class UsuariosModule {}
