@@ -4,7 +4,7 @@ import { AppService } from './app.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 
-// --- Usuarios y Accesos --- 
+// --- Usuarios y Accesos ---
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { PersonasModule } from './personas/personas.module';
 import { RolesModule } from './roles/roles.module';
@@ -85,4 +85,4 @@ import { AuthModule } from './auth/auth.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}
