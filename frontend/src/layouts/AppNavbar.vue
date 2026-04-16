@@ -1,23 +1,42 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useRouter, useRoute } from 'vue-router';
 
-const navLinks = [
-  { name: 'Home', href: '#inicio' },
-  { name: 'Information', href: '#informacion' },
-  { name: 'Organization', href: '#organizacion' },
-  { name: 'Location', href: '#ubicacion' },
-  { name: 'Contact', href: '#footer' },
-];
+const { t, locale } = useI18n();
+const router = useRouter();
+const route = useRoute();
+
+const navLinks = computed(() => [
+  { name: t('navbar.home'), href: '#inicio' },
+  { name: t('navbar.info'), href: '#informacion' },
+  { name: t('navbar.organization'), href: '#organizacion' },
+  { name: t('navbar.location'), href: '#ubicacion' },
+  { name: t('navbar.contact'), href: '#footer' },
+]);
 
 const isMenuOpen = ref(false);
 const isDark = ref(false);
 
 const scrollTo = (selector: string) => {
-  const element = document.querySelector(selector);
-  if (element) {
-    element.scrollIntoView({ behavior: 'smooth' });
-  }
   isMenuOpen.value = false;
+  if (route.path !== '/') {
+    router.push('/').then(() => {
+      // Esperar a que la página de Home se monte antes de hacer scroll
+      setTimeout(() => {
+        const element = document.querySelector(selector);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 300);
+    });
+  } else {
+    // Si ya estamos en el Home resolviendolo en vivo
+    const element = document.querySelector(selector);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  }
 };
 
 const toggleDark = () => {
@@ -31,6 +50,11 @@ const toggleDark = () => {
   }
 };
 
+const toggleLang = () => {
+  locale.value = locale.value === 'es' ? 'en' : 'es';
+  localStorage.setItem('lang', locale.value);
+};
+
 onMounted(() => {
   if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
     isDark.value = true;
@@ -40,7 +64,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <nav class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 fixed top-0 left-0 right-0 z-50 shadow-sm font-sans transition-colors duration-300">
+  <nav class="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 fixed top-0 left-0 right-0 z-50 shadow-sm font-sans transition-all duration-300">
     <div class="container mx-auto px-4 lg:px-8">
       <div class="flex justify-between items-center h-20">
         
@@ -74,10 +98,10 @@ onMounted(() => {
 
         <!-- Middle: Navigation Links -->
         <div class="hidden lg:flex flex-1 justify-center">
-          <ul class="flex items-center gap-6 xl:gap-8 text-gray-700 dark:text-gray-200 font-medium text-sm xl:text-base">
+          <ul class="flex items-center gap-2 xl:gap-3">
             <li v-for="link in navLinks" :key="link.name">
-              <a :href="link.href" @click.prevent="scrollTo(link.href)" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                {{ link.name }}
+              <a :href="link.href" @click.prevent="scrollTo(link.href)" class="relative px-5 py-2.5 text-sm xl:text-base font-bold text-slate-600 dark:text-slate-300 hover:text-white transition-all duration-300 ease-in-out group rounded-full hover:bg-primary-light dark:hover:bg-primary-dark hover:shadow-md hover:shadow-primary-light/20 active:scale-[0.95] flex items-center justify-center">
+                <span class="relative z-10">{{ link.name }}</span>
               </a>
             </li>
           </ul>
@@ -95,17 +119,18 @@ onMounted(() => {
           </button>
 
           <!-- Botón Idioma -->
-          <button class="flex items-center gap-2 px-3 py-1.5 border border-gray-400 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-medium transition-colors">
+          <button @click="toggleLang" class="flex items-center gap-2 px-3 py-1.5 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold uppercase tracking-wider transition-colors duration-200">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <circle cx="12" cy="12" r="10" stroke-width="2"></circle>
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"></path>
             </svg>
-            ESPAÑOL
+            {{ t('navbar.language') }}
           </button>
           
-          <!-- Botón Login -->
-          <router-link to="/login" class="px-6 py-1.5 border border-blue-500 dark:border-blue-400 text-blue-500 dark:text-blue-400 rounded hover:bg-blue-50 dark:hover:bg-gray-800 text-sm font-medium transition-colors">
-            Login
+          <!-- Botón Login (Sistema Paleta) -->
+          <router-link to="/login" class="flex items-center justify-center gap-2 px-6 py-2.5 bg-gradient-to-r from-primary-light to-primary-dark text-white rounded-full font-bold text-sm tracking-wide uppercase transition-all duration-300 ease-in-out hover:shadow-lg hover:shadow-primary-light/40 hover:scale-[1.05] active:scale-[0.95] ml-4">
+            <span class="material-symbols-outlined text-[18px]">lock</span>
+            <span>{{ t('navbar.login') }}</span>
           </router-link>
           
           <!-- Logos UMSA / FCPN Circulares -->
@@ -131,13 +156,15 @@ onMounted(() => {
             </a>
           </li>
         </ul>
-        <div class="mt-4 px-4 flex flex-col gap-3">
-          <button class="flex items-center justify-center gap-2 w-full py-2 border border-gray-400 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded font-medium hover:bg-gray-50 dark:hover:bg-gray-800">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"></circle><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"></path></svg>
-            ESPAÑOL
+        <div class="mt-4 px-4 flex flex-col gap-4 pb-4">
+          <button @click="toggleLang" class="flex items-center justify-center gap-2 w-full py-3 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold uppercase tracking-wider transition-colors duration-200">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"></circle><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"></path></svg>
+            {{ t('navbar.language') }}
           </button>
-          <router-link to="/login" class="w-full text-center py-2 border border-blue-500 dark:border-blue-400 text-blue-500 dark:text-blue-400 rounded font-medium hover:bg-blue-50 dark:hover:bg-gray-800">
-            Login
+          
+          <router-link to="/login" class="flex items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-primary-light to-primary-dark text-white rounded-full font-bold text-sm tracking-wide uppercase transition-all duration-300 ease-in-out hover:shadow-lg hover:shadow-primary-light/40 hover:scale-[1.02] active:scale-[0.98] w-full max-w-[250px] mx-auto mt-2">
+            <span class="material-symbols-outlined text-[20px]">lock</span>
+            <span>{{ t('navbar.login') }}</span>
           </router-link>
           <div class="flex justify-center items-center gap-4 mt-2">
             <a href="https://www.fcpn.edu.bo/" class="w-12 h-12 rounded-full border-2 border-blue-300 dark:border-blue-600 flex items-center justify-center text-xs font-bold text-blue-800 dark:text-blue-200 bg-blue-50 dark:bg-blue-900/50">FCPN</a>

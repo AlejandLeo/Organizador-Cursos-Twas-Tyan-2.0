@@ -56,6 +56,18 @@ export class Evento {
   @Column({ length: 255, nullable: true })
   logo: string;
 
+  /** UUID o URL para la imagen principal de portada (Hero) del evento */
+  @Column({ length: 255, nullable: true })
+  imagen_portada: string;
+
+  /** UUID o URL para el video 1 de bienvenida (Ej. Palabras del Rector) */
+  @Column({ length: 255, nullable: true })
+  video_bienvenida_1: string;
+
+  /** UUID o URL para el video 2 de bienvenida (Ej. Bienvenida Decanato) */
+  @Column({ length: 255, nullable: true })
+  video_bienvenida_2: string;
+
   // ── Relaciones ────────────────────────────────────────────────────────────
 
   /** Un evento tiene múltiples actividades (cursos, talleres, conferencias). */

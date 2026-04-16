@@ -42,6 +42,11 @@ const router = createRouter({
           component: () => import('../views/actividades/ActividadDetalleView.vue'),
         },
         {
+          path: 'actividades/:id/certificado/workplace',
+          name: 'coordinador-certificado-workplace',
+          component: () => import('../views/actividades/CertificadoWorkplaceView.vue'),
+        },
+        {
           path: 'estudiantes',
           name: 'coordinador-estudiantes-global',
           component: () => import('../views/directorios/EstudiantesGlobalView.vue'),
@@ -85,7 +90,12 @@ const router = createRouter({
           component: () => import('../views/ponente/PonenteDatosView.vue'),
         },
         {
-          path: 'curso',
+          path: 'eventos',
+          name: 'ponente-eventos',
+          component: () => import('../views/ponente/PonenteEventosView.vue'),
+        },
+        {
+          path: 'eventos/:evento_id/curso',
           name: 'ponente-curso',
           component: () => import('../views/ponente/PonenteCursosView.vue'),
         },
@@ -119,6 +129,11 @@ const router = createRouter({
           path: 'catalogo',
           name: 'estudiante-catalogo',
           component: () => import('../views/estudiante/EstudianteCatalogoView.vue'),
+        },
+        {
+          path: 'eventos',
+          name: 'estudiante-eventos',
+          component: () => import('../views/estudiante/EstudianteEventosView.vue'),
         },
         {
           path: 'actividades',
