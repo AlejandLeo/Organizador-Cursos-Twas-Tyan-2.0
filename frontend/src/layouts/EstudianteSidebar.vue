@@ -33,30 +33,16 @@ const navigate = (routeName: string) => {
         :class="[ $route.name === 'estudiante-catalogo' ? 'nav-active bg-umsa-blue text-white shadow-md shadow-umsa-blue/20' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500' ]"
         class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group">
         <span class="text-xs uppercase tracking-widest font-bold">Actividades Académicas</span>
-        <span class="material-symbols-outlined text-[20px] transition-colors" :class="[ $route.name === 'estudiante-catalogo' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">local_library</span>        
+        <span class="material-symbols-outlined text-[20px] transition-colors" :class="[ $route.name === 'estudiante-catalogo' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">travel_explore</span>        
       </button>
 
       <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 mt-6 pl-2 border-b border-slate-100 dark:border-gray-800 pb-2">Mi Portal</p>
 
-      <button @click="navigate('estudiante-dashboard')"
-        :class="[ $route.name === 'estudiante-dashboard' ? 'nav-active bg-umsa-blue text-white shadow-md shadow-umsa-blue/20' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500' ]"
-        class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group mt-1">
-        <span class="text-xs uppercase tracking-widest font-bold">Mi Inicio</span>
-        <span class="material-symbols-outlined text-[20px] transition-colors" :class="[ $route.name === 'estudiante-dashboard' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">home</span>        
-      </button>
-
-      <button @click="navigate('estudiante-actividades')"
-        :class="[ $route.name === 'estudiante-actividades' ? 'nav-active bg-umsa-blue text-white shadow-md shadow-umsa-blue/20' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500' ]"
+      <button @click="navigate('estudiante-eventos')"
+        :class="[ $route.name === 'estudiante-eventos' || $route.name === 'estudiante-dashboard' ? 'nav-active bg-umsa-blue text-white shadow-md shadow-umsa-blue/20' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500' ]"
         class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group mt-2">
-        <span class="text-xs uppercase tracking-widest font-bold">Mis Actividades</span>
-        <span class="material-symbols-outlined text-[20px] transition-colors" :class="[ $route.name === 'estudiante-actividades' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">book</span>
-      </button>
-
-      <button @click="navigate('estudiante-calificaciones')"
-        :class="[ $route.name === 'estudiante-calificaciones' ? 'nav-active bg-umsa-blue text-white shadow-md shadow-umsa-blue/20' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500' ]"
-        class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group mt-2">
-        <span class="text-xs uppercase tracking-widest font-bold">Calificaciones</span>
-        <span class="material-symbols-outlined text-[20px] transition-colors" :class="[ $route.name === 'estudiante-calificaciones' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">grading</span>
+        <span class="text-xs uppercase tracking-widest font-bold">Mis Cursos</span>
+        <span class="material-symbols-outlined text-[20px] transition-colors" :class="[ $route.name === 'estudiante-eventos' || $route.name === 'estudiante-dashboard' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">school</span>
       </button>
 
       <button @click="navigate('estudiante-certificados')"
@@ -65,6 +51,8 @@ const navigate = (routeName: string) => {
         <span class="text-xs uppercase tracking-widest font-bold">Mis Certificados</span>
         <span class="material-symbols-outlined text-[20px] transition-colors" :class="[ $route.name === 'estudiante-certificados' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">workspace_premium</span>
       </button>
+
+      <!-- Botones de Calificaciones y Certificados Obsoletos debido al layout de Netflix -->
     </nav>
 
     <button @click="router.push('/login')" class="mt-8 flex items-center justify-center space-x-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl font-bold py-3 transition-colors uppercase text-xs tracking-widest mb-2 border border-red-100 dark:border-red-900/30">

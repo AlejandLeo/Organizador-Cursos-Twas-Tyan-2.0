@@ -1,96 +1,73 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 
-const certificates = ref([
+const certificados = ref([
   {
     id: 1,
-    course: 'Diseño Web Avanzado',
-    type: 'Certificado de Aprobación',
-    hours: 120,
-    date: '20 Dic 2025',
-    code: 'UMSA-PG-2025-081',
-    valid: true
+    actividad: 'Programa de Especialidad en Biofertilizantes',
+    tipo: 'Diplomado',
+    fechaEmision: '20 Jun 2026',
+    codigoQR: 'AB-12345-X',
+    imagenTumb: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=800&q=80',
+    estado: 'Emitido'
   },
   {
     id: 2,
-    course: 'Taller de Redacción Científica',
-    type: 'Certificado de Asistencia',
-    hours: 40,
-    date: '15 Sep 2025',
-    code: 'UMSA-PG-2025-042',
-    valid: true
+    actividad: 'Taller de Aplicación de Suelos',
+    tipo: 'Taller',
+    fechaEmision: '30 Jun 2026',
+    codigoQR: 'CD-98765-Y',
+    imagenTumb: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80',
+    estado: 'Emitido'
   }
 ]);
 
-const downloadPdf = (id: number) => {
-  // Simulación de descarga PDF
-  console.log(`Descargando certificado ${id}`);
+const getStatusColor = (status: string) => {
+  return 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800';
 };
 </script>
 
 <template>
   <div class="animate-in fade-in duration-500 max-w-7xl mx-auto space-y-8">
-    <div class="flex items-center justify-between border-b border-slate-200 dark:border-gray-800 pb-6 mb-8">
+    <div class="border-b border-slate-200 dark:border-gray-800 pb-6 mb-8 mt-2 flex justify-between items-end">
       <div>
-        <h2 class="text-3xl font-black text-primary-dark dark:text-white uppercase italic">Mis Certificados</h2>
-        <p class="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Credenciales digitales emitidas a tu nombre</p>
+        <h2 class="text-3xl font-black text-primary-dark dark:text-white uppercase italic">Mi Billetera de Certificados</h2>
+        <p class="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Todos tus logros avalados por The World Academy of Sciences</p>
       </div>
+      <span class="material-symbols-outlined text-[3rem] text-umsa-gold drop-shadow-sm">workspace_premium</span>
     </div>
 
-    <!-- Grid Certificates -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div v-for="cert in certificates" :key="cert.id" class="bg-white dark:bg-gray-900 rounded-3xl overflow-hidden shadow-sm border border-slate-100 dark:border-gray-800 hover:shadow-lg transition-all group group-hover:border-umsa-gold">
-        <!-- Visual "Diploma" Header -->
-        <div class="h-32 bg-gradient-to-r from-umsa-blue to-primary-dark relative flex items-center justify-center p-4">
-          <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
-          <div class="z-10 text-center text-white">
-            <span class="material-symbols-outlined text-4xl text-umsa-gold mb-1">workspace_premium</span>
-            <p class="text-[8px] font-black uppercase tracking-[0.3em] opacity-80">Postgrado UMSA</p>
-          </div>
-        </div>
-
-        <div class="p-6">
-          <div class="flex justify-between items-start mb-4">
-            <span class="text-[9px] font-black uppercase tracking-widest bg-amber-50 text-amber-700 px-3 py-1 rounded-full border border-amber-200">
-              {{ cert.type }}
-            </span>
-            <span v-if="cert.valid" class="text-emerald-500" title="Firma Digital Verificada">
-              <span class="material-symbols-outlined text-[18px]">verified</span>
-            </span>
+       <!-- Tarjeta de Certificado -->
+       <div v-for="cert in certificados" :key="cert.id" class="group bg-white dark:bg-gray-900 rounded-[1.5rem] overflow-hidden shadow-sm border border-slate-200/60 dark:border-gray-800 hover:border-umsa-gold/50 transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-yellow-500/10 flex flex-col justify-between">
+          <div class="relative h-40 w-full overflow-hidden shrink-0">
+             <div class="absolute inset-0 bg-primary-dark/40 group-hover:bg-black/60 transition-colors z-10 duration-500 backdrop-blur-[1px]"></div>
+             <img :src="cert.imagenTumb" class="w-full h-full object-cover grayscale opacity-60 group-hover:scale-110 transition-transform duration-700 ease-out" alt="Fondo">
+             <div class="absolute inset-0 flex items-center justify-center z-20">
+                <span class="material-symbols-outlined text-white text-5xl opacity-80 group-hover:scale-125 transition-transform duration-500 drop-shadow-md">workspace_premium</span>
+             </div>
+             <span class="absolute top-3 right-3 z-30 text-[8px] font-black uppercase px-2 py-1 rounded-md tracking-widest shadow-sm" :class="getStatusColor(cert.estado)">
+               {{ cert.tipo }}
+             </span>
           </div>
 
-          <h3 class="text-lg font-black text-primary-dark dark:text-white leading-tight hover:text-umsa-blue transition-colors cursor-pointer mb-2">
-            {{ cert.course }}
-          </h3>
-          <p class="text-xs font-bold text-slate-500 dark:text-gray-400 mb-6 flex items-center">
-            <span class="material-symbols-outlined text-[14px] mr-1">schedule</span> {{ cert.hours }} horas académicas
-          </p>
-
-          <div class="space-y-4 pt-4 border-t border-slate-100 dark:border-gray-800">
-            <div class="flex items-center justify-between text-xs text-slate-400 font-medium">
-              <span>Emisión:</span> <span class="font-bold text-slate-600 dark:text-gray-300">{{ cert.date }}</span>
-            </div>
-            <div class="flex items-center justify-between text-xs text-slate-400 font-medium">
-              <span>Folio:</span> <span class="font-mono text-slate-500">{{ cert.code }}</span>
-            </div>
+          <div class="p-6 relative z-20 flex flex-col flex-1">
+             <h3 class="text-sm font-black text-slate-800 dark:text-white leading-tight mb-2 line-clamp-2">{{ cert.actividad }}</h3>
+             <div class="space-y-1 mt-2">
+                 <p class="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest">Emisión: <span class="text-slate-800 dark:text-white">{{ cert.fechaEmision }}</span></p>
+                 <p class="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest">Cod: <span class="font-mono text-slate-700 dark:text-gray-300">{{ cert.codigoQR }}</span></p>
+             </div>
+             
+             <div class="mt-6 pt-4 border-t border-slate-100 dark:border-gray-800 flex gap-2">
+                 <button class="flex-1 bg-slate-100 dark:bg-gray-800 hover:bg-slate-200 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 text-[10px] font-black uppercase py-2.5 rounded-lg tracking-widest transition-colors flex items-center justify-center gap-2">
+                     <span class="material-symbols-outlined text-[16px]">visibility</span> Ver HTML
+                 </button>
+                 <button class="flex-1 bg-umsa-gold hover:bg-yellow-500 text-white text-[10px] font-black uppercase py-2.5 rounded-lg tracking-widest transition-colors flex items-center justify-center gap-2 shadow-sm">
+                     <span class="material-symbols-outlined text-[16px]">download</span> PDF
+                 </button>
+             </div>
           </div>
-          
-          <button @click="downloadPdf(cert.id)" class="w-full mt-6 bg-slate-50 dark:bg-gray-800 hover:bg-umsa-blue hover:text-white hover:border-umsa-blue text-slate-600 dark:text-white border border-slate-200 dark:border-gray-700 font-black py-3 rounded-xl transition-all shadow-sm flex items-center justify-center space-x-2 group-hover:bg-umsa-blue group-hover:text-white">
-            <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
-            <span class="text-xs uppercase tracking-widest">Descargar PDF</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Empty State -->
-      <div v-if="certificates.length === 0" class="col-span-full py-16 text-center bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 border-dashed rounded-3xl">
-        <div class="w-20 h-20 bg-slate-50 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-200 dark:border-gray-700">
-          <span class="material-symbols-outlined text-slate-400 text-3xl">history_edu</span>
-        </div>
-        <h3 class="text-sm font-black text-slate-600 dark:text-gray-300 uppercase tracking-widest">Sin certificados aún</h3>
-        <p class="text-xs text-slate-400 mt-2 max-w-sm mx-auto">Completa una actividad académica o diplomado para comenzar a coleccionar credenciales.</p>
-        <button @click="$router.push('/estudiante/actividades')" class="mt-6 bg-umsa-blue text-white px-6 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest shadow-md">Ver mis cursos</button>
-      </div>
+       </div>
     </div>
   </div>
 </template>
