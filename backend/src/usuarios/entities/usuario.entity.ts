@@ -27,8 +27,8 @@ import { Imparticion } from '../../imparticiones/entities/imparticion.entity';
  */
 @Entity('usuarios')
 export class Usuario {
-  @PrimaryGeneratedColumn()
-  id_usuario: number;
+  @PrimaryGeneratedColumn({ name: 'id' })
+  id: number;
 
   @Column({ unique: true, length: 255 })
   email: string;

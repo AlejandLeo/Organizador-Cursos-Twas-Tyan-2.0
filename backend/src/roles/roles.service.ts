@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Rol } from './entities/rol.entity';
+import { CreateRolDto } from './dto/create-rol.dto';
+import { UpdateRolDto } from './dto/update-rol.dto';
 
 @Injectable()
 export class RolesService {
@@ -10,24 +12,52 @@ export class RolesService {
     private readonly rolRepository: Repository<Rol>,
   ) {}
 
-  create(data: Partial<Rol>) {
+  create(data: CreateRolDto): Promise<Rol> {
     const rol = this.rolRepository.create(data);
     return this.rolRepository.save(rol);
   }
 
-  findAll() {
+  findAll(): Promise<Rol[]> {
     return this.rolRepository.find();
   }
 
-  findOne(id: number) {
-    return this.rolRepository.findOneBy({ id_rol: id });
+  async findOne(id: number): Promise<Rol> {
+    const rol = await this.rolRepository.findOneBy({ id: id });
+    if (!rol) {
+      throw new NotFoundException(`Rol con id ${id} no encontrado.`);
+    }
+    return rol;
   }
 
-  update(id: number, data: Partial<Rol>) {
-    return this.rolRepository.update(id, data);
+  async update(id: number, data: UpdateRolDto): Promise<Rol> {
+    await this.findOne(id);
+    await this.rolRepository.update(id, data);
+    return this.findOne(id);
   }
 
-  remove(id: number) {
-    return this.rolRepository.delete(id);
+  async remove(id: number): Promise<{ mensaje: string }> {
+    await this.findOne(id);
+    await this.rolRepository.delete(id);
+    return { mensaje: `Rol con id ${id} eliminado correctamente.` };
+  }
+
+  /**
+   * Obtiene un rol y lista todos los usuarios que lo tienen asignado (JOIN).
+   */
+  async getUsuariosPorRol(id: number): Promise<Rol> {
+    const rol = await this.rolRepository.findOne({
+      where: { id },
+      relations: [
+        'usuariosRoles',
+        'usuariosRoles.usuario',
+        'usuariosRoles.usuario.persona',
+      ],
+    });
+
+    if (!rol) {
+      throw new NotFoundException(`Rol con id ${id} no encontrado.`);
+    }
+
+    return rol;
   }
 }

@@ -20,7 +20,7 @@ export class SesionesAcademicasService {
   }
 
   findOne(id: number) {
-    return this.sesionRepository.findOneBy({ id_sesion_academica: id });
+    return this.sesionRepository.findOneBy({ id: id });
   }
 
   update(id: number, data: Partial<SesionAcademica>) {

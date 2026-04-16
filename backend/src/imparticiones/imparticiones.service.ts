@@ -20,7 +20,7 @@ export class ImparticionesService {
   }
 
   findOne(id: number) {
-    return this.imparticionRepository.findOneBy({ id_imparticion: id });
+    return this.imparticionRepository.findOneBy({ id: id });
   }
 
   update(id: number, data: Partial<Imparticion>) {

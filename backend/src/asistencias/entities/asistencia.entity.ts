@@ -26,8 +26,8 @@ import { SesionAcademica } from '../../sesiones-academicas/entities/sesion-acade
  */
 @Entity('asistencias')
 export class Asistencia {
-  @PrimaryGeneratedColumn()
-  id_asistencia: number;
+  @PrimaryGeneratedColumn({ name: 'id' })
+  id: number;
 
   /** Marca de tiempo exacta en que se registró la asistencia. */
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
@@ -43,10 +43,7 @@ export class Asistencia {
    * La inscripción del estudiante en esta modalidad específica.
    * Antes: → Inscripcion. Ahora: → InscripcionModalidad.
    */
-  @ManyToOne(
-    () => InscripcionModalidad,
-    (im) => im.asistencias,
-  )
+  @ManyToOne(() => InscripcionModalidad, (im) => im.asistencias)
   @JoinColumn({ name: 'id_inscripcion_modalidad' })
   inscripcionModalidad: InscripcionModalidad;
 

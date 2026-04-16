@@ -28,8 +28,8 @@ import { Asistencia } from '../../asistencias/entities/asistencia.entity';
  */
 @Entity('inscripcion_modalidades')
 export class InscripcionModalidad {
-  @PrimaryGeneratedColumn()
-  id_inscripcion_modalidad: number;
+  @PrimaryGeneratedColumn({ name: 'id' })
+  id: number;
 
   /** Nota obtenida en esta modalidad. NULL hasta que se cargue la calificación. */
   @Column({ type: 'float', nullable: true })

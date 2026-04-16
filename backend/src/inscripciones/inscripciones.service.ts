@@ -20,7 +20,7 @@ export class InscripcionesService {
   }
 
   findOne(id: number) {
-    return this.inscripcionRepository.findOneBy({ id_inscripcion: id });
+    return this.inscripcionRepository.findOneBy({ id: id });
   }
 
   update(id: number, data: Partial<Inscripcion>) {

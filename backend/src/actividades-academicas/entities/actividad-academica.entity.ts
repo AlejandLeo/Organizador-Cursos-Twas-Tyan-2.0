@@ -26,8 +26,8 @@ import { Imparticion } from '../../imparticiones/entities/imparticion.entity';
  */
 @Entity('actividades_academicas')
 export class ActividadAcademica {
-  @PrimaryGeneratedColumn()
-  id_actividad_academica: number;
+  @PrimaryGeneratedColumn({ name: 'id' })
+  id: number;
 
   @Column({ length: 255 })
   nombre: string;

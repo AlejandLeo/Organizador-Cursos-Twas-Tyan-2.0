@@ -2,8 +2,9 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule } from '@nestjs/config';
 
-// --- Usuarios y Accesos --- 
+// --- Usuarios y Accesos ---
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { PersonasModule } from './personas/personas.module';
 import { RolesModule } from './roles/roles.module';
@@ -30,8 +31,16 @@ import { InfoCertificadosModule } from './info-certificados/info-certificados.mo
 import { CertificadosModule } from './certificados/certificados.module';
 import { UsuariosCertificadosModule } from './usuarios-certificados/usuarios-certificados.module';
 
+// --- Auth ---
+import { AuthModule } from './auth/auth.module';
+
 @Module({
   imports: [
+    // --- Config ---
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
+
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DATABASE_HOST,
@@ -69,8 +78,11 @@ import { UsuariosCertificadosModule } from './usuarios-certificados/usuarios-cer
     InfoCertificadosModule,
     CertificadosModule,
     UsuariosCertificadosModule,
+
+    // --- Auth ---
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

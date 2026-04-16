@@ -26,8 +26,8 @@ import { InscripcionModalidad } from '../../inscripcion-modalidades/entities/ins
  */
 @Entity('inscripciones')
 export class Inscripcion {
-  @PrimaryGeneratedColumn()
-  id_inscripcion: number;
+  @PrimaryGeneratedColumn({ name: 'id' })
+  id: number;
 
   @CreateDateColumn({ type: 'timestamptz' })
   fecha_creacion: Date;

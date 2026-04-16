@@ -1,4 +1,3 @@
-
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -9,7 +8,7 @@ export class AsistenciasService {
   constructor(
     @InjectRepository(Asistencia)
     private readonly asistenciaRepository: Repository<Asistencia>,
-  ) { }
+  ) {}
 
   create(data: Partial<Asistencia>) {
     const asistencia = this.asistenciaRepository.create(data);
@@ -21,7 +20,7 @@ export class AsistenciasService {
   }
 
   findOne(id: number) {
-    return this.asistenciaRepository.findOneBy({ id_asistencia: id });
+    return this.asistenciaRepository.findOneBy({ id: id });
   }
 
   update(id: number, data: Partial<Asistencia>) {

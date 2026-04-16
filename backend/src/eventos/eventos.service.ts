@@ -20,7 +20,7 @@ export class EventosService {
   }
 
   findOne(id: number) {
-    return this.eventoRepository.findOneBy({ id_eventos: id });
+    return this.eventoRepository.findOneBy({ id: id });
   }
 
   update(id: number, data: Partial<Evento>) {

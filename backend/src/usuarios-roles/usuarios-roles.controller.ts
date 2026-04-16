@@ -1,13 +1,23 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { UsuariosRolesService } from './usuarios-roles.service';
-import { UsuarioRol } from './entities/usuario-rol.entity';
+import { CreateUsuarioRolDto } from './dto/create-usuario-rol.dto';
+import { UpdateUsuarioRolDto } from './dto/update-usuario-rol.dto';
 
 @Controller('usuarios-roles')
 export class UsuariosRolesController {
   constructor(private readonly usuariosRolesService: UsuariosRolesService) {}
 
   @Post()
-  create(@Body() data: Partial<UsuarioRol>) {
+  create(@Body() data: CreateUsuarioRolDto) {
     return this.usuariosRolesService.create(data);
   }
 
@@ -22,7 +32,10 @@ export class UsuariosRolesController {
   }
 
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() data: Partial<UsuarioRol>) {
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: UpdateUsuarioRolDto,
+  ) {
     return this.usuariosRolesService.update(id, data);
   }
 

@@ -1,10 +1,17 @@
-import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn, } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { UsuarioRol } from '../../usuarios-roles/entities/usuario-rol.entity';
 
 @Entity('roles')
 export class Rol {
-  @PrimaryGeneratedColumn()
-  id_rol: number;
+  @PrimaryGeneratedColumn({ name: 'id' })
+  id: number;
 
   @Column({ length: 50 })
   nombre_rol: string;
@@ -18,4 +25,3 @@ export class Rol {
   @UpdateDateColumn({ type: 'timestamptz' })
   fecha_actualizacion: Date;
 }
-

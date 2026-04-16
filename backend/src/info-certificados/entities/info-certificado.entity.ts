@@ -28,8 +28,8 @@ import { Certificado } from '../../certificados/entities/certificado.entity';
  */
 @Entity('info_certificados')
 export class InfoCertificado {
-  @PrimaryGeneratedColumn()
-  id_info_certificado: number;
+  @PrimaryGeneratedColumn({ name: 'id' })
+  id: number;
 
   @Column({ type: 'text', nullable: true })
   cabecera: string;

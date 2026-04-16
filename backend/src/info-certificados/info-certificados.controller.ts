@@ -1,10 +1,21 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { InfoCertificadosService } from './info-certificados.service';
 import { InfoCertificado } from './entities/info-certificado.entity';
 
 @Controller('info-certificados')
 export class InfoCertificadosController {
-  constructor(private readonly infoCertificadosService: InfoCertificadosService) {}
+  constructor(
+    private readonly infoCertificadosService: InfoCertificadosService,
+  ) {}
 
   @Post()
   create(@Body() data: Partial<InfoCertificado>) {
@@ -22,7 +33,10 @@ export class InfoCertificadosController {
   }
 
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() data: Partial<InfoCertificado>) {
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: Partial<InfoCertificado>,
+  ) {
     return this.infoCertificadosService.update(id, data);
   }
 

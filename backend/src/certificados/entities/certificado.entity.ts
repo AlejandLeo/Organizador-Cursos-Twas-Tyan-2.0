@@ -32,8 +32,8 @@ import { UsuarioCertificado } from '../../usuarios-certificados/entities/usuario
  */
 @Entity('certificados')
 export class Certificado {
-  @PrimaryGeneratedColumn()
-  id_certificado: number;
+  @PrimaryGeneratedColumn({ name: 'id' })
+  id: number;
 
   /** Código público del QR. Único por certificado. */
   @Column({ unique: true, length: 255 })

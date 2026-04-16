@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { AsistenciasService } from './asistencias.service';
 import { Asistencia } from './entities/asistencia.entity';
 
@@ -22,7 +31,10 @@ export class AsistenciasController {
   }
 
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() data: Partial<Asistencia>) {
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: Partial<Asistencia>,
+  ) {
     return this.asistenciasService.update(id, data);
   }
 
