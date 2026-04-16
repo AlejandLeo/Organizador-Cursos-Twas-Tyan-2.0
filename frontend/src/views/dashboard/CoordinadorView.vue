@@ -35,7 +35,7 @@ const stats = ref([
             <div class="flex items-end justify-around h-56 w-full gap-4 border-b-2 border-slate-100 dark:border-gray-800 pb-2">
                 <div class="flex flex-col items-center w-full group relative">
                     <span class="absolute -top-8 text-[10px] font-black text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-gray-800 px-2 py-1 rounded shadow-sm">45</span>
-                    <div class="w-full max-w-[3rem] bg-slate-200 dark:bg-gray-700 rounded-t-xl h-[45%] group-hover:bg-emerald-500 dark:group-hover:bg-blue-500 transition-colors cursor-pointer"></div>
+                    <div class="w-full max-w-[3rem] bg-slate-200 dark:bg-gray-700 rounded-t-xl h-[45%] group-hover:bg-umsa-gold dark:group-hover:bg-blue-500 transition-colors cursor-pointer"></div>
                     <span class="text-[9px] font-bold text-slate-500 dark:text-gray-400 mt-4 uppercase text-center leading-tight">Bio<br>fertilizantes</span>
                 </div>
                 <div class="flex flex-col items-center w-full group relative">
@@ -45,12 +45,12 @@ const stats = ref([
                 </div>
                 <div class="flex flex-col items-center w-full group relative">
                     <span class="absolute -top-8 text-[10px] font-black text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-gray-800 px-2 py-1 rounded shadow-sm">75</span>
-                    <div class="w-full max-w-[3rem] bg-slate-200 dark:bg-gray-700 rounded-t-xl h-[75%] group-hover:bg-emerald-500 dark:group-hover:bg-blue-500 transition-colors cursor-pointer"></div>
+                    <div class="w-full max-w-[3rem] bg-slate-200 dark:bg-gray-700 rounded-t-xl h-[75%] group-hover:bg-umsa-gold dark:group-hover:bg-blue-500 transition-colors cursor-pointer"></div>
                     <span class="text-[9px] font-bold text-slate-500 dark:text-gray-400 mt-4 uppercase text-center leading-tight">Riego<br>Agro</span>
                 </div>
                 <div class="flex flex-col items-center w-full group relative">
                     <span class="absolute -top-8 text-[10px] font-black text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-gray-800 px-2 py-1 rounded shadow-sm">30</span>
-                    <div class="w-full max-w-[3rem] bg-slate-200 dark:bg-gray-700 rounded-t-xl h-[30%] group-hover:bg-emerald-500 dark:group-hover:bg-blue-500 transition-colors cursor-pointer"></div>
+                    <div class="w-full max-w-[3rem] bg-slate-200 dark:bg-gray-700 rounded-t-xl h-[30%] group-hover:bg-umsa-gold dark:group-hover:bg-blue-500 transition-colors cursor-pointer"></div>
                     <span class="text-[9px] font-bold text-slate-500 dark:text-gray-400 mt-4 uppercase text-center leading-tight">Genética<br>Vegetal</span>
                 </div>
             </div>
@@ -66,7 +66,7 @@ const stats = ref([
             </div>
             <div class="flex flex-wrap justify-center gap-6 mt-10 w-full">
                 <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-primary-dark dark:bg-blue-600"></span><span class="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase">Diplomados (50%)</span></div>
-                <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-500 dark:bg-blue-400"></span><span class="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase">Especialidades (25%)</span></div>
+                <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-umsa-gold dark:bg-blue-400"></span><span class="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase">Especialidades (25%)</span></div>
                 <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-slate-100 dark:bg-gray-700 border border-slate-200 dark:border-gray-600"></span><span class="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase">Talleres (25%)</span></div>
             </div>
         </div>
