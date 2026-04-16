@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, } from '@nestjs/common';
 import { CertificadosService } from './certificados.service';
 import { Certificado } from './entities/certificado.entity';
 
@@ -22,7 +22,10 @@ export class CertificadosController {
   }
 
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() data: Partial<Certificado>) {
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: Partial<Certificado>,
+  ) {
     return this.certificadosService.update(id, data);
   }
 

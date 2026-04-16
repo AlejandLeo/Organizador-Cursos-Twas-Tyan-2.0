@@ -20,7 +20,7 @@ export class ActividadesAcademicasService {
   }
 
   findOne(id: number) {
-    return this.actividadRepository.findOneBy({ id_actividad_academica: id });
+    return this.actividadRepository.findOneBy({ id: id });
   }
 
   update(id: number, data: Partial<ActividadAcademica>) {

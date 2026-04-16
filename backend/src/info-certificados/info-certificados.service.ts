@@ -20,7 +20,7 @@ export class InfoCertificadosService {
   }
 
   findOne(id: number) {
-    return this.infoRepository.findOneBy({ id_info_certificado: id });
+    return this.infoRepository.findOneBy({ id: id });
   }
 
   update(id: number, data: Partial<InfoCertificado>) {

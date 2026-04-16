@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { ImparticionesService } from './imparticiones.service';
 import { Imparticion } from './entities/imparticion.entity';
 
@@ -22,7 +31,10 @@ export class ImparticionesController {
   }
 
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() data: Partial<Imparticion>) {
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: Partial<Imparticion>,
+  ) {
     return this.imparticionesService.update(id, data);
   }
 

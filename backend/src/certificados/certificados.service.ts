@@ -20,7 +20,7 @@ export class CertificadosService {
   }
 
   findOne(id: number) {
-    return this.certificadoRepository.findOneBy({ id_certificado: id });
+    return this.certificadoRepository.findOneBy({ id: id });
   }
 
   update(id: number, data: Partial<Certificado>) {

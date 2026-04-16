@@ -3,5 +3,7 @@ import { UsuariosCertificadosService } from './usuarios-certificados.service';
 
 @Controller('usuarios-certificados')
 export class UsuariosCertificadosController {
-  constructor(private readonly usuariosCertificadosService: UsuariosCertificadosService) {}
+  constructor(
+    private readonly usuariosCertificadosService: UsuariosCertificadosService,
+  ) {}
 }

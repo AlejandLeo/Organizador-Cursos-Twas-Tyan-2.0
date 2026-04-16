@@ -20,7 +20,7 @@ export class CoordinacionesService {
   }
 
   findOne(id: number) {
-    return this.coordinacionRepository.findOneBy({ id_coordinacion: id });
+    return this.coordinacionRepository.findOneBy({ id: id });
   }
 
   update(id: number, data: Partial<CoordinacionEvento>) {

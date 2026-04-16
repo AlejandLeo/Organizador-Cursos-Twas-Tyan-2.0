@@ -3,5 +3,7 @@ import { InscripcionModalidadesService } from './inscripcion-modalidades.service
 
 @Controller('inscripcion-modalidades')
 export class InscripcionModalidadesController {
-  constructor(private readonly inscripcionModalidadesService: InscripcionModalidadesService) {}
+  constructor(
+    private readonly inscripcionModalidadesService: InscripcionModalidadesService,
+  ) {}
 }

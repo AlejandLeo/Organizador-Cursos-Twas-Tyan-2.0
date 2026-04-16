@@ -1,10 +1,21 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { SesionesAcademicasService } from './sesiones-academicas.service';
 import { SesionAcademica } from './entities/sesion-academica.entity';
 
 @Controller('sesiones-academicas')
 export class SesionesAcademicasController {
-  constructor(private readonly sesionesAcademicasService: SesionesAcademicasService) {}
+  constructor(
+    private readonly sesionesAcademicasService: SesionesAcademicasService,
+  ) {}
 
   @Post()
   create(@Body() data: Partial<SesionAcademica>) {
@@ -22,7 +33,10 @@ export class SesionesAcademicasController {
   }
 
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() data: Partial<SesionAcademica>) {
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: Partial<SesionAcademica>,
+  ) {
     return this.sesionesAcademicasService.update(id, data);
   }
 
