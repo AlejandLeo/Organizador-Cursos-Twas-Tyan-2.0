@@ -8,7 +8,7 @@ export class AuthService {
    */
   private readonly tokenBlacklist = new Set<string>();
 
-  constructor(private readonly jwtService: JwtService) { }
+  constructor(private readonly jwtService: JwtService) {}
 
   /**
    * Genera el JWT con el payload básico del usuario.
@@ -17,8 +17,8 @@ export class AuthService {
   async generarToken(usuario: any): Promise<{ access_token: string }> {
     const roles: string[] = usuario.usuariosRoles
       ? usuario.usuariosRoles
-        .map((ur: any) => ur.rol?.nombre_rol)
-        .filter(Boolean)
+          .map((ur: any) => ur.rol?.nombre_rol)
+          .filter(Boolean)
       : [];
 
     const payload = {
