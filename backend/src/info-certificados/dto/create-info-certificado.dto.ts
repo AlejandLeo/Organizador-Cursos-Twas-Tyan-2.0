@@ -1,19 +1,37 @@
-import { IsNotEmpty, IsString } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 export class CreateInfoCertificadoDto {
-  @ApiProperty()
+  @ApiProperty({ example: 1, description: 'ID del Evento' })
   @IsNotEmpty()
-  @IsString()
-  cabecera: string;
+  @Type(() => Number)
+  @IsInt()
+  id_evento: number;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'plantilla-1.pdf' })
   @IsNotEmpty()
   @IsString()
-  tenor: string;
+  url_plantilla_certificado: string;
 
-  @ApiProperty()
-  @IsNotEmpty()
+  @ApiPropertyOptional({ example: '{ "x": 100, "y": 200 }' })
+  @IsOptional()
   @IsString()
-  id_version_evento: string;
+  config_qr?: string;
+
+  @ApiPropertyOptional({ example: '{ "x": 50, "y": 300 }' })
+  @IsOptional()
+  @IsString()
+  config_titular?: string;
+
+  @ApiPropertyOptional({ example: '{ "x": 50, "y": 400 }' })
+  @IsOptional()
+  @IsString()
+  config_organizadores?: string;
+
+  @ApiPropertyOptional({ example: 40 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  horas_academicas?: number;
 }
