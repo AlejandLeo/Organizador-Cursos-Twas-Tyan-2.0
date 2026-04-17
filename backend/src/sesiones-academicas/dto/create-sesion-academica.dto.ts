@@ -1,39 +1,41 @@
-import { IsNotEmpty, IsString, IsDateString } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsDateString, IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 export class CreateSesionAcademicaDto {
-  @ApiProperty()
+  @ApiProperty({ example: 'Sesión 1: Introducción' })
+  @IsNotEmpty()
+  @IsString()
+  nombre: string;
+
+  @ApiPropertyOptional({ example: 'Fundamentos básicos' })
+  @IsOptional()
+  @IsString()
+  descripcion?: string;
+
+  @ApiProperty({ example: 'En línea' })
+  @IsNotEmpty()
+  @IsString()
+  modalidad_sesion: string;
+
+  @ApiProperty({ example: '2025-07-14' })
   @IsNotEmpty()
   @IsDateString()
   fecha: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: '09:00' })
   @IsNotEmpty()
   @IsString()
   hora_inicio: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: '11:00' })
   @IsNotEmpty()
   @IsString()
   hora_fin: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 1, description: 'ID de la Modalidad del Curso' })
   @IsNotEmpty()
-  @IsString()
-  modalidad: string;
-
-  @ApiProperty()
-  @IsNotEmpty()
-  @IsString()
-  aula: string;
-
-  @ApiProperty()
-  @IsNotEmpty()
-  @IsString()
-  cod_verificacion: string;
-
-  @ApiProperty()
-  @IsNotEmpty()
-  @IsString()
-  id_detalle_actividad_academica: string;
+  @Type(() => Number)
+  @IsInt()
+  id_curso_modalidad: number;
 }
