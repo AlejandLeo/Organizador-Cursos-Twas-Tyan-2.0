@@ -21,4 +21,9 @@ export class CreateEventoDto {
   @IsOptional()
   @IsString()
   logo?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  imagen_fondo?: string;
 }

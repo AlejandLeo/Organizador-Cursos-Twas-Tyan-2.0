@@ -29,6 +29,9 @@ export class Evento {
   @PrimaryGeneratedColumn({ name: 'id' })
   id: number;
 
+  @Column({ length: 255, nullable: true })
+  nombre: string;
+
   @Column({ type: 'text', nullable: true })
   descripcion: string;
 
@@ -56,17 +59,9 @@ export class Evento {
   @Column({ length: 255, nullable: true })
   logo: string;
 
-  /** UUID o URL para la imagen principal de portada (Hero) del evento */
+  /** UUID o URL para la imagen de fondo de las vistas del evento */
   @Column({ length: 255, nullable: true })
-  imagen_portada: string;
-
-  /** UUID o URL para el video 1 de bienvenida (Ej. Palabras del Rector) */
-  @Column({ length: 255, nullable: true })
-  video_bienvenida_1: string;
-
-  /** UUID o URL para el video 2 de bienvenida (Ej. Bienvenida Decanato) */
-  @Column({ length: 255, nullable: true })
-  video_bienvenida_2: string;
+  imagen_fondo: string;
 
   // ── Relaciones ────────────────────────────────────────────────────────────
 
