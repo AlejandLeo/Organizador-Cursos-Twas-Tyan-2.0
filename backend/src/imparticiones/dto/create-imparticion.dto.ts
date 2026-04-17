@@ -1,14 +1,23 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsInt, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 export class CreateImparticionDto {
-  @ApiProperty()
+  @ApiProperty({ example: 1, description: 'ID del ponente (Usuario)' })
   @IsNotEmpty()
-  @IsString()
-  id_usuario: string;
+  @Type(() => Number)
+  @IsInt()
+  id_usuario: number;
 
-  @ApiProperty()
+  @ApiProperty({ example: 1, description: 'ID de la actividad académica' })
   @IsNotEmpty()
-  @IsString()
-  id_detalle_actividad_academica: string;
+  @Type(() => Number)
+  @IsInt()
+  id_actividad_academica: number;
+
+  @ApiProperty({ example: 1, description: 'ID del evento' })
+  @IsNotEmpty()
+  @Type(() => Number)
+  @IsInt()
+  id_evento: number;
 }
