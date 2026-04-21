@@ -20,6 +20,8 @@ import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RegisterDto } from './dto/register.dto';
+import { CrearPonenteDto } from './dto/crear-ponente.dto';
+import { FiltrarUsuariosDto } from './dto/filtrar-usuarios.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -82,17 +84,20 @@ export class UsuariosController {
 
   /**
    * GET /usuarios
-   * Lista usuarios activos por defecto.
-   * ?soloActivos=false → incluye también usuarios inactivos (uso administrativo).
-   * La contraseña NUNCA se incluye en la respuesta.
+   * Usa FiltrarUsuariosDto para soportar ?rol=, ?q=, ?page=, ?limit=, ?soloActivos=
+   * Si el coordinador pasa filtros → llama findConFiltros.
+   * Si no hay filtros → comportamiento anterior (findAll).
    */
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Get()
-  @ApiOperation({ summary: 'Listar usuarios (con filtros)' })
-  findAll(@Query('soloActivos') soloActivos: string) {
-    // Si el query param existe y es exactamente 'false', muestra todos
-    const filtrar = soloActivos !== 'false';
+  @ApiOperation({ summary: 'Listar usuarios (con filtros y paginación)' })
+  findAll(@Query() filtros: FiltrarUsuariosDto) {
+    // Si viene algún filtro de coordinador, usar la versión enriquecida
+    if (filtros.rol || filtros.q || filtros.page || filtros.limit) {
+      return this.usuariosService.findConFiltros(filtros);
+    }
+    const filtrar = filtros.soloActivos !== 'false';
     return this.usuariosService.findAll(filtrar);
   }
 
@@ -162,5 +167,37 @@ export class UsuariosController {
     @Body('rolId', ParseIntPipe) rolId: number,
   ) {
     return this.usuariosService.asignarRol(id, rolId);
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  ENDPOINTS COORDINADOR
+  // ══════════════════════════════════════════════════════════
+
+  /**
+   * POST /usuarios/ponente
+   * Crea un ponente completo (credenciales + persona + rol Ponente).
+   * Solo accesible por Coordinador o Super Usuario.
+   */
+  @Roles('Coordinador', 'Super Usuario')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Post('ponente')
+  @ApiOperation({ summary: 'Crear un ponente directamente (Coord/Admin)' })
+  crearPonente(@Body() dto: CrearPonenteDto) {
+    return this.usuariosService.crearPonente(dto);
+  }
+
+  /**
+   * DELETE /usuarios/:id
+   * Deshabilita el usuario (estado=0). No elimina físicamente.
+   * Solo accesible por Coordinador o Super Usuario.
+   */
+  @Roles('Coordinador', 'Super Usuario')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Delete(':id')
+  @ApiOperation({ summary: 'Deshabilitar usuario (Coord/Admin)' })
+  deshabilitarUsuario(@Param('id', ParseIntPipe) id: number) {
+    return this.usuariosService.deshabilitarUsuario(id);
   }
 }

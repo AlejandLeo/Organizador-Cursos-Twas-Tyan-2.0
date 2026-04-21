@@ -3,43 +3,52 @@ import {
   Get,
   Post,
   Body,
-  Patch,
+  Put,
   Param,
   Delete,
   ParseIntPipe,
+  UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CertificadosService } from './certificados.service';
-import { Certificado } from './entities/certificado.entity';
+import { EmitirLoteDto } from './dto/emitir-lote.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
+@ApiTags('Certificados')
 @Controller('certificados')
 export class CertificadosController {
-  constructor(private readonly certificadosService: CertificadosService) {}
+  constructor(private readonly service: CertificadosService) {}
 
-  @Post()
-  create(@Body() data: Partial<Certificado>) {
-    return this.certificadosService.create(data);
+  // ── Coordinador ─────────────────────────────────────────────
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Coordinador', 'Super Usuario')
+  @ApiBearerAuth()
+  @Post('emitir-lote')
+  @ApiOperation({ summary: 'Emitir múltiples certificados (Coordinador)' })
+  emitirLote(@Body() dto: EmitirLoteDto) {
+    return this.service.emitirLote(dto);
   }
+
+  // ── Legacy ──────────────────────────────────────────────────
 
   @Get()
   findAll() {
-    return this.certificadosService.findAll();
+    return this.service.findAll();
   }
 
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.certificadosService.findOne(id);
+    return this.service.findOne(id);
   }
 
-  @Patch(':id')
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() data: Partial<Certificado>,
-  ) {
-    return this.certificadosService.update(id, data);
-  }
-
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Coordinador', 'Super Usuario')
+  @ApiBearerAuth()
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
-    return this.certificadosService.remove(id);
+    return this.service.remove(id);
   }
 }

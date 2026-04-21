@@ -17,6 +17,8 @@ import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RegisterDto } from './dto/register.dto';
+import { CrearPonenteDto } from './dto/crear-ponente.dto';
+import { FiltrarUsuariosDto } from './dto/filtrar-usuarios.dto';
 
 // Entidades adicionales para registro y roles
 import { Rol } from '../roles/entities/rol.entity';
@@ -136,6 +138,130 @@ export class UsuariosService {
     await this.findOne(id); // valida existencia
     await this.usuarioRepository.delete(id);
     return { mensaje: `Usuario ${id} eliminado correctamente.` };
+  }
+
+  /**
+   * Deshabilita un usuario (estado = 0) en lugar de eliminarlo físicamente.
+   * Uso del coordinador para suspender accesos sin perder historias.
+   */
+  async deshabilitarUsuario(id: number): Promise<{ mensaje: string }> {
+    await this.findOne(id);
+    await this.usuarioRepository.update(id, { estado: 0 });
+    return { mensaje: `Usuario ${id} deshabilitado correctamente.` };
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  BÚSQUEDA Y FILTRADO (para el panel del Coordinador)
+  // ══════════════════════════════════════════════════════════
+
+  /**
+   * Lista usuarios con filtros: por rol, búsqueda libre y paginación.
+   * Nunca devuelve el campo password.
+   */
+  async findConFiltros(filtros: FiltrarUsuariosDto): Promise<{ data: any[]; total: number; page: number; limit: number }> {
+    const { rol, q, page = 1, limit = 20, soloActivos } = filtros;
+    const soloActibosBool = soloActivos !== 'false';
+
+    const qb = this.dataSource
+      .createQueryBuilder()
+      .select([
+        'u.id',
+        'u.email',
+        'u.estado',
+        'u.fecha_creacion',
+        'p.nombres',
+        'p.primer_apellido',
+        'p.segundo_apellido',
+        'p.documento_identidad',
+        'p.celular',
+        'p.pais_origen',
+      ])
+      .addSelect('r.nombre_rol', 'rol_nombre')
+      .from('usuarios', 'u')
+      .leftJoin('personas', 'p', 'p.id_usuario = u.id')
+      .leftJoin('usuarios_roles', 'ur', 'ur.id_usuario = u.id')
+      .leftJoin('roles', 'r', 'r.id = ur.id_rol');
+
+    if (soloActibosBool) {
+      qb.where('u.estado = :estado', { estado: 1 });
+    }
+
+    if (rol) {
+      qb.andWhere('LOWER(r.nombre_rol) = LOWER(:rol)', { rol });
+    }
+
+    if (q) {
+      qb.andWhere(
+        '(LOWER(p.nombres) ILIKE :q OR LOWER(p.primer_apellido) ILIKE :q OR LOWER(u.email) ILIKE :q)',
+        { q: `%${q.toLowerCase()}%` },
+      );
+    }
+
+    const total = await qb.getCount();
+
+    qb.skip((page - 1) * limit).take(limit);
+
+    const data = await qb.getRawMany();
+
+    return { data, total, page: Number(page), limit: Number(limit) };
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  CREACIÓN DIRECTA DE PONENTE (por el Coordinador)
+  // ══════════════════════════════════════════════════════════
+
+  /**
+   * Crea un usuario tipo Ponente: credenciales + persona + rol Ponente.
+   * Se ejecuta dentro de una transacción.
+   */
+  async crearPonente(dto: CrearPonenteDto): Promise<Omit<Usuario, 'password'>> {
+    const existe = await this.usuarioRepository.findOneBy({ email: dto.email });
+    if (existe) {
+      throw new ConflictException(`El email '${dto.email}' ya está registrado.`);
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const hash = await bcrypt.hash(dto.password, 10);
+
+      const usuario = queryRunner.manager.create(Usuario, {
+        email: dto.email,
+        password: hash,
+        estado: 1,
+      });
+      const usuarioGuardado = await queryRunner.manager.save(usuario);
+
+      const { email, password, ...datosPersona } = dto;
+      const persona = queryRunner.manager.create(Persona, {
+        ...datosPersona,
+        usuario: usuarioGuardado,
+      });
+      await queryRunner.manager.save(persona);
+
+      const ponenteRol = await queryRunner.manager.findOne(Rol, {
+        where: { id: RoleId.PONENTE },
+      });
+
+      if (ponenteRol) {
+        const usuarioRol = queryRunner.manager.create(UsuarioRol, {
+          usuario: usuarioGuardado,
+          rol: ponenteRol,
+          estado: 1,
+        });
+        await queryRunner.manager.save(usuarioRol);
+      }
+
+      await queryRunner.commitTransaction();
+      return this.getPerfil(usuarioGuardado.id);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   // ══════════════════════════════════════════════════════════

@@ -1,47 +1,66 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  ParseIntPipe,
+  Controller, Get, Post, Put, Delete,
+  Body, Param, ParseIntPipe, UseGuards, Query,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ActividadesAcademicasService } from './actividades-academicas.service';
-import { ActividadAcademica } from './entities/actividad-academica.entity';
+import { CreateActividadDto } from './dto/create-actividad.dto';
+import { UpdateActividadDto } from './dto/update-actividad.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
+@ApiTags('Actividades Académicas')
 @Controller('actividades-academicas')
 export class ActividadesAcademicasController {
-  constructor(
-    private readonly actividadesAcademicasService: ActividadesAcademicasService,
-  ) {}
+  constructor(private readonly service: ActividadesAcademicasService) {}
 
-  @Post()
-  create(@Body() data: Partial<ActividadAcademica>) {
-    return this.actividadesAcademicasService.create(data);
-  }
-
+  /** GET /actividades-academicas — lista todas */
   @Get()
+  @ApiOperation({ summary: 'Listar actividades académicas' })
   findAll() {
-    return this.actividadesAcademicasService.findAll();
+    return this.service.findAll();
   }
 
+  /** GET /actividades-academicas/:id */
   @Get(':id')
+  @ApiOperation({ summary: 'Detalle de una actividad' })
   findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.actividadesAcademicasService.findOne(id);
+    return this.service.findOne(id);
   }
 
-  @Patch(':id')
-  update(
+  // ── Coordinador ─────────────────────────────────────────────
+
+  /** POST /actividades-academicas */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Coordinador', 'Super Usuario')
+  @ApiBearerAuth()
+  @Post()
+  @ApiOperation({ summary: 'Crear actividad académica (Coordinador)' })
+  crear(@Body() dto: CreateActividadDto) {
+    return this.service.crear(dto);
+  }
+
+  /** PUT /actividades-academicas/:id */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Coordinador', 'Super Usuario')
+  @ApiBearerAuth()
+  @Put(':id')
+  @ApiOperation({ summary: 'Actualizar actividad académica (Coordinador)' })
+  actualizar(
     @Param('id', ParseIntPipe) id: number,
-    @Body() data: Partial<ActividadAcademica>,
+    @Body() dto: UpdateActividadDto,
   ) {
-    return this.actividadesAcademicasService.update(id, data);
+    return this.service.actualizar(id, dto);
   }
 
+  /** DELETE /actividades-academicas/:id */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Coordinador', 'Super Usuario')
+  @ApiBearerAuth()
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.actividadesAcademicasService.remove(id);
+  @ApiOperation({ summary: 'Eliminar actividad académica (Coordinador)' })
+  eliminar(@Param('id', ParseIntPipe) id: number) {
+    return this.service.eliminar(id);
   }
 }
