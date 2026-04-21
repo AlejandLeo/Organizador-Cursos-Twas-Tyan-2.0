@@ -124,3 +124,4 @@ export class InscripcionesController {
     return this.service.remove(id);
   }
 }
+

@@ -35,6 +35,12 @@ import { UsuariosCertificadosModule } from './usuarios-certificados/usuarios-cer
 // --- Auth ---
 import { AuthModule } from './auth/auth.module';
 
+// --- Archivos ---
+import { UploadsModule } from './uploads/uploads.module';
+
+// --- Dashboard ---
+import { CoordinadorModule } from './coordinador/coordinador.module';
+
 @Module({
   imports: [
     // --- Config ---
@@ -83,6 +89,12 @@ import { AuthModule } from './auth/auth.module';
 
     // --- Auth ---
     AuthModule,
+
+    // --- Archivos ---
+    UploadsModule,
+
+    // --- Especiales ---
+    CoordinadorModule,
   ],
   controllers: [AppController],
   providers: [AppService],

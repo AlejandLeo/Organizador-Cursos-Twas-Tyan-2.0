@@ -286,6 +286,10 @@ export class UsuariosService {
   //  BÚSQUEDA Y FILTRADO (para el panel del Coordinador)
   // ══════════════════════════════════════════════════════════
 
+  // ══════════════════════════════════════════════════════════
+  //  BÚSQUEDA Y FILTRADO (para el panel del Coordinador)
+  // ══════════════════════════════════════════════════════════
+
   /**
    * Lista usuarios con filtros: por rol, búsqueda libre y paginación.
    * Nunca devuelve el campo password.
@@ -294,7 +298,7 @@ export class UsuariosService {
     filtros: FiltrarUsuariosDto,
   ): Promise<{ data: any[]; total: number; page: number; limit: number }> {
     const { rol, q, page = 1, limit = 20, soloActivos } = filtros;
-    const soloActibosBool = soloActivos !== 'false';
+    const soloActivosBool = soloActivos !== 'false';
 
     const qb = this.usuarioRepository.createQueryBuilder('u')
       .leftJoinAndSelect('u.persona', 'p')
@@ -309,7 +313,7 @@ export class UsuariosService {
       .leftJoinAndSelect('imp.actividadAcademica', 'act_imp')
       .leftJoinAndSelect('act_imp.evento', 'ev_imp');
 
-    if (soloActibosBool) {
+    if (soloActivosBool) {
       qb.where('u.estado = :estado', { estado: 1 });
     }
 
@@ -363,7 +367,6 @@ export class UsuariosService {
       });
       const usuarioGuardado = await queryRunner.manager.save(usuario);
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { email, password, id_grado_academico, id_rol, ...datosPersona } = dto;
       const persona = queryRunner.manager.create(Persona, {
         ...datosPersona,
@@ -406,6 +409,7 @@ export class UsuariosService {
       await queryRunner.release();
     }
   }
+
 
   // ══════════════════════════════════════════════════════════
   //  AUTH

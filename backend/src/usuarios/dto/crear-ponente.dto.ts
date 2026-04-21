@@ -65,3 +65,4 @@ export class CrearPonenteDto {
   @IsInt()
   id_rol?: number;
 }
+

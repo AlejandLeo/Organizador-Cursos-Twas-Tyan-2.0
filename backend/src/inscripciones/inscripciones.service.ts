@@ -125,3 +125,4 @@ export class InscripcionesService {
     return this.inscripcionRepository.delete(id);
   }
 }
+
