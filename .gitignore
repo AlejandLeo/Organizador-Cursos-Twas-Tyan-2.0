@@ -1,1 +1,5 @@
 node_modules
+scratch/
+backend/uploads/
+*.bak
+
