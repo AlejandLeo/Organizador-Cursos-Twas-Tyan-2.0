@@ -10,6 +10,9 @@ export interface Usuario {
   email: string;
   password?: string; // Opcional porque no siempre la traemos del back
   estado: EstadoUsuario;
+  persona?: Persona;
+  roles?: Rol[];
+  afiliaciones?: Afiliacion[];
 }
 
 export interface Persona {

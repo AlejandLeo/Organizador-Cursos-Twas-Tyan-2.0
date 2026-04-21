@@ -1,1 +1,1 @@
-<!-- File deprecated by refactor. See router level for details. -->
+<template><div>Actividades</div></template><script setup lang="ts"></script>

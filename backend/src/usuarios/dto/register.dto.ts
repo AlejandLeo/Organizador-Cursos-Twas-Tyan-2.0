@@ -87,4 +87,8 @@ export class RegisterDto {
   @IsOptional()
   @IsInt({ message: 'El id_grado_academico debe ser un número entero.' })
   id_grado_academico?: number;
+
+  @IsOptional()
+  @IsInt({ message: 'El ID de rol debe ser un número entero.' })
+  id_rol?: number;
 }

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import LoginView from '../views/auth/LoginView.vue'
 import RegisterView from '../views/auth/RegisterView.vue'
 import DashboardLayout from '../layouts/DashboardLayout.vue'
@@ -35,6 +36,11 @@ const router = createRouter({
           path: 'actividades',
           name: 'coordinador-actividades',
           component: () => import('../views/actividades/ActividadesListView.vue'),
+        },
+        {
+          path: 'solicitudes',
+          name: 'coordinador-solicitudes',
+          component: () => import('../views/coordinador/CoordinadorSolicitudesView.vue'),
         },
         {
           path: 'actividades/:id',
@@ -131,11 +137,6 @@ const router = createRouter({
           component: () => import('../views/estudiante/EstudianteCatalogoView.vue'),
         },
         {
-          path: 'eventos',
-          name: 'estudiante-eventos',
-          component: () => import('../views/estudiante/EstudianteEventosView.vue'),
-        },
-        {
           path: 'actividades',
           name: 'estudiante-actividades',
           component: () => import('../views/estudiante/EstudianteActividadesView.vue'),
@@ -154,11 +155,45 @@ const router = createRouter({
           path: 'certificados',
           name: 'estudiante-certificados',
           component: () => import('../views/estudiante/EstudianteCertificadosView.vue'),
+        },
+        {
+          path: 'perfil',
+          name: 'estudiante-perfil',
+          component: () => import('../views/estudiante/EstudiantePerfilView.vue'),
         }
       ]
     },
     // ... otras rutas
   ],
 })
+
+router.beforeEach(async (to, from, next) => {
+  // Rutas que requieren estar autenticado
+  const requireAuthPaths = ['/coordinador', '/ponente', '/estudiante'];
+  
+  const pathRequiresAuth = requireAuthPaths.some(path => to.path.startsWith(path));
+
+  // Initialize store safely inside router hooks to prevent circular dependencies at load time
+  const authStore = useAuthStore();
+
+  if (pathRequiresAuth) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      // No hay sesión activa, bloqueamos el acceso y mandamos al login
+      return next({ name: 'login' });
+    } else if (!authStore.user) {
+      // Fetch fresh user dynamically with existing token before passing the guard
+      await authStore.fetchUser();
+      
+      // If fetching the user fails, token is likely expired or invalid
+      if (!authStore.isAuthenticated) {
+         return next({ name: 'login' });
+      }
+    }
+  }
+  
+  // Si no requiere autenticación o sí tiene token, lo dejamos continuar
+  next();
+});
 
 export default router

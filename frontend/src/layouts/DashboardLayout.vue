@@ -1,17 +1,27 @@
 <script setup lang="ts">
-import { ref } from 'vue';
 import { RouterView } from 'vue-router';
 import AppHeader from '@/layouts/AppHeader.vue';
 import AppSidebar from '@/layouts/AppSidebar.vue';
+import { useUIStore } from '@/stores/ui';
 
-const sidebarOpen = ref(true);
+const uiStore = useUIStore();
 </script>
 
 <template>
-  <div class="flex min-h-screen overflow-x-hidden bg-[#f8f9fc] dark:bg-black transition-colors duration-300">
+  <div class="min-h-screen bg-[#f8f9fc] dark:bg-black transition-colors duration-300 relative">
     <AppHeader />
     <AppSidebar />
-    <main class="flex-1 ml-72 p-10 mt-[75px] relative transition-colors duration-300">
+    
+    <!-- Overlay para móviles -->
+    <div v-if="uiStore.isMobile && uiStore.isSidebarOpen" 
+         @click="uiStore.closeSidebar"
+         class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[40] animate-in fade-in duration-300">
+    </div>
+
+    <main :class="[
+            uiStore.isSidebarOpen && !uiStore.isMobile ? 'ml-72' : 'ml-0',
+            'transition-all duration-300 p-4 md:p-10 pt-[100px] md:pt-[105px] min-h-screen relative'
+          ]">
       <div class="max-w-7xl mx-auto">
         <RouterView />
       </div>

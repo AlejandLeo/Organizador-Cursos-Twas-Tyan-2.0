@@ -29,13 +29,13 @@ const eventosAsignados = ref([
   }
 ]);
 
-const getStatusColor = (status) => {
+const getStatusColor = (status: any) => {
   if (status === 'En Progreso') return 'text-umsa-blue bg-blue-50 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800';
   if (status === 'Finalizado') return 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800';
   return 'text-slate-500 bg-slate-100 dark:bg-gray-800 dark:text-gray-400 border border-slate-200 dark:border-gray-700';
 };
 
-const openActividadesEvento = (eventoId) => {
+const openActividadesEvento = (eventoId: any) => {
   router.push({ name: 'ponente-curso', params: { evento_id: eventoId } });
 };
 </script>

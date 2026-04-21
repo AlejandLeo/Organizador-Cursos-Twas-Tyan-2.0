@@ -17,13 +17,16 @@ import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RegisterDto } from './dto/register.dto';
+import { CrearPonenteDto } from './dto/crear-ponente.dto';
+import { FiltrarUsuariosDto } from './dto/filtrar-usuarios.dto';
 
 // Entidades adicionales para registro y roles
 import { Rol } from '../roles/entities/rol.entity';
 import { UsuarioRol } from '../usuarios-roles/entities/usuario-rol.entity';
 import { Afiliacion } from '../afiliaciones/entities/afiliacion.entity';
-import { GradoAcademico } from '../grados-academicos/entities/grado-academico.entity';
 import { RoleId } from './constants/user-roles.constants';
+import * as fs from 'fs';
+import { join } from 'path';
 
 @Injectable()
 export class UsuariosService {
@@ -38,6 +41,137 @@ export class UsuariosService {
   // ══════════════════════════════════════════════════════════
   //  CRUD BÁSICO
   // ══════════════════════════════════════════════════════════
+
+  // ══════════════════════════════════════════════════════════
+  // PERFIL
+  // ══════════════════════════════════════════════════════════
+
+  async actualizarPerfil(
+    id_usuario: number,
+    data: {
+      institucion?: string;
+      id_grado_academico?: number;
+      [key: string]: any;
+    },
+  ) {
+    const usuario = await this.usuarioRepository.findOne({
+      where: { id: id_usuario },
+      relations: ['persona', 'afiliaciones'],
+    });
+
+    if (!usuario || !usuario.persona) {
+      throw new NotFoundException('Perfil no encontrado');
+    }
+
+    const { institucion, id_grado_academico, ...datosPersonaOriginal } = data;
+    // Cast safe para actualizar persona, ignorando los ids
+    const datosPersona = { ...datosPersonaOriginal };
+
+    // Evitar que traten de cambiar IDs internos
+    delete datosPersona.id;
+    delete datosPersona.id_usuario;
+    delete datosPersona.email;
+    delete datosPersona.password;
+    delete datosPersona.estado;
+
+    await this.personaRepository.update(usuario.persona.id, datosPersona);
+
+    // Actualizar o crear Afiliacion principal
+    if (institucion !== undefined || id_grado_academico !== undefined) {
+      const afiliacionRepo = this.dataSource.getRepository(Afiliacion);
+      if (usuario.afiliaciones && usuario.afiliaciones.length > 0) {
+        // Actualizar la primera
+        const af = usuario.afiliaciones[0];
+        if (institucion !== undefined) af.institucion = institucion;
+        if (id_grado_academico !== undefined)
+          af.id_grado_academico = id_grado_academico;
+        await afiliacionRepo.save(af);
+      } else {
+        // Crear una nueva
+        const newAf = afiliacionRepo.create({
+          institucion: institucion || '',
+          id_grado_academico: id_grado_academico ?? undefined,
+          usuario: usuario,
+        });
+        await afiliacionRepo.save(newAf);
+      }
+    }
+
+    return this.getPerfil(id_usuario);
+  }
+
+  /**
+   * Permite a un administrador o coordinador actualizar los datos de CUALQUIER usuario.
+   */
+  async actualizarDatosAdmin(id_usuario: number, data: any) {
+    const usuario = await this.usuarioRepository.findOne({
+      where: { id: id_usuario },
+      relations: ['persona', 'afiliaciones'],
+    });
+
+    if (!usuario) {
+      throw new NotFoundException(`Usuario ${id_usuario} no encontrado`);
+    }
+
+    // 1. Actualizar Email
+    if (data.email && data.email !== usuario.email) {
+      usuario.email = data.email;
+      await this.usuarioRepository.save(usuario);
+    }
+
+    // 2. Extraer datos específicos
+    const { institucion, id_grado_academico, especialidad, ...datosPersonaOriginal } = data;
+
+    // 3. Procesar Persona (Sanitización y Mapeo)
+    if (usuario.persona) {
+      const datosPersona: any = {};
+      
+      // Mapeo seguro de campos existentes en Persona
+      const camposSeguros = ['nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad', 'celular', 'pais_origen', 'pais_residencia'];
+      camposSeguros.forEach(c => {
+        if (datosPersonaOriginal[c] !== undefined) datosPersona[c] = datosPersonaOriginal[c];
+      });
+
+      // Mapeo de Género (Texto -> Número)
+      if (datosPersonaOriginal.genero !== undefined) {
+        const g = datosPersonaOriginal.genero;
+        if (typeof g === 'string') {
+          if (g.startsWith('Mas')) datosPersona.genero = 0;
+          else if (g.startsWith('Fem')) datosPersona.genero = 1;
+          else datosPersona.genero = 2;
+        } else {
+          datosPersona.genero = g;
+        }
+      }
+
+      // Manejo de Fecha Nacimiento
+      if (datosPersonaOriginal.fecha_nacimiento === '' || datosPersonaOriginal.fecha_nacimiento === null) {
+        datosPersona.fecha_nacimiento = null;
+      } else if (datosPersonaOriginal.fecha_nacimiento) {
+        datosPersona.fecha_nacimiento = datosPersonaOriginal.fecha_nacimiento;
+      }
+
+      await this.personaRepository.update(usuario.persona.id, datosPersona);
+    }
+
+    // 4. Actualizar Afiliación (Incluyendo especialidad/disciplina)
+    if (institucion !== undefined || id_grado_academico !== undefined || especialidad !== undefined) {
+      const afRepo = this.dataSource.getRepository(Afiliacion);
+      let af = usuario.afiliaciones?.[0];
+      
+      if (!af) {
+        af = afRepo.create({ usuario: usuario });
+      }
+
+      if (institucion !== undefined) af.institucion = institucion;
+      if (id_grado_academico !== undefined) af.id_grado_academico = id_grado_academico;
+      if (especialidad !== undefined) af.disciplina_cientifica = especialidad;
+
+      await afRepo.save(af);
+    }
+
+    return this.getPerfil(id_usuario);
+  }
 
   /**
    * Crea un usuario simple (solo credenciales).
@@ -138,6 +272,141 @@ export class UsuariosService {
     return { mensaje: `Usuario ${id} eliminado correctamente.` };
   }
 
+  /**
+   * Deshabilita un usuario (estado = 0) en lugar de eliminarlo físicamente.
+   * Uso del coordinador para suspender accesos sin perder historias.
+   */
+  async deshabilitarUsuario(id: number): Promise<{ mensaje: string }> {
+    await this.findOne(id);
+    await this.usuarioRepository.update(id, { estado: 0 });
+    return { mensaje: `Usuario ${id} deshabilitado correctamente.` };
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  BÚSQUEDA Y FILTRADO (para el panel del Coordinador)
+  // ══════════════════════════════════════════════════════════
+
+  /**
+   * Lista usuarios con filtros: por rol, búsqueda libre y paginación.
+   * Nunca devuelve el campo password.
+   */
+  async findConFiltros(
+    filtros: FiltrarUsuariosDto,
+  ): Promise<{ data: any[]; total: number; page: number; limit: number }> {
+    const { rol, q, page = 1, limit = 20, soloActivos } = filtros;
+    const soloActibosBool = soloActivos !== 'false';
+
+    const qb = this.usuarioRepository.createQueryBuilder('u')
+      .leftJoinAndSelect('u.persona', 'p')
+      .leftJoinAndSelect('u.usuariosRoles', 'ur')
+      .leftJoinAndSelect('ur.rol', 'r')
+      .leftJoinAndSelect('u.afiliaciones', 'af')
+      .leftJoinAndSelect('af.gradoAcademico', 'ga')
+      .leftJoinAndSelect('u.inscripciones', 'ins')
+      .leftJoinAndSelect('ins.actividadAcademica', 'act')
+      .leftJoinAndSelect('act.evento', 'ev')
+      .leftJoinAndSelect('u.imparticiones', 'imp')
+      .leftJoinAndSelect('imp.actividadAcademica', 'act_imp')
+      .leftJoinAndSelect('act_imp.evento', 'ev_imp');
+
+    if (soloActibosBool) {
+      qb.where('u.estado = :estado', { estado: 1 });
+    }
+
+    if (rol) {
+      qb.andWhere('LOWER(r.nombre_rol) = LOWER(:rol)', { rol });
+    }
+
+    if (q) {
+      qb.andWhere(
+        '(LOWER(p.nombres) ILIKE :q OR LOWER(p.primer_apellido) ILIKE :q OR LOWER(u.email) ILIKE :q)',
+        { q: `%${q.toLowerCase()}%` },
+      );
+    }
+
+    const total = await qb.getCount();
+
+    qb.skip((page - 1) * limit).take(limit);
+
+    const data = await qb.getMany();
+
+    return { data, total, page: Number(page), limit: Number(limit) };
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  CREACIÓN DIRECTA DE PONENTE (por el Coordinador)
+  // ══════════════════════════════════════════════════════════
+
+  /**
+   * Crea un usuario tipo Ponente: credenciales + persona + rol Ponente.
+   * Se ejecuta dentro de una transacción.
+   */
+  async crearPonente(dto: CrearPonenteDto): Promise<Omit<Usuario, 'password'>> {
+    const existe = await this.usuarioRepository.findOneBy({ email: dto.email });
+    if (existe) {
+      throw new ConflictException(
+        `El email '${dto.email}' ya está registrado.`,
+      );
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const hash = await bcrypt.hash(dto.password, 10);
+
+      const usuario = queryRunner.manager.create(Usuario, {
+        email: dto.email,
+        password: hash,
+        estado: 1,
+      });
+      const usuarioGuardado = await queryRunner.manager.save(usuario);
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { email, password, id_grado_academico, id_rol, ...datosPersona } = dto;
+      const persona = queryRunner.manager.create(Persona, {
+        ...datosPersona,
+        usuario: usuarioGuardado,
+      });
+      await queryRunner.manager.save(persona);
+
+      // 4️⃣ Crear Afiliación Inicial si se especificó grado académico
+      if (id_grado_academico) {
+        const afiliacion = queryRunner.manager.create(Afiliacion, {
+          id_grado_academico,
+          usuario: usuarioGuardado,
+          institucion: 'UMSA', // Valor por defecto para agilizar registro
+          estado: 1,
+        });
+        await queryRunner.manager.save(afiliacion);
+      }
+
+      // 5️⃣ Asignar Rol
+      const rolId = id_rol || RoleId.PONENTE;
+      const rolSeleccionado = await queryRunner.manager.findOne(Rol, {
+        where: { id: rolId },
+      });
+
+      if (rolSeleccionado) {
+        const usuarioRol = queryRunner.manager.create(UsuarioRol, {
+          usuario: usuarioGuardado,
+          rol: rolSeleccionado,
+          estado: 1,
+        });
+        await queryRunner.manager.save(usuarioRol);
+      }
+
+      await queryRunner.commitTransaction();
+      return this.getPerfil(usuarioGuardado.id);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
   // ══════════════════════════════════════════════════════════
   //  AUTH
   // ══════════════════════════════════════════════════════════
@@ -175,6 +444,7 @@ export class UsuariosService {
     }
 
     // Eliminamos password del objeto antes de devolver
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...usuarioSinPassword } = usuario;
     return usuarioSinPassword as Omit<Usuario, 'password'>;
   }
@@ -243,14 +513,18 @@ export class UsuariosService {
       const usuarioGuardado = await queryRunner.manager.save(usuario);
 
       // 3️⃣ Crear persona vinculada
+
       const {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         email,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         password,
         institucion,
         tipo_afiliacion,
         area_tematica,
         disciplina_cientifica,
         id_grado_academico,
+        id_rol,
         ...datoPersona
       } = dto;
 
@@ -260,15 +534,16 @@ export class UsuariosService {
       });
       await queryRunner.manager.save(persona);
 
-      // 4️⃣ Asignar Rol de Estudiante por defecto
-      const estudianteRol = await queryRunner.manager.findOne(Rol, {
-        where: { id: RoleId.ESTUDIANTE },
+      // 4️⃣ Asignar Rol solicitado o Estudiante por defecto
+      const rolSeleccionadoId = id_rol ? id_rol : RoleId.ESTUDIANTE;
+      const rolSeleccionado = await queryRunner.manager.findOne(Rol, {
+        where: { id: rolSeleccionadoId },
       });
 
-      if (estudianteRol) {
+      if (rolSeleccionado) {
         const usuarioRol = queryRunner.manager.create(UsuarioRol, {
           usuario: usuarioGuardado,
-          rol: estudianteRol,
+          rol: rolSeleccionado,
           estado: 1,
         });
         await queryRunner.manager.save(usuarioRol);
@@ -365,7 +640,54 @@ export class UsuariosService {
       throw new NotFoundException(`Usuario con id ${id} no encontrado.`);
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...perfil } = usuario;
     return perfil as Omit<Usuario, 'password'>;
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // FIRMA DIGITAL (PONENTES)
+  // ══════════════════════════════════════════════════════════
+  async actualizarFirmaLocal(id_usuario: number, filename: string) {
+    const usuario = await this.usuarioRepository.findOne({
+      where: { id: id_usuario },
+      relations: ['persona'],
+    });
+
+    if (!usuario || !usuario.persona) {
+      throw new NotFoundException('Perfil de usuario no encontrado');
+    }
+
+    const oldFirma = usuario.persona.firma_dig;
+
+    // Guardar nuevo nombre
+    await this.personaRepository.update(usuario.persona.id, {
+      firma_dig: filename,
+    });
+
+    // Eliminar la firma vieja físicamente si existe
+    if (oldFirma && oldFirma !== filename) {
+      const p = join(process.cwd(), 'uploads/firmas', oldFirma);
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    }
+
+    return true;
+  }
+
+  async obtenerRutaFirmaLocal(id_usuario: number): Promise<string | null> {
+    const usuario = await this.usuarioRepository.findOne({
+      where: { id: id_usuario },
+      relations: ['persona'],
+    });
+
+    if (!usuario || !usuario.persona || !usuario.persona.firma_dig) {
+      return null;
+    }
+
+    const p = join(process.cwd(), 'uploads/firmas', usuario.persona.firma_dig);
+    if (fs.existsSync(p)) {
+      return p;
+    }
+    return null;
   }
 }

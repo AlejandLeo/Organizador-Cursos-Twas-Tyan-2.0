@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
+const authStore = useAuthStore();
 
 const navigate = (routeName: string) => {
   router.push({ name: routeName });
@@ -16,11 +18,11 @@ const navigate = (routeName: string) => {
 
       <div class="flex items-center gap-3 mb-2">
         <div class="w-10 h-10 rounded-full bg-blue-100 dark:bg-gray-800 text-umsa-blue font-black flex items-center justify-center text-lg border border-blue-200 dark:border-gray-700 shadow-inner">
-          F
+          {{ authStore.user?.persona?.nombres?.charAt(0) || 'P' }}
         </div>
         <div>
           <p class="text-[9px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Bienvenido</p>
-          <h3 class="text-sm font-black text-slate-800 dark:text-white leading-tight uppercase">Federico</h3>
+          <h3 class="text-sm font-black text-slate-800 dark:text-white leading-tight uppercase">{{ authStore.user?.persona?.nombres || 'Ponente' }}</h3>
         </div>
       </div>
       <p class="text-[10px] text-umsa-blue dark:text-blue-400 mt-2 uppercase tracking-widest font-black bg-blue-50 w-max px-2 py-1 rounded-md dark:bg-gray-800 border border-blue-100 dark:border-gray-700">Expositor</p>

@@ -7,19 +7,28 @@ import {
   Param,
   Delete,
   ParseIntPipe,
-  HttpCode,
   HttpStatus,
   UseGuards,
   Request,
   Query,
+  UseInterceptors,
+  UploadedFile,
+  Res,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
+import * as fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 import { UsuariosService } from './usuarios.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
-import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RegisterDto } from './dto/register.dto';
+import { CrearPonenteDto } from './dto/crear-ponente.dto';
+import { FiltrarUsuariosDto } from './dto/filtrar-usuarios.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -45,6 +54,151 @@ export class UsuariosController {
   @ApiOperation({ summary: 'Registro completo (Usuario + Persona)' })
   register(@Body() registerDto: RegisterDto) {
     return this.usuariosService.register(registerDto);
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // PERFIL METHODS
+  // ══════════════════════════════════════════════════════════
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Patch('perfil/datos')
+  @ApiOperation({ summary: 'Actualizar datos personales del perfil' })
+  async updatePerfil(@Request() req: any, @Body() data: any) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+    return this.usuariosService.actualizarPerfil(req.user.sub, data);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('perfil/upload-foto')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads/profiles',
+        filename: (req: any, file, cb) => {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+          const id = req.user?.sub;
+          const ext = extname(file.originalname).toLowerCase();
+          cb(null, `user_${id}${ext}`);
+        },
+      }),
+      fileFilter: (req: any, file, cb) => {
+        if (file.mimetype === 'image/jpeg' || file.mimetype === 'image/png') {
+          cb(null, true);
+        } else {
+          cb(new Error('Extensiones válidas: JPG o PNG'), false);
+        }
+      },
+    }),
+  )
+  @ApiOperation({ summary: 'Subir foto de perfil (JPG/PNG)' })
+  uploadFoto(@Request() req: any, @UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new Error('No se pudo subir la foto de perfil');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+    const idUsuario = req.user.sub;
+    const currentExt = extname(file.originalname).toLowerCase();
+
+    // Clean up other extensions
+    const exts = ['.jpg', '.jpeg', '.png'];
+    for (const e of exts) {
+      if (e !== currentExt) {
+        const p = join(
+          process.cwd(),
+          'uploads/profiles',
+          `user_${idUsuario}${e}`,
+        );
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      }
+    }
+    return { message: 'Foto actualizada' };
+  }
+
+  @Get('perfil/foto')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Obtener la foto de perfil' })
+  getFoto(@Request() req: any, @Res() res: Response) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+    const id = req.user.sub;
+    const exts = ['.jpg', '.jpeg', '.png'];
+    let filePath: string | null = null;
+
+    for (const ext of exts) {
+      const p = join(process.cwd(), 'uploads/profiles', `user_${id}${ext}`);
+      if (fs.existsSync(p)) {
+        filePath = p;
+        break;
+      }
+    }
+
+    if (filePath) {
+      res.sendFile(filePath);
+    } else {
+      res.status(HttpStatus.NOT_FOUND).send('No profile photo');
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // FIRMA DIGITAL (Ponentes)
+  // ══════════════════════════════════════════════════════════
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Ponente') // Restringido opcionalmente, o a todos los que requieran
+  @ApiBearerAuth()
+  @Post('perfil/upload-firma')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads/firmas',
+        filename: (req: any, file, cb) => {
+          const ext = extname(file.originalname).toLowerCase();
+          cb(null, `${uuidv4()}${ext}`);
+        },
+      }),
+      fileFilter: (req: any, file, cb) => {
+        if (file.mimetype === 'image/png') {
+          cb(null, true);
+        } else {
+          cb(new Error('Extension válida para firma: PNG'), false);
+        }
+      },
+    }),
+  )
+  @ApiOperation({ summary: 'Subir firma digital (Solo PNG)' })
+  async uploadFirma(
+    @Request() req: any,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new Error('No se pudo subir la firma digital');
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const idUsuario = req.user.sub as number;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+    await (this.usuariosService as any).actualizarFirmaLocal(
+      idUsuario,
+      file.filename,
+    );
+    return { message: 'Firma digital actualizada', firma: file.filename };
+  }
+
+  @Get('perfil/firma')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Obtener la firma digital (Ponente)' })
+  async getFirma(@Request() req: any, @Res() res: Response) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const idUsuario = req.user.sub as number;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+    const filePath = await (this.usuariosService as any).obtenerRutaFirmaLocal(
+      idUsuario,
+    );
+    if (filePath) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      res.sendFile(filePath);
+    } else {
+      res.status(HttpStatus.NOT_FOUND).send('No digital signature');
+    }
   }
 
   /**
@@ -82,18 +236,34 @@ export class UsuariosController {
 
   /**
    * GET /usuarios
-   * Lista usuarios activos por defecto.
-   * ?soloActivos=false → incluye también usuarios inactivos (uso administrativo).
-   * La contraseña NUNCA se incluye en la respuesta.
+   * Usa FiltrarUsuariosDto para soportar ?rol=, ?q=, ?page=, ?limit=, ?soloActivos=
+   * Si el coordinador pasa filtros → llama findConFiltros.
+   * Si no hay filtros → comportamiento anterior (findAll).
    */
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Get()
-  @ApiOperation({ summary: 'Listar usuarios (con filtros)' })
-  findAll(@Query('soloActivos') soloActivos: string) {
-    // Si el query param existe y es exactamente 'false', muestra todos
-    const filtrar = soloActivos !== 'false';
+  @ApiOperation({ summary: 'Listar usuarios (con filtros y paginación)' })
+  findAll(@Query() filtros: FiltrarUsuariosDto) {
+    // Si viene algún filtro de coordinador, usar la versión enriquecida
+    if (filtros.rol || filtros.q || filtros.page || filtros.limit) {
+      return this.usuariosService.findConFiltros(filtros);
+    }
+    const filtrar = filtros.soloActivos !== 'false';
     return this.usuariosService.findAll(filtrar);
+  }
+
+  /**
+   * GET /usuarios/public/equipo
+   * Endpoint público para la landing page. Retorna Ponentes y Coordinadores.
+   */
+  @Get('public/equipo')
+  @ApiOperation({ summary: 'Listar equipo para la página pública (Landing)' })
+  async findEquipoPublico(@Query('rol') rol: string) {
+    const filtros = new FiltrarUsuariosDto();
+    filtros.rol = rol || 'Ponente'; // Por defecto Ponente
+    filtros.limit = 100;
+    return this.usuariosService.findConFiltros(filtros);
   }
 
   /**
@@ -162,5 +332,49 @@ export class UsuariosController {
     @Body('rolId', ParseIntPipe) rolId: number,
   ) {
     return this.usuariosService.asignarRol(id, rolId);
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  ENDPOINTS COORDINADOR
+  // ══════════════════════════════════════════════════════════
+
+  /**
+   * POST /usuarios/ponente
+   * Crea un ponente completo (credenciales + persona + rol Ponente).
+   * Solo accesible por Coordinador o Super Usuario.
+   */
+  @Roles('Coordinador', 'Super Usuario')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Post('ponente')
+  @ApiOperation({ summary: 'Crear un ponente directamente (Coord/Admin)' })
+  crearPonente(@Body() dto: CrearPonenteDto) {
+    return this.usuariosService.crearPonente(dto);
+  }
+
+  @Roles('Coordinador', 'Super Usuario')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Patch(':id/perfil-completo')
+  @ApiOperation({ summary: 'Actualización administrativa de datos (Persona + Afiliación)' })
+  actualizarDatosAdmin(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: any,
+  ) {
+    return this.usuariosService.actualizarDatosAdmin(id, data);
+  }
+
+  /**
+   * DELETE /usuarios/:id
+   * Deshabilita el usuario (estado=0). No elimina físicamente.
+   * Solo accesible por Coordinador o Super Usuario.
+   */
+  @Roles('Coordinador', 'Super Usuario')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Delete(':id')
+  @ApiOperation({ summary: 'Deshabilitar usuario (Coord/Admin)' })
+  deshabilitarUsuario(@Param('id', ParseIntPipe) id: number) {
+    return this.usuariosService.deshabilitarUsuario(id);
   }
 }

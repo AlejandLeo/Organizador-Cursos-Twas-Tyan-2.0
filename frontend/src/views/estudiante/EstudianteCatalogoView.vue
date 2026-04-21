@@ -1,63 +1,66 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import api from '@/services/api'; // Import api instance
 
-const eventosPublicados = ref([
-  {
-    id: 1,
-    nombreCorto: 'TWAS',
-    nombreLargo: 'The World Academy of Sciences',
-    version: 'Versión 2026',
-    descripcion: 'Eventos del The World Academy of Sciences incluyendo diversas ramas de especialización. Inscríbete a nuestras próximas actividades académicas.',
-    imagen: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80',
-    estado: 'Evento Activo',
-    colorEstado: 'bg-emerald-500 text-white border-emerald-400/30',
-    inscripcionesAbiertas: true,
-    mostrarActividades: true,
-    actividades: [
-      {
-        id: 1,
-        title: 'Programa de Especialidad en Biofertilizantes',
-        status: 'Inscripciones',
-        type: 'Especialidad',
-        date: '15 Mar - 20 Jul 2026',
-        modules: 4,
-        image: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80'
-      },
-      {
-        id: 2,
-        title: 'Taller de Redacción APA 7ma Edición',
-        status: 'Inscripciones',
-        type: 'Taller',
-        date: '10 Abr - 15 Abr 2026',
-        modules: 1,
-        image: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80'
-      }
-    ]
-  },
-  {
-    id: 2,
-    nombreCorto: 'Innovación Tecnológica',
-    nombreLargo: 'Congreso Internacional de Innovación y Tecnología',
-    version: 'Versión 2026',
-    descripcion: 'El congreso anual sobre los últimos avances en tecnología global e investigación.',
-    imagen: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1600&q=80',
-    estado: 'Próximamente',
-    colorEstado: 'bg-emerald-500 text-white border-emerald-400/30',
-    inscripcionesAbiertas: false,
-    mostrarActividades: true,
-    actividades: [
-      {
-        id: 3,
-        title: 'Diplomado en Riego Tecnificado',
-        status: 'Próximamente',
-        type: 'Diplomado',
-        date: '01 Ene - 28 Feb 2026',
-        modules: 6,
-        image: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=800&q=80'
-      }
-    ]
+const router = useRouter();
+const eventosPublicados = ref<any[]>([]);
+const loading = ref(true);
+
+const fetchEventos = async () => {
+  try {
+    const [responseEventos, responseInsc] = await Promise.all([
+      api.get('/eventos'),
+      api.get('/inscripciones/mis-inscripciones')
+    ]);
+
+    const misInsc = responseInsc.data;
+
+    eventosPublicados.value = responseEventos.data.map((evento: any) => ({
+      id: evento.id,
+      nombreCorto: evento.nombre,
+      nombreLargo: evento.nombre,
+      version: evento.gestion || 'Última versión',
+      descripcion: evento.descripcion || 'Sin descripción',
+      imagen: evento.logo || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80',
+      estado: evento.estado == 1 ? 'Activo' : 'Próximamente',
+      colorEstado: evento.estado == 1 ? 'bg-emerald-500 text-white border-emerald-400/30' : 'bg-slate-500 text-white border-slate-400/30',
+      mostrarActividades: true,
+      actividades: (evento.actividades || []).map((act: any) => {
+        const found = misInsc.find((i: any) => i.actividadAcademica?.id === act.id);
+        let myStatus = 'Disponible';
+        if (found) {
+          if (found.estado === 1) myStatus = 'Inscrito';
+          else if (found.estado === 3) myStatus = 'Finalizado';
+          else if (found.estado === 2) myStatus = 'Rechazado';
+          else myStatus = 'Pre-Inscrito';
+        }
+
+        return {
+          id: act.id,
+          title: act.nombre,
+          status: myStatus,
+          type: act.tipo || 'General',
+          date: `${act.fecha_inicio ? new Date(act.fecha_inicio).toLocaleDateString() : 'Por definir'}`,
+          modules: 1,
+          image: act.imagen || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80'
+        };
+      })
+    }));
+  } catch (error) {
+    console.error('Error cargando eventos:', error);
+  } finally {
+    loading.value = false;
   }
-]);
+};
+
+onMounted(() => {
+  fetchEventos();
+});
+
+const verDetalle = (idActividad: number) => {
+  router.push({ name: 'estudiante-actividades-detalle', params: { id: idActividad } });
+};
 
 const toggleActividades = (evento: any) => {
   evento.mostrarActividades = !evento.mostrarActividades;
@@ -76,9 +79,12 @@ const getActividadesAgrupadas = (actividades: any) => {
 };
 
 const getStatusColor = (status: string) => {
-  if (status === 'Inscripciones') return 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800';
-  if (status === 'Próximamente') return 'text-slate-500 bg-slate-100 dark:bg-gray-800 dark:text-gray-400 border border-slate-200 dark:border-gray-700';
-  return 'text-slate-500 bg-slate-100 dark:bg-gray-800 dark:text-gray-400 border border-slate-200 dark:border-gray-700';
+  if (status === 'Finalizado') return 'text-white bg-red-500 border border-red-400 shadow-md';
+  if (status === 'Inscrito' || status === 'En curso') return 'text-white bg-blue-500 border border-blue-400 shadow-md';
+  if (status === 'Pre-Inscrito') return 'text-white bg-amber-500 border border-amber-400 shadow-md';
+  if (status === 'Rechazado') return 'text-white bg-slate-600 border border-slate-500 shadow-md';
+  if (status === 'Próximamente') return 'text-slate-500 bg-slate-100 dark:bg-gray-800 border border-slate-200 dark:border-gray-700';
+  return 'text-white bg-emerald-500 border border-emerald-400 shadow-md'; // Default Disponible
 };
 </script>
 
@@ -99,10 +105,12 @@ const getStatusColor = (status: string) => {
         <img :src="evento.imagen" :alt="evento.nombreCorto" class="w-full h-full object-cover object-center group-hover/card:scale-105 transition-transform duration-[1.5s] ease-out">
         <div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent"></div>
         
+        <!-- Etiqueta de Estado en la parte superior izquierda, destacada -->
+        <span class="absolute top-6 left-6 z-30" :class="[evento.colorEstado, 'text-[12px] font-black uppercase px-4 py-2 rounded-full tracking-widest w-fit shadow-2xl backdrop-blur-md border-2 border-white/20']">
+          ● {{ evento.estado }}
+        </span>
+
         <div class="absolute bottom-0 left-0 right-0 p-8 pt-24 z-20 flex flex-col">
-          <span class="mb-3" :class="[evento.colorEstado, 'text-[8px] font-black uppercase px-3 py-1 rounded-full tracking-widest w-fit shadow-lg backdrop-blur-md border']">
-            {{ evento.estado }}
-          </span>
           <div class="flex items-end justify-between">
             <div>
               <p class="text-xs font-bold text-emerald-400 dark:text-emerald-400 uppercase tracking-widest mb-2">{{ evento.version }}</p>
@@ -134,12 +142,12 @@ const getStatusColor = (status: string) => {
 
           <div class="flex overflow-x-auto gap-6 px-8 pb-8 pt-2 snap-x snap-mandatory flex-nowrap" style="scrollbar-width: none; -ms-overflow-style: none;">
             
-            <div v-for="act in acts" :key="act.id" class="flex-none w-[280px] md:w-[320px] bg-white dark:bg-gray-900 rounded-[1.5rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none border border-slate-200/60 dark:border-gray-800 hover:border-emerald-500/50 dark:hover:border-emerald-500 transition-all hover:-translate-y-1 hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] cursor-pointer group flex flex-col snap-start relative">
+            <div v-for="act in acts" :key="act.id" @click="verDetalle(act.id)" class="flex-none w-[280px] md:w-[320px] bg-white dark:bg-gray-900 rounded-[1.5rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none border border-slate-200/60 dark:border-gray-800 hover:border-emerald-500/50 dark:hover:border-emerald-500 transition-all hover:-translate-y-1 hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] cursor-pointer group flex flex-col snap-start relative">
               
               <div class="relative h-48 w-full overflow-hidden shrink-0">
                 <div class="absolute inset-0 bg-primary-dark/10 group-hover:bg-transparent transition-colors z-10"></div>
                 <img :src="act.image" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" :alt="act.title">   
-                <span class="absolute top-3 right-3 z-20 text-[8px] font-black uppercase px-2 py-1 rounded-md tracking-widest shadow-sm bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm" :class="getStatusColor(act.status)">
+                <span class="absolute top-3 right-3 z-20 text-[8px] font-black uppercase px-2 py-1 rounded-md tracking-widest shadow-sm " :class="getStatusColor(act.status)">
                   {{ act.status }}
                 </span>
                 <div class="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-white dark:from-gray-900 to-transparent z-10 opacity-60"></div>
@@ -153,10 +161,10 @@ const getStatusColor = (status: string) => {
                     <span class="text-[9px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest border border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-800 px-2 py-0.5 rounded-md">{{ act.date }}</span>
                   </div>
                   <div class="flex justify-between items-center text-slate-500 dark:text-gray-400">
-                    <div class="flex items-center text-emerald-600 font-bold group-hover:translate-x-1 transition-transform">   
-                      <span class="text-[10px] uppercase">Inscribirse</span>
+                    <button @click.prevent="verDetalle(act.id)" class="flex items-center text-emerald-600 font-bold hover:translate-x-1 transition-transform group-hover:translate-x-1">   
+                      <span class="text-[10px] uppercase">Ver Actividad</span>
                       <span class="material-symbols-outlined text-[16px] ml-1">arrow_forward</span>    
-                    </div>
+                    </button>
                   </div>
                 </div>
               </div>

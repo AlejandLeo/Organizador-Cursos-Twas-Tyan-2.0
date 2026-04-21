@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const isDark = ref(false)
 const isProfileOpen = ref(false)
 const profileDropdownRef = ref<HTMLElement | null>(null)
@@ -26,6 +28,11 @@ const closeProfile = (e: MouseEvent) => {
 const goToProfile = () => {
   isProfileOpen.value = false
   router.push({ name: 'ponente-datos' })
+}
+
+const handleLogout = () => {
+  authStore.logout()
+  router.push('/login')
 }
 
 onMounted(() => {
@@ -71,7 +78,9 @@ onUnmounted(() => {
             <span class="material-symbols-outlined text-2xl text-slate-400">account_circle</span>
           </div>
           <div class="hidden md:flex flex-col items-start pr-1">
-            <span class="text-xs font-black text-primary-dark dark:text-white leading-tight">Federico Brown</span>
+            <span class="text-xs font-black text-primary-dark dark:text-white leading-tight">
+              {{ authStore.user?.persona?.nombres || 'Ponente' }}
+            </span>
             <span class="text-[9px] uppercase tracking-widest text-slate-400 dark:text-gray-500 font-bold">SSA - Mi Perfil</span>
           </div>
           <span class="material-symbols-outlined text-slate-400 text-sm transition-transform duration-200" :class="[isProfileOpen ? 'rotate-180' : '']">expand_more</span>
@@ -81,7 +90,7 @@ onUnmounted(() => {
         <div v-if="isProfileOpen" class="absolute right-0 top-full mt-2 w-[220px] bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
           
           <div class="p-4 border-b border-slate-100 dark:border-gray-800 bg-slate-50 dark:bg-gray-800/50 block md:hidden">
-             <span class="block text-xs font-black text-primary-dark dark:text-white">Federico Brown</span>
+             <span class="block text-xs font-black text-primary-dark dark:text-white">{{ authStore.user?.persona?.nombres || 'Usuario' }}</span>
              <span class="block text-[9px] uppercase tracking-widest text-slate-400 font-bold mt-0.5">Expositor</span>
           </div>
 
@@ -91,7 +100,7 @@ onUnmounted(() => {
               Ver Perfil de Datos
             </button>
             <div class="h-[1px] bg-slate-100 dark:border-gray-800 my-1"></div>
-            <button class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center gap-2">
+            <button @click="handleLogout" class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center gap-2">
               <span class="material-symbols-outlined text-[18px]">logout</span>
               Cerrar Sesión
             </button>

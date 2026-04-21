@@ -1,41 +1,43 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
+import api from '@/services/api';
+import Swal from 'sweetalert2';
 
-// Usamos datos simulados basados en la estructura del PonenteCursoDetalleView
 const route = useRoute();
 const router = useRouter();
-const actividadId = route.params.id;
-const activeTab = ref(route.query.tab ? String(route.query.tab) : 'resumen');
+const authStore = useAuthStore();
+const user = computed(() => authStore.user);
+const actividadId = Number(route.params.id);
+const loading = ref(true);
 
-const tabs = [
-  { id: 'resumen', label: 'Resumen', icon: 'info' },
-  { id: 'material', label: 'Material & Tareas', icon: 'library_books' },
-  { id: 'calificaciones', label: 'Mi Progreso', icon: 'leaderboard' },
-  { id: 'certificados', label: 'Mi Certificado', icon: 'workspace_premium' }
-];
+const myInscripcion = ref<any>(null); // Guardará la inscripción si existe
+const preinscripcionMenu = ref(false);
+const preinscribiendo = ref(false);
+const errorMensaje = ref('');
+
+const preinscripcionForm = ref({
+  razon: '',
+  miembro_tyan: 0
+});
 
 const actividad = ref({
   id: actividadId,
-  nombre: 'Módulo 1: Fundamentos de Biofertilizantes',
-  tipo: 'Módulo',
-  fecha: '10 May - 20 Jun 2026',
-  estado: 'En curso',
-  progreso: 60,
-  promedio: 85,
-  asistencia: 90,
-  horas: 40,
-  docente: 'Dr. John Doe',
-  descripcion: 'En este módulo aprenderás los principios básicos de la producción y aplicación de biofertilizantes en cultivos de alto rendimiento.',
+  nombre: 'Cargando...',
+  tipo: 'Cargando',
+  fecha: '',
+  estado: 'Cargando',
+  progreso: 0,
+  promedio: 0,
+  asistencia: [] as any[],
+  horas: 0,
+  docente: 'Sin asignar',
+  descripcion: 'Cargando detalle...',
   imagen: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=1200&q=80',
-  materiales: [
-    { id: 1, titulo: 'Guía de Introducción', tipo: 'PDF', tamaño: '2.4 MB', fecha: '12 May 2026' },
-    { id: 2, titulo: 'Video Analisis de Suelo', tipo: 'Video', tamaño: '145 MB', fecha: '15 May 2026' }
-  ],
-  tareas: [
-    { id: 1, titulo: 'Cuestionario Tema 1', estado: 'Entregado', nota: 90, fecha: '18 May 2026' },
-    { id: 2, titulo: 'Ensayo Práctico', estado: 'Pendiente', nota: null, fecha: '25 May 2026' }
-  ],
+  materiales: [] as any[],
+  ponentes: [] as any[],
+  tareas: [] as any[],
   certificadoRequisitos: {
     asistenciaMinima: 80,
     notaMinima: 71,
@@ -43,14 +45,137 @@ const actividad = ref({
   }
 });
 
-const getStatusColor = (status: string) => {
-  if (status === 'En curso' || status === 'Entregado') return 'bg-emerald-500 text-white';
-  if (status === 'Pendiente') return 'bg-amber-500 text-white';
-  return 'bg-slate-500 text-white';
+const loadActividad = async () => {
+  try {
+    const res = await api.get('/actividades-academicas/' + actividadId);
+    const act = res.data;
+    actividad.value = {
+      id: act.id,
+      nombre: act.nombre,
+      tipo: act.tipo || 'General',
+      fecha: act.fecha_inicio ? `${new Date(act.fecha_inicio).toLocaleDateString()} al ${new Date(act.fecha_fin).toLocaleDateString()}` : 'Por definir',
+      estado: 'Disponible',
+      progreso: 0,
+      promedio: 0,
+      asistencia: act.asistencias?.length ? act.asistencias : [
+        { estado: 'presente', fecha: new Date().toLocaleDateString() },
+        { estado: 'presente', fecha: new Date(Date.now() - 86400000).toLocaleDateString() }
+      ],
+      horas: act.horas || 40,
+      docente: act.imparticiones && act.imparticiones.length > 0 ? `${act.imparticiones[0].usuario.persona.nombres} ${act.imparticiones[0].usuario.persona.primer_apellido}` : 'Sin Docente',
+      descripcion: act.descripcion || 'Sin descripción detallada.',
+      imagen: act.imagen || 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=1200&q=80',
+      materiales: act.materiales?.length ? act.materiales : [
+        { id: 1, titulo: 'Guía del Estudiante', tipo: 'PDF', tamaño: '2 MB', fecha: 'Hace 2 días' },
+        { id: 2, titulo: 'Presentación del Curso', tipo: 'PDF', tamaño: '4.5 MB', fecha: 'Hace 3 días' }
+      ],
+      ponentes: act.imparticiones ? act.imparticiones.map((imp: any) => ({
+        id: imp.usuario.id,
+        nombre: imp.usuario.persona.nombres,
+        apellidos: `${imp.usuario.persona.primer_apellido} ${imp.usuario.persona.segundo_apellido || ''}`,
+        especialidad: 'Ponente'
+      })) : [],
+      tareas: act.tareas || [],
+      certificadoRequisitos: {
+        asistenciaMinima: 80,
+        notaMinima: 71,
+        completado: false
+      }
+    };
+  } catch (e) {
+    console.error('Error cargando actividad:', e);
+  }
 };
 
+const checkInscripcionStatus = async () => {
+  try {
+    const res = await api.get('/inscripciones/mis-inscripciones');
+    const all = res.data;
+    const found = all.find((i: any) => i.actividadAcademica.id === actividadId);
+    if (found) {
+      myInscripcion.value = found;
+      if (found.estado === 1) actividad.value.estado = 'Inscrito';
+      else if (found.estado === 3) actividad.value.estado = 'Finalizado';
+      else if (found.estado === 2) actividad.value.estado = 'Rechazado';
+      else actividad.value.estado = 'Pre-Inscrito';
+      
+      actividad.value.progreso = found.estado === 1 ? 50 : (found.estado === 3 ? 100 : 0);
+      actividad.value.certificadoRequisitos.completado = (found.estado === 3);
+    } else {
+      myInscripcion.value = null; 
+      actividad.value.estado = 'Disponible';
+      actividad.value.progreso = 0;
+    }
+  } catch (e) {
+    console.error('Error checando pre-inscripcion', e);
+  }
+};
+
+onMounted(async () => {
+  loading.value = true;
+  await loadActividad();
+  await checkInscripcionStatus();
+  loading.value = false;
+});
+
+const submitPreinscripcion = async () => {
+  preinscribiendo.value = true;
+  errorMensaje.value = '';
+  try {
+    await api.post('/inscripciones/preinscribir', {
+      id_actividad: actividadId,
+      miembro_tyan: Number(preinscripcionForm.value.miembro_tyan),
+      razon: preinscripcionForm.value.razon
+    });
+    preinscripcionMenu.value = false;
+    
+    Swal.fire({
+      icon: 'success',
+      title: 'Solicitud Enviada',
+      text: 'Tu pre-inscripción ha sido registrada exitosamente. Un coordinador revisará tu caso.',
+      confirmButtonColor: '#10b981'
+    });
+    
+    await checkInscripcionStatus();
+  } catch (e: any) {
+    console.error(e);
+    errorMensaje.value = e.response?.data?.message || 'Error al procesar la solicitud.';
+  } finally {
+    preinscribiendo.value = false;
+  }
+};
+
+const getStatusColor = (status: string) => {
+  if (status === 'Inscrito' || status === 'Finalizado' || status === 'En curso' || status === 'Entregado') return 'bg-emerald-500 text-white';
+  if (status === 'Pre-Inscrito' || status === 'Pendiente') return 'bg-amber-500 text-white';
+  if (status === 'Rechazado') return 'bg-red-500 text-white';
+  return 'bg-blue-600 text-white';
+};
+
+const activeTab = ref(route.query.tab ? String(route.query.tab) : 'resumen');
+
+const tabs = computed(() => {
+  const isAprobado = myInscripcion.value && (myInscripcion.value.estado === 1 || myInscripcion.value.estado === 3);
+  
+  const baseTabs = [
+    { id: 'resumen', label: 'Resumen', icon: 'info' },
+    { id: 'ponentes', label: 'Ponentes', icon: 'group' }
+  ];
+
+  if (isAprobado) {
+    baseTabs.push(
+      { id: 'material', label: 'Materiales', icon: 'auto_stories' },
+      { id: 'asistencia', label: 'Asistencia', icon: 'fact_check' },
+      { id: 'notas', label: 'Notas', icon: 'grading' },
+      { id: 'certificados', label: 'Certificados', icon: 'workspace_premium' }
+    );
+  }
+  
+  return baseTabs;
+});
+
 const goBack = () => {
-    router.push({ name: 'estudiante-eventos' });
+    router.push({ name: 'estudiante-catalogo' });
 };
 </script>
 
@@ -83,18 +208,27 @@ const goBack = () => {
           <p class="text-sm md:text-base font-medium text-gray-300 line-clamp-2 md:line-clamp-3 leading-relaxed drop-shadow-md max-w-2xl">{{ actividad.descripcion }}</p>
         </div>
 
-        <!-- Metric Cards Flotantes -->
-        <div class="flex gap-4 shrink-0">
-            <div class="bg-gray-900/60 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-4 flex flex-col items-center justify-center min-w-[100px] shadow-2xl">
-                <span class="material-symbols-outlined text-emerald-400 text-3xl mb-1">school</span>
-                <span class="text-2xl font-black text-white leading-none">{{ actividad.promedio }}</span>
-                <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Promedio</span>
+        <!-- Acciones o Metric -->
+        <div class="flex flex-col gap-4 shrink-0 mt-4 md:mt-0 items-end">
+          <template v-if="myInscripcion">
+            <div :class="myInscripcion.estado === 1 ? 'bg-emerald-500' : (myInscripcion.estado === 2 ? 'bg-red-500' : (myInscripcion.estado === 3 ? 'bg-blue-500' : 'bg-amber-500'))"
+                  class="backdrop-blur-xl border border-white/20 dark:border-gray-800 rounded-2xl p-6 flex flex-col items-center justify-center min-w-[180px] shadow-2xl transition-all">
+              <div v-if="myInscripcion.estado === 1" class="flex flex-col items-center"><span class="material-symbols-outlined text-white mb-2 text-3xl">check_circle</span><span class="text-white text-base font-black uppercase text-center w-full block">Aprobado</span></div>
+              <div v-else-if="myInscripcion.estado === 2" class="flex flex-col items-center"><span class="material-symbols-outlined text-white mb-2 text-3xl">cancel</span><span class="text-white text-base font-black uppercase text-center w-full block">Rechazado</span></div>
+              <div v-else-if="myInscripcion.estado === 3" class="flex flex-col items-center"><span class="material-symbols-outlined text-white mb-2 text-3xl">school</span><span class="text-white text-base font-black uppercase text-center w-full block">Finalizado</span></div>
+              <div v-else class="flex flex-col items-center"><span class="material-symbols-outlined text-white mb-2 text-3xl">hourglass_empty</span><span class="text-white text-xs font-black uppercase text-center w-full block mt-1 tracking-tight">Pendiente de<br>Aprobación</span></div>
+              <span class="text-[10px] text-white/80 font-bold uppercase tracking-widest mt-2">Estado</span>
             </div>
-            <div class="bg-gray-900/60 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-4 flex flex-col items-center justify-center min-w-[100px] shadow-2xl">
-                <span class="material-symbols-outlined text-blue-400 text-3xl mb-1">fact_check</span>
-                <span class="text-2xl font-black text-white leading-none">{{ actividad.asistencia }}%</span>
-                <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Asistencia</span>
-            </div>
+            <div v-if="myInscripcion.estado === 0" class="text-xs font-bold text-amber-500 dark:text-amber-400 mt-2 text-center max-w-[200px]">Tu pre-inscripción fue enviada y está en revisión</div>
+            <div v-if="myInscripcion.estado === 2" class="text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-xl mt-2 text-center max-w-[200px] border border-red-200 dark:border-red-900/50"><strong>No se pudo habilitar su inscripción debido a:</strong><br>{{ myInscripcion.observacion || myInscripcion.razon_rechazo || 'No se cumplieron los requisitos requeridos por la coordinadora.' }}</div>
+          </template>
+          <template v-else>
+            <button @click="preinscripcionMenu = true" class="bg-umsa-blue hover:bg-blue-600 text-white px-8 py-5 rounded-2xl font-black uppercase tracking-widest transition-all shadow-[0_0_40px_-5px_rgba(37,99,235,0.5)] flex items-center justify-center gap-3 min-w-[180px] border border-blue-400/50 hover:scale-105">
+               <span class="material-symbols-outlined text-[24px]">approval</span>
+               Pre-inscribirme
+            </button>
+            <span class="text-xs text-slate-500 dark:text-gray-400 font-bold text-center mt-2 max-w-[200px]">Inscríbete para acceder al material y asistencia.</span>
+          </template>
         </div>
       </div>
     </div>
@@ -141,7 +275,7 @@ const goBack = () => {
               </div>
               
               <!-- Sidebar Stats -->
-              <div class="bg-slate-50 dark:bg-gray-950 p-6 rounded-[1.5rem] border border-slate-100 dark:border-gray-800 space-y-6 h-fit">
+              <div v-if="myInscripcion" class="bg-slate-50 dark:bg-gray-950 p-6 rounded-[1.5rem] border border-slate-100 dark:border-gray-800 space-y-6 h-fit">
                    <h3 class="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight border-b border-slate-200 dark:border-gray-800 pb-3">Resumen de Progreso</h3>
                    
                    <div class="space-y-4">
@@ -172,7 +306,8 @@ const goBack = () => {
       <!-- Tab: Material (Placeholder simple) -->
       <div v-if="activeTab === 'material'" class="animate-in slide-in-from-bottom-4 duration-500 fade-in">
           <h3 class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight mb-6">Material Didáctico</h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div v-if="actividad.materiales.length === 0" class="text-sm font-bold text-slate-500 bg-slate-50 dark:bg-gray-800 p-8 rounded-2xl border border-slate-200 dark:border-gray-700 text-center">Aún no hay material subido para esta actividad.</div>
+          <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div v-for="mat in actividad.materiales" :key="mat.id" class="border border-slate-200 dark:border-gray-800 rounded-2xl p-5 hover:border-blue-500 transition-colors group cursor-pointer dark:bg-gray-950">
                   <div class="flex justify-between items-start mb-4">
                       <span class="material-symbols-outlined text-3xl" :class="mat.tipo === 'PDF' ? 'text-red-500' : 'text-blue-500'">{{ mat.tipo === 'PDF' ? 'picture_as_pdf' : 'smart_display' }}</span>
@@ -184,95 +319,153 @@ const goBack = () => {
           </div>
       </div>
 
-       <!-- Tab: Calificaciones (Placeholder simple) -->
-      <div v-if="activeTab === 'calificaciones'" class="animate-in slide-in-from-bottom-4 duration-500 fade-in">
-          <h3 class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight mb-6">Tus Calificaciones</h3>
-          <div class="space-y-4 max-w-3xl">
-              <div v-for="tarea in actividad.tareas" :key="tarea.id" class="flex items-center justify-between border border-slate-200 dark:border-gray-800 rounded-2xl p-5 dark:bg-gray-950 relative overflow-hidden">
-                  <div class="absolute left-0 top-0 bottom-0 w-1" :class="tarea.nota ? 'bg-emerald-500' : 'bg-amber-500'"></div>
-                  <div class="flex items-center gap-4">
-                      <div class="bg-slate-100 dark:bg-gray-900 p-3 rounded-xl">
-                          <span class="material-symbols-outlined text-slate-500" :class="tarea.nota ? 'text-emerald-500' : 'text-amber-500'">{{ tarea.nota ? 'task_alt' : 'history_edu' }}</span>
+       <!-- Tab: Ponentes -->
+      <div v-if="activeTab === 'ponentes'" class="animate-in slide-in-from-bottom-4 duration-500 fade-in">
+          <h3 class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight mb-6">Ponentes</h3>
+          <div v-if="!actividad.ponentes || actividad.ponentes.length === 0" class="text-sm font-bold text-slate-500 bg-slate-50 dark:bg-gray-800 p-8 rounded-2xl border border-slate-200 dark:border-gray-700 text-center">Aún no hay ponentes registrados para esta actividad.</div>
+          <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div v-for="ponente in actividad.ponentes" :key="ponente.id" class="border border-slate-200 dark:border-gray-800 rounded-2xl p-5 dark:bg-gray-950 flex flex-col items-center text-center group cursor-pointer hover:border-blue-500 transition-colors">
+                  <div class="h-16 w-16 bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 rounded-full flex items-center justify-center font-bold text-xl mb-4 group-hover:scale-110 transition-transform">{{ ponente.nombre ? ponente.nombre.charAt(0) : 'P' }}</div>
+                  <h4 class="font-bold text-slate-800 dark:text-white text-lg">{{ ponente.nombre }} {{ ponente.apellidos || '' }}</h4>
+                  <span class="text-xs text-slate-500 dark:text-gray-400 mt-1 uppercase tracking-wider font-bold">{{ ponente.especialidad || 'Especialista' }}</span>
+              </div>
+          </div>
+      </div>
+
+       <!-- Tab: Asistencia -->
+      <div v-if="activeTab === 'asistencia'" class="animate-in slide-in-from-bottom-4 duration-500 fade-in">
+          <div class="flex justify-between items-center mb-6">
+              <h3 class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">Registro de Asistencia</h3>
+              
+              <!-- Registro de hoy QR -->
+              <button class="bg-primary-dark dark:bg-emerald-600 text-white px-5 py-3 rounded-xl shadow-lg border border-transparent hover:scale-105 transition-transform flex items-center gap-2 group cursor-pointer">
+                  <span class="material-symbols-outlined text-white transition-transform">qr_code_scanner</span>
+                  <span class="font-black text-sm uppercase tracking-wider text-white">Registro de Hoy</span>
+              </button>
+          </div>
+          
+          <div v-if="!actividad.asistencia || actividad.asistencia.length === 0" class="text-sm font-bold text-slate-500 bg-slate-50 dark:bg-gray-800 p-8 rounded-2xl border border-slate-200 dark:border-gray-700 text-center flex flex-col items-center">
+             <span class="material-symbols-outlined text-4xl mb-3 opacity-50 block">event_busy</span>
+             Aún no hay registros de asistencia en esta actividad.
+          </div>
+          <div v-else class="space-y-4 max-w-3xl">
+              <div v-for="(registro, index) in actividad.asistencia" :key="index" class="flex items-center justify-between border border-slate-200 dark:border-gray-800 rounded-2xl p-5 dark:bg-gray-950 relative overflow-hidden group hover:border-slate-300 dark:hover:border-gray-700 transition-colors">
+                  <div class="absolute left-0 top-0 bottom-0 w-1 transition-all" :class="registro.estado === 'presente' ? 'bg-emerald-500 group-hover:w-2' : 'bg-rose-500 group-hover:w-2'"></div>
+                  <div class="flex items-center gap-4 pl-2">
+                      <div class="bg-slate-100 dark:bg-gray-900 h-12 w-12 rounded-xl flex items-center justify-center">
+                          <span class="material-symbols-outlined" :class="registro.estado === 'presente' ? 'text-emerald-500' : 'text-rose-500'">
+                              {{ registro.estado === 'presente' ? 'check_circle' : 'cancel' }}
+                          </span>
                       </div>
                       <div>
-                          <h4 class="font-bold text-slate-800 dark:text-white text-sm md:text-base">{{ tarea.titulo }}</h4>
-                          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{{ tarea.fecha }} - <span :class="getStatusColor(tarea.estado) + ' px-1.5 py-0.5 rounded ml-1'">{{ tarea.estado }}</span></span>
+                          <h4 class="font-bold text-slate-800 dark:text-white">{{ registro.fecha }}</h4>
+                          <div class="text-xs text-slate-500 dark:text-gray-400 font-medium uppercase tracking-widest mt-1">Sesión {{ index + 1 }}</div>
                       </div>
                   </div>
-                  <div class="text-right">
-                      <span v-if="tarea.nota !== null" class="text-2xl font-black text-slate-800 dark:text-white">{{ tarea.nota }}/100</span>
-                      <span v-else class="text-sm font-bold text-amber-500 uppercase tracking-widest">- / 100</span>
+                  <div class="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-sm transition-transform group-hover:scale-105" :class="registro.estado === 'presente' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400'">
+                    {{ registro.estado === 'presente' ? 'Registrado' : 'No Registrado' }}
                   </div>
+              </div>
+          </div>
+      </div>
+
+      <!-- Tab: Notas -->
+      <div v-if="activeTab === 'notas'" class="animate-in slide-in-from-bottom-4 duration-500 fade-in">
+          <h3 class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight mb-6">Mis Calificaciones</h3>
+          <div class="bg-slate-50 dark:bg-gray-950 p-8 rounded-[2rem] border border-slate-200 dark:border-gray-800 flex flex-col md:flex-row items-center justify-between shadow-sm max-w-3xl">
+              <div class="text-center md:text-left mb-6 md:mb-0">
+                  <p class="text-sm font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-2">Nota Final</p>
+                  <h4 class="text-5xl font-black text-slate-800 dark:text-white">{{ myInscripcion?.nota_principal !== null && myInscripcion?.nota_principal !== undefined ? myInscripcion.nota_principal : 'N/A' }} <span v-if="myInscripcion?.nota_principal !== null && myInscripcion?.nota_principal !== undefined" class="text-xl text-slate-400 font-bold">/ 100</span></h4>
+                  <p v-if="myInscripcion?.nota_principal === null || myInscripcion?.nota_principal === undefined" class="text-xs text-slate-400 dark:text-gray-500 mt-2 font-medium">Calificación pendiente por el docente.</p>
+              </div>
+              <div class="flex-shrink-0">
+                 <div class="w-24 h-24 rounded-full flex items-center justify-center border-4 shadow-lg bg-white dark:bg-gray-900" :class="(myInscripcion?.nota_principal ?? 0) >= 71 ? 'border-emerald-500 text-emerald-500' : (myInscripcion?.nota_principal !== null && myInscripcion?.nota_principal !== undefined ? 'border-red-500 text-red-500' : 'border-slate-300 text-slate-400')">
+                    <span class="material-symbols-outlined text-4xl">{{ (myInscripcion?.nota_principal ?? 0) >= 71 ? 'verified' : (myInscripcion?.nota_principal !== null && myInscripcion?.nota_principal !== undefined ? 'cancel' : 'pending') }}</span>
+                 </div>
               </div>
           </div>
       </div>
 
       <!-- Tab: Certificados -->
       <div v-if="activeTab === 'certificados'" class="animate-in slide-in-from-bottom-4 duration-500 fade-in flex flex-col items-center justify-center py-12 md:py-20 text-center max-w-2xl mx-auto">
-        
-        <div class="relative w-32 h-32 mb-8 group">
-          <div class="absolute inset-0 bg-umsa-gold/20 dark:bg-yellow-500/10 rounded-full blur-xl group-hover:blur-2xl transition-all duration-500"></div>
-          <div class="w-full h-full bg-gradient-to-br from-umsa-gold to-yellow-600 rounded-full flex items-center justify-center shadow-2xl border-4 border-white dark:border-gray-900 relative z-10 transform group-hover:scale-105 transition-transform">
-             <span class="material-symbols-outlined text-white text-5xl">workspace_premium</span>
-          </div>
-        </div>
-
-        <h3 class="text-2xl md:text-3xl font-black text-slate-800 dark:text-white uppercase tracking-tighter mb-4">Tu Certificado de Participación</h3>
-        
-        <p v-if="!actividad.certificadoRequisitos.completado" class="text-slate-500 dark:text-gray-400 text-sm md:text-base mb-8 leading-relaxed max-w-lg">
-          Para habilitar la descarga de tu certificado oficial, debes cumplir con los requisitos académicos del {{ actividad.tipo.toLowerCase() }}. Revisa tu estado actual:
-        </p>
-        <p v-else class="text-green-600 dark:text-green-400 text-sm md:text-base mb-8 leading-relaxed max-w-lg font-bold">
-          ¡Felicidades! Has cumplido con todos los requisitos. Tu certificado está listo para ser descargado en alta resolución.
-        </p>
-
-        <!-- Tracker de Requisitos -->
-        <div class="w-full bg-slate-50 dark:bg-gray-950 border border-slate-200 dark:border-gray-800 rounded-3xl p-6 md:p-8 mb-10 text-left relative overflow-hidden">
-            <h4 class="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-gray-500 mb-6 border-b border-slate-200 dark:border-gray-800 pb-3">Progreso de Requisitos Academicos</h4>
+        <template v-if="myInscripcion?.estado === 3 || actividad.estado === 'Finalizado'">
+            <div class="relative w-32 h-32 mb-8 group">
+              <div class="absolute inset-0 bg-umsa-gold/20 dark:bg-yellow-500/10 rounded-full blur-xl group-hover:blur-2xl transition-all duration-500"></div>
+              <div class="w-full h-full bg-gradient-to-br from-umsa-gold to-yellow-600 rounded-full flex items-center justify-center shadow-2xl border-4 border-white dark:border-gray-900 relative z-10 transform group-hover:scale-105 transition-transform">
+                 <span class="material-symbols-outlined text-white text-5xl">workspace_premium</span>
+              </div>
+            </div>
+            <h3 class="text-3xl font-black text-slate-800 dark:text-white uppercase tracking-tight mb-4 text-balance">¡Felicidades por completar el {{ actividad.tipo.toLowerCase() }}!</h3>
+            <p class="text-slate-600 dark:text-gray-400 leading-relaxed mb-8">Has cumplido con todos los requisitos académicos. Tu certificado de participación ya está disponible para descargar.</p>
             
-            <div class="space-y-6">
-                <!-- Req Asistencia -->
-                <div>
-                   <div class="flex justify-between items-center mb-2">
-                       <span class="text-xs md:text-sm font-bold text-slate-700 dark:text-gray-300">Asistencia Mínima ({{ actividad.certificadoRequisitos.asistenciaMinima }}%)</span>
-                       <span class="text-sm font-black" :class="actividad.asistencia >= actividad.certificadoRequisitos.asistenciaMinima ? 'text-emerald-500' : 'text-amber-500'">{{ actividad.asistencia }}%</span>
-                   </div>
-                   <div class="w-full bg-slate-200 dark:bg-gray-800 rounded-full h-2">
-                       <div class="h-2 rounded-full transition-all" :class="actividad.asistencia >= actividad.certificadoRequisitos.asistenciaMinima ? 'bg-emerald-500' : 'bg-amber-500'" :style="{ width: `${Math.min(100, (actividad.asistencia / actividad.certificadoRequisitos.asistenciaMinima) * 100)}%` }"></div>
-                   </div>
-                </div>
-
-                <!-- Req Promedio -->
-                <div>
-                   <div class="flex justify-between items-center mb-2">
-                       <span class="text-xs md:text-sm font-bold text-slate-700 dark:text-gray-300">Aprobación (>= {{ actividad.certificadoRequisitos.notaMinima }} pts)</span>
-                       <span class="text-sm font-black" :class="actividad.promedio >= actividad.certificadoRequisitos.notaMinima ? 'text-emerald-500' : 'text-amber-500'">{{ actividad.promedio }} pts</span>
-                   </div>
-                   <div class="w-full bg-slate-200 dark:bg-gray-800 rounded-full h-2">
-                       <div class="h-2 rounded-full transition-all" :class="actividad.promedio >= actividad.certificadoRequisitos.notaMinima ? 'bg-emerald-500' : 'bg-amber-500'" :style="{ width: `${Math.min(100, (actividad.promedio / actividad.certificadoRequisitos.notaMinima) * 100)}%` }"></div>
-                   </div>
-                </div>
+            <button class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-8 py-4 rounded-xl font-black uppercase tracking-widest text-sm hover:bg-slate-800 dark:hover:bg-gray-100 transition-all shadow-lg flex items-center gap-3">
+              <span class="material-symbols-outlined text-[20px]">download</span>
+              Descargar Certificado
+            </button>
+        </template>
+        <template v-else>
+            <div class="relative w-24 h-24 mb-6 opacity-60 grayscale">
+              <div class="w-full h-full bg-slate-200 dark:bg-gray-800 rounded-full flex items-center justify-center border-4 border-white dark:border-gray-900 relative z-10">
+                 <span class="material-symbols-outlined text-slate-400 text-4xl block">workspace_premium</span>
+              </div>
             </div>
-
-            <!-- Lock Overlay if incomplete but not explicitly showing as a lock block, just subtle UI -->
-            <div v-if="!actividad.certificadoRequisitos.completado" class="mt-6 flex items-center justify-center gap-2 text-amber-500 bg-amber-50 dark:bg-amber-500/10 p-3 rounded-xl border border-amber-200 dark:border-amber-500/20">
-                <span class="material-symbols-outlined text-sm">lock</span>
-                <span class="text-[10px] font-black uppercase tracking-widest">Aún no cumples todos los requisitos</span>
-            </div>
-        </div>
-
-        <!-- Botones de Acción -->
-        <button 
-          class="w-full md:w-auto px-10 py-4 rounded-xl font-black text-xs md:text-sm uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-3"
-          :class="actividad.certificadoRequisitos.completado ? 'bg-umsa-gold hover:bg-yellow-500 text-white hover:scale-105 hover:shadow-yellow-500/30' : 'bg-slate-200 text-slate-400 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed border border-slate-300 dark:border-gray-700'"
-          :disabled="!actividad.certificadoRequisitos.completado">
-          <span class="material-symbols-outlined text-[20px]">{{ actividad.certificadoRequisitos.completado ? 'download' : 'lock' }}</span>
-          {{ actividad.certificadoRequisitos.completado ? 'Descargar PDF Oficial' : 'Certificado Bloqueado' }}
-        </button>
-        <p v-if="actividad.certificadoRequisitos.completado" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-4">Documento firmado digitalmente con código QR de verificación</p>
-
+            <h3 class="text-xl font-black text-slate-500 dark:text-gray-400 uppercase tracking-tight mb-2">Certificado no disponible aún</h3>
+            <p class="text-slate-400 dark:text-gray-500 text-sm">El certificado estará disponible al finalizar el {{ actividad.tipo.toLowerCase() || 'curso' }} y cumplir los requisitos de aprobación.</p>
+        </template>
       </div>
 
+    </div>
+  </div>
+
+  <!-- Modal Pre-inscripción -->
+  <div v-if="preinscripcionMenu" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-900 rounded-[2rem] p-8 max-w-md w-full shadow-2xl relative border border-slate-200/50 dark:border-gray-800">
+        <button @click="preinscripcionMenu = false" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 dark:hover:text-white transition-colors">
+            <span class="material-symbols-outlined">close</span>
+        </button>
+        <h3 class="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight mb-4">Pre-inscripción</h3>
+        <p class="text-slate-600 dark:text-gray-400 mb-6 text-sm">Por favor, llene los siguientes datos para solicitar su inscripción.</p>
+        
+        <div class="space-y-4">
+            <!-- Datos del Estudiante (Autocompletados/Solo lectura) -->
+            <div class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-900/50 mb-4">
+                <p class="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-2">Datos del Estudiante</p>
+                <div class="grid grid-cols-1 gap-2">
+                    <div class="flex flex-col">
+                        <span class="text-[10px] text-slate-400 uppercase font-bold">Nombre Completo</span>
+                        <span class="text-sm font-black text-slate-700 dark:text-slate-200">{{ user?.persona?.nombres }} {{ user?.persona?.primer_apellido }} {{ user?.persona?.segundo_apellido || '' }}</span>
+                    </div>
+                    <div class="flex flew-col">
+                        <span class="text-[10px] text-slate-400 uppercase font-bold">Documento / CI</span>
+                        <span class="text-sm font-black text-slate-700 dark:text-slate-200">{{ user?.persona?.documento_identidad || 'No especificado' }}</span>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-[10px] text-slate-400 uppercase font-bold">Correo Electrónico</span>
+                         <span class="text-sm font-black text-slate-700 dark:text-slate-200">{{ user?.email || 'No especificado' }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Razón de inscripción</label>
+                <textarea v-model="preinscripcionForm.razon" class="w-full border border-slate-200 dark:border-gray-800 rounded-xl p-3 bg-slate-50 dark:bg-gray-950 text-slate-800 dark:text-white focus:outline-none focus:border-blue-500 transition-colors" rows="3" placeholder="¿Por qué desea participar?"></textarea>
+            </div>
+            <div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" v-model="preinscripcionForm.miembro_tyan" :true-value="1" :false-value="0" class="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                    <span class="text-sm font-bold text-slate-700 dark:text-gray-300">Soy miembro TYAN</span>
+                </label>
+            </div>
+        </div>
+        
+         <div v-if="errorMensaje" class="mt-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm font-bold rounded-xl border border-red-200 dark:border-red-900/50">
+            {{ errorMensaje }}
+        </div>
+        
+        <button @click="submitPreinscripcion" :disabled="preinscribiendo" class="w-full mt-6 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-4 rounded-xl font-black uppercase tracking-widest transition-all shadow-lg flex justify-center items-center gap-2">
+            <span v-if="preinscribiendo" class="material-symbols-outlined animate-spin text-white">autorenew</span>
+            <span>{{ preinscribiendo ? 'Enviando...' : 'Enviar Solicitud' }}</span>
+        </button>
     </div>
   </div>
 </template>
