@@ -45,6 +45,12 @@ export class ActividadAcademica {
   @Column({ type: 'date', nullable: true })
   fecha_fin: Date;
 
+  @Column({ length: 255, nullable: true })
+  imagen: string;
+
+  @Column({ type: 'integer', nullable: true })
+  horas: number;
+
   // ── Relaciones ────────────────────────────────────────────────────────────
 
   /** La actividad pertenece a un evento. */

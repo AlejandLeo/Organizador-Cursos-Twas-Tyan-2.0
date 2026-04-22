@@ -25,124 +25,78 @@ const getStatusColor = (status: string) => {
 
 const cargarEventos = async () => {
     try {
-        try {
-            const [resP, resC] = await Promise.all([
-              api.get('/usuarios/public/equipo?rol=Ponente'),
-              api.get('/usuarios/public/equipo?rol=Coordinador')
-            ]);
-            
-            const processUsers = (res: any, role: string) => {
-                return (Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : [])).map((u:any) => {
-                    const persona = u.persona || {};
-                    const gaObj = u.afiliaciones?.[0]?.gradoAcademico || {};
-                    const prefijo = gaObj.abreviacion ? `${gaObj.abreviacion}. ` : '';
-                    const nombreCompleto = `${prefijo}${persona.nombres || ''} ${persona.primer_apellido || ''}`.trim();
-                    return {...u, roleLabel: role, fullDisplayName: nombreCompleto || u.email || 'Sin Nombre'};
-                });
-            };
-            
-            const abrirMapa = (url: string) => {
-                if (url) window.open(url, '_blank');
-            };
-            
-            const arrP = processUsers(resP, 'Expositor');
-            const arrC = processUsers(resC, 'Coordinador');
-            
-            ponentesDB.value = [...arrP, ...arrC];
-        } catch (e) {
-            console.warn("No se pudieron cargar los equipos públicos, intentando continuar", e);
-            ponentesDB.value = [];
-        }
-        
         const response = await api.get('/eventos');
         const eventosDB = Array.isArray(response.data) ? response.data : (response.data.data || []);
         
         // Filtramos solo Activos (1) y Planificación (2) para el home
         const filtrados = eventosDB.filter((e: any) => e.estado === 1 || e.estado === 2);
-             eventosActivos.value = filtrados.map((ev: any, index: number) => {
-               
-               let ponentesArr: any[] = [];
-               
-               // Revisamos si el admin seleccionó explícitamente a través de nuestro guardado especial
-               const rawDesc = ev.descripcion || '';
-               const metadataMarker = '\n[PONENTES_METADATA]:';
-               
-               if (rawDesc.includes(metadataMarker)) {
-                   const parts = rawDesc.split(metadataMarker);
-                   const nombresArr = parts[1].split(',').map((s: string) => s.trim());
-                   
-                   ponentesArr = ponentesDB.value.filter(p => {
-                       const persona = p.persona || {};
-                       const nameRaw = `${persona.nombres || ''} ${persona.primer_apellido || ''}`.trim();
-                       return nombresArr.some(n => n.toLowerCase().includes(nameRaw.toLowerCase()));
-                   }).map(p => ({
-                       id: p.id,
-                       name: p.fullDisplayName,
-                       topic: p.roleLabel || 'Invitado Especial',
-                       country: p.persona?.profesion || 'Internacional',
-                       img: p.persona?.foto || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&q=80'
-                   }));
-               }
-               
-               if (ponentesArr.length === 0 && ev.actividades && Array.isArray(ev.actividades)) {
-                   const uniqueSpeakers = new Map();
-                   ev.actividades.forEach((act: any) => {
-                       if (act.imparticiones && Array.isArray(act.imparticiones)) {
-                           act.imparticiones.forEach((imp: any) => {
-                               if (imp.usuario && imp.usuario.persona && !uniqueSpeakers.has(imp.usuario.id)) {
-                                   uniqueSpeakers.set(imp.usuario.id, {
-                                       id: imp.usuario.id,
-                                       name: `${imp.usuario.persona.nombres} ${imp.usuario.persona.primer_apellido}`,
-                                       topic: act.nombre,
-                                       country: imp.usuario.persona.profesion || 'Internacional',
-                                       img: imp.usuario.persona.foto || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&q=80' 
-                                   });
-                               }
-                           });
-                       }
-                   });
-                   ponentesArr = Array.from(uniqueSpeakers.values());
-               }
+        
+        // Procesamos los eventos y cargamos sus ponentes reales
+        const eventosProcesados = await Promise.all(filtrados.map(async (ev: any, index: number) => {
+            let ponentesArr: any[] = [];
+            
+            try {
+                // LLAMADA AUTOMÁTICA: Traer ponentes de las actividades del evento
+                const resP = await api.get(`/eventos/${ev.id}/imparticiones`);
+                const dataP = Array.isArray(resP.data) ? resP.data : (resP.data.data || []);
+                
+                ponentesArr = dataP.map((p: any) => ({
+                    id: p.id,
+                    name: `${p.grado_abreviacion} ${p.nombres} ${p.primer_apellido}`.trim(),
+                    topic: p.profesion || 'Expositor',
+                    country: p.email, // Podríamos usar país si existiera en el modelo
+                    img: p.foto || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&q=80'
+                }));
+            } catch (e) {
+                console.error(`Error cargando ponentes para evento ${ev.id}`, e);
+            }
 
-               return {
-                   id: ev.id,
-                   title: ev.nombre,
-                   subtitle: ev.ubicacion || 'Universidad Mayor de San Andrés', 
-                   status: ev.estado === 1 ? 'Activo' : 'Planificación',
-                   gestion: ev.gestion || 'Actual',
-                   date: `${ev.fecha_inicio || 'TBD'} - ${ev.fecha_fin || 'TBD'}`,
-                   dateShort: formatDate(ev.fecha_inicio) || 'Fechas por definir',
-                   description: rawDesc.split(metadataMarker)[0] || 'Sin descripción',
-                   version: ev.version || '',
-                   color: colors[index % colors.length],
-                   icon: icons[index % icons.length],
-                   imagen_fondo: ev.imagen_fondo || 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?w=1600&q=80',
-                   google_maps_link: ev.google_maps_link || null,
-                   direccion: ev.direccion || null,
-                   sobre_evento_1: ev.sobre_evento_1 || null,
-                   sobre_evento_2: ev.sobre_evento_2 || null,
-                   frase_destacada: ev.frase_destacada || null,
-                   cronograma: (() => { 
-                       try { return ev.cronograma ? (typeof ev.cronograma === 'string' ? JSON.parse(ev.cronograma) : ev.cronograma) : null; } 
-                       catch(e) { return null; } 
-                   })(),
-                   ponentes: ponentesArr
-               }
-            });
+            return {
+                id: ev.id,
+                title: ev.nombre,
+                subtitle: ev.ubicacion || 'Universidad Mayor de San Andrés', 
+                status: ev.estado === 1 ? 'Activo' : 'Planificación',
+                gestion: ev.gestion || 'Actual',
+                date: `${ev.fecha_inicio || 'TBD'} - ${ev.fecha_fin || 'TBD'}`,
+                dateShort: formatDate(ev.fecha_inicio) || 'Fechas por definir',
+                description: (ev.descripcion || 'Sin descripción').split('\n[PONENTES_METADATA]:')[0],
+                version: ev.version || '',
+                color: colors[index % colors.length],
+                icon: icons[index % icons.length],
+                imagen_fondo: ev.imagen_fondo || 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?w=1600&q=80',
+                google_maps_link: ev.google_maps_link || null,
+                direccion: ev.direccion || null,
+                sobre_evento_1: ev.sobre_evento_1 || null,
+                sobre_evento_2: ev.sobre_evento_2 || null,
+                frase_destacada: ev.frase_destacada || null,
+                cronograma: (() => {
+                    if (!ev.cronograma) return null;
+                    try { 
+                        return typeof ev.cronograma === 'string' ? JSON.parse(ev.cronograma) : ev.cronograma; 
+                    } catch(e) { 
+                        console.error("Error parsing cronograma JSON", e);
+                        return null; 
+                    } 
+                })(),
+                ponentes: ponentesArr
+            };
+        }));
 
-        // Set default to first active event, if missing keep static default structure
+        eventosActivos.value = eventosProcesados;
+
+        // Set default to first active event
         if (eventosActivos.value.length > 0) {
             eventoSeleccionado.value = eventosActivos.value[0];
         } else {
-            // "Default Mode"
             eventoSeleccionado.value = {
                 title: 'Bienvenidos al Portal TYAN',
                 subtitle: 'Universidad Mayor de San Andrés',
                 dateShort: 'Próximamente',
                 description: 'Actualmente no hay eventos programados. Manténgase atento para futuras actualizaciones y convocatorias en la red académica.',
                 imagen_fondo: 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?w=1600&q=80',
-                google_maps_link: '<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d15301.761763784013!2d-68.1332029785816!3d-16.505086782352123!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x915edf0a00000001%3A0x6420546944e8574d!2sUniversidad%20Mayor%20de%20San%20Andr%C3%A9s!5e0!3m2!1ses!2sbo!4v1713670000000!5m2!1ses!2sbo" width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>',
-                direccion: 'Av. Villazón Nro 1995, Plaza del Bicentenario - La Paz'
+                google_maps_link: '<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d15301.761763784013!2d-68.1332029785816!3d-16.505086782352123!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x915edf0a00000001%3A0x6420546944e8574d!2sUniversidad%20Mayor%20de%20San%20Andr%C3%A9s!5e0!3m2!1ses!2sbo!4v1713670000000!5m2!1ses!2sbo" width="600" height="450" style="border:0;" allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>',
+                direccion: 'Av. Villazón Nro 1995, Plaza del Bicentenario - La Paz',
+                ponentes: []
             };
         }
     } catch(err) {
@@ -159,59 +113,11 @@ const seleccionarEvento = (evento: any) => {
   isDropdownOpen.value = false;
 };
 
-// Datos del cronograma (Mocked based on index.html)
-const days = [
-  { 
-    day: 6, 
-    name: 'Lunes', 
-    events: [
-      { time: '08:30', title: 'Registro' }, 
-      { time: '09:00', title: 'Inauguración' }
-    ] 
-  },
-  { 
-    day: 7, 
-    name: 'Martes', 
-    events: [
-      { time: '09:00', title: 'Presentaciones' }, 
-      { time: '14:00', title: 'Prácticas' }
-    ] 
-  },
-  { 
-    day: 8, 
-    name: 'Miércoles',
-    events: [
-      { time: '09:00', title: 'Presentaciones' }, 
-      { time: '14:00', title: 'Prácticas' }
-    ] 
-  },
-  { 
-    day: 9, 
-    name: 'Jueves', 
-    events: [
-      { time: '09:00', title: 'Presentaciones' }, 
-      { time: '14:00', title: 'Prácticas' }
-    ] 
-  },
-  { 
-    day: 10, 
-    name: 'Viernes', 
-    events: [
-      { time: '09:00', title: 'Presentaciones' }, 
-      { time: '12:00', title: 'Clausura' }
-    ] 
-  },
-];
+const abrirMapa = (url: string) => {
+  if (url) window.open(url, '_blank');
+};
 
-const speakers = [
-  { name: 'Dra. Warshi Dandeniya', country: 'Sri Lanka', topic: 'Biofertilizantes para la producción sostenible de cultivos', img: '/images/Dandeniya.webp' },
-  { name: 'Dr. Ranga Ambati', country: 'India', topic: 'Algas para la seguridad alimentaria y nutricional', img: '/images/AbantiRaga.webp' },
-  { name: 'Dr. Pablo Bolaños-Villegas', country: 'Costa Rica', topic: 'Biología de la reproducción vegetal para fitomejoradores', img: '/images/PabloBollanos.png' },
-  { name: 'Dra. Mónica Izurieta Guevara', country: 'Ecuador', topic: 'Agroinnovación para construir resiliencia: modelos gastronómicos sostenibles', img: '/images/MonicaGuevara.webp' },
-  { name: 'Dra. Gloria Rodrigo', country: 'Bolivia', topic: 'Modelos animales y aplicaciones en agroindustria y medio ambiente', img: '/images/Exp-Gloria.webp' },
-  { name: 'Dr. Federico Brown', country: 'Brasil', topic: 'Modelos animales y aplicaciones en agroindustria y medio ambiente', img: '/images/federicoBrown.jpg' },
-  { name: 'Dra. Sdenka Moscoso', country: 'Bolivia', topic: 'Modelos animales y aplicaciones en agroindustria y medio ambiente', img: '/images/Exp-Sdenka.webp' },
-];
+
 </script>
 
 <template>
@@ -348,10 +254,11 @@ const speakers = [
             <h3 class="text-xl font-bold text-slate-500 -mt-6 mb-8 uppercase tracking-widest">{{ eventoSeleccionado?.title }}</h3>
             
             <div class="text-slate-600 dark:text-gray-400 text-lg md:text-xl leading-relaxed space-y-6 font-medium">
-              <p v-html="eventoSeleccionado?.sobre_evento_1 || 'Esta versión establece una red de colaboración que vincula a universidades bolivianas con sus homólogas latinoamericanas e internacionales, centrándose este año en la <strong class=\'text-emerald-600 dark:text-emerald-500 uppercase tracking-widest\'>Agroindustria y Ciencias Ambientales</strong> para abordar los desafíos de seguridad alimentaria en Bolivia y la región.'"></p>
-              <p v-html="eventoSeleccionado?.sobre_evento_2 || 'Basado en el éxito de las escuelas prácticas de 2023 y 2024, esta iniciativa, liderada por <strong class=\'text-umsa-blue dark:text-white\'>TYAN-TWAS</strong>, prioriza el fortalecimiento de la colaboración científica para combatir la pobreza y promover el desarrollo sostenible a largo plazo, en consonancia con la misión de la UNESCO.'"></p>
-              <div class="bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-950/50 border-l-4 border-umsa-blue p-6 md:p-8 rounded-r-2xl mt-12 shadow-sm dark:shadow-none">
-                <p class="italic text-blue-800 dark:text-blue-300 font-bold text-xl md:text-2xl leading-none" v-html="`&quot;${eventoSeleccionado?.frase_destacada || 'Un encuentro global para la ciencia, oportunidad única para conectar, innovar y transformar el agroambiente.'}&quot;`">
+              <p v-if="eventoSeleccionado?.sobre_evento_1" v-html="eventoSeleccionado.sobre_evento_1"></p>
+              <p v-if="eventoSeleccionado?.sobre_evento_2" v-html="eventoSeleccionado.sobre_evento_2"></p>
+              <div v-if="eventoSeleccionado?.frase_destacada" class="bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-950/50 border-l-4 border-umsa-blue p-6 md:p-8 rounded-r-2xl mt-12 shadow-sm dark:shadow-none">
+                <p class="italic text-blue-800 dark:text-blue-300 font-bold text-xl md:text-2xl leading-none">
+                  "{{ eventoSeleccionado.frase_destacada }}"
                 </p>
               </div>
             </div>
@@ -373,7 +280,7 @@ const speakers = [
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 max-w-[1400px] mx-auto">
-          <div v-for="day in (eventoSeleccionado?.cronograma || days)" :key="day.day" class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-3xl shadow-lg hover:-translate-y-4 hover:shadow-2xl hover:shadow-umsa-blue/10 dark:hover:shadow-black/50 hover:border-umsa-blue/30 transition-all duration-300 overflow-hidden flex flex-col group h-full">
+          <div v-for="day in (eventoSeleccionado?.cronograma || [])" :key="day.day" class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-3xl shadow-lg hover:-translate-y-4 hover:shadow-2xl hover:shadow-umsa-blue/10 dark:hover:shadow-black/50 hover:border-umsa-blue/30 transition-all duration-300 overflow-hidden flex flex-col group h-full">
             <div class="bg-slate-100 dark:bg-gray-900 text-primary-dark dark:text-white p-8 relative overflow-hidden group-hover:bg-gradient-to-br group-hover:from-slate-100 group-hover:to-slate-200 dark:group-hover:from-gray-800 dark:group-hover:to-gray-900 transition-colors">
                <div class="text-8xl font-black opacity-5 dark:opacity-5 absolute -top-4 -right-4 text-umsa-blue group-hover:opacity-10 transition-all">{{ day.day }}</div>
                <span class="block text-6xl font-black text-umsa-blue dark:text-blue-200 group-hover:text-blue-800 dark:group-hover:text-white relative z-10 font-serif leading-none mb-2">{{ day.day }}</span>
@@ -390,6 +297,15 @@ const speakers = [
               </div>
             </div>
           </div>
+          
+          <!-- Estado vacío para cronograma -->
+          <div v-if="!(eventoSeleccionado?.cronograma?.length)" class="col-span-full py-20 flex flex-col items-center justify-center text-center opacity-60">
+             <div class="w-20 h-20 bg-slate-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-6">
+                <span class="material-symbols-outlined text-4xl text-slate-400">calendar_today</span>
+             </div>
+             <h3 class="text-xl font-black text-slate-500 uppercase tracking-widest">Cronograma en Preparación</h3>
+             <p class="text-sm text-slate-400 mt-2 max-w-md">Próximamente se publicarán las actividades detalladas para este evento. Manténgase informado a través de nuestras redes académicas.</p>
+          </div>
         </div>
       </div>
     </section>
@@ -402,8 +318,8 @@ const speakers = [
         </div>
         <h2 class="text-4xl md:text-6xl font-black text-center text-primary-dark dark:text-white mb-20 uppercase tracking-tighter italic"><span class="text-umsa-blue dark:text-blue-400">Directorio</span> Expositor</h2>
 
-        <div v-if="(eventoSeleccionado?.ponentes?.length ? eventoSeleccionado.ponentes : speakers).length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-0 overflow-hidden w-full lg:min-w-[600px] border-t border-slate-100 dark:border-gray-800">
-            <div v-for="(spk, i) in (eventoSeleccionado?.ponentes?.length ? eventoSeleccionado.ponentes : speakers)" :key="i" class="group flex flex-col md:flex-row min-h-[300px] border-b border-r border-slate-100 dark:border-gray-800 relative cursor-pointer">
+        <div v-if="eventoSeleccionado?.ponentes?.length" class="grid grid-cols-1 md:grid-cols-2 gap-0 overflow-hidden w-full lg:min-w-[600px] border-t border-slate-100 dark:border-gray-800">
+            <div v-for="(spk, i) in eventoSeleccionado.ponentes" :key="i" class="group flex flex-col md:flex-row min-h-[300px] border-b border-r border-slate-100 dark:border-gray-800 relative cursor-pointer">
               
               <!-- Imagen de fondo Netflix style -->
               <div class="absolute inset-0 md:relative md:w-2/5 overflow-hidden">
@@ -460,7 +376,7 @@ const speakers = [
                width="100%" 
                height="500" 
                style="border:0;" 
-               allowfullscreen="true" 
+               allowfullscreen
                loading="lazy" 
                referrerpolicy="no-referrer-when-downgrade"
                class="rounded-[1.5rem] md:rounded-[2.5rem] filter md:grayscale-[80%] dark:invert opacity-90 text-sm contrast-125 group-hover:grayscale-0 group-hover:invert-0 group-hover:contrast-100 transition-all duration-1000 w-full"
@@ -480,7 +396,7 @@ const speakers = [
 
              <!-- Fallback si NO hay link (Mapa UMSA por defecto) -->
              <div v-else class="google-maps-container w-full h-[500px] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden">
-                <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d15301.761763784013!2d-68.1332029785816!3d-16.505086782352123!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x915edf0a00000001%3A0x6420546944e8574d!2sUniversidad%20Mayor%20de%20San%20Andr%C3%A9s!5e0!3m2!1ses!2sbo!4v1713670000000!5m2!1ses!2sbo" width="100%" height="500" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade" class="filter md:grayscale-[80%] dark:invert text-sm contrast-125 hover:grayscale-0 hover:invert-0 transition-all duration-700"></iframe>
+                <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d15301.761763784013!2d-68.1332029785816!3d-16.505086782352123!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x915edf0a00000001%3A0x6420546944e8574d!2sUniversidad%20Mayor%20de%20San%20Andr%C3%A9s!5e0!3m2!1ses!2sbo!4v1713670000000!5m2!1ses!2sbo" width="100%" height="500" style="border:0;" allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade" class="filter md:grayscale-[80%] dark:invert text-sm contrast-125 hover:grayscale-0 hover:invert-0 transition-all duration-700"></iframe>
              </div>
 
              <div class="absolute inset-0 pointer-events-none rounded-[2rem] md:rounded-[3rem] shadow-[inset_0_0_50px_rgba(0,0,0,0.1)] dark:shadow-[inset_0_0_50px_rgba(0,0,0,0.8)]"></div>

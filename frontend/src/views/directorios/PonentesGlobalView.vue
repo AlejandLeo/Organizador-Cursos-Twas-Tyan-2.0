@@ -2,8 +2,9 @@
 import { ref, onMounted, computed, reactive } from 'vue';
 import api from '@/services/api';
 import Swal from 'sweetalert2';
+import type { Usuario } from '@/types/admin';
 
-const ponentes = ref<any[]>([]);
+const ponentes = ref<Usuario[]>([]);
 const loading = ref(true);
 const searchQuery = ref('');
 const isEditing = ref(false);
@@ -115,20 +116,42 @@ const saveChanges = async () => {
   <div class="animate-in fade-in duration-500 max-w-7xl mx-auto space-y-8">
     
     <!-- Header Minimalista -->
-    <div class="bg-slate-50 dark:bg-gray-800 rounded-3xl md:rounded-[2.5rem] p-6 md:p-10 flex flex-col lg:flex-row items-center justify-between shadow-sm relative overflow-hidden border-l-[8px] md:border-l-[12px] border-emerald-500 border-b-4 border-umsa-gold">
-      <div class="relative z-10 text-center lg:text-left">
-        <h2 class="text-2xl md:text-5xl font-black text-primary-dark dark:text-white italic uppercase tracking-tighter">Plantel Docente</h2>
-        <p class="text-slate-400 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.4em] mt-2 flex items-center justify-center lg:justify-start gap-2">
-            Gestión de Ponentes e Investigadores
-        </p>
-      </div>
-      <div class="relative z-10 flex gap-4 mt-6 lg:mt-0 items-center justify-center w-full lg:w-auto">
-         <div class="relative group w-full lg:w-auto">
-            <span class="absolute inset-y-0 left-4 flex items-center text-slate-400">
-                <span class="material-symbols-outlined">search</span>
-            </span>
-            <input v-model="searchQuery" class="pl-12 pr-6 py-3 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-2xl text-xs font-bold text-primary-dark outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all w-full lg:w-64 shadow-sm" placeholder="Buscar Ponente...">
-         </div>
+    <div class="relative bg-white dark:bg-slate-800 rounded-[2.5rem] p-8 md:p-12 overflow-hidden shadow-sm border border-emerald-100 dark:border-emerald-900/30 group mb-10">
+      <!-- Decoración sutil -->
+      <div class="absolute top-0 right-0 w-96 h-96 bg-emerald-50 dark:bg-emerald-900/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
+      <div class="absolute inset-0 bg-gradient-to-br from-emerald-50/30 to-transparent dark:from-emerald-900/5 pointer-events-none"></div>
+
+      <div class="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
+        <div class="flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
+          <div class="w-20 h-20 bg-emerald-50 dark:bg-emerald-900/30 rounded-3xl flex items-center justify-center shadow-sm border border-emerald-100 dark:border-emerald-800 transition-transform duration-500">
+            <span class="material-symbols-outlined text-4xl text-emerald-600 dark:text-emerald-400">psychology</span>
+          </div>
+          <div>
+            <h2 class="text-4xl md:text-5xl font-black text-slate-800 dark:text-white italic uppercase tracking-tighter leading-none">
+              Plantel <span class="text-emerald-600">Docente</span>
+            </h2>
+            <p class="text-slate-400 dark:text-slate-500 text-[10px] md:text-xs font-black uppercase tracking-[0.3em] mt-3 flex items-center justify-center md:justify-start gap-2">
+               <span class="w-5 h-px bg-emerald-400"></span> Gestión de Ponentes e Investigadores TYAN
+            </p>
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+          <div class="relative w-full sm:w-72 group/search">
+            <label class="absolute -top-2.5 left-5 px-2 bg-white dark:bg-slate-800 text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest z-10">Buscar experto</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-4 flex items-center text-emerald-500">
+                <span class="material-symbols-outlined text-[18px]">search</span>
+              </span>
+              <input v-model="searchQuery" class="w-full pl-12 pr-6 py-4 bg-slate-50 dark:bg-slate-900/50 border border-emerald-100 dark:border-emerald-800 text-slate-800 dark:text-white rounded-2xl text-xs font-bold outline-none focus:border-emerald-500 transition-all placeholder:text-slate-400" placeholder="Nombre, apellido o CI...">
+            </div>
+          </div>
+          
+          <div class="hidden sm:flex flex-col items-end border-l border-emerald-100 dark:border-emerald-900/30 pl-6">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Docentes</p>
+            <p class="text-3xl font-black text-emerald-600 dark:text-white italic">{{ filteredPonentes.length }}</p>
+          </div>
+        </div>
       </div>
     </div>
 

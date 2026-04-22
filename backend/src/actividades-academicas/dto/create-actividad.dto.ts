@@ -33,4 +33,15 @@ export class CreateActividadDto {
   @Type(() => Number)
   @IsInt()
   id_evento: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  imagen?: string;
+
+  @ApiPropertyOptional({ example: 40 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  horas?: number;
 }

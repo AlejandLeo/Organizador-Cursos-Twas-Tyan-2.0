@@ -63,6 +63,25 @@ export class Evento {
   @Column({ length: 255, nullable: true })
   imagen_fondo: string;
 
+  @Column({ length: 150, nullable: true })
+  version: string;
+
+  @Column({ type: 'text', nullable: true })
+  sobre_evento_1: string;
+
+  @Column({ type: 'text', nullable: true })
+  sobre_evento_2: string;
+
+  @Column({ type: 'text', nullable: true })
+  frase_destacada: string;
+
+  @Column({ type: 'text', nullable: true })
+  google_maps_link: string;
+
+  /** Almacena el cronograma en formato JSON o texto */
+  @Column({ type: 'text', nullable: true })
+  cronograma: string;
+
   // ── Relaciones ────────────────────────────────────────────────────────────
 
   /** Un evento tiene múltiples actividades (cursos, talleres, conferencias). */

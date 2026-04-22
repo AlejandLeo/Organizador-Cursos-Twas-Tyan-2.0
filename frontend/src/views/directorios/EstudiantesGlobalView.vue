@@ -2,8 +2,9 @@
 import { ref, onMounted, computed, reactive } from 'vue';
 import api from '@/services/api';
 import Swal from 'sweetalert2';
+import type { Usuario } from '@/types/admin';
 
-const estudiantes = ref<any[]>([]);
+const estudiantes = ref<Usuario[]>([]);
 const loading = ref(true);
 const searchQuery = ref('');
 const isEditing = ref(false);
@@ -117,20 +118,42 @@ const saveChanges = async () => {
 <template>
   <div class="animate-in fade-in duration-500 max-w-7xl mx-auto space-y-8">
     <!-- Header Minimalista -->
-    <div class="bg-slate-50 dark:bg-gray-800 rounded-3xl md:rounded-[2.5rem] p-6 md:p-10 flex flex-col lg:flex-row items-center justify-between shadow-sm relative overflow-hidden border-l-[8px] md:border-l-[12px] border-umsa-blue border-b-4 border-umsa-gold">
-      <div class="relative z-10 text-center lg:text-left">
-        <h2 class="text-2xl md:text-5xl font-black text-primary-dark dark:text-white italic uppercase tracking-tighter">Expediente Estudiantil</h2>
-        <p class="text-slate-400 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.4em] mt-2 flex items-center justify-center lg:justify-start gap-2">
-            Gestión Global de Participantes
-        </p>
-      </div>
-      <div class="relative z-10 flex gap-4 mt-6 lg:mt-0 items-center justify-center w-full lg:w-auto">
-         <div class="relative group w-full lg:w-auto">
-            <span class="absolute inset-y-0 left-4 flex items-center text-slate-400">
-                <span class="material-symbols-outlined">search</span>
-            </span>
-            <input v-model="searchQuery" class="pl-12 pr-6 py-3 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-2xl text-xs font-bold text-primary-dark outline-none focus:ring-4 focus:ring-umsa-blue/10 transition-all w-full lg:w-64 shadow-sm" placeholder="Buscar Estudiante...">
-         </div>
+    <div class="relative bg-white dark:bg-slate-800 rounded-[2.5rem] p-8 md:p-12 overflow-hidden shadow-sm border border-sky-100 dark:border-slate-700 group mb-10">
+      <!-- Decoración sutil -->
+      <div class="absolute top-0 left-0 w-80 h-80 bg-sky-50 dark:bg-sky-900/10 rounded-full -ml-20 -mt-20 blur-3xl"></div>
+      <div class="absolute inset-0 bg-gradient-to-br from-sky-50/50 to-transparent dark:from-sky-900/5 pointer-events-none"></div>
+      
+      <div class="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
+        <div class="flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
+          <div class="w-20 h-20 bg-sky-100 dark:bg-sky-900/30 rounded-3xl flex items-center justify-center shadow-sm border border-sky-200 dark:border-sky-800 transition-transform duration-500">
+            <span class="material-symbols-outlined text-4xl text-sky-600 dark:text-sky-400">assignment_ind</span>
+          </div>
+          <div>
+            <h2 class="text-4xl md:text-5xl font-black text-sky-950 dark:text-white italic uppercase tracking-tighter leading-none">
+              Expediente <span class="text-sky-600">Estudiantil</span>
+            </h2>
+            <p class="text-slate-400 dark:text-slate-500 text-[10px] md:text-xs font-black uppercase tracking-[0.3em] mt-3 flex items-center justify-center md:justify-start gap-2">
+               <span class="w-5 h-px bg-sky-400"></span> Gestión Global de Participantes TYAN
+            </p>
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+          <div class="relative w-full sm:w-80 group/search">
+            <label class="absolute -top-2.5 left-5 px-2 bg-white dark:bg-slate-800 text-[9px] font-black text-sky-600 dark:text-sky-400 uppercase tracking-widest z-10">Búsqueda de alumno</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-4 flex items-center text-sky-400">
+                <span class="material-symbols-outlined text-[18px]">search</span>
+              </span>
+              <input v-model="searchQuery" class="w-full pl-12 pr-6 py-4 bg-slate-50 dark:bg-slate-900/50 border border-sky-100 dark:border-slate-700 text-sky-900 dark:text-white rounded-2xl text-xs font-bold outline-none focus:border-sky-400 transition-all placeholder:text-slate-400" placeholder="Nombre completo o documento...">
+            </div>
+          </div>
+          
+          <div class="bg-sky-50 dark:bg-slate-900/50 px-5 py-3 rounded-2xl border border-sky-100 dark:border-slate-700 flex flex-col items-center justify-center min-w-[100px]">
+             <p class="text-[9px] font-black text-slate-400 uppercase tracking-tighter leading-none mb-1">Registrados</p>
+             <p class="text-2xl font-black text-sky-900 dark:text-white italic leading-none">{{ filteredEstudiantes.length }}</p>
+          </div>
+        </div>
       </div>
     </div>
 

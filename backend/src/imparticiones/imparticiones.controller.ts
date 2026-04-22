@@ -12,6 +12,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ImparticionesService } from './imparticiones.service';
 import { CreateImparticionDto } from './dto/create-imparticion.dto';
+import { AsignarPonenteDto } from './dto/asignar-ponente.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -27,9 +28,18 @@ export class ImparticionesController {
   @Roles('Coordinador', 'Super Usuario')
   @ApiBearerAuth()
   @Post()
-  @ApiOperation({ summary: 'Asignar un ponente a una actividad (Coordinador)' })
+  @ApiOperation({ summary: 'Asignar un usuario existente a una actividad (Coordinador)' })
   asignar(@Body() dto: CreateImparticionDto) {
     return this.service.asignar(dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Coordinador', 'Super Usuario')
+  @ApiBearerAuth()
+  @Post('asignar-ponente')
+  @ApiOperation({ summary: 'Vincular/Crear un ponente a una actividad (Coordinador)' })
+  asignarPonente(@Body() dto: AsignarPonenteDto) {
+    return this.service.asignarPonente(dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -42,6 +52,15 @@ export class ImparticionesController {
       return this.service.findByEvento(Number(eventoId));
     }
     return this.service.findAll();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Coordinador', 'Super Usuario')
+  @ApiBearerAuth()
+  @Get('actividad/:actividadId')
+  @ApiOperation({ summary: 'Ver ponentes de una actividad específica (Coordinador)' })
+  findByActividad(@Param('actividadId', ParseIntPipe) actividadId: number) {
+    return this.service.findByActividad(actividadId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

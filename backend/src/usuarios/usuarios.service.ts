@@ -649,6 +649,17 @@ export class UsuariosService {
     return perfil as Omit<Usuario, 'password'>;
   }
 
+  /**
+   * Busca un usuario por email sin lanzar excepción si no existe.
+   * Útil para flujos de "buscar o crear".
+   */
+  async findOptionalByEmail(email: string): Promise<Usuario | null> {
+    return this.usuarioRepository.findOne({
+      where: { email },
+      relations: ['persona', 'usuariosRoles', 'usuariosRoles.rol'],
+    });
+  }
+
   // ══════════════════════════════════════════════════════════
   // FIRMA DIGITAL (PONENTES)
   // ══════════════════════════════════════════════════════════

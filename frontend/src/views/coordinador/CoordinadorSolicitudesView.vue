@@ -2,36 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import api from '@/services/api';
 import Swal from 'sweetalert2';
-
-interface Persona {
-  nombres: string;
-  primer_apellido: string;
-  segundo_apellido: string;
-  documento_identidad: string;
-}
-
-interface Evento {
-  id: number;
-  nombre: string;
-}
-
-interface Actividad {
-  id: number;
-  tipo: string;
-  nombre: string;
-  evento?: Evento;
-}
-
-interface Inscripcion {
-  id: number;
-  fecha_creacion: string;
-  nota_principal: number | null;
-  miembro_tyan: number;
-  razon: string;
-  estado: number;
-  usuario: Usuario;
-  actividadAcademica: Actividad;
-}
+import type { Inscripcion, Actividad, Persona } from '@/types/admin';
 
 const inscripciones = ref<Inscripcion[]>([]);
 const loading = ref(true);
@@ -171,24 +142,50 @@ const verDetalle = (item: Inscripcion) => {
 
 <template>
   <div class="animate-in fade-in duration-500 max-w-7xl mx-auto space-y-8">
-    <div class="bg-slate-50 dark:bg-gray-800 rounded-[2.5rem] p-10 flex flex-col md:flex-row items-center justify-between shadow-sm relative overflow-hidden border-l-[12px] border-umsa-blue border-b-4 border-umsa-gold">
-      <div class="absolute top-0 right-0 w-64 h-64 bg-umsa-blue/5 rounded-full -mr-20 -mt-20 blur-2xl"></div>
-      <div class="relative z-10">
-        <h2 class="text-3xl md:text-5xl font-black text-primary-dark dark:text-white italic uppercase tracking-tighter">Gestión de Solicitudes</h2>
-        <p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.4em] mt-2 flex items-center gap-2">
-            Aprobación de Pre-Inscripciones Globales
-        </p>
-      </div>
-      <div class="relative z-10 flex gap-4 mt-6 md:mt-0 items-center justify-center">
-         <div class="flex flex-col">
-             <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1 text-center">Filtrar por curso</label>
-             <select v-model="selectActividadId" class="bg-white dark:bg-gray-900 text-primary-dark dark:text-white border border-slate-200 dark:border-gray-700 rounded-xl px-6 py-3 text-xs font-bold outline-none focus:border-umsa-blue shadow-sm transition-all">
+    <div class="relative bg-white dark:bg-slate-800 rounded-[2.5rem] p-8 md:p-12 overflow-hidden shadow-sm border border-sky-100 dark:border-slate-700 group">
+      <!-- Decoración sutil -->
+      <div class="absolute top-0 right-0 w-64 h-64 bg-sky-50 dark:bg-sky-900/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
+      <div class="absolute inset-0 bg-gradient-to-br from-sky-50/50 to-transparent dark:from-sky-900/5 pointer-events-none"></div>
+
+      <div class="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
+        <div class="flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
+          <div class="w-20 h-20 bg-sky-100 dark:bg-sky-900/30 rounded-3xl flex items-center justify-center shadow-sm border border-sky-200 dark:border-sky-800 transition-transform duration-500">
+            <span class="material-symbols-outlined text-4xl text-sky-600 dark:text-sky-400">how_to_reg</span>
+          </div>
+          <div>
+            <h2 class="text-4xl md:text-5xl font-black text-sky-950 dark:text-white italic uppercase tracking-tighter leading-none">
+              Gestión de <span class="text-sky-600">Solicitudes</span>
+            </h2>
+            <p class="text-slate-400 dark:text-slate-500 text-[10px] md:text-xs font-black uppercase tracking-[0.3em] mt-3 flex items-center justify-center md:justify-start gap-2">
+               <span class="w-5 h-px bg-sky-400"></span> Registro Global de Postulantes
+            </p>
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+          <div class="relative w-full sm:w-72 group/filter">
+            <label class="absolute -top-2.5 left-5 px-2 bg-white dark:bg-slate-800 text-[9px] font-black text-sky-600 dark:text-sky-400 uppercase tracking-widest z-10">Filtrar por actividad</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-4 flex items-center text-sky-400">
+                <span class="material-symbols-outlined text-[18px]">filter_list</span>
+              </span>
+              <select v-model="selectActividadId" class="w-full pl-12 pr-10 py-4 bg-slate-50 dark:bg-slate-900/50 border border-sky-100 dark:border-slate-700 text-sky-900 dark:text-white rounded-2xl text-xs font-bold outline-none focus:border-sky-400 transition-all appearance-none cursor-pointer">
                 <option value="todas">Todas las Solicitudes</option>
                 <option v-for="act in actividadesList" :key="act.id" :value="act.id">
                     {{ act.tipo }} • {{ act.nombre }}
                 </option>
-             </select>
-         </div>
+              </select>
+              <span class="absolute inset-y-0 right-4 flex items-center text-sky-300 pointer-events-none">
+                <span class="material-symbols-outlined">expand_more</span>
+              </span>
+            </div>
+          </div>
+          
+          <div class="hidden sm:flex flex-col items-end border-l border-sky-100 dark:border-slate-700 pl-6">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Pendientes</p>
+            <p class="text-3xl font-black text-sky-900 dark:text-white italic">{{ pendingInscripciones.length }}</p>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -223,7 +220,7 @@ const verDetalle = (item: Inscripcion) => {
                 <tr v-if="!loading && pendingInscripciones.length === 0" class="bg-white dark:bg-gray-900">
                     <td colspan="5" class="py-12 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">No hay solicitudes pendientes</td>
                 </tr>
-                <tr v-for="item in pendingInscripciones" :key="item.id" class="hover:bg-slate-50 dark:hover:bg-gray-800/80 transition-colors">
+                <tr v-for="item in pendingInscripciones" :key="item.id || item.id_inscripcion" class="hover:bg-slate-50 dark:hover:bg-gray-800/80 transition-colors">
                     <td class="px-6 py-4">
                         <span class="text-xs font-bold text-slate-500 dark:text-gray-400">{{ new Date(item.fecha_creacion).toLocaleDateString() }}</span>
                     </td>
@@ -232,24 +229,24 @@ const verDetalle = (item: Inscripcion) => {
                     </td>
                     <td class="px-6 py-4">
                         <p class="font-black text-primary-dark dark:text-white text-xs uppercase">{{ parseFullName(item.usuario?.persona) }}</p>
-                        <p class="text-[10px] text-slate-400 font-medium">ID: {{ item.usuario?.id }}</p>
+                        <p class="text-[10px] text-slate-400 font-medium">ID Usuario: {{ item.usuario?.id }}</p>
                     </td>
                     <td class="px-6 py-4">
-                        <p class="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{{ item.actividadAcademica?.tipo }}</p>
+                        <p class="text-[10px] font-black text-sky-600 dark:text-sky-400 uppercase tracking-widest">{{ item.actividadAcademica?.tipo }}</p>
                         <p class="text-xs font-bold text-slate-500 truncate max-w-[200px]">{{ item.actividadAcademica?.nombre }}</p>
                     </td>
                     <td class="px-6 py-4 text-center">
-                        <span v-if="item.miembro_tyan === 1" class="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full text-[9px] font-black uppercase">SÍ</span>
+                        <span v-if="item.miembro_tyan == 1" class="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full text-[9px] font-black uppercase">SÍ</span>
                         <span v-else class="bg-slate-100 dark:bg-gray-800 text-slate-500 px-3 py-1 rounded-full text-[9px] font-black uppercase">NO</span>
                     </td>
                     <td class="px-6 py-4 flex justify-center gap-2">
                         <button @click="verDetalle(item)" class="p-2 border border-slate-200 dark:border-gray-700 text-slate-500 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 transition-all group" title="Ver Detalles">
                             <span class="material-symbols-outlined text-[16px] group-hover:text-blue-500">visibility</span>
                         </button>
-                        <button @click="aprobar(item.id)" class="p-2 border border-emerald-200 dark:border-emerald-900/50 text-emerald-500 rounded-lg hover:bg-emerald-500 hover:text-white transition-all group" title="Aprobar Solicitud">
+                        <button @click="aprobar(item.id || item.id_inscripcion!)" class="p-2 border border-emerald-200 dark:border-emerald-900/50 text-emerald-500 rounded-lg hover:bg-emerald-500 hover:text-white transition-all group" title="Aprobar Solicitud">
                             <span class="material-symbols-outlined text-[16px]">check</span>
                         </button>
-                        <button @click="rechazar(item.id)" class="p-2 border border-red-200 dark:border-red-900/50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all group" title="Rechazar Solicitud">
+                        <button @click="rechazar(item.id || item.id_inscripcion!)" class="p-2 border border-red-200 dark:border-red-900/50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all group" title="Rechazar Solicitud">
                             <span class="material-symbols-outlined text-[16px]">close</span>
                         </button>
                     </td>

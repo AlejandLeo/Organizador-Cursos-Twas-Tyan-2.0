@@ -71,9 +71,20 @@ const router = createRouter({
           name: 'coordinador-certificados',
           component: () => import('../views/certificados/CertificadosView.vue'),
         },
-        {          path: 'eventos',
+        {
+          path: 'eventos',
           name: 'coordinador-eventos',
           component: () => import('../views/eventos/EventosView.vue'),
+        },
+        {
+          path: 'eventos/:id',
+          name: 'coordinador-evento-detalle',
+          component: () => import('../views/eventos/EventoDetalleView.vue'),
+        },
+        {
+          path: 'eventos/nuevo',
+          name: 'coordinador-evento-nuevo',
+          component: () => import('../views/eventos/EventoNuevoView.vue'),
         },
       ]
     },

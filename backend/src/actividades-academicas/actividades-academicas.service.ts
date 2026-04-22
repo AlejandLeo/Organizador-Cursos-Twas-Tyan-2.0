@@ -15,7 +15,7 @@ export class ActividadesAcademicasService {
   // ── CRUD básico ────────────────────────────────────────────
 
   findAll() {
-    return this.actividadRepository.find({ relations: ['evento'] });
+    return this.actividadRepository.find({ relations: ['evento', 'inscripciones'] });
   }
 
   async findOne(id: number) {
