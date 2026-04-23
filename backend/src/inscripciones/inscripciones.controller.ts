@@ -45,6 +45,7 @@ export class InscripcionesController {
       id_actividad_academica: Number(body.id_actividad),
       miembro_tyan: body.miembro_tyan !== undefined ? Number(body.miembro_tyan) : 0,
       razon: body.razon || '',
+      datos_adicionales: body.datos_adicionales || {},
       estado: 0, // 0 = pendiente
     });
   }

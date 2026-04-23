@@ -36,7 +36,8 @@ async function bootstrap() {
             tipo: 'Simposio',
             fecha_inicio: new Date('2025-05-16'),
             fecha_fin: new Date('2025-05-17'),
-            imagen: 'https://images.unsplash.com/photo-1530026405186-ed1f139313f8?w=800&q=80'
+            imagen: 'https://images.unsplash.com/photo-1530026405186-ed1f139313f8?w=800&q=80',
+            requisitos: { base: { nombres: true, primer_apellido: true, email: true, documento_identidad: true, celular: true }, custom: [] }
           },
           {
             nombre: 'Taller de Redacción Científica',
@@ -44,7 +45,8 @@ async function bootstrap() {
             tipo: 'Taller',
             fecha_inicio: new Date('2025-05-18'),
             fecha_fin: new Date('2025-05-18'),
-            imagen: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800&q=80'
+            imagen: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800&q=80',
+            requisitos: { base: { nombres: true, primer_apellido: true, email: true }, custom: [{ label: 'Título del Articulo a Redactar', type: 'text' }] }
           },
           {
             nombre: 'Panel: Cambio Climático en los Andes',
@@ -52,7 +54,8 @@ async function bootstrap() {
             tipo: 'Panel',
             fecha_inicio: new Date('2025-05-19'),
             fecha_fin: new Date('2025-05-19'),
-            imagen: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&q=80'
+            imagen: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&q=80',
+            requisitos: { base: { nombres: true, primer_apellido: true, email: true, pais_origen: true }, custom: [] }
           }
         ]
       },
@@ -75,7 +78,8 @@ async function bootstrap() {
             tipo: 'Conferencia',
             fecha_inicio: new Date('2026-08-10'),
             fecha_fin: new Date('2026-08-10'),
-            imagen: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&q=80'
+            imagen: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&q=80',
+            requisitos: { base: { nombres: true, primer_apellido: true, email: true, documento_identidad: true }, custom: [] }
           },
           {
             nombre: 'Bootcamp de Programación Reactiva',
@@ -83,7 +87,89 @@ async function bootstrap() {
             tipo: 'Bootcamp',
             fecha_inicio: new Date('2026-08-11'),
             fecha_fin: new Date('2026-08-12'),
-            imagen: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&q=80'
+            imagen: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&q=80',
+            requisitos: { base: { nombres: true, primer_apellido: true, email: true, celular: true }, custom: [{ label: 'Nivel de Programación', type: 'select', options: ['Básico', 'Intermedio', 'Avanzado'] }] }
+          }
+        ]
+      },
+      {
+        nombre: 'Diplomado en Inteligencia Artificial y Ciencia de Datos',
+        descripcion: 'Programa de postgrado avanzado diseñado para profesionales que buscan dominar las herramientas de IA, Machine Learning y Big Data aplicadas a la industria actual.',
+        gestion: '2025',
+        version: '4ta Versión',
+        ubicacion: 'Virtual / Online',
+        direccion: 'Plataforma LMS TYAN',
+        fecha_inicio: new Date('2025-06-01'),
+        fecha_fin: new Date('2025-12-15'),
+        estado: 1,
+        logo: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1600&q=80',
+        imagen_fondo: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1600&q=80',
+        actividades: [
+          {
+            nombre: 'Módulo I: Fundamentos de Python para Data Science',
+            descripcion: 'Primer paso en el dominio de la ciencia de datos utilizando el lenguaje más potente del mercado.',
+            tipo: 'Diplomado',
+            fecha_inicio: new Date('2025-06-01'),
+            fecha_fin: new Date('2025-06-30'),
+            imagen: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&q=80',
+            requisitos: { base: { nombres: true, primer_apellido: true, email: true, documento_identidad: true, grado_academico: true }, custom: [] }
+          },
+          {
+            nombre: 'Módulo II: Deep Learning y Redes Neuronales',
+            descripcion: 'Estudio profundo de arquitecturas complejas y entrenamiento de modelos inteligentes.',
+            tipo: 'Diplomado',
+            fecha_inicio: new Date('2025-07-01'),
+            fecha_fin: new Date('2025-07-31'),
+            imagen: 'https://images.unsplash.com/photo-1509228468518-180dd4864904?w=800&q=80',
+            requisitos: { base: { nombres: true, primer_apellido: true, email: true, afiliacion: true }, custom: [{ label: '¿Tiene conocimientos de Cálculo?', type: 'select', options: ['Si', 'No'] }] }
+          }
+        ]
+      },
+      {
+        nombre: 'Cumbre Panamericana de Energías Renovables 2025',
+        descripcion: 'Encuentro de líderes y expertos internacionales para discutir la transición hacia matrices energéticas sostenibles en el continente.',
+        gestion: '2025',
+        version: 'I Edición',
+        ubicacion: 'Cochabamba, Bolivia',
+        direccion: 'Auditorio Central Gran Hotel Cochabamba',
+        fecha_inicio: new Date('2025-09-10'),
+        fecha_fin: new Date('2025-09-12'),
+        estado: 1,
+        logo: 'https://images.unsplash.com/photo-1466611653911-954ffaa137a8?w=1600&q=80',
+        imagen_fondo: 'https://images.unsplash.com/photo-1466611653911-954ffaa137a8?w=1600&q=80',
+        actividades: [
+          {
+            nombre: 'Seminario: El Potencial del Litio en la Región',
+            descripcion: 'Perspectivas económicas y tecnológicas sobre la extracción y uso del litio.',
+            tipo: 'Seminario',
+            fecha_inicio: new Date('2025-09-10'),
+            fecha_fin: new Date('2025-09-10'),
+            imagen: 'https://images.unsplash.com/photo-1536939459926-301728717817?w=800&q=80',
+            requisitos: { base: { nombres: true, primer_apellido: true, email: true, documento_identidad: true, pais_origen: true }, custom: [] }
+          }
+        ]
+      },
+      {
+        nombre: 'Workshop Internacional: Biotecnología Avanzada',
+        descripcion: 'Taller práctico intensivo sobre edición genética y bioprocesos industriales.',
+        gestion: '2025',
+        version: 'Edición Verano',
+        ubicacion: 'Sucre, Bolivia',
+        direccion: 'Laboratorios de Genética Universidad USFX',
+        fecha_inicio: new Date('2025-11-20'),
+        fecha_fin: new Date('2025-11-25'),
+        estado: 1,
+        logo: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=1600&q=80',
+        imagen_fondo: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=1600&q=80',
+        actividades: [
+          {
+            nombre: 'Taller: Aplicaciones de la Tecnología CRISPR',
+            descripcion: 'Hands-on sobre las técnicas más modernas de edición de ADN.',
+            tipo: 'Taller',
+            fecha_inicio: new Date('2025-11-21'),
+            fecha_fin: new Date('2025-11-23'),
+            imagen: 'https://images.unsplash.com/photo-1579154204601-01588f351e67?w=800&q=80',
+            requisitos: { base: { nombres: true, primer_apellido: true, email: true, celular: true, afiliacion: true, grado_academico: true }, custom: [{ label: 'Talla de Mandil', type: 'select', options: ['S', 'M', 'L', 'XL'] }] }
           }
         ]
       }

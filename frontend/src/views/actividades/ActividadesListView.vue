@@ -280,7 +280,22 @@ const nuevaActividad = ref({
     modalidad: 'Presencial',
     fecha_inicio: '',
     fecha_fin: '',
-    sesiones: [] as any[]
+    sesiones: [] as any[],
+    requisitos: {
+        base: {
+            nombres: true,
+            primer_apellido: true,
+            segundo_apellido: true,
+            email: true,
+            documento_identidad: true,
+            genero: false,
+            pais_origen: false,
+            celular: true,
+            afiliacion: false,
+            grado_academico: false
+        },
+        custom: [] as any[]
+    }
 });
 
 const resetNuevaActividad = (eventoId: number) => {
@@ -297,7 +312,16 @@ const resetNuevaActividad = (eventoId: number) => {
         modalidad: 'Presencial',
         fecha_inicio: '',
         fecha_fin: '',
-        sesiones: []
+        sesiones: [],
+        requisitos: {
+            base: {
+                nombres: true, primer_apellido: true, segundo_apellido: true,
+                email: true, documento_identidad: true, genero: false,
+                pais_origen: false, celular: true, afiliacion: false,
+                grado_academico: false
+            },
+            custom: []
+        }
     };
     imagenArchivo.value = null;
     imagenPreview.value = null;
@@ -363,6 +387,32 @@ const eliminarActividad = async (id: number, nombre: string) => {
 const imagenArchivo = ref<File | null>(null);
 const imagenPreview = ref<string | null>(null);
 
+const nuevoRequisito = ref({
+    label: '',
+    type: 'text',
+    optionsRaw: ''
+});
+
+const agregarRequisitoPersonalizado = () => {
+    if (nuevaActividad.value.requisitos.custom.length >= 10) {
+        Swal.fire('Límite alcanzado', 'Solo puedes añadir hasta 10 requisitos personalizados.', 'warning');
+        return;
+    }
+    
+    const req: any = {
+        label: nuevoRequisito.value.label,
+        type: nuevoRequisito.value.type,
+        options: []
+    };
+
+    if (req.type === 'select' && nuevoRequisito.value.optionsRaw) {
+        req.options = nuevoRequisito.value.optionsRaw.split(',').map(o => o.trim()).filter(o => o !== '');
+    }
+
+    nuevaActividad.value.requisitos.custom.push(req);
+    nuevoRequisito.value = { label: '', type: 'text', optionsRaw: '' };
+};
+
 const handleFileUpload = (event: any) => {
     const file = event.target.files[0];
     if (file) {
@@ -421,7 +471,8 @@ const publicarActividad = async () => {
             descripcion: nuevaActividad.value.descripcion,
             id_evento: Number(nuevaActividad.value.id_evento),
             fecha_inicio: nuevaActividad.value.fecha_inicio || null,
-            fecha_fin: nuevaActividad.value.fecha_fin || null
+            fecha_fin: nuevaActividad.value.fecha_fin || null,
+            requisitos: nuevaActividad.value.requisitos
         };
 
         if (isEditingActividad.value && editActividadId.value) {
@@ -521,7 +572,7 @@ const openDetalleCurso = (courseId: any) => {
 
 const changeStep = (delta: number) => {
   const nextStep = currentStep.value + delta;
-  if (nextStep >= 1 && nextStep <= 4) {
+  if (nextStep >= 1 && nextStep <= 5) {
     currentStep.value = nextStep;
   }
 };
@@ -712,17 +763,17 @@ const changeStep = (delta: number) => {
               <!-- Step 2 -->
               <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
-                       :class="currentStep === 2 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(188,156,49,0.4)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
-                      <span class="material-symbols-outlined text-xl">gavel</span>
+                       :class="currentStep >= 2 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
+                      <span class="material-symbols-outlined text-xl">verified</span>
                   </div>
-                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 2 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Reglas</span>
+                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 2 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Aprobación</span>
               </div>
 
               <!-- Step 3 -->
               <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
-                       :class="currentStep === 3 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(188,156,49,0.4)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
-                      <span class="material-symbols-outlined text-xl">calendar_clock</span>
+                       :class="currentStep >= 3 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
+                      <span class="material-symbols-outlined text-xl">schedule</span>
                   </div>
                   <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 3 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Horarios</span>
               </div>
@@ -730,10 +781,19 @@ const changeStep = (delta: number) => {
               <!-- Step 4 -->
               <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
-                       :class="currentStep === 4 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(188,156,49,0.4)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
+                       :class="currentStep >= 4 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
+                      <span class="material-symbols-outlined text-xl">person_add_alt</span>
+                  </div>
+                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 4 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Requisitos</span>
+              </div>
+
+              <!-- Step 5 -->
+              <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
+                  <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
+                       :class="currentStep === 5 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(188,156,49,0.4)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
                       <span class="material-symbols-outlined text-xl">check_circle</span>
                   </div>
-                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 4 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Resumen</span>
+                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 5 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Resumen</span>
               </div>
           </div>
       </div>
@@ -915,10 +975,87 @@ const changeStep = (delta: number) => {
           </div>
       </div>
 
-      <!-- Contenido del Step 4 -->
-      <div v-show="currentStep === 4" class="space-y-8 animate-in zoom-in-95 duration-500">
+      <!-- Contenido del Paso 4: Requisitos de Pre-inscripción -->
+      <div v-show="currentStep === 4" class="space-y-8 animate-in slide-in-from-right-8 duration-500">
+          <div class="bg-white dark:bg-gray-900 p-8 rounded-[2rem] shadow-sm border border-slate-100 dark:border-gray-800">
+              <div class="flex items-center justify-between mb-8">
+                  <div>
+                      <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic">4. Requisitos de Pre-inscripción</h3>
+                      <p class="text-xs font-bold text-slate-500 dark:text-gray-400 mt-1 italic italic">Configura qué datos debe proporcionar el estudiante para inscribirse.</p>
+                  </div>
+                  <div class="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 rounded-xl border border-blue-100 dark:border-blue-800">
+                      <span class="material-symbols-outlined text-blue-600 text-sm">info</span>
+                      <span class="text-[9px] font-black text-blue-700 dark:text-blue-400 uppercase tracking-widest">Los datos base se autocompletarán del perfil del estudiante</span>
+                  </div>
+              </div>
+
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                  <!-- Columna: Datos Base del Perfil -->
+                  <div class="space-y-6">
+                      <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2 mb-4">Datos del Perfil (Entidad Persona)</h4>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div v-for="(val, key) in nuevaActividad.requisitos.base" :key="key" 
+                               class="flex items-center justify-between p-4 bg-slate-50 dark:bg-gray-800/50 rounded-2xl border border-slate-100 dark:border-gray-800 transition-all hover:border-blue-300">
+                              <span class="text-[10px] font-bold text-slate-600 dark:text-gray-300 uppercase truncate pr-2">{{ key.replace(/_/g, ' ') }}</span>
+                              <label class="relative inline-flex items-center cursor-pointer">
+                                  <input type="checkbox" v-model="nuevaActividad.requisitos.base[key]" class="sr-only peer">
+                                  <div class="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all dark:border-gray-600 peer-checked:bg-umsa-blue"></div>
+                              </label>
+                          </div>
+                      </div>
+                  </div>
+
+                  <!-- Columna: Campos Personalizados -->
+                  <div class="space-y-6">
+                      <div class="flex items-center justify-between border-b pb-2 mb-4">
+                          <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Requisitos Personalizados (Máx. 10)</h4>
+                          <span class="text-[9px] font-bold text-blue-600 uppercase">{{ nuevaActividad.requisitos.custom.length }} / 10</span>
+                      </div>
+
+                      <div v-if="nuevaActividad.requisitos.custom.length === 0" class="flex flex-col items-center justify-center p-8 bg-slate-50 dark:bg-gray-800/40 border-2 border-dashed border-slate-200 dark:border-gray-700 rounded-2xl opacity-60">
+                          <span class="material-symbols-outlined text-4xl mb-2">add_task</span>
+                          <p class="text-[10px] font-black text-slate-500 uppercase">No has añadido requisitos personalizados aún</p>
+                      </div>
+
+                      <div class="space-y-3">
+                          <div v-for="(req, idx) in nuevaActividad.requisitos.custom" :key="idx" 
+                               class="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl animate-in slide-in-from-bottom-2">
+                              <span class="material-symbols-outlined text-sm text-blue-500">{{ req.type === 'select' ? 'list' : (req.type === 'number' ? '123' : 'text_fields') }}</span>
+                              <div class="flex-1 min-w-0">
+                                  <p class="text-xs font-black text-slate-700 dark:text-white truncate">{{ req.label }}</p>
+                                  <p class="text-[9px] font-bold text-slate-400 uppercase">{{ req.type }} <span v-if="req.type === 'select'">({{ req.options.length }} opciones)</span></p>
+                              </div>
+                              <button @click="nuevaActividad.requisitos.custom.splice(idx, 1)" class="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-all">
+                                  <span class="material-symbols-outlined text-sm">delete</span>
+                              </button>
+                          </div>
+                      </div>
+
+                      <div v-if="nuevaActividad.requisitos.custom.length < 10" class="p-5 bg-blue-50/30 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/50 rounded-2xl space-y-4">
+                          <div class="grid grid-cols-2 gap-3">
+                              <input v-model="nuevoRequisito.label" type="text" placeholder="Ej: Talla de Polera" class="col-span-2 px-4 py-2 text-xs font-bold bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl outline-none focus:border-blue-500">
+                              <select v-model="nuevoRequisito.type" class="px-4 py-2 text-xs font-bold bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl outline-none">
+                                  <option value="text">Texto Libre</option>
+                                  <option value="number">Número</option>
+                                  <option value="select">Selección</option>
+                              </select>
+                              <div v-if="nuevoRequisito.type === 'select'" class="col-span-2">
+                                  <input v-model="nuevoRequisito.optionsRaw" type="text" placeholder="Opciones sep. por comas (Ej: S, M, L)" class="w-full px-4 py-2 text-xs font-bold bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl outline-none focus:border-blue-500">
+                              </div>
+                          </div>
+                          <button @click="agregarRequisitoPersonalizado" :disabled="!nuevoRequisito.label" class="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md">
+                              + Añadir Requisito
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      <!-- Contenido del Paso 5 (Anterior 4) -->
+      <div v-show="currentStep === 5" class="space-y-8 animate-in zoom-in-95 duration-500">
           <div class="bg-white dark:bg-gray-900 p-8 rounded-[2rem] shadow-sm border-l-[10px] border-l-umsa-gold dark:border-l-yellow-600 border border-slate-100 dark:border-gray-800">
-              <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic mb-4">4. Confirmación y Revisión</h3>
+              <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic mb-4">5. Confirmación y Revisión</h3>
               <p class="text-sm font-bold text-slate-500 dark:text-gray-400 mb-8 italic">Por favor, verifica los detalles finales antes de publicar la actividad en el sistema.</p>
 
               <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -968,6 +1105,38 @@ const changeStep = (delta: number) => {
                               <p class="text-[10px] font-black text-blue-700 mt-1 uppercase">{{ nuevaActividad.fecha_inicio || '--/--/--' }}</p>
                           </div>
                       </div>
+
+                      <!-- BLOQUE DE REQUISITOS (RESUMEN) -->
+                      <div class="p-6 bg-blue-50/50 dark:bg-blue-950/20 rounded-[2rem] border-2 border-dashed border-blue-100 dark:border-blue-900/30">
+                          <div class="flex items-center gap-2 mb-4">
+                              <span class="material-symbols-outlined text-blue-600 text-lg">fact_check</span>
+                              <h4 class="text-xs font-black text-blue-800 dark:text-blue-300 uppercase tracking-widest">Resumen de Requisitos</h4>
+                          </div>
+                          
+                          <div class="space-y-4">
+                              <div>
+                                  <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Datos del Perfil Activados:</span>
+                                  <div class="flex flex-wrap gap-1.5">
+                                      <template v-for="(val, key) in nuevaActividad.requisitos.base" :key="key">
+                                          <span v-if="val" class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 px-2 py-1 rounded-md text-[8px] font-black text-slate-600 dark:text-gray-400 uppercase">
+                                              {{ key.toString().replace(/_/g, ' ') }}
+                                          </span>
+                                      </template>
+                                  </div>
+                              </div>
+                              
+                              <div v-if="nuevaActividad.requisitos.custom.length > 0">
+                                  <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Campos Personalizados ({{ nuevaActividad.requisitos.custom.length }}):</span>
+                                  <div class="grid grid-cols-1 gap-2">
+                                      <div v-for="(req, i) in nuevaActividad.requisitos.custom" :key="i" class="flex items-center justify-between bg-blue-100/50 dark:bg-blue-900/20 px-3 py-1.5 rounded-xl border border-blue-200/50 dark:border-blue-800">
+                                          <span class="text-[9px] font-black text-blue-700 dark:text-blue-400 uppercase">{{ req.label }}</span>
+                                          <span class="text-[8px] font-bold text-blue-500 uppercase italic">{{ req.type }}</span>
+                                      </div>
+                                  </div>
+                              </div>
+                              <div v-else class="text-[9px] font-bold text-slate-400 uppercase italic">Sin campos personalizados adicionales.</div>
+                          </div>
+                      </div>
                   </div>
 
                   <!-- Columna Preview Imagen -->
@@ -980,7 +1149,7 @@ const changeStep = (delta: number) => {
                           <p class="text-[10px] font-black text-slate-500 uppercase">Sin imagen de portada</p>
                       </div>
                       <div class="absolute bottom-4 left-4 right-4 z-20">
-                          <div class="bg-white/90 dark:bg-gray-900/90 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-white/20">
+                  <div class="bg-white/90 dark:bg-gray-900/90 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-white/20">
                               <p class="text-[10px] font-black text-primary-dark dark:text-white uppercase truncate">{{ nuevaActividad.nombre || 'Vista Previa' }}</p>
                               <p class="text-[8px] font-bold text-umsa-blue uppercase mt-1">{{ nuevaActividad.tipo === 'Otro' ? nuevaActividad.tipoPersonalizado : nuevaActividad.tipo }}</p>
                           </div>
@@ -997,14 +1166,14 @@ const changeStep = (delta: number) => {
               <span class="material-symbols-outlined text-[18px]">arrow_back</span> Regresar
           </button>
           
-          <button v-if="currentStep < 4" @click="changeStep(1)" 
-            class="px-10 py-4 bg-primary-dark dark:bg-blue-600 text-white font-black text-[12px] uppercase rounded-xl shadow-xl hover:shadow-2xl hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center gap-3">
-              Siguiente Paso <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+          <button v-if="currentStep < 5" @click="changeStep(1)" 
+            class="px-8 py-3 bg-primary-dark dark:bg-blue-600 text-white font-black text-[11px] uppercase rounded-xl hover:bg-umsa-blue dark:hover:bg-blue-500 flex items-center gap-2 transition-all shadow-xl hover:-translate-y-0.5">
+              Continuar <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
           </button>
 
-          <button v-else @click="publicarActividad" 
-            class="px-12 py-4 bg-umsa-gold dark:bg-yellow-600 text-white font-black text-[12px] uppercase rounded-xl shadow-[0_10px_30px_rgba(163,134,40,0.3)] hover:shadow-[0_15px_40px_rgba(163,134,40,0.4)] hover:-translate-y-1 active:translate-y-0 transition-all flex items-center gap-3">
-              Publicar Actividad <span class="material-symbols-outlined text-[20px]">verified</span>
+          <button v-else @click="publicarActividad" :disabled="isLoading"
+            class="px-8 py-3 bg-umsa-gold hover:bg-yellow-600 text-white font-black text-[11px] uppercase rounded-xl flex items-center gap-2 transition-all shadow-xl hover:-translate-y-0.5 disabled:opacity-50">
+              <span class="material-symbols-outlined text-[18px]">publish</span> Publicar Actividad
           </button>
       </div>
 

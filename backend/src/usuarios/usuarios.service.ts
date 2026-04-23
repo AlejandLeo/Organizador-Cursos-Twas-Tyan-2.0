@@ -48,11 +48,7 @@ export class UsuariosService {
 
   async actualizarPerfil(
     id_usuario: number,
-    data: {
-      institucion?: string;
-      id_grado_academico?: number;
-      [key: string]: any;
-    },
+    data: any,
   ) {
     const usuario = await this.usuarioRepository.findOne({
       where: { id: id_usuario },
@@ -63,34 +59,64 @@ export class UsuariosService {
       throw new NotFoundException('Perfil no encontrado');
     }
 
-    const { institucion, id_grado_academico, ...datosPersonaOriginal } = data;
-    // Cast safe para actualizar persona, ignorando los ids
-    const datosPersona = { ...datosPersonaOriginal };
+    // 1. Filtrar campos específicos para la entidad Persona
+    const camposPersonaValidos = [
+      'nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad', 
+      'genero', 'pais_origen', 'pais_residencia', 'fecha_nacimiento', 'celular'
+    ];
+    
+    const datosPersona: any = {};
+    camposPersonaValidos.forEach(key => {
+      if (data[key] !== undefined) {
+        // Manejo especial para género si viene como string
+        if (key === 'genero' && typeof data[key] === 'string') {
+           const g = data[key];
+           if (g.startsWith('Mas')) datosPersona.genero = 0;
+           else if (g.startsWith('Fem')) datosPersona.genero = 1;
+           else datosPersona.genero = 2;
+        } else {
+          datosPersona[key] = data[key];
+        }
+      }
+    });
 
-    // Evitar que traten de cambiar IDs internos
-    delete datosPersona.id;
-    delete datosPersona.id_usuario;
-    delete datosPersona.email;
-    delete datosPersona.password;
-    delete datosPersona.estado;
+    if (Object.keys(datosPersona).length > 0) {
+      await this.personaRepository.update(usuario.persona.id, datosPersona);
+    }
 
-    await this.personaRepository.update(usuario.persona.id, datosPersona);
+    // 2. Extraer campos para Afiliación
+    // Notar que 'afiliacion' se mapea a 'institucion'
+    const institucion = data.institucion || data.afiliacion;
+    const { id_grado_academico, tipo_afiliacion, area_tematica, disciplina_cientifica } = data;
 
-    // Actualizar o crear Afiliacion principal
-    if (institucion !== undefined || id_grado_academico !== undefined) {
+    if (
+      institucion !== undefined || 
+      id_grado_academico !== undefined || 
+      tipo_afiliacion !== undefined || 
+      area_tematica !== undefined || 
+      disciplina_cientifica !== undefined
+    ) {
       const afiliacionRepo = this.dataSource.getRepository(Afiliacion);
-      if (usuario.afiliaciones && usuario.afiliaciones.length > 0) {
-        // Actualizar la primera
-        const af = usuario.afiliaciones[0];
+      let af = usuario.afiliaciones && usuario.afiliaciones.length > 0 
+        ? usuario.afiliaciones[0] 
+        : null;
+
+      if (af) {
+        // Actualizar existente
         if (institucion !== undefined) af.institucion = institucion;
-        if (id_grado_academico !== undefined)
-          af.id_grado_academico = id_grado_academico;
+        if (id_grado_academico !== undefined) af.id_grado_academico = id_grado_academico;
+        if (tipo_afiliacion !== undefined) af.tipo_afiliacion = tipo_afiliacion;
+        if (area_tematica !== undefined) af.area_tematica = area_tematica;
+        if (disciplina_cientifica !== undefined) af.disciplina_cientifica = disciplina_cientifica;
         await afiliacionRepo.save(af);
       } else {
-        // Crear una nueva
+        // Crear nueva
         const newAf = afiliacionRepo.create({
           institucion: institucion || '',
-          id_grado_academico: id_grado_academico ?? undefined,
+          id_grado_academico,
+          tipo_afiliacion,
+          area_tematica,
+          disciplina_cientifica,
           usuario: usuario,
         });
         await afiliacionRepo.save(newAf);

@@ -113,28 +113,147 @@ const rechazar = async (id: number) => {
 };
 
 const verDetalle = (item: Inscripcion) => {
+    const persona = item.usuario?.persona;
+    const af = item.usuario?.afiliaciones?.[0];
+
+    // Helper para campos de información personal
+    const renderInfoRow = (label: string, value?: any, icon?: string) => {
+        if (!value || value === 'No especificado' || value === '') return '';
+        return `
+            <div class="flex items-center gap-4 py-3 border-b border-slate-100 dark:border-gray-800/50 last:border-0 hover:bg-slate-50/50 dark:hover:bg-gray-800/30 transition-colors px-2 rounded-lg">
+                <div class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-gray-800 flex items-center justify-center text-slate-400">
+                    <span class="material-symbols-outlined text-[18px]">${icon || 'info'}</span>
+                </div>
+                <div class="flex-1">
+                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">${label}</p>
+                    <p class="text-xs font-bold text-slate-700 dark:text-gray-200">${value}</p>
+                </div>
+            </div>
+        `;
+    };
+
+    // Generar bloque de información personal
+    const infoPersonalHtml = [
+        renderInfoRow('Documento ID', persona?.documento_identidad, 'fingerprint'),
+        renderInfoRow('Género', persona?.genero === 0 ? 'Masculino' : (persona?.genero === 1 ? 'Femenino' : 'Otro'), 'person'),
+        renderInfoRow('Fecha Nacimiento', persona?.fecha_nacimiento ? new Date(persona.fecha_nacimiento).toLocaleDateString() : null, 'calendar_today'),
+        renderInfoRow('Celular', persona?.celular, 'call'),
+        renderInfoRow('País de Origen', persona?.pais_origen, 'public'),
+        renderInfoRow('País de Residencia', persona?.pais_residencia, 'home_pin'),
+    ].join('');
+
+    // Generar bloque de requisitos adicionales
+    let extraFieldsHtml = '';
+    if (item.datos_adicionales && Object.keys(item.datos_adicionales).length > 0) {
+        extraFieldsHtml = `
+            <div class="mt-8">
+                <p class="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                    <span class="w-6 h-px bg-emerald-200 dark:bg-emerald-800"></span> Requisitos de la Actividad
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    ${Object.entries(item.datos_adicionales).map(([label, value]) => `
+                        <div class="p-4 bg-emerald-50/50 dark:bg-emerald-900/5 border border-emerald-100 dark:border-emerald-800/40 rounded-2xl">
+                            <p class="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">${label}</p>
+                            <p class="text-[11px] font-bold text-slate-700 dark:text-gray-200">${value}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
     Swal.fire({
-        title: 'Ficha de Inscripción',
         html: `
-            <div class="text-left text-sm space-y-4 mt-6">
-                <div class="bg-slate-50 dark:bg-gray-800 p-6 rounded-3xl border border-slate-200 dark:border-gray-700">
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Estudiante</p>
-                    <p class="font-black text-primary-dark dark:text-white uppercase">${parseFullName(item.usuario?.persona)}</p>
-                    <p class="text-xs font-bold text-slate-400">CI: ${item.usuario?.persona?.documento_identidad}</p>
+            <div class="text-left text-sm max-h-[75vh] overflow-y-auto pr-2 custom-scrollbar">
+                <!-- Header del Estudiante -->
+                <div class="bg-gradient-to-br from-primary-dark to-sky-900 -mx-6 -mt-6 p-8 mb-8 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-4">
+                        <span class="bg-white/10 backdrop-blur-md text-white/80 text-[9px] font-bold px-3 py-1 rounded-full border border-white/10 uppercase tracking-widest italic">Postulante ID: ${item.usuario?.id}</span>
+                    </div>
+                    <div class="relative z-10 flex items-center gap-6">
+                        <div class="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-2xl">
+                             <span class="material-symbols-outlined text-4xl text-primary-dark font-black">person_outline</span>
+                        </div>
+                        <div>
+                             <h2 class="text-3xl font-black text-white italic uppercase tracking-tighter leading-none mb-2">${parseFullName(persona)}</h2>
+                             <div class="flex flex-wrap gap-2">
+                                <span class="bg-umsa-gold text-white text-[9px] font-black px-3 py-1 rounded-full uppercase flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[10px]">workspace_premium</span>
+                                    ${item.miembro_tyan === 1 ? 'Miembro TYAN' : 'No Miembro'}
+                                </span>
+                                <span class="bg-white/20 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase">Actividad Académica</span>
+                             </div>
+                        </div>
+                    </div>
                 </div>
-                <div>
-                   <p class="text-[10px] font-black text-umsa-blue uppercase tracking-widest mb-1">Actividad Académica</p>
-                   <p class="text-xs font-bold text-primary-dark dark:text-white uppercase">${item.actividadAcademica?.tipo} en ${item.actividadAcademica?.nombre}</p>
-                   <p class="text-[10px] font-black text-umsa-gold uppercase mt-1">Evento: ${item.actividadAcademica?.evento?.nombre}</p>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    <!-- Columna Izquierda: Personal y Académico -->
+                    <div class="lg:col-span-12 space-y-8">
+                        <div>
+                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                <span class="w-6 h-px bg-slate-200 dark:bg-gray-800"></span> Información Personal
+                            </p>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-y-2 gap-x-6 bg-slate-50/50 dark:bg-gray-800/20 p-5 rounded-[2rem] border border-slate-100 dark:border-gray-800/50">
+                                ${infoPersonalHtml || '<p class="text-xs text-slate-400 col-span-full py-4 text-center">No hay información personal adicional registrada.</p>'}
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div>
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                    <span class="w-6 h-px bg-slate-200 dark:bg-gray-800"></span> Perfil Académico
+                                </p>
+                                <div class="bg-blue-50/50 dark:bg-blue-900/5 border border-blue-100 dark:border-blue-900/30 p-6 rounded-[2rem] relative overflow-hidden group">
+                                    <span class="material-symbols-outlined absolute -right-2 -bottom-2 text-6xl text-blue-500/5 group-hover:scale-110 transition-transform">school</span>
+                                    ${af ? `
+                                        <div class="space-y-4 relative z-10">
+                                            <div>
+                                                <p class="text-[8px] font-black text-blue-400 uppercase tracking-widest mb-1">Institución / Afiliación</p>
+                                                <p class="text-xs font-black text-primary-dark dark:text-blue-100 uppercase">${af.institucion}</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-[8px] font-black text-blue-400 uppercase tracking-widest mb-1">Grado Académico</p>
+                                                <p class="text-xs font-black text-primary-dark dark:text-blue-200 uppercase">${af.gradoAcademico?.nombre_grado || 'S/N'}</p>
+                                            </div>
+                                        </div>
+                                    ` : `
+                                        <div class="text-center py-6">
+                                            <span class="material-symbols-outlined text-slate-300 text-3xl mb-2">no_accounts</span>
+                                            <p class="text-[10px] font-bold text-slate-400 uppercase">Sin información académica</p>
+                                        </div>
+                                    `}
+                                </div>
+                            </div>
+
+                            <div>
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                    <span class="w-6 h-px bg-slate-200 dark:bg-gray-800"></span> Motivación de Inscripción
+                                </p>
+                                <div class="bg-indigo-50/50 dark:bg-indigo-900/5 border border-indigo-100 dark:border-indigo-900/30 p-6 rounded-[2rem] h-full italic">
+                                    <p class="text-xs text-indigo-900 dark:text-indigo-200 leading-relaxed font-medium">"${item.razon || 'No se proporcionó una razón específica.'}"</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        ${extraFieldsHtml}
+                    </div>
                 </div>
-                <div class="bg-blue-50 dark:bg-blue-900/10 p-5 rounded-2xl border-l-4 border-umsa-blue">
-                    <p class="font-bold text-[10px] uppercase tracking-widest text-umsa-blue mb-2">Motivación del Estudiante:</p>
-                    <p class="italic text-slate-600 dark:text-gray-300">"${item.razon || 'No se proporcionó una razón'}"</p>
+
+                <div class="mt-8 pt-6 border-t border-slate-100 dark:border-gray-800 flex justify-between items-center text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                    <span>Actividad Académica solicitada:</span>
+                    <span class="text-primary-dark dark:text-sky-400">${item.actividadAcademica?.nombre}</span>
                 </div>
             </div>
         `,
-        confirmButtonText: 'Entendido',
-        confirmButtonColor: '#002147'
+        width: '900px',
+        showConfirmButton: false,
+        showCancelButton: false,
+        padding: '24px',
+        customClass: {
+            popup: 'rounded-[2.5rem] border-none shadow-2xl dark:bg-slate-900',
+            htmlContainer: 'p-0 overflow-hidden'
+        }
     });
 };
 

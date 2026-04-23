@@ -58,6 +58,12 @@ export class Inscripcion {
   @Column({ type: 'integer', default: 1 })
   estado: number;
 
+  /** 
+   * Respuestas a los requisitos dinámicos configurados en la actividad.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  datos_adicionales: any;
+
   // ── Relaciones ────────────────────────────────────────────────────────────
 
   /** El usuario que se inscribió. */
