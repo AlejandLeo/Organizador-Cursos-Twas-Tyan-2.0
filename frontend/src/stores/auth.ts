@@ -13,14 +13,34 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const response = await api.post('/auth/login', { email, password });
       token.value = response.data.token;
-      user.value = response.data.user;
       
       if (token.value) {
         localStorage.setItem('token', token.value);
       }
+      
+      // Request updated fresh profile from /auth/me after securely writing token to local storage 
+      // preventing old cached default users
+      const meResponse = await api.get('/auth/me');
+      user.value = meResponse.data;
+      
     } catch (error) {
       console.error('Login failed', error);
       throw error;
+    }
+  }
+
+  async function fetchUser() {
+    try {
+      if (token.value) {
+        // Using /auth/me to populate the real user profile
+        const response = await api.get('/auth/me');
+        if (response.data) {
+           user.value = response.data;
+        }
+      }
+    } catch (e: any) {
+      console.error('Error fetching user', e);
+      logout();
     }
   }
 
@@ -35,6 +55,7 @@ export const useAuthStore = defineStore('auth', () => {
     token,
     isAuthenticated,
     login,
-    logout
+    logout,
+    fetchUser
   };
 });

@@ -1,21 +1,21 @@
 import api from './api';
-import type { Perfil } from '@/types';
+import type { Persona } from '@/types';
 
 export const perfilesService = {
   getAll() {
-    return api.get<Perfil[]>('/perfiles');
+    return api.get<Persona[]>('/perfiles');
   },
   getById(id: number) {
-    return api.get<Perfil>(`/perfiles/${id}`);
+    return api.get<Persona>(`/perfiles/${id}`);
   },
   getByUsuarioId(usuarioId: number) {
-    return api.get<Perfil>(`/perfiles/usuario/${usuarioId}`);
+    return api.get<Persona>(`/perfiles/usuario/${usuarioId}`);
   },
-  create(data: Partial<Perfil>) {
-    return api.post<Perfil>('/perfiles', data);
+  create(data: Partial<Persona>) {
+    return api.post<Persona>('/perfiles', data);
   },
-  update(id: number, data: Partial<Perfil>) {
-    return api.put<Perfil>(`/perfiles/${id}`, data);
+  update(id: number, data: Partial<Persona>) {
+    return api.put<Persona>(`/perfiles/${id}`, data);
   },
   delete(id: number) {
     return api.delete(`/perfiles/${id}`);

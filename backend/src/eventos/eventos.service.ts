@@ -27,11 +27,17 @@ export class EventosService {
   }
 
   async findAll() {
-    const eventos = await this.eventoRepository.find();
+    const eventos = await this.eventoRepository.find({
+      relations: ['actividades', 'actividades.modalidades', 'actividades.inscripciones']
+    });
     return eventos.map(evento => ({
       ...evento,
       logo: this.formatImageUrl(evento.logo),
-      imagen_fondo: this.formatImageUrl(evento.imagen_fondo)
+      imagen_fondo: this.formatImageUrl(evento.imagen_fondo),
+      actividades: (evento.actividades || []).map(act => ({
+        ...act,
+        imagen: this.formatImageUrl(act.imagen)
+      }))
     }));
   }
 
@@ -66,10 +72,36 @@ export class EventosService {
         'imparticiones',
         'imparticiones.usuario',
         'imparticiones.usuario.persona',
-        'imparticiones.actividadAcademica'
-      ]
+        'imparticiones.usuario.afiliaciones',
+        'imparticiones.usuario.afiliaciones.gradoAcademico',
+      ],
     });
-    return evento ? evento.imparticiones : [];
+
+    if (!evento || !evento.imparticiones) return [];
+
+    // Agrupar por usuario para evitar duplicados si un ponente tiene varias actividades
+    const expositoresMap = new Map();
+
+    evento.imparticiones.forEach((imp) => {
+      if (imp.usuario && !expositoresMap.has(imp.usuario.id)) {
+        const u = imp.usuario;
+        const persona = u.persona || {};
+        const ga = u.afiliaciones?.[0]?.gradoAcademico || {};
+        
+        expositoresMap.set(u.id, {
+          id: u.id,
+          email: u.email,
+          nombres: persona.nombres,
+          primer_apellido: persona.primer_apellido,
+          segundo_apellido: persona.segundo_apellido,
+          profesion: u.afiliaciones?.[0]?.institucion || 'Expositor',
+          grado_abreviacion: ga.abreviacion || '',
+          foto: this.formatImageUrl(persona.firma_dig), // Usamos firma_dig o un campo de foto si existiera
+        });
+      }
+    });
+
+    return Array.from(expositoresMap.values());
   }
 
   async getCoordinaciones(id: number) {
@@ -112,6 +144,11 @@ export class EventosService {
 
     const [eventos, total] = await this.eventoRepository.findAndCount({
       where,
+      relations: [
+        'actividades', 
+        'actividades.modalidades', 
+        'actividades.inscripciones'
+      ],
       order: { fecha_creacion: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
@@ -121,6 +158,10 @@ export class EventosService {
       ...evento,
       logo: this.formatImageUrl(evento.logo),
       imagen_fondo: this.formatImageUrl(evento.imagen_fondo),
+      actividades: (evento.actividades || []).map(act => ({
+        ...act,
+        imagen: this.formatImageUrl(act.imagen)
+      }))
     }));
 
     return { data, total, page, limit };

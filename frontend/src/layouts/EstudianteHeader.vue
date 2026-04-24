@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useAuthStore } from '@/stores/auth';
+import api from '@/services/api';
 
 const isProfileOpen = ref(false);
 const isDark = ref(false);
+const authStore = useAuthStore();
+const profilePhotoUrl = ref('');
 
 const toggleDark = () => {
   isDark.value = !isDark.value;
@@ -10,11 +14,19 @@ const toggleDark = () => {
   localStorage.setItem('theme', isDark.value ? 'dark' : 'light');
 };
 
-onMounted(() => {
+onMounted(async () => {
   const savedTheme = localStorage.getItem('theme');
   if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
     isDark.value = true;
     document.documentElement.classList.add('dark');
+  }
+
+  try {
+    const photoRes = await api.get('/usuarios/perfil/foto', { responseType: 'blob' });
+    if (profilePhotoUrl.value) URL.revokeObjectURL(profilePhotoUrl.value);
+    profilePhotoUrl.value = URL.createObjectURL(photoRes.data);
+  } catch (e) {
+    profilePhotoUrl.value = '';
   }
 });
 </script>
@@ -67,11 +79,12 @@ onMounted(() => {
       <!-- Profile Button matched exactly to Ponente -->
       <div class="relative" @click.stop>
         <button @click="isProfileOpen = !isProfileOpen" class="flex items-center gap-2 md:gap-3 bg-slate-50 dark:bg-gray-900 border border-slate-200 dark:border-gray-700 hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors rounded-xl pr-2 md:pr-3 py-1 pl-1 shadow-sm">
-          <div class="h-8 w-8 rounded-full overflow-hidden bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 p-0.5 flex items-center justify-center">
-            <span class="material-symbols-outlined text-2xl text-slate-400">account_circle</span>
+          <div class="h-8 w-8 rounded-full overflow-hidden bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 p-0 flex flex-shrink-0 items-center justify-center">
+            <img v-if="profilePhotoUrl" :src="profilePhotoUrl" alt="Foto" class="w-full h-full object-cover" />
+            <span v-else class="material-symbols-outlined text-2xl text-slate-400">account_circle</span>
           </div>
           <div class="hidden md:flex flex-col items-start pr-1">
-            <span class="text-xs font-black text-primary-dark dark:text-white leading-tight">Maria F. Rojas</span>
+            <span class="text-xs font-black text-primary-dark dark:text-white leading-tight">{{ authStore.user?.persona?.nombres || 'Usuario' }} {{ authStore.user?.persona?.primer_apellido || '' }}</span>
             <span class="text-[9px] uppercase tracking-widest text-slate-400 dark:text-gray-500 font-bold">Portal - Mi Perfil</span>
           </div>
           <span class="material-symbols-outlined text-slate-400 text-sm transition-transform duration-200" :class="[isProfileOpen ? 'rotate-180' : '']">expand_more</span>
@@ -81,19 +94,14 @@ onMounted(() => {
         <div v-if="isProfileOpen" class="absolute right-0 top-full mt-2 w-[220px] bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
           
           <div class="p-4 border-b border-slate-100 dark:border-gray-800 bg-slate-50 dark:bg-gray-800/50 block md:hidden">
-             <span class="block text-xs font-black text-primary-dark dark:text-white">Maria F. Rojas</span>
+             <span class="block text-xs font-black text-primary-dark dark:text-white">{{ authStore.user?.persona?.nombres || 'Usuario' }} {{ authStore.user?.persona?.primer_apellido || '' }}</span>
              <span class="block text-[9px] uppercase tracking-widest text-slate-400 font-bold mt-0.5">Estudiante</span>
           </div>
 
           <div class="p-2 space-y-1">
-            <button class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold text-slate-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800 hover:text-umsa-blue transition-colors flex items-center gap-2">
+            <button @click="$router.push('/estudiante/perfil')" class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold text-slate-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800 hover:text-umsa-blue transition-colors flex items-center gap-2">
               <span class="material-symbols-outlined text-[18px]">badge</span>
               Ver Perfil
-            </button>
-            <div class="h-[1px] bg-slate-100 dark:border-gray-800 my-1"></div>
-            <button class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center gap-2">
-              <span class="material-symbols-outlined text-[18px]">logout</span>
-              Cerrar Sesión
             </button>
           </div>
         </div>

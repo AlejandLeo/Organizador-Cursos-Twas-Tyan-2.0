@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsInt, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
@@ -49,4 +49,20 @@ export class CrearPonenteDto {
   @IsOptional()
   @IsString()
   celular?: string;
+
+  @ApiPropertyOptional({ example: 'Ingeniero de Sistemas' })
+  @IsOptional()
+  @IsString()
+  profesion?: string;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @IsInt()
+  id_grado_academico?: number;
+
+  @ApiPropertyOptional({ example: 5, description: 'ID del Rol (2=Coordinador, 5=Ponente)' })
+  @IsOptional()
+  @IsInt()
+  id_rol?: number;
 }
+

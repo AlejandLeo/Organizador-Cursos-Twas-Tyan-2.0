@@ -10,9 +10,9 @@ const isDashboard = computed(() => route.path.startsWith('/coordinador') || rout
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col font-sans antialiased text-gray-900 bg-white dark:bg-gray-950 dark:text-gray-100 transition-colors duration-300">      
+  <div class="min-h-[100vh] flex flex-col font-sans antialiased text-gray-900 bg-white dark:bg-gray-950 dark:text-gray-100 transition-colors duration-300">      
     <AppNavbar v-if="!isDashboard" />
-    <main :class="[!isDashboard ? 'pt-[90px]' : '', 'flex-grow']">
+    <main class="flex-grow">
       <RouterView />
     </main>
 

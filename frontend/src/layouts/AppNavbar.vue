@@ -64,8 +64,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <nav class="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 fixed top-0 left-0 right-0 z-50 shadow-sm font-sans transition-all duration-300">
-    <div class="container mx-auto px-4 lg:px-8">
+  <nav class="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 sticky top-0 w-full z-50 shadow-sm font-sans transition-all duration-300">
+    <div class="w-full px-4 md:px-12 lg:px-24">
       <div class="flex justify-between items-center h-20">
         
         <!-- Left: Logos -->

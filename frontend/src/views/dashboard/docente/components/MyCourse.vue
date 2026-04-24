@@ -101,12 +101,12 @@ const updateAttendance = (id: number, status: string) => {
                 <span 
                   class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
                   :class="{
-                    'bg-green-100 text-green-800': std.calificacion >= 51,
-                    'bg-red-100 text-red-800': std.calificacion < 51 && std.calificacion !== null,
+                    'bg-green-100 text-green-800': (std.calificacion ?? 0) >= 51,
+                    'bg-red-100 text-red-800': (std.calificacion ?? 0) < 51 && std.calificacion !== null,
                     'bg-gray-100 text-gray-800': std.calificacion === null
                   }"
                 >
-                  {{ std.calificacion >= 51 ? 'Aprobado' : (std.calificacion === null ? 'Pendiente' : 'Reprobado') }}
+                  {{ (std.calificacion ?? 0) >= 51 ? 'Aprobado' : (std.calificacion === null ? 'Pendiente' : 'Reprobado') }}
                 </span>
               </td>
             </tr>

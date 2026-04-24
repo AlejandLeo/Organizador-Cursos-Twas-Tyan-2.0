@@ -14,7 +14,7 @@
         <button @click="$router.back()" class="mb-4 text-blue-100 hover:text-white flex items-center gap-2">
           ← Volver
         </button>
-        <h1 class="text-4xl font-bold mb-4">{{ event.nombre }}</h1>
+        <h1 class="text-4xl font-bold mb-4">{{ event.descripcion }}</h1>
         <div class="flex flex-wrap items-center gap-6 text-blue-100">
           <div class="flex items-center gap-2">
             <span class="bg-blue-500/50 px-3 py-1 rounded-full text-sm">Gestión {{ event.gestion }}</span>
@@ -42,23 +42,7 @@
             </p>
           </div>
 
-          <!-- Versions List (Optional) -->
-          <div class="mb-12" v-if="versiones.length > 0">
-            <h2 class="text-3xl font-bold text-[#0052a3] mb-6">Versiones Disponibles</h2>
-            <div class="space-y-4">
-                <div v-for="v in versiones" :key="v.id_version_evento" class="border rounded-lg p-4 hover:shadow-md transition bg-white">
-                    <div class="font-bold text-lg text-gray-800">{{ v.gestion }}</div>
-                    <div class="text-sm text-gray-600 mb-2">
-                        {{ new Date(v.fecha_inicio).toLocaleDateString() }} - {{ new Date(v.fecha_fin).toLocaleDateString() }}
-                    </div>
-                    <div>{{ v.ubicacion || 'Ubicación por confirmar' }}</div>
-                    
-                    <button class="mt-4 btn btn-ghost text-sm border border-blue-200">
-                        Ver Detalles Versión
-                    </button>
-                </div>
-            </div>
-          </div>
+          <!-- Versions List (Optional) Removed for now -->
         </div>
 
         <!-- Sidebar Info -->
@@ -87,12 +71,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
-import { eventosService, versionesEventosService } from '@/services';
-import type { Evento, VersionEvento } from '@/types';
+import { eventosService } from '@/services';
+import type { Evento } from '@/types';
 
 const route = useRoute();
 const event = ref<Evento | null>(null);
-const versiones = ref<VersionEvento[]>([]);
 const loading = ref(true);
 
 onMounted(async () => {
@@ -102,14 +85,6 @@ onMounted(async () => {
     try {
         const resEvento = await eventosService.getById(eventId);
         event.value = resEvento.data;
-
-        // Cargar versiones si existen
-        try {
-            const resVersiones = await versionesEventosService.getByEventoId(eventId);
-            versiones.value = resVersiones.data;
-        } catch (e) {
-            console.warn("No se pudieron cargar versiones", e);
-        }
 
     } catch (error) {
         console.error("Error cargando evento", error);

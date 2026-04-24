@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsDateString, IsInt, IsNotEmpty } from 'class-validator';
+import { IsOptional, IsString, IsDateString, IsInt, IsNotEmpty, IsNumber, IsObject } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -29,8 +29,24 @@ export class CreateActividadDto {
   fecha_fin?: string;
 
   @ApiProperty({ example: 1, description: 'ID del evento al que pertenece' })
+  @IsNumber()
   @IsNotEmpty()
+  id_evento: number;
+
+  @ApiPropertyOptional({ example: { fields: [] } })
+  @IsOptional()
+  @IsObject()
+  @Type(() => Object)
+  requisitos?: any;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  imagen?: string;
+
+  @ApiPropertyOptional({ example: 40 })
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
-  id_evento: number;
+  horas?: number;
 }

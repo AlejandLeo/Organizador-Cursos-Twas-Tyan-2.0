@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-// import { useAuthStore } from '@/stores/auth'; // Descomentar cuando exista el store
+import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
-// const authStore = useAuthStore();
+const authStore = useAuthStore();
 
 const email = ref('');
 const password = ref('');
@@ -16,12 +16,26 @@ const handleLogin = async () => {
   error.value = '';
   
   try {
-    // await authStore.login(email.value, password.value);
-    console.log('Login attempt:', email.value);
-    // Simulación de redirección
-    router.push('/coordinador'); // Redirigir al dashboard del coordinador
-  } catch (e) {
-    error.value = 'Credenciales inválidas';
+    // Force cleanup before attempting new login to prevent overlaps
+    localStorage.removeItem('token');
+    
+    await authStore.login(email.value, password.value);
+    
+    // Check role and redirect
+    const userRoles = (authStore.user as any)?.usuariosRoles || [];
+    const isCoordinador = userRoles.some((ur: any) => ur.rol?.nombre_rol === 'Coordinador' || ur.rol?.nombre_rol === 'Super Usuario');
+    const isPonente = userRoles.some((ur: any) => ur.rol?.nombre_rol === 'Ponente');
+    
+    if (isCoordinador) {
+      router.push('/coordinador');
+    } else if (isPonente) {
+      router.push('/ponente');
+    } else {
+      // Por defecto, lo enviamos al dashboard de estudiante
+      router.push('/estudiante');
+    }
+  } catch (e: any) {
+    error.value = e.response?.data?.message || 'Credenciales inválidas';
   } finally {
     loading.value = false;
   }

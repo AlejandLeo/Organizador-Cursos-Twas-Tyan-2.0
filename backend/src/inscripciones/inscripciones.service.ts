@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Inscripcion } from './entities/inscripcion.entity';
@@ -10,7 +10,21 @@ export class InscripcionesService {
   constructor(
     @InjectRepository(Inscripcion)
     private readonly inscripcionRepository: Repository<Inscripcion>,
-  ) {}
+  ) { }
+
+  // ── Estudiante ─────────────────────────────────────────────
+
+  async findByUsuario(usuarioId: number) {
+    return this.inscripcionRepository.find({
+      where: { usuario: { id: usuarioId } },
+      relations: [
+        'actividadAcademica',
+        'actividadAcademica.evento',
+        'actividadAcademica.modalidades',
+      ],
+      order: { fecha_creacion: 'DESC' },
+    });
+  }
 
   // ── Coordinador ─────────────────────────────────────────────
 
@@ -21,7 +35,9 @@ export class InscripcionesService {
         'usuario',
         'usuario.persona',
         'actividadAcademica',
+        'actividadAcademica.evento',
         'modalidades',
+        'modalidades.cursoModalidad',
       ],
       order: { fecha_creacion: 'DESC' },
       skip: (page - 1) * limit,
@@ -30,20 +46,56 @@ export class InscripcionesService {
     return { data, total, page, limit };
   }
 
+  async findByActividad(actividadId: number) {
+    return this.inscripcionRepository.find({
+      where: { actividadAcademica: { id: actividadId } },
+      relations: [
+        'usuario',
+        'usuario.persona',
+        'usuario.afiliaciones',
+        'usuario.afiliaciones.gradoAcademico',
+        'modalidades',
+        'modalidades.cursoModalidad',
+      ],
+      order: { usuario: { persona: { primer_apellido: 'ASC' } } },
+    });
+  }
+
+  async actualizarNota(id: number, nota: number) {
+    const ins = await this.inscripcionRepository.findOneBy({ id });
+    if (!ins) throw new NotFoundException('Inscripción no encontrada');
+    await this.inscripcionRepository.update(id, { nota_principal: nota });
+    return { id, nota_principal: nota, mensaje: 'Nota actualizada' };
+  }
+
   async inscribir(dto: CreateInscripcionDto) {
     const { id_usuario, id_actividad_academica, ...rest } = dto;
+
+    // Check if the user is already inscribed or pre-inscribed
+    const existing = await this.inscripcionRepository.findOne({
+      where: {
+        usuario: { id: id_usuario },
+        actividadAcademica: { id: id_actividad_academica }
+      }
+    });
+
+    if (existing) {
+      throw new ConflictException(`El usuario ya cuenta con una inscripción o pre-inscripción en esta actividad.`);
+    }
+
     const inscripcion = this.inscripcionRepository.create({
       ...rest,
       usuario: { id: id_usuario },
       actividadAcademica: { id: id_actividad_academica },
+      datos_adicionales: dto.datos_adicionales,
     });
     return this.inscripcionRepository.save(inscripcion);
   }
 
-  async cambiarEstado(id: number, estado: number) {
+  async cambiarEstado(id: number, estado: number, observacion?: string) {
     const inscripcion = await this.inscripcionRepository.findOneBy({ id });
     if (!inscripcion) throw new NotFoundException(`Inscripción ${id} no encontrada`);
-    await this.inscripcionRepository.update(id, { estado });
+    await this.inscripcionRepository.update(id, { estado, observacion });
     return this.inscripcionRepository.findOneBy({ id });
   }
 
@@ -55,7 +107,14 @@ export class InscripcionesService {
 
   findAll() {
     return this.inscripcionRepository.find({
-      relations: ['usuario', 'actividadAcademica'],
+      relations: [
+        'usuario', 
+        'usuario.persona', 
+        'usuario.afiliaciones', 
+        'usuario.afiliaciones.gradoAcademico',
+        'actividadAcademica', 
+        'actividadAcademica.evento'
+      ],
     });
   }
 
@@ -74,3 +133,4 @@ export class InscripcionesService {
     return this.inscripcionRepository.delete(id);
   }
 }
+

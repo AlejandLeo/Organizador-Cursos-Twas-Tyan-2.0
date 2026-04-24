@@ -50,9 +50,19 @@ export class Inscripcion {
   @Column({ type: 'text', nullable: true })
   razon: string;
 
+  /** Observación del coordinador (p. ej. motivo de rechazo) */
+  @Column({ type: 'text', nullable: true })
+  observacion: string;
+
   /** 1 = Activa | 0 = Cancelada */
   @Column({ type: 'integer', default: 1 })
   estado: number;
+
+  /** 
+   * Respuestas a los requisitos dinámicos configurados en la actividad.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  datos_adicionales: any;
 
   // ── Relaciones ────────────────────────────────────────────────────────────
 

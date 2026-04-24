@@ -46,8 +46,40 @@ export class CreateEventoDto {
   estado?: number;
 
   @ApiPropertyOptional({ type: 'string', format: 'binary', description: 'Logo/Portada del evento' })
+  @IsOptional()
   logo?: any;
 
   @ApiPropertyOptional({ type: 'string', format: 'binary', description: 'Imagen de fondo del evento' })
+  @IsOptional()
   imagen_fondo?: any;
+
+  @ApiPropertyOptional({ example: '3ra Edición' })
+  @IsOptional()
+  @IsString()
+  version?: string;
+
+  @ApiPropertyOptional({ example: 'Texto largo sobre el evento...' })
+  @IsOptional()
+  @IsString()
+  sobre_evento_1?: string;
+
+  @ApiPropertyOptional({ example: 'Más texto sobre el evento...' })
+  @IsOptional()
+  @IsString()
+  sobre_evento_2?: string;
+
+  @ApiPropertyOptional({ example: 'La frase inspiradora del evento.' })
+  @IsOptional()
+  @IsString()
+  frase_destacada?: string;
+
+  @ApiPropertyOptional({ example: 'https://maps.google.com/...' })
+  @IsOptional()
+  @IsString()
+  google_maps_link?: string;
+
+  @ApiPropertyOptional({ example: '[{day: 1, name: "Lunes", events: [...]}]' })
+  @IsOptional()
+  @IsString()
+  cronograma?: string;
 }

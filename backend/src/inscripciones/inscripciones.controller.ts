@@ -9,6 +9,8 @@ import {
   ParseIntPipe,
   Query,
   UseGuards,
+  Request,
+  Patch,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { InscripcionesService } from './inscripciones.service';
@@ -21,6 +23,32 @@ import { Roles } from '../auth/roles.decorator';
 @Controller('inscripciones')
 export class InscripcionesController {
   constructor(private readonly service: InscripcionesService) {}
+
+  // ── Estudiante ─────────────────────────────────────────────
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('mis-inscripciones')
+  @ApiOperation({ summary: 'Listar las inscripciones del estudiante autenticado' })
+  misInscripciones(@Request() req: any) {
+    return this.service.findByUsuario(req.user.id || req.user.sub);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('preinscribir')
+  @ApiOperation({ summary: 'Pre-inscripción de estudiante a una actividad' })
+  preinscribir(@Request() req: any, @Body() body: any) {
+    // Creamos la inscripción con estado 0 = Pendiente
+    return this.service.inscribir({
+      id_usuario: req.user.id || req.user.sub,
+      id_actividad_academica: Number(body.id_actividad),
+      miembro_tyan: body.miembro_tyan !== undefined ? Number(body.miembro_tyan) : 0,
+      razon: body.razon || '',
+      datos_adicionales: body.datos_adicionales || {},
+      estado: 0, // 0 = pendiente
+    });
+  }
 
   // ── Coordinador ─────────────────────────────────────────────
 
@@ -48,6 +76,27 @@ export class InscripcionesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('Coordinador', 'Super Usuario')
   @ApiBearerAuth()
+  @Get('actividad/:actividadId')
+  @ApiOperation({ summary: 'Listar inscripciones por actividad específica' })
+  findByActividad(@Param('actividadId', ParseIntPipe) actividadId: number) {
+    return this.service.findByActividad(actividadId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Coordinador', 'Super Usuario')
+  @ApiBearerAuth()
+  @Patch(':id/nota')
+  @ApiOperation({ summary: 'Actualizar nota de un estudiante' })
+  actualizarNota(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('nota') nota: number,
+  ) {
+    return this.service.actualizarNota(id, nota);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Coordinador', 'Super Usuario')
+  @ApiBearerAuth()
   @Post()
   @ApiOperation({ summary: 'Inscribir estudiante manualmente (Coordinador)' })
   inscribir(@Body() dto: CreateInscripcionDto) {
@@ -62,8 +111,9 @@ export class InscripcionesController {
   cambiarEstado(
     @Param('id', ParseIntPipe) id: number,
     @Body('estado', ParseIntPipe) estado: number,
+    @Body('observacion') observacion?: string,
   ) {
-    return this.service.cambiarEstado(id, Math.floor(estado));
+    return this.service.cambiarEstado(id, Math.floor(estado), observacion);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -75,3 +125,4 @@ export class InscripcionesController {
     return this.service.remove(id);
   }
 }
+

@@ -1,4 +1,4 @@
-import { IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString, IsObject } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -31,4 +31,9 @@ export class CreateInscripcionDto {
   @Type(() => Number)
   @IsInt()
   estado?: number;
+
+  @ApiPropertyOptional({ example: { talla: 'M' } })
+  @IsOptional()
+  @IsObject()
+  datos_adicionales?: any;
 }

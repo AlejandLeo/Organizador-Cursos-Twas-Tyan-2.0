@@ -35,7 +35,11 @@ export class AuthController {
     // 1. Valida credenciales (lanza 401 si son incorrectas o cuenta inactiva)
     const usuario = await this.usuariosService.login(loginDto);
     // 2. Genera y devuelve el access_token JWT
-    return this.authService.generarToken(usuario);
+    const token = await this.authService.generarToken(usuario);
+    return {
+      user: usuario,
+      token: token.access_token,
+    };
   }
 
   @Post('register')
@@ -75,6 +79,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Alias de /perfil' })
   @Get('me')
   async me(@Request() req: any) {
+    // req.user viene de JwtStrategy.validate() → { id, email, roles }
     return this.usuariosService.getPerfil(req.user.id);
   }
 

@@ -64,7 +64,7 @@ const videos = ref([
                   
                   <div class="flex items-center justify-center gap-2 w-full">
                     <span class="material-symbols-outlined text-[18px] text-primary-light dark:text-primary-dark opacity-0 group-hover:opacity-100 transition-opacity -ml-4 group-hover:ml-0">movie</span>
-                    <h3 class="font-bold text-[16px] text-slate-700 dark:text-slate-200 group-hover:text-primary-dark dark:group-hover:text-white transition-colors">{{ videos[0].title }}</h3>
+                    <h3 class="font-bold text-[16px] text-slate-700 dark:text-slate-200 group-hover:text-primary-dark dark:group-hover:text-white transition-colors">{{ videos[0]?.title }}</h3>
                   </div>
                 </button>
 
@@ -84,7 +84,7 @@ const videos = ref([
                   
                   <div class="flex items-center justify-center gap-2 w-full">
                     <span class="material-symbols-outlined text-[18px] text-primary-light dark:text-primary-dark opacity-0 group-hover:opacity-100 transition-opacity -ml-4 group-hover:ml-0">movie</span>
-                    <h3 class="font-bold text-[16px] text-slate-700 dark:text-slate-200 group-hover:text-primary-dark dark:group-hover:text-white transition-colors">{{ videos[1].title }}</h3>
+                    <h3 class="font-bold text-[16px] text-slate-700 dark:text-slate-200 group-hover:text-primary-dark dark:group-hover:text-white transition-colors">{{ videos[1]?.title }}</h3>
                   </div>
                 </button>
               </div>
