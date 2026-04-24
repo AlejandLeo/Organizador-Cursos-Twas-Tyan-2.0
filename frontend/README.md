@@ -1,58 +1,61 @@
-# frontend
+# Frontend: Organizador de Cursos Tyan
 
-This template should help get you started developing with Vue 3 in Vite.
+Interfaz de usuario moderna desarrollada con Vue 3, Vite y Pinia. Enfocada en ofrecer una experiencia fluida para los estudiantes y administradores de la UMSA.
 
-## Recommended IDE Setup
+---
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+## Instalacion y Desarrollo
 
-## Recommended Browser Setup
-
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
-
-## Type Support for `.vue` Imports in TS
-
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
-
-```sh
+### 1. Instalar dependencias
+```bash
 npm install
 ```
 
-### Compile and Hot-Reload for Development
-
-```sh
+### 2. Ejecutar en modo desarrollo
+```bash
 npm run dev
 ```
+La aplicacion estara disponible en: [http://localhost:5173](http://localhost:5173)
 
-### Type-Check, Compile and Minify for Production
+---
 
-```sh
+## Caracteristicas principales (UX)
+
+1.  **Autocompletado Inteligente**: El formulario de pre-inscripcion detecta los requisitos y precarga datos desde el perfil del estudiante.
+2.  **Sincronizacion de Perfil**: Las correcciones realizadas durante la inscripcion se guardan en el perfil global.
+3.  **Respaldo de Requisitos (Fallback)**: El sistema garantiza un set basico de seguridad si no hay requisitos configurados.
+4.  **Diseño Responsive Premium**: Uso de micro-animaciones y layouts fluidos.
+
+---
+
+## Stack Tecnologico (Frontend)
+
+| Paquete | Para que sirve |
+|---|---|
+| vue (v3) | Framework principal para la interfaz de usuario |
+| vue-router | Gestion de rutas y navegacion |
+| pinia | Almacenamiento y gestion del estado global |
+| axios | Cliente HTTP para peticiones al Backend |
+| sweetalert2 | Dialogos y alertas visuales |
+| tailwindcss | Framework de utilidades CSS |
+
+---
+
+## Produccion
+
+Para generar el paquete optimizado para despliegue:
+
+```bash
 npm run build
 ```
 
-### Lint with [ESLint](https://eslint.org/)
+El resultado se encontrara en la carpeta dist/.
 
-```sh
-npm run lint
-```
+---
 
-## Project Structure
+## Documentacion Adicional
 
-For a detailed explanation of the project structure and data model, see [STRUCTURE.md](./STRUCTURE.md).
+Para entender el modelo de datos y la logica de negocio, revisa [STRUCTURE.md](./STRUCTURE.md).
 
-To generate the directory structure:
-
-```sh
-node ../create_dirs.js
-```
+---
+[Volver al Menu Principal](../Readme.md)

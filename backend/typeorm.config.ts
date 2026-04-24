@@ -1,9 +1,10 @@
-import { DataSource } from 'typeorm';
+import { DataSource, DataSourceOptions } from 'typeorm';
+import { SeederOptions } from 'typeorm-extension';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
 
-export default new DataSource({
+const options: DataSourceOptions & SeederOptions = {
   type: 'postgres',
   host: process.env.DATABASE_HOST,
   port: Number(process.env.DATABASE_PORT),
@@ -13,4 +14,8 @@ export default new DataSource({
   entities: ['src/**/*.entity.ts'],
   migrations: ['src/database/migrations/*.ts'],
   synchronize: false,
-});
+  seeds: ['src/database/seeds/production/*.ts', 'src/database/seeds/development/*.ts'],
+  factories: ['src/database/factories/**/*.ts'],
+};
+
+export default new DataSource(options);
