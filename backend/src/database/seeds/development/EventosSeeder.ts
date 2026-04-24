@@ -1,20 +1,17 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from '../../app.module';
+import { Seeder } from 'typeorm-extension';
 import { DataSource } from 'typeorm';
-import { Evento } from '../../eventos/entities/evento.entity';
-import { ActividadAcademica } from '../../actividades-academicas/entities/actividad-academica.entity';
-import { Usuario } from '../../usuarios/entities/usuario.entity';
-import { Imparticion } from '../../imparticiones/entities/imparticion.entity';
+import { Evento } from '../../../eventos/entities/evento.entity';
+import { ActividadAcademica } from '../../../actividades-academicas/entities/actividad-academica.entity';
+import { Usuario } from '../../../usuarios/entities/usuario.entity';
+import { Imparticion } from '../../../imparticiones/entities/imparticion.entity';
 
-async function bootstrap() {
-  const app = await NestFactory.createApplicationContext(AppModule);
-  const dataSource = app.get(DataSource);
-  
-  const queryRunner = dataSource.createQueryRunner();
-  await queryRunner.connect();
-  await queryRunner.startTransaction();
+export default class EventosSeeder implements Seeder {
+  public async run(dataSource: DataSource): Promise<void> {
+    const eventoRepository = dataSource.getRepository(Evento);
+    const actividadRepository = dataSource.getRepository(ActividadAcademica);
+    const userRepository = dataSource.getRepository(Usuario);
+    const imparticionRepository = dataSource.getRepository(Imparticion);
 
-  try {
     const eventosData = [
       {
         nombre: 'Congreso Internacional TWAS-TYAN 2025',
@@ -26,7 +23,6 @@ async function bootstrap() {
         fecha_inicio: new Date('2025-05-15'),
         fecha_fin: new Date('2025-05-20'),
         estado: 1,
-        // Usamos una imagen de stock llamativa para el banner (lo que usa el frontend en "logo / imagen")
         logo: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80',
         imagen_fondo: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80',
         actividades: [
@@ -175,54 +171,38 @@ async function bootstrap() {
       }
     ];
 
-    // Fetch ponente
-    const ponente = await queryRunner.manager.findOne(Usuario, { where: { email: 'ponente@gmail.com' } });
+    const ponente = await userRepository.findOneBy({ email: 'ponente@gmail.com' });
 
     for (const data of eventosData) {
       const { actividades, ...eventoInfo } = data;
 
-      // Buscar si el evento ya existe
-      let evento = await queryRunner.manager.findOne(Evento, { where: { nombre: eventoInfo.nombre } });
+      let evento = await eventoRepository.findOneBy({ nombre: eventoInfo.nombre });
       if (!evento) {
-        evento = queryRunner.manager.create(Evento, eventoInfo);
-        await queryRunner.manager.save(evento);
-        console.log(`✅ Evento creado: ${evento.nombre}`);
+        evento = await eventoRepository.save(eventoRepository.create(eventoInfo));
+        console.log(`Evento creado: ${evento.nombre}`);
 
-        // Crear sus actividades
         for (const act of actividades) {
-          const nuevaActividad = queryRunner.manager.create(ActividadAcademica, {
+          const nuevaActividad = await actividadRepository.save(actividadRepository.create({
             ...act,
             evento: evento,
             horas: 40
-          });
-          await queryRunner.manager.save(nuevaActividad);
+          }));
           console.log(`  - Actividad añadida: ${nuevaActividad.nombre}`);
           
-          // Seed imparticion for ALL activities to ensure frontend fully displays the Ponente section
           if (ponente) {
-            const imparticion = queryRunner.manager.create(Imparticion, {
+            await imparticionRepository.save(imparticionRepository.create({
               actividadAcademica: nuevaActividad,
               usuario: ponente,
               rol_imparticion: 1
-            });
-            await queryRunner.manager.save(imparticion);
+            }));
             console.log(`    - Ponente asignado a la actividad ${nuevaActividad.nombre}`);
           }
         }
       } else {
-        console.log(`ℹ️ El evento "${evento.nombre}" ya existe.`);
+        console.log(`El evento "${evento.nombre}" ya existe.`);
       }
     }
 
-    await queryRunner.commitTransaction();
-    console.log('🎉 Seeder de Eventos y Actividades completado con éxito.');
-  } catch (error) {
-    console.error('❌ Error al insertar eventos:', error);
-    await queryRunner.rollbackTransaction();
-  } finally {
-    await queryRunner.release();
-    await app.close();
+    console.log('Seeder de Eventos y Actividades completado con éxito.');
   }
 }
-
-bootstrap();
