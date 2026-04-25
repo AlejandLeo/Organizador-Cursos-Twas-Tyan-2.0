@@ -454,12 +454,19 @@ export class UsuariosService {
       relations: ['persona', 'usuariosRoles', 'usuariosRoles.rol'],
     });
 
+    console.log('--- INTENTO DE LOGIN ---');
+    console.log('Email:', loginDto.email);
+
     if (!usuario) {
-      // Usamos mensaje genérico para no revelar si el email existe
+      console.log('Error: Usuario no encontrado en la BD.');
       throw new UnauthorizedException('Credenciales incorrectas.');
     }
 
+    console.log('Usuario encontrado. ID:', usuario.id);
+    console.log('Estado:', usuario.estado);
+
     if (usuario.estado === 0) {
+      console.log('Error: Usuario inactivo.');
       throw new UnauthorizedException(
         'Tu cuenta está inactiva. Contacta al administrador.',
       );
@@ -469,9 +476,14 @@ export class UsuariosService {
       loginDto.password,
       usuario.password,
     );
+
     if (!passwordValido) {
+      console.log('Error: La contraseña NO coincide.');
+      console.log('Password enviada:', loginDto.password);
       throw new UnauthorizedException('Credenciales incorrectas.');
     }
+
+    console.log('✅ LOGIN EXITOSO');
 
     // Eliminamos password del objeto antes de devolver
     // eslint-disable-next-line @typescript-eslint/no-unused-vars

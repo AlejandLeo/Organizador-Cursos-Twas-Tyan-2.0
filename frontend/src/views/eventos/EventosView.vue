@@ -114,17 +114,17 @@ const agregarDia = () => {
     });
 };
 
-const eliminarDia = (idx: number) => {
+const eliminarDia = (idx: any) => {
     nuevoEvento.value.cronograma_lista.splice(idx, 1);
     // Reordenar días
-    nuevoEvento.value.cronograma_lista.forEach((d, i) => d.day = i + 1);
+    nuevoEvento.value.cronograma_lista.forEach((d: any, i: number) => d.day = i + 1);
 };
 
-const agregarActividad = (dayIdx: number) => {
+const agregarActividad = (dayIdx: any) => {
     nuevoEvento.value.cronograma_lista[dayIdx].events.push({ time: '09:00', title: '' });
 };
 
-const eliminarActividad = (dayIdx: number, actIdx: number) => {
+const eliminarActividad = (dayIdx: any, actIdx: any) => {
     nuevoEvento.value.cronograma_lista[dayIdx].events.splice(actIdx, 1);
 };
 
@@ -186,11 +186,66 @@ const eventosAgrupados = computed(() => {
     
     group.gestiones.push({
       ...ev,
-      estadoStr: getEstadoLabel(ev.estado)
+      estadoStr: ev.estado === -1 ? 'Inhabilitado' : getEstadoLabel(ev.estado)
     });
   });
-  return Array.from(map.values()).sort((a: any, b: any) => b.gestiones.length - a.gestiones.length);
+
+  // Ordenar: Primero los activos, luego por cantidad de gestiones, y los inhabilitados al final
+  return Array.from(map.values()).sort((a: any, b: any) => {
+    // Si uno es inhabilitado y el otro no
+    const aInhabilitado = a.gestiones.every((g: any) => g.estado === -1);
+    const bInhabilitado = b.gestiones.every((g: any) => g.estado === -1);
+    
+    if (aInhabilitado && !bInhabilitado) return 1;
+    if (!aInhabilitado && bInhabilitado) return -1;
+    
+    return b.gestiones.length - a.gestiones.length;
+  });
 });
+
+const inhabilitarEvento = async (gestion: any) => {
+    const { value: motivo } = await Swal.fire({
+        title: '¿Inhabilitar esta Gestión?',
+        text: "Explique el motivo de la inhabilitación del evento:",
+        input: 'textarea',
+        inputPlaceholder: 'Escriba el motivo aquí...',
+        inputAttributes: {
+          'aria-label': 'Motivo de inhabilitación'
+        },
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: 'Sí, Inhabilitar',
+        cancelButtonText: 'Cancelar',
+        inputValidator: (value) => {
+          if (!value) {
+            return '¡Debes escribir un motivo!'
+          }
+        }
+    });
+
+    if (motivo) {
+        try {
+            // Mandamos -1 como estado de inhabilitado y el motivo
+            await api.patch(`/eventos/${gestion.id}`, { 
+                estado: -1, 
+                descripcion: `${gestion.descripcion}\n[INHABILITACION_MOTIVO]:${motivo}\n[FECHA_INHABILITACION]:${new Date().toLocaleString()}`
+            });
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Evento Inhabilitado',
+                text: 'La gestión ya no será visible para ponentes ni estudiantes.',
+                confirmButtonColor: '#10b981'
+            });
+            
+            await fetchEventos();
+            await eventoStore.fetchEventosInfo();
+        } catch (err: any) {
+            Swal.fire('Error', 'No se pudo inhabilitar el evento', 'error');
+        }
+    }
+};
 
 const handleCreateEvento = async () => {
     try {
@@ -597,7 +652,7 @@ const editarGestion = (gestion: any) => {
 
                         <div class="space-y-3">
                             <div v-for="(act, aIdx) in dia.events" :key="aIdx" class="flex flex-col sm:flex-row items-center gap-3 group/act relative">
-                                <span class="text-[9px] font-black text-slate-300 dark:text-gray-600 hidden sm:block">{{ aIdx + 1 }}</span>
+                                <span class="text-[9px] font-black text-slate-300 dark:text-gray-600 hidden sm:block">{{ Number(aIdx) + 1 }}</span>
                                 <input v-model="act.time" type="time" class="w-full sm:w-32 bg-slate-50 dark:bg-gray-900 border border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-xs font-black text-umsa-blue" />
                                 <input v-model="act.title" placeholder="Descripción de la actividad..." class="flex-1 w-full bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold shadow-sm focus:border-emerald-500 transition-all" />
                                 <button @click.prevent="eliminarActividad(dIdx, aIdx)" class="text-slate-300 hover:text-red-500 opacity-0 group-hover/act:opacity-100 transition-all">
@@ -674,22 +729,47 @@ const editarGestion = (gestion: any) => {
               </h4>
               
               <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                <div v-for="gestion in evento.gestiones" :key="gestion.id" @click="editarGestion(gestion)" class="p-5 rounded-2xl border border-slate-200 dark:border-gray-700 hover:border-umsa-blue dark:hover:border-blue-500 transition-all group cursor-pointer bg-white dark:bg-gray-900 shadow-sm hover:shadow-xl hover:shadow-umsa-blue/10 dark:hover:shadow-blue-900/20 relative overflow-hidden flex flex-col justify-between min-h-[120px]">
+                <div v-for="gestion in evento.gestiones" :key="gestion.id" 
+                  :class="[
+                    gestion.estado === -1 ? 'opacity-40 grayscale-[0.5] hover:opacity-100' : '',
+                    'p-5 rounded-2xl border border-slate-200 dark:border-gray-700 hover:border-umsa-blue dark:hover:border-blue-500 transition-all group cursor-pointer bg-white dark:bg-gray-900 shadow-sm hover:shadow-xl hover:shadow-umsa-blue/10 dark:hover:shadow-blue-900/20 relative overflow-hidden flex flex-col justify-between min-h-[140px]'
+                  ]">
                   
-                  <div class="absolute -right-6 -top-6 text-slate-50 dark:text-gray-800 group-hover:text-blue-50 dark:group-hover:text-blue-900/30 transition-colors z-0">
-                    <span class="material-symbols-outlined text-[100px]">{{ gestion.estadoStr === 'Activo' ? 'verified' : (gestion.estadoStr === 'Planificación' ? 'edit_calendar' : 'history') }}</span>
+                  <!-- Tooltip informativo para inhabilitados -->
+                  <div v-if="gestion.estado === -1" class="absolute inset-0 z-50 flex items-center justify-center p-4 bg-white/95 dark:bg-black/95 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div class="text-center">
+                          <p class="text-[9px] font-black text-rose-500 uppercase tracking-widest mb-1">Motivo de Inhabilitación</p>
+                          <p class="text-[10px] font-bold text-slate-600 dark:text-slate-300 italic mb-2 line-clamp-3">
+                              {{ gestion.descripcion?.split('[INHABILITACION_MOTIVO]:')?.[1]?.split('\n')?.[0] || 'No especificado' }}
+                          </p>
+                          <p class="text-[8px] font-black text-slate-400 uppercase tracking-tighter">
+                              {{ gestion.descripcion?.split('[FECHA_INHABILITACION]:')?.[1] || '' }}
+                          </p>
+                      </div>
                   </div>
 
-                  <div class="flex flex-col mb-4 relative z-10">
+                  <div class="absolute -right-6 -top-6 text-slate-50 dark:text-gray-800 group-hover:text-blue-50 dark:group-hover:text-blue-900/30 transition-colors z-0">
+                    <span class="material-symbols-outlined text-[100px]">{{ gestion.estado === -1 ? 'block' : (gestion.estadoStr === 'Activo' ? 'verified' : (gestion.estadoStr === 'Planificación' ? 'edit_calendar' : 'history')) }}</span>
+                  </div>
+
+                  <div class="flex flex-col mb-4 relative z-10" @click="editarGestion(gestion)">
                     <span class="text-2xl font-black text-primary-dark dark:text-white leading-none">{{ gestion.gestion }}</span>
                     <span class="text-[9px] font-black text-umsa-gold mt-1.5 uppercase italic tracking-widest">{{ gestion.version || 'Sin versión' }}</span>
                   </div>
 
-                  <div class="flex justify-between items-end relative z-10">
-                    <span class="text-[10px] uppercase font-black px-2.5 py-1 rounded-md" :class="gestion.estadoStr === 'Activo' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : (gestion.estadoStr === 'Planificación' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' : 'bg-slate-100 dark:bg-gray-800 text-slate-500 dark:text-gray-400')">
+                  <div class="flex justify-between items-end relative z-10 gap-2">
+                    <span class="text-[10px] uppercase font-black px-2.5 py-1 rounded-md" :class="gestion.estado === -1 ? 'bg-rose-500/10 text-rose-600' : (gestion.estadoStr === 'Activo' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : (gestion.estadoStr === 'Planificación' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' : 'bg-slate-100 dark:bg-gray-800 text-slate-500 dark:text-gray-400'))">
                       {{ gestion.estadoStr }}
                     </span>
-                    <span class="text-[10px] font-black text-umsa-blue opacity-0 group-hover:opacity-100 transition-opacity bg-blue-50 dark:bg-blue-900/40 px-2.5 py-1 rounded-md flex items-center gap-1">Editar <span class="material-symbols-outlined text-[12px]">edit</span></span>
+                    
+                    <div class="flex items-center gap-1">
+                        <button v-if="gestion.estado !== -1" @click.stop="inhabilitarEvento(gestion)" class="w-8 h-8 rounded-lg bg-slate-50 dark:bg-gray-800 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all flex items-center justify-center" title="Inhabilitar Gestión">
+                            <span class="material-symbols-outlined text-lg">block</span>
+                        </button>
+                        <button @click.stop="editarGestion(gestion)" class="w-8 h-8 rounded-lg bg-slate-50 dark:bg-gray-800 text-slate-400 hover:bg-blue-50 hover:text-umsa-blue transition-all flex items-center justify-center" title="Editar">
+                            <span class="material-symbols-outlined text-lg">edit</span>
+                        </button>
+                    </div>
                   </div>
                 </div>
               </div>

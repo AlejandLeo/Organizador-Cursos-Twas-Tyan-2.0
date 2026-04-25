@@ -2,17 +2,39 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useEventoStore } from '@/stores/eventoStore';
+
+import { useAdminHistorialStore } from '@/stores/adminHistorial';
+import { useAuthStore } from '@/stores/auth';
+
 import api from '@/services/api';
 import Swal from 'sweetalert2';
 
 const router = useRouter();
 const route = useRoute();
 const eventoStore = useEventoStore();
+const historialStore = useAdminHistorialStore();
+const authStore = useAuthStore();
+
+// Solo registrar en historial si el usuario es Super Admin
+const isAdmin = () => {
+  const roles = (authStore.user as any)?.usuariosRoles || [];
+  return roles.some((ur: any) => ur.rol?.nombre_rol === 'Super Usuario' || ur.rol?.id === 1);
+};
+const registrarAccion = (...args: Parameters<typeof historialStore.registrar>) => {
+  if (isAdmin()) historialStore.registrar(...args);
+};
 
 // --- LÓGICA DE GESTIÓN DE EVENTOS (FUSIÓN MAESTRA) ---
+const isLoading = ref(false);
+const isCreating = ref(false);
 const isCreatingEvento = ref(false);
 const isEditingEvento = ref(false);
+const isEditingActividad = ref(false);
+const editActividadId = ref<number | null>(null);
 const editEventoId = ref<number | null>(null);
+const currentStep = ref(1);
+const filtroBusqueda = ref('');
+
 const ponentesDB = ref<any[]>([]);
 const gradosAcademicosDB = ref<any[]>([]);
 const previewEventoImg = ref<string | null>(null);
@@ -65,16 +87,16 @@ const agregarDiaEvento = () => {
     });
 };
 
-const eliminarDiaEvento = (idx: number) => {
+const eliminarDiaEvento = (idx: any) => {
     formEvento.value.cronograma_lista.splice(idx, 1);
-    formEvento.value.cronograma_lista.forEach((d, i) => d.day = i + 1);
+    formEvento.value.cronograma_lista.forEach((d: any, i: number) => d.day = i + 1);
 };
 
-const agregarActividadEvento = (dayIdx: number) => {
+const agregarActividadEvento = (dayIdx: any) => {
     formEvento.value.cronograma_lista[dayIdx].events.push({ time: '09:00', title: '' });
 };
 
-const eliminarActividadEvento = (dayIdx: number, actIdx: number) => {
+const eliminarActividadEvento = (dayIdx: any, actIdx: any) => {
     formEvento.value.cronograma_lista[dayIdx].events.splice(actIdx, 1);
 };
 
@@ -112,6 +134,45 @@ const onEventoFileChange = (e: any) => {
     if (file) {
         formEvento.value.fondo_img = file;
         previewEventoImg.value = URL.createObjectURL(file);
+    }
+};
+
+const fetchEventos = async () => {
+    try {
+        isLoading.value = true;
+        const res = await api.get('/eventos');
+        eventosPublicados.value = (res.data || []).map((ev: any) => ({
+            ...ev,
+            nombreCorto: ev.nombre,
+            version: ev.gestion,
+            imagen: ev.imagen_fondo || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80',
+            estado: ev.estado === 1 ? 'Activo' : (ev.estado === 2 ? 'Planificación' : 'Cerrado'),
+            colorEstado: ev.estado === 1 ? 'bg-emerald-500 text-white' : (ev.estado === 2 ? 'bg-blue-500 text-white' : 'bg-slate-500 text-white'),
+            mostrarActividades: true,
+            actividades: (ev.actividades || []).map((act: any) => ({
+                id: act.id,
+                title: act.nombre,
+                version: act.version,
+                status: 'Activo',
+                type: act.tipo || 'Curso',
+                date: act.fecha_inicio ? new Date(act.fecha_inicio).toLocaleDateString() : 'Pendiente',
+                students: act.inscripciones?.length || 0,
+                modules: 1,
+                image: act.imagen || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80',
+                id_evento: ev.id,
+                min_nota: act.min_nota,
+                min_asistencia: act.min_asistencia,
+                modalidad: act.modalidad,
+                fecha_inicio_raw: act.fecha_inicio ? act.fecha_inicio.split('T')[0] : '',
+                fecha_fin_raw: act.fecha_fin ? act.fecha_fin.split('T')[0] : '',
+                requisitos: act.requisitos,
+                descripcion: act.descripcion
+            }))
+        }));
+    } catch (error) {
+        console.error("Error fetching eventos:", error);
+    } finally {
+        isLoading.value = false;
     }
 };
 
@@ -153,6 +214,15 @@ const handleSaveEvento = async () => {
         }
 
         Swal.fire({ icon: 'success', title: '¡ÉXITO!', text: 'Gestión guardada con todas sus secciones.' });
+        // Registrar en historial
+        registrarAccion(
+          'evento',
+          isEditingEvento.value ? 'editar' : 'crear',
+          isEditingEvento.value
+            ? `Evento editado: "${formEvento.value.nombre}"`
+            : `Nuevo evento creado: "${formEvento.value.nombre}"`,
+          { entidadId: editEventoId.value?.toString() ?? undefined, entidadNombre: formEvento.value.nombre }
+        );
         isCreatingEvento.value = false;
         fetchEventos();
         eventoStore.fetchEventosInfo();
@@ -170,7 +240,7 @@ const editarEvento = (evento: any) => {
     formEvento.value = {
         nombre: evento.nombreCorto,
         descripcion: parts[0] || '',
-        gestion: (evento.gestion || ev.version)?.toString(),
+        gestion: (evento.gestion || evento.version)?.toString(),
         version: evento.version_slogan || evento.version || '',
         fecha_inicio: evento.fecha_inicio ? evento.fecha_inicio.split('T')[0] : '',
         fecha_fin: evento.fecha_fin ? evento.fecha_fin.split('T')[0] : '',
@@ -195,22 +265,32 @@ const editarEvento = (evento: any) => {
     isCreatingEvento.value = true;
 };
 
-const eliminarEvento = async (id: number, nombre: string) => {
-    const res = await Swal.fire({
-        title: '¿ELIMINAR EVENTO?',
-        text: `Se borrará "${nombre}" y todas sus actividades vinculadas. Esta acción es irreversible.`,
-        icon: 'warning',
+const inhabilitarEvento = async (id: number, nombre: string) => {
+    const { value: motivo } = await Swal.fire({
+        title: '¿INHABILITAR EVENTO?',
+        text: `Explique por qué desea inhabilitar "${nombre}". Esta acción ocultará el evento y todas sus actividades.`,
+        input: 'textarea',
+        inputPlaceholder: 'Escriba el motivo aquí...',
         showCancelButton: true,
-        confirmButtonColor: '#d33',
-        confirmButtonText: 'SÍ, ELIMINAR TODO'
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'SÍ, INHABILITAR',
+        cancelButtonText: 'CANCELAR',
+        inputValidator: (value) => {
+          if (!value) return '¡Debes escribir un motivo!'
+        }
     });
-    if (res.isConfirmed) {
+
+    if (motivo) {
         try {
-            await api.delete(`/eventos/${id}`);
+            await api.patch(`/eventos/${id}`, { 
+                estado: -1, 
+                descripcion: `[INHABILITACION_MOTIVO]:${motivo}\n[FECHA]:${new Date().toLocaleString()}\n` 
+            });
+            registrarAccion('evento', 'eliminar', `Evento inhabilitado: "${nombre}"`, { entidadId: id.toString(), entidadNombre: nombre });
             fetchEventos();
             eventoStore.fetchEventosInfo();
-            Swal.fire('Eliminado', 'El evento ha sido borrado.', 'success');
-        } catch (e) { Swal.fire('Error', 'No se pudo eliminar el evento', 'error'); }
+            Swal.fire('Inhabilitado', 'El evento ha sido inactivado correctamente.', 'success');
+        } catch (e) { Swal.fire('Error', 'No se pudo inhabilitar el evento', 'error'); }
     }
 };
 
@@ -231,43 +311,6 @@ const eventosFiltrados = computed(() => {
     })).filter(ev => ev.actividades.length > 0 || ev.nombreCorto.toLowerCase().includes(search));
 });
 
-const isCreating = ref(false);
-const isEditingActividad = ref(false);
-const editActividadId = ref<number | null>(null);
-const currentStep = ref(1);
-const isLoading = ref(false);
-const filtroBusqueda = ref('');
-
-const fetchEventos = async () => {
-    try {
-        isLoading.value = true;
-        const res = await api.get('/eventos');
-        eventosPublicados.value = (res.data || []).map((ev: any) => ({
-            ...ev,
-            nombreCorto: ev.nombre,
-            version: ev.gestion,
-            imagen: ev.imagen_fondo || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80', // Fallback
-            estado: ev.estado === 1 ? 'Activo' : 'Cerrado',
-            colorEstado: ev.estado === 1 ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white',
-            mostrarActividades: true,
-            actividades: (ev.actividades || []).map((act: any) => ({
-                id: act.id,
-                title: act.nombre,
-                version: act.version, // Capturar versión de la DB
-                status: 'Activo',
-                type: act.tipo || 'Curso',
-                date: act.fecha_inicio ? new Date(act.fecha_inicio).toLocaleDateString() : 'Pendiente',
-                students: act.inscripciones?.length || 0,
-                modules: 1,
-                image: act.imagen || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80'
-            }))
-        }));
-    } catch (error) {
-        console.error("Error fetching eventos:", error);
-    } finally {
-        isLoading.value = false;
-    }
-};
 
 const nuevaActividad = ref({
     nombre: '',
@@ -339,13 +382,15 @@ const editarActividad = async (act: any) => {
             tipo: act.type || 'Curso',
             tipoPersonalizado: '',
             descripcion: act.descripcion || '',
-            id_evento: act.id_evento, // Asegurarnos que el objeto tenga esto
+
+            id_evento: act.id_evento,
             min_nota: act.min_nota || 71,
             min_asistencia: act.min_asistencia || 80,
             modalidad: act.modalidad || 'Presencial',
-            fecha_inicio: act.fecha_inicio_raw || '', // Necesitaremos la fecha y descripción real
+            fecha_inicio: act.fecha_inicio_raw || '',
             fecha_fin: act.fecha_fin_raw || '',
-            sesiones: []
+            sesiones: [],
+            requisitos: act.requisitos || { base: {}, custom: [] }
         };
         
         // Intentar obtener descripción completa y campos extras si no están
@@ -365,22 +410,31 @@ const editarActividad = async (act: any) => {
     }
 };
 
-const eliminarActividad = async (id: number, nombre: string) => {
-    const res = await Swal.fire({
-        title: '¿ELIMINAR ACTIVIDAD?',
-        text: `Se borrará "${nombre}". Los inscritos podrían verse afectados.`,
-        icon: 'warning',
+const inhabilitarActividad = async (id: number, nombre: string) => {
+    const { value: motivo } = await Swal.fire({
+        title: '¿INHABILITAR ACTIVIDAD?',
+        text: `Indique la razón para inhabilitar "${nombre}":`,
+        input: 'textarea',
+        inputPlaceholder: 'Escriba el motivo aquí...',
         showCancelButton: true,
-        confirmButtonColor: '#d33',
-        confirmButtonText: 'SÍ, ELIMINAR'
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'INHABILITAR',
+        cancelButtonText: 'CANCELAR',
+        inputValidator: (value) => {
+          if (!value) return '¡Es obligatorio indicar un motivo!'
+        }
     });
 
-    if (res.isConfirmed) {
+    if (motivo) {
         try {
-            await api.delete(`/actividades-academicas/${id}`);
+            await api.patch(`/actividades-academicas/${id}`, { 
+                estado: -1, // Estado inhabilitado
+                descripcion: `[INHABILITACION_MOTIVO]:${motivo}\n[FECHA]:${new Date().toLocaleString()}\n` 
+            });
+            registrarAccion('actividad', 'eliminar', `Actividad inhabilitada: "${nombre}"`, { entidadId: id.toString(), entidadNombre: nombre });
             fetchEventos();
-            Swal.fire('Eliminado', 'La actividad ha sido borrada.', 'success');
-        } catch (e) { Swal.fire('Error', 'No se pudo eliminar la actividad', 'error'); }
+            Swal.fire('Inhabilitada', 'La actividad ha sido marcada como inactiva.', 'success');
+        } catch (e) { Swal.fire('Error', 'No se pudo inhabilitar la actividad', 'error'); }
     }
 };
 
@@ -497,6 +551,26 @@ const publicarActividad = async () => {
 
         isCreating.value = false;
         
+
+        // Registrar en historial
+        registrarAccion(
+          'actividad',
+          isEditingActividad.value ? 'editar' : 'crear',
+          isEditingActividad.value
+            ? `Actividad editada: "${nuevaActividad.value.nombre}"`
+            : `Nueva actividad creada: "${nuevaActividad.value.nombre}"`,
+          {
+            entidadId: editActividadId.value?.toString() ?? undefined,
+            entidadNombre: nuevaActividad.value.nombre,
+            metadatos: {
+              tipo: nuevaActividad.value.tipo,
+              modalidad: nuevaActividad.value.modalidad,
+              evento_id: nuevaActividad.value.id_evento?.toString() ?? undefined,
+            }
+          }
+        );
+        
+
         // Resetear form
         imagenArchivo.value = null;
         imagenPreview.value = null;
@@ -561,12 +635,16 @@ const getStatusColor = (status: string) => {
 };
 
 const openDetalleCurso = (courseId: any) => {
-  if (route.name === 'coordinador-estudiantes-global') {
-    router.push({ path: `/coordinador/actividades/${courseId}`, query: { tab: 'estudiantes' } });
-  } else if (route.name === 'coordinador-ponentes-global') {
-    router.push({ path: `/coordinador/actividades/${courseId}`, query: { tab: 'ponentes' } });
+  // Detectar contexto: ¿estamos en /admin o /coordinador?
+  const isAdminContext = route.path.startsWith('/admin');
+  const prefix = isAdminContext ? '/admin' : '/coordinador';
+
+  if (route.name === 'coordinador-estudiantes-global' || route.name === 'admin-estudiantes') {
+    router.push({ path: `${prefix}/actividades/${courseId}`, query: { tab: 'estudiantes' } });
+  } else if (route.name === 'coordinador-ponentes-global' || route.name === 'admin-ponentes') {
+    router.push({ path: `${prefix}/actividades/${courseId}`, query: { tab: 'ponentes' } });
   } else {
-    router.push({ path: `/coordinador/actividades/${courseId}` });
+    router.push({ path: `${prefix}/actividades/${courseId}` });
   }
 };
 
@@ -639,8 +717,8 @@ const changeStep = (delta: number) => {
                 <button @click="editarEvento(evento)" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 px-4 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 group/btn cursor-pointer" title="Configurar Eventos">
                    <span class="material-symbols-outlined text-[18px]">settings</span>
                 </button>
-                <button @click="eliminarEvento(evento.id, evento.nombreCorto)" class="bg-red-500/20 hover:bg-red-500/40 backdrop-blur-md text-white border border-red-500/30 px-4 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 group/btn cursor-pointer" title="Eliminar Evento">
-                   <span class="material-symbols-outlined text-[18px]">delete</span>
+                <button @click="inhabilitarEvento(evento.id, evento.nombreCorto)" class="bg-red-500/20 hover:bg-red-500/40 backdrop-blur-md text-white border border-red-500/30 px-4 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 group/btn cursor-pointer" title="Inhabilitar Evento">
+                   <span class="material-symbols-outlined text-[18px]">block</span>
                 </button>
 
                 <div class="h-8 w-px bg-white/20 mx-1"></div>
@@ -692,8 +770,8 @@ const changeStep = (delta: number) => {
                     <button @click.stop="editarActividad(act)" class="p-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-lg shadow-lg text-umsa-blue hover:scale-110 transition-all border border-blue-50/20" title="Editar Actividad">
                         <span class="material-symbols-outlined text-[18px]">edit</span>
                     </button>
-                    <button @click.stop="eliminarActividad(act.id, act.title)" class="p-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-lg shadow-lg text-red-500 hover:scale-110 transition-all border border-red-50/20" title="Eliminar Actividad">
-                        <span class="material-symbols-outlined text-[18px]">delete</span>
+                    <button @click.stop="inhabilitarActividad(act.id, act.title)" class="p-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-lg shadow-lg text-red-500 hover:scale-110 transition-all border border-red-50/20" title="Inhabilitar Actividad">
+                        <span class="material-symbols-outlined text-[18px]">block</span>
                     </button>
                   </div>
 
@@ -1128,7 +1206,8 @@ const changeStep = (delta: number) => {
                               <div v-if="nuevaActividad.requisitos.custom.length > 0">
                                   <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Campos Personalizados ({{ nuevaActividad.requisitos.custom.length }}):</span>
                                   <div class="grid grid-cols-1 gap-2">
-                                      <div v-for="(req, i) in nuevaActividad.requisitos.custom" :key="i" class="flex items-center justify-between bg-blue-100/50 dark:bg-blue-900/20 px-3 py-1.5 rounded-xl border border-blue-200/50 dark:border-blue-800">
+                                      <div v-for="(req, aIdx) in nuevaActividad.requisitos.custom" :key="aIdx" class="flex items-center justify-between bg-blue-100/50 dark:bg-blue-900/20 px-3 py-1.5 rounded-xl border border-blue-200/50 dark:border-blue-800">
+                                          <span class="text-[9px] font-black text-slate-300 dark:text-gray-600 hidden sm:block">{{ Number(aIdx) + 1 }}</span>
                                           <span class="text-[9px] font-black text-blue-700 dark:text-blue-400 uppercase">{{ req.label }}</span>
                                           <span class="text-[8px] font-bold text-blue-500 uppercase italic">{{ req.type }}</span>
                                       </div>
@@ -1376,6 +1455,7 @@ const changeStep = (delta: number) => {
 
                         <div class="space-y-4">
                             <div v-for="(act, aIdx) in dia.events" :key="aIdx" class="flex flex-col sm:flex-row items-center gap-4 group/act relative">
+                                <span class="text-[9px] font-black text-slate-300 dark:text-gray-600 hidden sm:block">{{ Number(aIdx) + 1 }}</span>
                                 <input v-model="act.time" type="time" class="w-full sm:w-36 bg-slate-50 dark:bg-gray-900 border border-slate-100 dark:border-gray-700 rounded-2xl px-5 py-4 text-xs font-black text-umsa-blue shadow-inner" />
                                 <input v-model="act.title" placeholder="Descripción de la actividad..." class="flex-1 w-full bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-700 rounded-2xl px-5 py-4 text-sm font-bold shadow-sm focus:border-emerald-500 transition-all" />
                                 <button @click.prevent="eliminarActividadEvento(dIdx, aIdx)" class="text-slate-300 hover:text-red-500 sm:opacity-0 group-hover/act:opacity-100 transition-all">

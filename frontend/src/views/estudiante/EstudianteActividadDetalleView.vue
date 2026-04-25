@@ -240,7 +240,11 @@ const tabs = computed(() => {
 });
 
 const goBack = () => {
-    router.push({ name: 'estudiante-catalogo' });
+    if (window.history.length > 1) {
+        router.back();
+    } else {
+        router.push({ name: 'estudiante-dashboard' });
+    }
 };
 </script>
 
@@ -253,8 +257,8 @@ const goBack = () => {
       <div class="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-900/80 to-transparent"></div>
       
       <!-- Navegación y Badges Top -->
-      <div class="absolute top-0 left-0 right-0 p-8 z-20 flex justify-between items-start">
-          <button @click="goBack" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 p-2.5 rounded-2xl transition-all hover:scale-105 flex items-center justify-center">
+      <div class="absolute top-0 left-0 right-0 p-8 z-50 flex justify-between items-start">
+          <button @click="goBack" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 p-2.5 rounded-2xl transition-all hover:scale-105 flex items-center justify-center cursor-pointer pointer-events-auto">
               <span class="material-symbols-outlined text-[20px]">arrow_back</span>
           </button>
           <span class="text-[10px] font-black uppercase px-4 py-1.5 rounded-full tracking-widest shadow-lg backdrop-blur-md border border-white/20 text-white" :class="getStatusColor(actividad.estado)">
@@ -424,7 +428,7 @@ const goBack = () => {
                       </div>
                       <div>
                           <h4 class="font-bold text-slate-800 dark:text-white">{{ registro.fecha }}</h4>
-                          <div class="text-xs text-slate-500 dark:text-gray-400 font-medium uppercase tracking-widest mt-1">Sesión {{ index + 1 }}</div>
+                          <div class="text-xs text-slate-500 dark:text-gray-400 font-medium uppercase tracking-widest mt-1">Sesión {{ Number(index) + 1 }}</div>
                       </div>
                   </div>
                   <div class="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-sm transition-transform group-hover:scale-105" :class="registro.estado === 'presente' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400'">

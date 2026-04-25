@@ -43,19 +43,18 @@ const navigate = (routeName: string) => {
 
       <button @click="navigate('ponente-eventos')"
         :class="[ $route.name === 'ponente-eventos' || $route.name === 'ponente-evento-detalle' ? 'nav-active bg-umsa-blue text-white shadow-lg shadow-umsa-blue/30' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500 hover:text-umsa-blue hover:translate-x-1' ]"
-        class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group mt-1"     
-        :style="[$route.name === 'ponente-eventos' ? '' : '']">
+        class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group mt-1">
         <span class="text-xs uppercase tracking-widest font-bold">Mis Cursos Asignados</span>
         <span class="material-symbols-outlined text-[18px] transition-colors" :class="[ $route.name === 'ponente-eventos' || $route.name === 'ponente-evento-detalle' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">collections_bookmark</span>
       </button>
 
-      <button @click="navigate('ponente-calificacion')"
-        :class="[ $route.name === 'ponente-calificacion' ? 'nav-active bg-umsa-blue text-white shadow-lg shadow-umsa-blue/30' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500 hover:text-umsa-blue hover:translate-x-1' ]"
-        class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group mt-1"     
-        :style="[$route.name === 'ponente-calificacion' ? '' : '']">
-        <span class="text-xs uppercase tracking-widest font-bold">Calificaciones</span>
-        <span class="material-symbols-outlined text-[18px] transition-colors" :class="[ $route.name === 'ponente-calificacion' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">grading</span>
+      <button @click="navigate('ponente-historial-notas')"
+        :class="[ $route.name === 'ponente-historial-notas' ? 'nav-active bg-umsa-blue text-white shadow-lg shadow-umsa-blue/30' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500 hover:text-umsa-blue hover:translate-x-1' ]"
+        class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group mt-1">
+        <span class="text-xs uppercase tracking-widest font-bold">Historial de Notas</span>
+        <span class="material-symbols-outlined text-[18px] transition-colors" :class="[ $route.name === 'ponente-historial-notas' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">history_edu</span>
       </button>
+
 
       <button @click="navigate('ponente-certificados')"
         :class="[ $route.name === 'ponente-certificados' ? 'nav-active bg-umsa-blue text-white shadow-lg shadow-umsa-blue/30' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500 hover:text-umsa-blue hover:translate-x-1' ]"

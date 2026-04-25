@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth'
 import LoginView from '../views/auth/LoginView.vue'
 import RegisterView from '../views/auth/RegisterView.vue'
 import DashboardLayout from '../layouts/DashboardLayout.vue'
+import AdminLayout from '../layouts/AdminLayout.vue'
 import HomeView from '../views/HomeView.vue'
 
 const router = createRouter({
@@ -67,7 +68,8 @@ const router = createRouter({
           name: 'coordinador-usuarios',
           component: () => import('../views/usuarios/UsuariosView.vue'),
         },
-        {          path: 'certificados',
+        {
+          path: 'certificados',
           name: 'coordinador-certificados',
           component: () => import('../views/certificados/CertificadosView.vue'),
         },
@@ -88,6 +90,74 @@ const router = createRouter({
         },
       ]
     },
+    // ─── RUTAS SUPER ADMINISTRADOR ───────────────────────────────────────────
+    {
+      path: '/admin',
+      component: AdminLayout,
+      children: [
+        {
+          path: '',
+          name: 'admin-dashboard',
+          component: () => import('../views/admin/AdminDashboardView.vue'),
+        },
+        {
+          path: 'historial',
+          name: 'admin-historial',
+          component: () => import('../views/admin/AdminHistorialView.vue'),
+        },
+        {
+          path: 'gestion',
+          name: 'admin-gestion',
+          component: () => import('../views/admin/AdminGestionView.vue'),
+        },
+        {
+          path: 'eventos',
+          name: 'admin-eventos',
+          component: () => import('../views/admin/AdminGestionView.vue'),
+        },
+        {
+          path: 'actividades',
+          name: 'admin-actividades',
+          component: () => import('../views/admin/AdminGestionView.vue'),
+        },
+        {
+          path: 'actividades/:id',
+          name: 'admin-actividades-detalle',
+          component: () => import('../views/actividades/ActividadDetalleView.vue'),
+        },
+        {
+          path: 'actividades/:id/certificado/workplace',
+          name: 'admin-certificado-workplace',
+          component: () => import('../views/actividades/CertificadoWorkplaceView.vue'),
+        },
+        {
+          path: 'solicitudes',
+          name: 'admin-solicitudes',
+          component: () => import('../views/coordinador/CoordinadorSolicitudesView.vue'),
+        },
+        {
+          path: 'certificados',
+          name: 'admin-certificados',
+          component: () => import('../views/certificados/CertificadosView.vue'),
+        },
+        {
+          path: 'usuarios',
+          name: 'admin-usuarios',
+          component: () => import('../views/admin/AdminUsuariosView.vue'),
+        },
+        {
+          path: 'estudiantes',
+          name: 'admin-estudiantes',
+          component: () => import('../views/directorios/EstudiantesGlobalView.vue'),
+        },
+        {
+          path: 'ponentes',
+          name: 'admin-ponentes',
+          component: () => import('../views/directorios/PonentesGlobalView.vue'),
+        },
+      ]
+    },
+    // ─── RUTAS COORDINADOR ────────────────────────────────────────────────────
     {
       path: '/ponente',
       component: () => import('../layouts/PonenteLayout.vue'),
@@ -122,15 +192,20 @@ const router = createRouter({
           component: () => import('../views/ponente/PonenteCursoDetalleView.vue'),
         },
         {
-          path: 'calificacion',
-          name: 'ponente-calificacion',
+          path: 'actividad/:actividadId/calificaciones',
+          name: 'ponente-actividad-calificaciones',
           component: () => import('../views/ponente/PonenteCalificacionesView.vue'),
         },
         {
           path: 'certificados',
           name: 'ponente-certificados',
           component: () => import('../views/ponente/PonenteCertificadosView.vue'),
-        }
+        },
+        {
+          path: 'historial-notas',
+          name: 'ponente-historial-notas',
+          component: () => import('../views/ponente/PonenteHistorialNotasView.vue'),
+        },
       ]
     },
     {
@@ -179,31 +254,55 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, from, next) => {
+
   // Rutas que requieren estar autenticado
   const requireAuthPaths = ['/coordinador', '/ponente', '/estudiante'];
-  
+
   const pathRequiresAuth = requireAuthPaths.some(path => to.path.startsWith(path));
 
   // Initialize store safely inside router hooks to prevent circular dependencies at load time
+
   const authStore = useAuthStore();
 
   if (pathRequiresAuth) {
     const token = localStorage.getItem('token');
     if (!token) {
-      // No hay sesión activa, bloqueamos el acceso y mandamos al login
       return next({ name: 'login' });
-    } else if (!authStore.user) {
-      // Fetch fresh user dynamically with existing token before passing the guard
+    }
+
+    // Cargar usuario si aún no está en memoria
+    if (!authStore.user) {
       await authStore.fetchUser();
-      
-      // If fetching the user fails, token is likely expired or invalid
       if (!authStore.isAuthenticated) {
-         return next({ name: 'login' });
+        return next({ name: 'login' });
       }
     }
+
+    // ── Guard de roles ──────────────────────────────────────────────────
+    const userRoles: string[] = (authStore.user as any)?.usuariosRoles?.map((ur: any) => ur.rol?.nombre_rol) || [];
+    const rolIds: number[] = (authStore.user as any)?.usuariosRoles?.map((ur: any) => ur.rol?.id) || [];
+
+    const isSuperAdmin = userRoles.includes('Super Usuario') || rolIds.includes(1);
+    const isCoordinador = userRoles.includes('Coordinador');
+    const isPonente = userRoles.includes('Ponente');
+
+    // /admin → solo Super Admin
+    if (to.path.startsWith('/admin') && !isSuperAdmin) {
+      return next(isCoordinador ? '/coordinador' : isPonente ? '/ponente' : '/estudiante');
+    }
+
+    // /coordinador → solo Coordinador (o Super Admin que tiene acceso total)
+    if (to.path.startsWith('/coordinador') && !isCoordinador && !isSuperAdmin) {
+      return next(isPonente ? '/ponente' : '/estudiante');
+    }
+
+    // /ponente → solo Ponente (o superior)
+    if (to.path.startsWith('/ponente') && !isPonente && !isSuperAdmin) {
+      return next('/estudiante');
+    }
   }
-  
-  // Si no requiere autenticación o sí tiene token, lo dejamos continuar
+
+
   next();
 });
 
