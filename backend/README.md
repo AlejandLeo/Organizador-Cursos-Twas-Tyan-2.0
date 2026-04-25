@@ -1,98 +1,129 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Backend: Organizador de Cursos Tyan
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Este directorio contiene el nucleo del sistema, desarrollado con NestJS y TypeORM. Se ha optimizado para ser ligero, seguro y altamente escalable.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## Optimizacion de Dependencias
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Para mantener un entorno de produccion ligero, hemos separado estrictamente las librerias:
 
-## Project setup
+*   **Runtime (dependencies)**: Paquetes esenciales para la ejecucion (NestJS, TypeORM, Bcrypt, UUID, etc.).
+*   **Desarrollo (devDependencies)**: Librerias como @faker-js/faker y tipos @types/* se excluyen del build final, reduciendo el tamaño del servidor de despliegue.
 
+---
+
+## Arquitectura de Datos
+
+La base de datos sigue un flujo profesional:
+
+1.  **Migraciones (src/database/migrations)**: Archivos DDL puros. **NO BORRAR** para preservar el historial de sincronizacion.
+2.  **Seeders (src/database/seeds)**:
+    *   **Production (/production)**: Datos vitales (Roles, Configuracion maestros).
+    *   **Development (/development)**: Datos de prueba (Faker users, eventos mock).
+
+---
+
+## Scripts de NPM
+
+| Comando | Descripcion |
+| :--- | :--- |
+| `npm run migration:run` | Ejecuta los cambios de estructura pendientes. |
+| `npm run seed:config` | Carga unicamente los datos vitales (Ej: Roles). |
+| `npm run seed:dev` | Carga configuracion base y datos de prueba. |
+| `npm run db:reset` | Resetea la DB (Drop), corre migraciones y carga datos base. |
+| `npm run start:dev` | Arranca el servidor en modo desarrollo (Hot-reload). |
+| `npm run build` | Genera el build optimizado para produccion. |
+
+---
+
+## Estructura de la Base de Datos (Bloques)
+
+| Bloque | Tablas | Proposito |
+|---|---|---|
+| **Bloque 1** | USUARIOS, PERSONAS, ROLES, USUARIOS_ROLES, AFILIACIONES | Identidad, perfil personal y datos institucionales |
+| **Bloque 2** | EVENTOS, COORDINACIONES, ACTIVIDADES_ACADEMICAS, IMPARTICIONES | Gestion de eventos, staff y oferta academica |
+| **Bloque 3** | CURSO_MODALIDADES, SESIONES_ACADEMICAS | Configuracion de modalidades y cronograma |
+| **Bloque 4** | INSCRIPCIONES, INSCRIPCION_MODALIDADES, ASISTENCIAS | Seguimiento de alumnos, notas y asistencia |
+| **Bloque 5** | INFO_CERTIFICADOS, CERTIFICADOS, USUARIOS_CERTIFICADOS | Diseño de certificados y emision segura |
+
+---
+
+## Configuracion de la Base de Datos
+
+El sistema requiere una instancia de PostgreSQL activa. Antes de iniciar, debes crear la base de datos vacia.
+
+### 1. Creacion Manual (Recomendado)
 ```bash
-$ npm install
+# Conecta a PostgreSQL
+psql -U postgres
+
+# Crea la base de datos con las especificaciones correctas
+CREATE DATABASE eventos_academicos_db
+WITH 
+    OWNER = tu_usuario
+    ENCODING = 'UTF8'
+    LC_COLLATE = 'C'
+    LC_CTYPE = 'C'
+    TEMPLATE = template0;
 ```
 
-## Compile and run the project
+> **Sincronizacion Automatica**: Al ejecutar `npm run start:dev`, TypeORM comparara tus entidades con la base de datos y aplicara los cambios necesarios automaticamente.
 
-```bash
-# development
-$ npm run start
+---
 
-# watch mode
-$ npm run start:dev
+## Configuracion (.env)
 
-# production mode
-$ npm run start:prod
+Crea un archivo .env basado en .env.example:
+
+```env
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_USER=tu_usuario
+DATABASE_PASSWORD=tu_password
+DATABASE_NAME=eventos_academicos_db
+JWT_SECRET=secreto_seguro
 ```
 
-## Run tests
+---
 
+## Swagger Documentation
+
+Una vez iniciado el servidor, accede a la documentacion interactiva en:
+`http://localhost:3000/api`
+
+---
+
+## Migraciones de Base de Datos
+
+Las migraciones permiten evolucionar la estructura de la DB de forma controlada.
+
+### Comandos de Migracion
 ```bash
-# unit tests
-$ npm run test
+# Generar una nueva migracion
+npm run migration:generate --name=NombreDescriptivo
 
-# e2e tests
-$ npm run test:e2e
+# Aplicar migraciones pendientes
+npm run migration:run
 
-# test coverage
-$ npm run test:cov
+# Deshacer la ultima migracion
+npm run migration:revert
 ```
 
-## Deployment
+---
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## Scripts de Utilidad para Desarrolladores
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+*   **Volcado de Datos (Dump Events)**: Permite visualizar rapidamente los eventos y sus requisitos configurados en la base de datos sin SQL manual.
+*   **Comando**: `npx ts-node src/scripts/dump_eventos.ts`
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+---
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Seguridad v2.0
 
-## Resources
+*   **Privacidad de archivos**: No se guardan rutas en la base de datos. Se usan **UUIDs** para localizar firmas, logos y certificados en el servidor.
+*   **Integridad**: Los certificados incluyen un `hash_integridad` (HMAC-SHA256) para evitar alteraciones externas del PDF y garantizar su autenticidad.
 
-Check out a few resources that may come in handy when working with NestJS:
+---
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+[Volver al Menu Principal](../Readme.md)

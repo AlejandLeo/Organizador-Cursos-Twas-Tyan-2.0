@@ -2,8 +2,10 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useEventoStore } from '@/stores/eventoStore';
+
 import { useAdminHistorialStore } from '@/stores/adminHistorial';
 import { useAuthStore } from '@/stores/auth';
+
 import api from '@/services/api';
 import Swal from 'sweetalert2';
 
@@ -23,9 +25,16 @@ const registrarAccion = (...args: Parameters<typeof historialStore.registrar>) =
 };
 
 // --- LÓGICA DE GESTIÓN DE EVENTOS (FUSIÓN MAESTRA) ---
+const isLoading = ref(false);
+const isCreating = ref(false);
 const isCreatingEvento = ref(false);
 const isEditingEvento = ref(false);
+const isEditingActividad = ref(false);
+const editActividadId = ref<number | null>(null);
 const editEventoId = ref<number | null>(null);
+const currentStep = ref(1);
+const filtroBusqueda = ref('');
+
 const ponentesDB = ref<any[]>([]);
 const gradosAcademicosDB = ref<any[]>([]);
 const previewEventoImg = ref<string | null>(null);
@@ -125,6 +134,45 @@ const onEventoFileChange = (e: any) => {
     if (file) {
         formEvento.value.fondo_img = file;
         previewEventoImg.value = URL.createObjectURL(file);
+    }
+};
+
+const fetchEventos = async () => {
+    try {
+        isLoading.value = true;
+        const res = await api.get('/eventos');
+        eventosPublicados.value = (res.data || []).map((ev: any) => ({
+            ...ev,
+            nombreCorto: ev.nombre,
+            version: ev.gestion,
+            imagen: ev.imagen_fondo || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80',
+            estado: ev.estado === 1 ? 'Activo' : (ev.estado === 2 ? 'Planificación' : 'Cerrado'),
+            colorEstado: ev.estado === 1 ? 'bg-emerald-500 text-white' : (ev.estado === 2 ? 'bg-blue-500 text-white' : 'bg-slate-500 text-white'),
+            mostrarActividades: true,
+            actividades: (ev.actividades || []).map((act: any) => ({
+                id: act.id,
+                title: act.nombre,
+                version: act.version,
+                status: 'Activo',
+                type: act.tipo || 'Curso',
+                date: act.fecha_inicio ? new Date(act.fecha_inicio).toLocaleDateString() : 'Pendiente',
+                students: act.inscripciones?.length || 0,
+                modules: 1,
+                image: act.imagen || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80',
+                id_evento: ev.id,
+                min_nota: act.min_nota,
+                min_asistencia: act.min_asistencia,
+                modalidad: act.modalidad,
+                fecha_inicio_raw: act.fecha_inicio ? act.fecha_inicio.split('T')[0] : '',
+                fecha_fin_raw: act.fecha_fin ? act.fecha_fin.split('T')[0] : '',
+                requisitos: act.requisitos,
+                descripcion: act.descripcion
+            }))
+        }));
+    } catch (error) {
+        console.error("Error fetching eventos:", error);
+    } finally {
+        isLoading.value = false;
     }
 };
 
@@ -263,43 +311,6 @@ const eventosFiltrados = computed(() => {
     })).filter(ev => ev.actividades.length > 0 || ev.nombreCorto.toLowerCase().includes(search));
 });
 
-const isCreating = ref(false);
-const isEditingActividad = ref(false);
-const editActividadId = ref<number | null>(null);
-const currentStep = ref(1);
-const isLoading = ref(false);
-const filtroBusqueda = ref('');
-
-const fetchEventos = async () => {
-    try {
-        isLoading.value = true;
-        const res = await api.get('/eventos');
-        eventosPublicados.value = (res.data || []).map((ev: any) => ({
-            ...ev,
-            nombreCorto: ev.nombre,
-            version: ev.gestion,
-            imagen: ev.imagen_fondo || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80', // Fallback
-            estado: ev.estado === 1 ? 'Activo' : 'Cerrado',
-            colorEstado: ev.estado === 1 ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white',
-            mostrarActividades: true,
-            actividades: (ev.actividades || []).map((act: any) => ({
-                id: act.id,
-                title: act.nombre,
-                version: act.version, // Capturar versión de la DB
-                status: 'Activo',
-                type: act.tipo || 'Curso',
-                date: act.fecha_inicio ? new Date(act.fecha_inicio).toLocaleDateString() : 'Pendiente',
-                students: act.inscripciones?.length || 0,
-                modules: 1,
-                image: act.imagen || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80'
-            }))
-        }));
-    } catch (error) {
-        console.error("Error fetching eventos:", error);
-    } finally {
-        isLoading.value = false;
-    }
-};
 
 const nuevaActividad = ref({
     nombre: '',
@@ -371,6 +382,7 @@ const editarActividad = async (act: any) => {
             tipo: act.type || 'Curso',
             tipoPersonalizado: '',
             descripcion: act.descripcion || '',
+
             id_evento: act.id_evento,
             min_nota: act.min_nota || 71,
             min_asistencia: act.min_asistencia || 80,
@@ -539,6 +551,7 @@ const publicarActividad = async () => {
 
         isCreating.value = false;
         
+
         // Registrar en historial
         registrarAccion(
           'actividad',
@@ -557,6 +570,7 @@ const publicarActividad = async () => {
           }
         );
         
+
         // Resetear form
         imagenArchivo.value = null;
         imagenPreview.value = null;

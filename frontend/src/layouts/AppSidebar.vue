@@ -72,6 +72,15 @@ const onNombreChange = (e: any) => {
         class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group mt-2">
         <span class="text-xs uppercase tracking-widest font-bold">Gestión de Eventos</span>
         <span class="material-symbols-outlined text-[20px] transition-colors" :class="[ $route.name === 'coordinador-actividades' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">corporate_fare</span>
+
+      </button>
+
+      <button @click="navigate('coordinador-solicitudes')"
+        :class="[ $route.name === 'coordinador-solicitudes' ? 'nav-active bg-umsa-blue text-white shadow-md shadow-umsa-blue/20' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500' ]"
+        class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group mt-2">
+        <span class="text-xs uppercase tracking-widest font-bold">Solicitudes</span>
+        <span class="material-symbols-outlined text-[20px] transition-colors" :class="[ $route.name === 'coordinador-solicitudes' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">how_to_reg</span>
+
       </button>
 
       <button @click="navigate('coordinador-solicitudes')"

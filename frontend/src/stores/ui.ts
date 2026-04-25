@@ -42,6 +42,7 @@ export const useUIStore = defineStore('ui', () => {
 
     onMounted(() => {
         window.addEventListener('resize', updateDimensions);
+
         applyTheme();
     });
 
@@ -52,6 +53,7 @@ export const useUIStore = defineStore('ui', () => {
     return {
         isSidebarOpen,
         isMobile,
+
         isDark,
         toggleSidebar,
         toggleTheme,

@@ -68,7 +68,8 @@ const router = createRouter({
           name: 'coordinador-usuarios',
           component: () => import('../views/usuarios/UsuariosView.vue'),
         },
-        {          path: 'certificados',
+        {
+          path: 'certificados',
           name: 'coordinador-certificados',
           component: () => import('../views/certificados/CertificadosView.vue'),
         },
@@ -253,8 +254,13 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, from, next) => {
-  const requireAuthPaths = ['/admin', '/coordinador', '/ponente', '/estudiante'];
+
+  // Rutas que requieren estar autenticado
+  const requireAuthPaths = ['/coordinador', '/ponente', '/estudiante'];
+
   const pathRequiresAuth = requireAuthPaths.some(path => to.path.startsWith(path));
+
+  // Initialize store safely inside router hooks to prevent circular dependencies at load time
 
   const authStore = useAuthStore();
 
@@ -274,11 +280,11 @@ router.beforeEach(async (to, from, next) => {
 
     // ── Guard de roles ──────────────────────────────────────────────────
     const userRoles: string[] = (authStore.user as any)?.usuariosRoles?.map((ur: any) => ur.rol?.nombre_rol) || [];
-    const rolIds: number[]    = (authStore.user as any)?.usuariosRoles?.map((ur: any) => ur.rol?.id) || [];
+    const rolIds: number[] = (authStore.user as any)?.usuariosRoles?.map((ur: any) => ur.rol?.id) || [];
 
-    const isSuperAdmin  = userRoles.includes('Super Usuario') || rolIds.includes(1);
+    const isSuperAdmin = userRoles.includes('Super Usuario') || rolIds.includes(1);
     const isCoordinador = userRoles.includes('Coordinador');
-    const isPonente     = userRoles.includes('Ponente');
+    const isPonente = userRoles.includes('Ponente');
 
     // /admin → solo Super Admin
     if (to.path.startsWith('/admin') && !isSuperAdmin) {
@@ -295,6 +301,7 @@ router.beforeEach(async (to, from, next) => {
       return next('/estudiante');
     }
   }
+
 
   next();
 });
