@@ -16,22 +16,33 @@ const handleLogin = async () => {
   error.value = '';
   
   try {
-    // Force cleanup before attempting new login to prevent overlaps
+    // Limpiar sesión anterior para evitar conflictos
     localStorage.removeItem('token');
     
     await authStore.login(email.value, password.value);
     
-    // Check role and redirect
+    // Detectar rol y redirigir al panel correspondiente
     const userRoles = (authStore.user as any)?.usuariosRoles || [];
-    const isCoordinador = userRoles.some((ur: any) => ur.rol?.nombre_rol === 'Coordinador' || ur.rol?.nombre_rol === 'Super Usuario');
-    const isPonente = userRoles.some((ur: any) => ur.rol?.nombre_rol === 'Ponente');
-    
-    if (isCoordinador) {
+
+    const isSuperAdmin = userRoles.some((ur: any) =>
+      ur.rol?.nombre_rol === 'Super Usuario' || ur.rol?.id === 1
+    );
+    const isCoordinador = userRoles.some((ur: any) =>
+      ur.rol?.nombre_rol === 'Coordinador'
+    );
+    const isPonente = userRoles.some((ur: any) =>
+      ur.rol?.nombre_rol === 'Ponente'
+    );
+
+    if (isSuperAdmin) {
+      // El Super Admin tiene su propio panel diferenciado
+      router.push('/admin');
+    } else if (isCoordinador) {
       router.push('/coordinador');
     } else if (isPonente) {
       router.push('/ponente');
     } else {
-      // Por defecto, lo enviamos al dashboard de estudiante
+      // Por defecto: panel de estudiante
       router.push('/estudiante');
     }
   } catch (e: any) {

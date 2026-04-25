@@ -28,9 +28,12 @@ El backend utiliza varias librerías clave del ecosistema de NestJS:
 | `bcrypt` | Hashea (encripta) contraseñas antes de guardarlas en la DB |
 | `class-validator` | Valida que los datos enviados en requests tengan el formato correcto |
 | `class-transformer` | Transforma objetos planos a instancias de clases y viceversa |
+| `uuid` | Genera identificadores únicos para archivos y firmas |
+| `jspdf` / `xlsx` | Generación de reportes y certificados en PDF y Excel |
 | `dotenv` | Carga las variables de entorno del archivo `.env` |
 | `reflect-metadata` | Requerido por TypeScript para que los decoradores funcionen |
 | `rxjs` | Librería de programación reactiva, base interna de NestJS |
+| `swagger-ui-express` | Interfaz visual para probar la API (Swagger) |
 
 > **¿Por qué bcrypt?** Las contraseñas nunca se guardan en texto plano. `bcrypt` las convierte en un hash irreversible. Aunque alguien robe la base de datos, no podrá leer las contraseñas.
 
@@ -80,8 +83,23 @@ frontend/
     ├── views/        ← Páginas principales
     ├── stores/       ← Estado global con Pinia
     ├── router/       ← Rutas de navegación
-    └── assets/       ← Imágenes y estilos globales
-```
+    ├── assets/       ← Imágenes y estilos globales
+    └── ...
+
+### Dependencias Principales del Frontend
+
+| Paquete | Para qué sirve |
+|---|---|
+| `vue` (v3) | Framework principal para la interfaz de usuario |
+| `vue-router` | Gestión de rutas y navegación entre vistas |
+| `pinia` | Almacenamiento y gestión del estado global (Auth, Prefijos, etc.) |
+| `axios` | Cliente HTTP para realizar peticiones al Backend |
+| `sweetalert2` | Diálogos y alertas visuales premium para el usuario |
+| `vue-i18n` | Soporte para multi-idioma (Internacionalización) |
+| `jspdf` | Generación de certificados y documentos desde el navegador |
+| `xlsx` | Procesamiento y descarga de datos en formato Excel |
+| `tailwindcss` | Framework de utilidades CSS para el diseño visual |
+| `vite` | Herramienta de construcción y servidor de desarrollo ultra rápido |
 
 ---
 
@@ -238,6 +256,29 @@ npm run start:prod    # Ejecuta la versión compilada
 npm run lint          # Revisa y corrige estilo de código
 npm run test          # Ejecuta las pruebas unitarias
 ```
+
+---
+
+## Scripts de Utilidad para Desarrolladores
+
+El proyecto incluye herramientas para facilitar el desarrollo y la depuración de datos:
+
+### 1. Volcado de Datos (Dump Events)
+Permite visualizar rápidamente los eventos y sus requisitos configurados en la base de datos.
+*   **Comando**: `npx ts-node src/scripts/dump_eventos.ts` (desde la carpeta `backend`)
+*   **Propósito**: Verificación técnica de los campos JSONB de requisitos sin usar SQL manual.
+
+---
+
+## Funcionalidades de Experiencia de Usuario (UX)
+
+Recientemente se han implementado mejoras críticas para el flujo de inscripción:
+
+1.  **Autocompletado Inteligente**: El formulario de pre-inscripción detecta los requisitos de la coordinadora y precarga automáticamente Nombres, Apellidos, CI, Celular, Correo, Institución y Grado Académico desde el perfil del estudiante.
+2.  **Sincronización de Perfil**: Cualquier corrección realizada por el estudiante durante la inscripción se guarda automáticamente en su perfil global para futuras sesiones.
+3.  **Respaldo de Requisitos (Fallback)**: Si una actividad no tiene requisitos configurados, el sistema garantiza un set básico de seguridad para asegurar que siempre haya trazabilidad de quién se inscribe.
+4.  **Diseño Responsive Premium**: Uso de micro-animaciones, modos oscuros y layouts fluidos para una experiencia óptima en móviles y escritorio.
+
 
 ---
 

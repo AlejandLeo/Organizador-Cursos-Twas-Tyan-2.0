@@ -22,6 +22,11 @@ const preinscripcionForm = ref({
   miembro_tyan: 0
 });
 
+// Respuestas a campos dinámicos
+const respuestasDinamicas = ref<Record<string, any>>({});
+// Campos del perfil que se están completando/editando
+const datosPerfilEdit = ref<Record<string, any>>({});
+
 const actividad = ref({
   id: actividadId,
   nombre: 'Cargando...',
@@ -42,7 +47,8 @@ const actividad = ref({
     asistenciaMinima: 80,
     notaMinima: 71,
     completado: false
-  }
+  },
+  requisitos: null as any
 });
 
 const loadActividad = async () => {
@@ -80,8 +86,55 @@ const loadActividad = async () => {
         asistenciaMinima: 80,
         notaMinima: 71,
         completado: false
-      }
+      },
+      requisitos: act.requisitos
     };
+
+    // Si el backend no tiene requisitos definidos (ej: datos semilla), 
+    // forzamos los básicos para que el formulario siempre aparezca completo.
+    if (!actividad.value.requisitos || !actividad.value.requisitos.base || Object.keys(actividad.value.requisitos.base).length === 0) {
+      actividad.value.requisitos = {
+        base: {
+          nombres: true,
+          primer_apellido: true,
+          segundo_apellido: true,
+          email: true,
+          documento_identidad: true,
+          celular: true
+        },
+        custom: []
+      };
+    }
+
+    // Inicializar datos del formulario (Autocompletar)
+    preinscripcionForm.value.razon = 'Me interesa participar debido a que deseo ampliar mis conocimientos en esta área y aplicar lo aprendido en mi desarrollo académico y profesional.';
+    preinscripcionForm.value.miembro_tyan = 1; // Default a miembro
+
+    // Inicializar datos del perfil editables
+    if (actividad.value.requisitos?.base) {
+        Object.keys(actividad.value.requisitos.base).forEach(key => {
+            if (actividad.value.requisitos.base[key]) {
+                const persona = user.value?.persona as any;
+                const affiliations = user.value?.afiliaciones as any[];
+                
+                if (key === 'email') {
+                    datosPerfilEdit.value[key] = user.value?.email || '';
+                } else if (key === 'afiliacion') {
+                    datosPerfilEdit.value[key] = affiliations?.[0]?.institucion || '';
+                } else if (key === 'grado_academico') {
+                    datosPerfilEdit.value[key] = affiliations?.[0]?.gradoAcademico?.abreviacion || affiliations?.[0]?.gradoAcademico?.nombre || '';
+                } else {
+                    datosPerfilEdit.value[key] = persona?.[key] || '';
+                }
+            }
+        });
+    }
+    // Inicializar campos dinámicos
+    if (actividad.value.requisitos?.custom) {
+        actividad.value.requisitos.custom.forEach((c: any) => {
+            respuestasDinamicas.value[c.label] = '';
+        });
+    }
   } catch (e) {
     console.error('Error cargando actividad:', e);
   }
@@ -122,11 +175,23 @@ const submitPreinscripcion = async () => {
   preinscribiendo.value = true;
   errorMensaje.value = '';
   try {
+    // 1. Actualizar perfil si hay cambios en datos base
+    if (Object.keys(datosPerfilEdit.value).length > 0) {
+        try {
+            await api.patch('/usuarios/perfil/datos', datosPerfilEdit.value);
+        } catch (e) {
+            console.warn("No se pudo actualizar el perfil, procediendo con la inscripción", e);
+        }
+    }
+
+    // 2. Enviar inscripción
     await api.post('/inscripciones/preinscribir', {
       id_actividad: actividadId,
       miembro_tyan: Number(preinscripcionForm.value.miembro_tyan),
-      razon: preinscripcionForm.value.razon
+      razon: preinscripcionForm.value.razon,
+      datos_adicionales: respuestasDinamicas.value
     });
+
     preinscripcionMenu.value = false;
     
     Swal.fire({
@@ -175,7 +240,11 @@ const tabs = computed(() => {
 });
 
 const goBack = () => {
-    router.push({ name: 'estudiante-catalogo' });
+    if (window.history.length > 1) {
+        router.back();
+    } else {
+        router.push({ name: 'estudiante-dashboard' });
+    }
 };
 </script>
 
@@ -188,8 +257,8 @@ const goBack = () => {
       <div class="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-900/80 to-transparent"></div>
       
       <!-- Navegación y Badges Top -->
-      <div class="absolute top-0 left-0 right-0 p-8 z-20 flex justify-between items-start">
-          <button @click="goBack" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 p-2.5 rounded-2xl transition-all hover:scale-105 flex items-center justify-center">
+      <div class="absolute top-0 left-0 right-0 p-8 z-50 flex justify-between items-start">
+          <button @click="goBack" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 p-2.5 rounded-2xl transition-all hover:scale-105 flex items-center justify-center cursor-pointer pointer-events-auto">
               <span class="material-symbols-outlined text-[20px]">arrow_back</span>
           </button>
           <span class="text-[10px] font-black uppercase px-4 py-1.5 rounded-full tracking-widest shadow-lg backdrop-blur-md border border-white/20 text-white" :class="getStatusColor(actividad.estado)">
@@ -359,7 +428,7 @@ const goBack = () => {
                       </div>
                       <div>
                           <h4 class="font-bold text-slate-800 dark:text-white">{{ registro.fecha }}</h4>
-                          <div class="text-xs text-slate-500 dark:text-gray-400 font-medium uppercase tracking-widest mt-1">Sesión {{ index + 1 }}</div>
+                          <div class="text-xs text-slate-500 dark:text-gray-400 font-medium uppercase tracking-widest mt-1">Sesión {{ Number(index) + 1 }}</div>
                       </div>
                   </div>
                   <div class="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-sm transition-transform group-hover:scale-105" :class="registro.estado === 'presente' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400'">
@@ -426,35 +495,59 @@ const goBack = () => {
         <h3 class="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight mb-4">Pre-inscripción</h3>
         <p class="text-slate-600 dark:text-gray-400 mb-6 text-sm">Por favor, llene los siguientes datos para solicitar su inscripción.</p>
         
-        <div class="space-y-4">
-            <!-- Datos del Estudiante (Autocompletados/Solo lectura) -->
-            <div class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-900/50 mb-4">
-                <p class="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-2">Datos del Estudiante</p>
-                <div class="grid grid-cols-1 gap-2">
-                    <div class="flex flex-col">
-                        <span class="text-[10px] text-slate-400 uppercase font-bold">Nombre Completo</span>
-                        <span class="text-sm font-black text-slate-700 dark:text-slate-200">{{ user?.persona?.nombres }} {{ user?.persona?.primer_apellido }} {{ user?.persona?.segundo_apellido || '' }}</span>
-                    </div>
-                    <div class="flex flew-col">
-                        <span class="text-[10px] text-slate-400 uppercase font-bold">Documento / CI</span>
-                        <span class="text-sm font-black text-slate-700 dark:text-slate-200">{{ user?.persona?.documento_identidad || 'No especificado' }}</span>
-                    </div>
-                    <div class="flex flex-col">
-                        <span class="text-[10px] text-slate-400 uppercase font-bold">Correo Electrónico</span>
-                         <span class="text-sm font-black text-slate-700 dark:text-slate-200">{{ user?.email || 'No especificado' }}</span>
+        <div class="space-y-6 max-h-[60vh] overflow-y-auto px-1">
+            <!-- SECCIÓN 1: DATOS BASE (PERSONA) -->
+            <div v-if="actividad.requisitos?.base" class="p-5 bg-slate-50 dark:bg-gray-800/50 rounded-2xl border border-slate-100 dark:border-gray-800 space-y-4">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2 mb-4">Verificación de Datos de Perfil</p>
+                <div class="grid grid-cols-1 gap-4">
+                    <template v-for="(required, key) in actividad.requisitos.base" :key="key">
+                        <div v-if="required" class="flex flex-col">
+                            <label class="text-[9px] font-black text-slate-400 uppercase mb-1">{{ key.toString().replace(/_/g, ' ') }}</label>
+                            <input v-model="datosPerfilEdit[key]" 
+                                   :placeholder="'Ingresa tu ' + key"
+                                   class="w-full px-4 py-2 text-xs font-bold bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl outline-none focus:border-blue-500 transition-all">
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- SECCIÓN 2: CAMPOS PERSONALIZADOS -->
+            <div v-if="actividad.requisitos?.custom?.length > 0" class="p-5 bg-blue-50/30 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/50 space-y-4">
+                <p class="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest border-b border-blue-100 dark:border-blue-800 pb-2 mb-4">Información Adicional Requerida</p>
+                <div class="space-y-4">
+                    <div v-for="(req, idx) in actividad.requisitos.custom" :key="idx" class="flex flex-col">
+                        <label class="text-[9px] font-black text-blue-500 uppercase mb-1">{{ req.label }}</label>
+                        
+                        <!-- Input tipo Texto -->
+                        <input v-if="req.type === 'text' || req.type === 'number'" 
+                               v-model="respuestasDinamicas[req.label]" 
+                               :type="req.type" 
+                               class="w-full px-4 py-2 text-xs font-bold bg-white dark:bg-gray-950 border border-blue-100 dark:border-blue-800/50 rounded-xl outline-none focus:border-blue-500 transition-all">
+                        
+                        <!-- Input tipo Select -->
+                        <select v-else-if="req.type === 'select'" 
+                                v-model="respuestasDinamicas[req.label]" 
+                                class="w-full px-4 py-2 text-xs font-bold bg-white dark:bg-gray-950 border border-blue-100 dark:border-blue-800/50 rounded-xl outline-none focus:border-blue-500 transition-all">
+                            <option value="">Seleccione una opción</option>
+                            <option v-for="opt in req.options" :key="opt" :value="opt">{{ opt }}</option>
+                        </select>
                     </div>
                 </div>
             </div>
 
-            <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Razón de inscripción</label>
-                <textarea v-model="preinscripcionForm.razon" class="w-full border border-slate-200 dark:border-gray-800 rounded-xl p-3 bg-slate-50 dark:bg-gray-950 text-slate-800 dark:text-white focus:outline-none focus:border-blue-500 transition-colors" rows="3" placeholder="¿Por qué desea participar?"></textarea>
-            </div>
-            <div>
-                <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" v-model="preinscripcionForm.miembro_tyan" :true-value="1" :false-value="0" class="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                    <span class="text-sm font-bold text-slate-700 dark:text-gray-300">Soy miembro TYAN</span>
-                </label>
+            <!-- SECCIÓN 3: RAZÓN Y TYAN -->
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">¿Por qué deseas participar? (Motivación)</label>
+                    <textarea v-model="preinscripcionForm.razon" class="w-full border border-slate-200 dark:border-gray-800 rounded-xl p-3 bg-slate-50 dark:bg-gray-950 text-xs font-bold text-slate-800 dark:text-white focus:outline-none focus:border-blue-500 transition-colors" rows="2" placeholder="Describe brevemente tu interés..."></textarea>
+                </div>
+                <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-gray-800/50 rounded-xl border border-slate-100 dark:border-gray-800">
+                    <span class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest">¿Eres miembro de la red TYAN?</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" v-model="preinscripcionForm.miembro_tyan" :true-value="1" :false-value="0" class="sr-only peer">
+                        <div class="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                    </label>
+                </div>
             </div>
         </div>
         
@@ -462,10 +555,15 @@ const goBack = () => {
             {{ errorMensaje }}
         </div>
         
-        <button @click="submitPreinscripcion" :disabled="preinscribiendo" class="w-full mt-6 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-4 rounded-xl font-black uppercase tracking-widest transition-all shadow-lg flex justify-center items-center gap-2">
-            <span v-if="preinscribiendo" class="material-symbols-outlined animate-spin text-white">autorenew</span>
-            <span>{{ preinscribiendo ? 'Enviando...' : 'Enviar Solicitud' }}</span>
-        </button>
+        <div class="flex gap-3 mt-8">
+            <button @click="preinscripcionMenu = false" class="flex-1 bg-slate-100 dark:bg-gray-800 text-slate-500 dark:text-gray-400 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-slate-200 dark:hover:bg-gray-700 transition-all">
+                Cancelar
+            </button>
+            <button @click="submitPreinscripcion" :disabled="preinscribiendo" class="flex-[2] bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-4 rounded-xl font-black uppercase tracking-widest text-xs transition-all shadow-lg flex justify-center items-center gap-2">
+                <span v-if="preinscribiendo" class="material-symbols-outlined animate-spin text-white">autorenew</span>
+                <span>{{ preinscribiendo ? 'Enviando...' : 'Enviar Solicitud' }}</span>
+            </button>
+        </div>
     </div>
   </div>
 </template>

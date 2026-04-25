@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
+import { useRouter } from 'vue-router';
 
 const router = useRouter();
-const route = useRoute();
 
 const eventoData = ref({
   id: 1,
@@ -68,11 +67,9 @@ const getStatusColor = (status: string) => {
 
     <div class="w-full bg-white dark:bg-gray-900 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 dark:border-gray-800 flex flex-col group/card mb-8">
         
-        <!-- Header Evento Banner (Estilo Netflix) -->
         <div class="relative w-full h-[320px] overflow-hidden">
           <img :src="eventoData.imagen" alt="Banner" class="w-full h-full object-cover object-center group-hover/card:scale-105 transition-transform duration-[1.5s] ease-out">
           <div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent"></div>
-          
           <div class="absolute bottom-0 left-0 right-0 p-8 pt-24 z-20 flex flex-col">
             <span class="mb-3" :class="[eventoData.colorEstado, 'text-[8px] font-black uppercase px-3 py-1 rounded-full tracking-widest w-fit shadow-lg backdrop-blur-md border']">
               {{ eventoData.estado }}
@@ -80,67 +77,43 @@ const getStatusColor = (status: string) => {
             <div class="flex items-end justify-between">
               <div>
                 <p class="text-xs font-bold text-umsa-gold dark:text-blue-400 uppercase tracking-widest mb-2">{{ eventoData.version }}</p>
-                <h1 class="text-4xl md:text-5xl font-black text-white tracking-tighter leading-none mb-4">{{ eventoData.nombreLargo }}</h1>
-                <p class="text-sm font-medium text-gray-300 max-w-2xl line-clamp-2 leading-relaxed">{{ eventoData.descripcion }}</p>
+                <h1 class="text-4xl md:text-5xl font-black text-white tracking-tighter leading-none mb-4 uppercase italic">{{ eventoData.nombreLargo }}</h1>
+                <p class="text-sm font-medium text-gray-300 max-w-2xl line-clamp-2 leading-relaxed italic opacity-80">{{ eventoData.descripcion }}</p>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Grid de Actividades Académicas (Estilo Catálogo Horizontal) -->
-        <div class="py-8 bg-slate-50 dark:bg-gray-950/50 w-full animate-in slide-in-from-top-4 duration-500 fade-in border-t border-slate-100 dark:border-gray-900">
-          
+        <div class="py-8 bg-slate-50 dark:bg-gray-950/50 w-full border-t border-slate-100 dark:border-gray-900">
           <div v-for="(acts, categoria) in getActividadesAgrupadas(eventoData.actividadesAsignadas)" :key="categoria" class="mb-10 w-full overflow-hidden">
-            <!-- Row Header -->
             <div class="flex items-end justify-between px-8 mb-4">
-              <div>
-                <h3 class="text-xl md:text-2xl font-black text-primary-dark dark:text-white uppercase tracking-tighter">{{ categoria }}</h3>
-                <p class="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest mt-1">Tienes {{ acts.length }} actividad(es) asignadas en esta categoría</p>
-              </div>
+              <h3 class="text-xl md:text-2xl font-black text-primary-dark dark:text-white uppercase tracking-tighter">{{ categoria }}s</h3>
             </div>
 
-            <!-- Horizontal Scroll Row -->
-            <div class="flex overflow-x-auto gap-6 px-8 pb-8 pt-2 snap-x snap-mandatory flex-nowrap" style="scrollbar-width: none; -ms-overflow-style: none;">
-              
-              <div v-for="act in acts" :key="act.id" @click="router.push({ name: 'ponente-curso-detalle', params: { id: act.id } })" class="flex-none w-[280px] md:w-[320px] bg-white dark:bg-gray-900 rounded-[1.5rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none border border-slate-200/60 dark:border-gray-800 hover:border-primary-light/50 dark:hover:border-gray-600 transition-all hover:-translate-y-1 hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] cursor-pointer group flex flex-col snap-start relative">
-                
+            <div class="flex overflow-x-auto gap-6 px-8 pb-8 pt-2 snap-x snap-mandatory flex-nowrap scrollbar-hide">
+              <div v-for="act in acts" :key="act.id" @click="router.push({ name: 'ponente-curso-detalle', params: { id: act.id } })" class="flex-none w-[280px] md:w-[320px] bg-white dark:bg-gray-900 rounded-[1.5rem] overflow-hidden shadow-sm border border-slate-200/60 dark:border-gray-800 hover:border-umsa-blue transition-all hover:-translate-y-1 cursor-pointer group flex flex-col snap-start relative">
                 <div class="relative h-48 w-full overflow-hidden shrink-0">
-                  <div class="absolute inset-0 bg-primary-dark/10 group-hover:bg-transparent transition-colors z-10"></div>
-                  <img :src="act.image" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" :alt="act.title">   
-                  <span class="absolute top-3 right-3 z-20 text-[8px] font-black uppercase px-2 py-1 rounded-md tracking-widest shadow-sm bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm" :class="getStatusColor(act.status)">
-                    {{ act.status }}
-                  </span>
-                  <div class="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-white dark:from-gray-900 to-transparent z-10 opacity-60"></div>
+                  <img :src="act.image" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700">   
+                  <span class="absolute top-3 right-3 z-20 text-[8px] font-black uppercase px-2 py-1 rounded-md tracking-widest shadow-sm bg-white/90 dark:bg-gray-900/90" :class="getStatusColor(act.status)">{{ act.status }}</span>
                 </div>
-
                 <div class="p-5 flex flex-col flex-1 relative z-20 bg-white dark:bg-gray-900">
-                  <h3 class="text-sm font-black text-slate-800 dark:text-white leading-tight mb-3 group-hover:text-primary-light dark:group-hover:text-blue-400 transition-colors line-clamp-2 block h-[2.5rem]">{{ act.title }}</h3> 
-
-                  <div class="mt-auto flex flex-col gap-3 pt-3 border-t border-slate-100 dark:border-gray-800">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <span class="text-[9px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest border border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-800 px-2 py-0.5 rounded-md">{{ act.date }}</span>
-                    </div>
-                    <div class="flex justify-between items-center text-slate-500 dark:text-gray-400">
-                      <div class="flex items-center">   
-                        <span class="material-symbols-outlined text-[16px] mr-1.5 text-primary-light dark:text-blue-400">groups</span>
-                        <span class="text-[10px] font-bold">{{ act.students }} Estudiantes</span>    
-                      </div>
-                      <div class="flex items-center text-umsa-blue font-bold group-hover:translate-x-1 transition-transform">
-                          <span class="text-[10px] uppercase">Gestionar</span>
+                  <h3 class="text-sm font-black text-slate-800 dark:text-white leading-tight mb-3 group-hover:text-umsa-blue transition-colors line-clamp-2 h-[2.5rem]">{{ act.title }}</h3> 
+                  <div class="mt-auto flex justify-between items-center text-slate-500 pt-3 border-t border-slate-100 dark:border-gray-800">
+                      <div class="flex items-center text-umsa-blue font-bold">
+                          <span class="text-[10px] uppercase">Gestionar Notas</span>
                           <span class="material-symbols-outlined text-[16px] ml-1">arrow_forward</span>
                       </div>
-                    </div>
                   </div>
                 </div>
-
               </div>
             </div>
-          </div>
-          
-          <div v-if="Object.keys(getActividadesAgrupadas(eventoData.actividadesAsignadas)).length === 0" class="px-8 py-10 text-center">
-            <p class="text-sm font-bold text-gray-500 uppercase tracking-widest">No hay actividades asignadas para este evento.</p>
           </div>
         </div>
       </div>
   </div>
 </template>
+
+<style scoped>
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+</style>

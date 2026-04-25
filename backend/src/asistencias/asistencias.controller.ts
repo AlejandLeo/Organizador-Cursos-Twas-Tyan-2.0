@@ -3,43 +3,61 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
   ParseIntPipe,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { AsistenciasService } from './asistencias.service';
-import { Asistencia } from './entities/asistencia.entity';
+import { BatchAsistenciaDto } from './dto/batch-asistencia.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
+@ApiTags('Asistencias')
 @Controller('asistencias')
 export class AsistenciasController {
-  constructor(private readonly asistenciasService: AsistenciasService) {}
+  constructor(private readonly service: AsistenciasService) {}
 
-  @Post()
-  create(@Body() data: Partial<Asistencia>) {
-    return this.asistenciasService.create(data);
+  // ── Coordinador: Lote ───────────────────────────────────────
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Coordinador', 'Super Usuario', 'Ponente')
+  @ApiBearerAuth()
+  @Post('batch')
+  @ApiOperation({ summary: 'Registrar múltiples asistencias (Coord/Docente)' })
+  registerBatch(@Body() dto: BatchAsistenciaDto) {
+    return this.service.registerBatch(dto);
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Coordinador', 'Super Usuario', 'Ponente')
+  @ApiBearerAuth()
+  @Get('sesion/:sesionId')
+  @ApiOperation({ summary: 'Listar asistencias de una sesión (Coord/Docente)' })
+  getBySesion(@Param('sesionId', ParseIntPipe) sesionId: number) {
+    return this.service.getBySesion(sesionId);
+  }
+
+  // ── Legacy ──────────────────────────────────────────────────
 
   @Get()
   findAll() {
-    return this.asistenciasService.findAll();
+    return this.service.findAll();
   }
 
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.asistenciasService.findOne(id);
+    return this.service.findOne(id);
   }
 
-  @Patch(':id')
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() data: Partial<Asistencia>,
-  ) {
-    return this.asistenciasService.update(id, data);
-  }
-
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Coordinador', 'Super Usuario')
+  @ApiBearerAuth()
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
-    return this.asistenciasService.remove(id);
+    return this.service.remove(id);
   }
 }

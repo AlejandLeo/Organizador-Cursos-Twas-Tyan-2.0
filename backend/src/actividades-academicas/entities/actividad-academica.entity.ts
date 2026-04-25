@@ -45,6 +45,19 @@ export class ActividadAcademica {
   @Column({ type: 'date', nullable: true })
   fecha_fin: Date;
 
+  @Column({ length: 255, nullable: true })
+  imagen: string;
+
+  @Column({ type: 'integer', nullable: true })
+  horas: number;
+
+  /** 
+   * Requisitos configurados para la pre-inscripción (Base + Dinámicos).
+   * Almacenado como JSON.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  requisitos: any;
+
   // ── Relaciones ────────────────────────────────────────────────────────────
 
   /** La actividad pertenece a un evento. */

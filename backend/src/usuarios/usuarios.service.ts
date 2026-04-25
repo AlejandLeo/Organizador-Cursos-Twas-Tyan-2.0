@@ -48,11 +48,7 @@ export class UsuariosService {
 
   async actualizarPerfil(
     id_usuario: number,
-    data: {
-      institucion?: string;
-      id_grado_academico?: number;
-      [key: string]: any;
-    },
+    data: any,
   ) {
     const usuario = await this.usuarioRepository.findOne({
       where: { id: id_usuario },
@@ -63,34 +59,64 @@ export class UsuariosService {
       throw new NotFoundException('Perfil no encontrado');
     }
 
-    const { institucion, id_grado_academico, ...datosPersonaOriginal } = data;
-    // Cast safe para actualizar persona, ignorando los ids
-    const datosPersona = { ...datosPersonaOriginal };
+    // 1. Filtrar campos específicos para la entidad Persona
+    const camposPersonaValidos = [
+      'nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad', 
+      'genero', 'pais_origen', 'pais_residencia', 'fecha_nacimiento', 'celular'
+    ];
+    
+    const datosPersona: any = {};
+    camposPersonaValidos.forEach(key => {
+      if (data[key] !== undefined) {
+        // Manejo especial para género si viene como string
+        if (key === 'genero' && typeof data[key] === 'string') {
+           const g = data[key];
+           if (g.startsWith('Mas')) datosPersona.genero = 0;
+           else if (g.startsWith('Fem')) datosPersona.genero = 1;
+           else datosPersona.genero = 2;
+        } else {
+          datosPersona[key] = data[key];
+        }
+      }
+    });
 
-    // Evitar que traten de cambiar IDs internos
-    delete datosPersona.id;
-    delete datosPersona.id_usuario;
-    delete datosPersona.email;
-    delete datosPersona.password;
-    delete datosPersona.estado;
+    if (Object.keys(datosPersona).length > 0) {
+      await this.personaRepository.update(usuario.persona.id, datosPersona);
+    }
 
-    await this.personaRepository.update(usuario.persona.id, datosPersona);
+    // 2. Extraer campos para Afiliación
+    // Notar que 'afiliacion' se mapea a 'institucion'
+    const institucion = data.institucion || data.afiliacion;
+    const { id_grado_academico, tipo_afiliacion, area_tematica, disciplina_cientifica } = data;
 
-    // Actualizar o crear Afiliacion principal
-    if (institucion !== undefined || id_grado_academico !== undefined) {
+    if (
+      institucion !== undefined || 
+      id_grado_academico !== undefined || 
+      tipo_afiliacion !== undefined || 
+      area_tematica !== undefined || 
+      disciplina_cientifica !== undefined
+    ) {
       const afiliacionRepo = this.dataSource.getRepository(Afiliacion);
-      if (usuario.afiliaciones && usuario.afiliaciones.length > 0) {
-        // Actualizar la primera
-        const af = usuario.afiliaciones[0];
+      let af = usuario.afiliaciones && usuario.afiliaciones.length > 0 
+        ? usuario.afiliaciones[0] 
+        : null;
+
+      if (af) {
+        // Actualizar existente
         if (institucion !== undefined) af.institucion = institucion;
-        if (id_grado_academico !== undefined)
-          af.id_grado_academico = id_grado_academico;
+        if (id_grado_academico !== undefined) af.id_grado_academico = id_grado_academico;
+        if (tipo_afiliacion !== undefined) af.tipo_afiliacion = tipo_afiliacion;
+        if (area_tematica !== undefined) af.area_tematica = area_tematica;
+        if (disciplina_cientifica !== undefined) af.disciplina_cientifica = disciplina_cientifica;
         await afiliacionRepo.save(af);
       } else {
-        // Crear una nueva
+        // Crear nueva
         const newAf = afiliacionRepo.create({
           institucion: institucion || '',
-          id_grado_academico: id_grado_academico ?? undefined,
+          id_grado_academico,
+          tipo_afiliacion,
+          area_tematica,
+          disciplina_cientifica,
           usuario: usuario,
         });
         await afiliacionRepo.save(newAf);
@@ -286,6 +312,10 @@ export class UsuariosService {
   //  BÚSQUEDA Y FILTRADO (para el panel del Coordinador)
   // ══════════════════════════════════════════════════════════
 
+  // ══════════════════════════════════════════════════════════
+  //  BÚSQUEDA Y FILTRADO (para el panel del Coordinador)
+  // ══════════════════════════════════════════════════════════
+
   /**
    * Lista usuarios con filtros: por rol, búsqueda libre y paginación.
    * Nunca devuelve el campo password.
@@ -294,7 +324,7 @@ export class UsuariosService {
     filtros: FiltrarUsuariosDto,
   ): Promise<{ data: any[]; total: number; page: number; limit: number }> {
     const { rol, q, page = 1, limit = 20, soloActivos } = filtros;
-    const soloActibosBool = soloActivos !== 'false';
+    const soloActivosBool = soloActivos !== 'false';
 
     const qb = this.usuarioRepository.createQueryBuilder('u')
       .leftJoinAndSelect('u.persona', 'p')
@@ -309,7 +339,7 @@ export class UsuariosService {
       .leftJoinAndSelect('imp.actividadAcademica', 'act_imp')
       .leftJoinAndSelect('act_imp.evento', 'ev_imp');
 
-    if (soloActibosBool) {
+    if (soloActivosBool) {
       qb.where('u.estado = :estado', { estado: 1 });
     }
 
@@ -363,7 +393,6 @@ export class UsuariosService {
       });
       const usuarioGuardado = await queryRunner.manager.save(usuario);
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { email, password, id_grado_academico, id_rol, ...datosPersona } = dto;
       const persona = queryRunner.manager.create(Persona, {
         ...datosPersona,
@@ -407,6 +436,7 @@ export class UsuariosService {
     }
   }
 
+
   // ══════════════════════════════════════════════════════════
   //  AUTH
   // ══════════════════════════════════════════════════════════
@@ -424,12 +454,19 @@ export class UsuariosService {
       relations: ['persona', 'usuariosRoles', 'usuariosRoles.rol'],
     });
 
+    console.log('--- INTENTO DE LOGIN ---');
+    console.log('Email:', loginDto.email);
+
     if (!usuario) {
-      // Usamos mensaje genérico para no revelar si el email existe
+      console.log('Error: Usuario no encontrado en la BD.');
       throw new UnauthorizedException('Credenciales incorrectas.');
     }
 
+    console.log('Usuario encontrado. ID:', usuario.id);
+    console.log('Estado:', usuario.estado);
+
     if (usuario.estado === 0) {
+      console.log('Error: Usuario inactivo.');
       throw new UnauthorizedException(
         'Tu cuenta está inactiva. Contacta al administrador.',
       );
@@ -439,9 +476,14 @@ export class UsuariosService {
       loginDto.password,
       usuario.password,
     );
+
     if (!passwordValido) {
+      console.log('Error: La contraseña NO coincide.');
+      console.log('Password enviada:', loginDto.password);
       throw new UnauthorizedException('Credenciales incorrectas.');
     }
+
+    console.log('✅ LOGIN EXITOSO');
 
     // Eliminamos password del objeto antes de devolver
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -643,6 +685,17 @@ export class UsuariosService {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...perfil } = usuario;
     return perfil as Omit<Usuario, 'password'>;
+  }
+
+  /**
+   * Busca un usuario por email sin lanzar excepción si no existe.
+   * Útil para flujos de "buscar o crear".
+   */
+  async findOptionalByEmail(email: string): Promise<Usuario | null> {
+    return this.usuarioRepository.findOne({
+      where: { email },
+      relations: ['persona', 'usuariosRoles', 'usuariosRoles.rol'],
+    });
   }
 
   // ══════════════════════════════════════════════════════════

@@ -29,6 +29,9 @@ export class Evento {
   @PrimaryGeneratedColumn({ name: 'id' })
   id: number;
 
+  @Column({ length: 255, nullable: true })
+  nombre: string;
+
   @Column({ type: 'text', nullable: true })
   descripcion: string;
 
@@ -56,17 +59,28 @@ export class Evento {
   @Column({ length: 255, nullable: true })
   logo: string;
 
-  /** UUID o URL para la imagen principal de portada (Hero) del evento */
+  /** UUID o URL para la imagen de fondo de las vistas del evento */
   @Column({ length: 255, nullable: true })
-  imagen_portada: string;
+  imagen_fondo: string;
 
-  /** UUID o URL para el video 1 de bienvenida (Ej. Palabras del Rector) */
-  @Column({ length: 255, nullable: true })
-  video_bienvenida_1: string;
+  @Column({ length: 150, nullable: true })
+  version: string;
 
-  /** UUID o URL para el video 2 de bienvenida (Ej. Bienvenida Decanato) */
-  @Column({ length: 255, nullable: true })
-  video_bienvenida_2: string;
+  @Column({ type: 'text', nullable: true })
+  sobre_evento_1: string;
+
+  @Column({ type: 'text', nullable: true })
+  sobre_evento_2: string;
+
+  @Column({ type: 'text', nullable: true })
+  frase_destacada: string;
+
+  @Column({ type: 'text', nullable: true })
+  google_maps_link: string;
+
+  /** Almacena el cronograma en formato JSON o texto */
+  @Column({ type: 'text', nullable: true })
+  cronograma: string;
 
   // ── Relaciones ────────────────────────────────────────────────────────────
 

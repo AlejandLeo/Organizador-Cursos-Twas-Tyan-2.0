@@ -43,17 +43,11 @@ const ponenteForm = ref({
 const fetchData = async () => {
     try {
         isLoading.value = true;
-        const [actRes, insRes, impRes, usersRes] = await Promise.all([
-            api.get(`/actividades-academicas/${route.params.id}`),
-            api.get(`/inscripciones/actividad/${route.params.id}`),
-            api.get(`/imparticiones/actividad/${route.params.id}`),
-            api.get('/usuarios?rol=Ponente&limit=100')
-        ]);
+
+        // Carga de la actividad (crítica)
+        const actRes = await api.get(`/actividades-academicas/${route.params.id}`);
         actividad.value = actRes.data;
-        inscritos.value = insRes.data;
-        imparticiones.value = impRes.data;
-        ponentesExistentes.value = usersRes.data.data || usersRes.data;
-        
+
         // Preparar formulario de edición
         const mod = actividad.value.modalidades?.[0];
         editForm.value = {
@@ -67,8 +61,36 @@ const fetchData = async () => {
             fecha_fin: actividad.value.fecha_fin || '',
             sesiones: mod?.sesiones || []
         };
+
+        // Carga de inscripciones (crítica - muestra solicitudes y alumnos)
+        try {
+            const insRes = await api.get(`/inscripciones/actividad/${route.params.id}`);
+            inscritos.value = Array.isArray(insRes.data) ? insRes.data : (insRes.data?.data || []);
+        } catch (e) {
+            console.warn('No se pudieron cargar las inscripciones:', e);
+            inscritos.value = [];
+        }
+
+        // Carga de imparticiones (no crítica - endpoint por actividad)
+        try {
+            const impRes = await api.get(`/imparticiones/actividad/${route.params.id}`);
+            imparticiones.value = Array.isArray(impRes.data) ? impRes.data : (impRes.data?.data || []);
+        } catch (e) {
+            console.warn('No se pudieron cargar las imparticiones:', e);
+            imparticiones.value = [];
+        }
+
+        // Carga de ponentes existentes (no crítica)
+        try {
+            const usersRes = await api.get('/usuarios?rol=Ponente&limit=100');
+            ponentesExistentes.value = usersRes.data.data || usersRes.data;
+        } catch (e) {
+            console.warn('No se pudieron cargar los ponentes:', e);
+            ponentesExistentes.value = [];
+        }
+
     } catch (error) {
-        console.error("Error al cargar datos:", error);
+        console.error("Error al cargar la actividad:", error);
     } finally {
         isLoading.value = false;
     }
@@ -127,9 +149,9 @@ const closeModal = (id: string) => {
     if (m) m.style.display = 'none'; 
 };
 
-// Computed para solicitudes (pendientes)
-const solicitudes = computed(() => inscritos.value.filter(i => i.estado === 0));
-const alumnosActivos = computed(() => inscritos.value.filter(i => i.estado === 1));
+// Computed para solicitudes (pendientes) - uso == para compatibilidad con valores numéricos del backend
+const solicitudes = computed(() => inscritos.value.filter(i => i.estado == 0));
+const alumnosActivos = computed(() => inscritos.value.filter(i => i.estado == 1));
 
 const cambiarEstadoInscripcion = async (id: number, nuevoEstado: number) => {
     try {
@@ -349,7 +371,12 @@ const eliminarPonente = async (id: number) => {
     <div v-if="activeTab === 'solicitudes'" class="tab-content block space-y-6 animate-in fade-in">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic">Solicitudes de Inscripción</h3>
-            <span class="bg-blue-100 dark:bg-blue-900/30 text-umsa-blue px-3 py-1 text-[10px] font-black uppercase rounded-lg">{{ solicitudes.length }} Pendientes</span>
+            <div class="flex items-center gap-3">
+                <span class="bg-blue-100 dark:bg-blue-900/30 text-umsa-blue px-3 py-1 text-[10px] font-black uppercase rounded-lg">{{ solicitudes.length }} Pendientes</span>
+                <button @click="fetchData" class="p-2 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-slate-400 hover:text-emerald-500 transition-colors" title="Actualizar">
+                    <span class="material-symbols-outlined text-[18px]">refresh</span>
+                </button>
+            </div>
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden">
             <table class="w-full text-left">
@@ -714,11 +741,12 @@ const eliminarPonente = async (id: number) => {
                   </h4>
                   <div class="space-y-4">
                       <div v-for="af in solicitudSeleccionada.usuario?.afiliaciones" :key="af.id" class="p-4 border border-slate-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-800 shadow-sm">
-                          <p class="text-[10px] font-black text-umsa-blue uppercase mb-1">{{ af.tipo_afiliacion || 'Insitución' }}</p>
-                          <p class="font-black text-primary-dark dark:text-white text-xs uppercase">{{ af.institucion }}</p>
-                          <div class="mt-2 pt-2 border-t border-slate-50 dark:border-gray-700">
+                          <p class="text-[10px] font-black text-umsa-blue uppercase mb-1">{{ af.tipo_afiliacion || 'Institución' }}</p>
+                          <p class="font-black text-primary-dark dark:text-white text-xs uppercase">{{ af.afiliacion || af.institucion }}</p>
+                          <div class="mt-2 pt-2 border-t border-slate-50 dark:border-gray-700 space-y-1">
                              <p class="text-[9px] font-bold text-slate-400 uppercase">Área: <span class="text-slate-600 dark:text-gray-300">{{ af.area_tematica }}</span></p>
                              <p class="text-[9px] font-bold text-slate-400 uppercase">Disciplina: <span class="text-slate-600 dark:text-gray-300">{{ af.disciplina_cientifica }}</span></p>
+                             <p v-if="af.gradoAcademico" class="text-[9px] font-bold text-slate-400 uppercase">Grado: <span class="text-emerald-600 dark:text-emerald-400 font-black">{{ af.gradoAcademico?.descripcion }}</span></p>
                           </div>
                       </div>
                       <div v-if="!solicitudSeleccionada.usuario?.afiliaciones?.length" class="text-center p-6 bg-slate-50 dark:bg-gray-800 rounded-2xl border-2 border-dashed border-slate-200 dark:border-gray-700">

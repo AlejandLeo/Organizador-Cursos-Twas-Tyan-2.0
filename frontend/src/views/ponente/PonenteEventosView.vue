@@ -62,9 +62,7 @@ const openActividadesEvento = (eventoId: any) => {
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <div v-for="evento in eventosAsignados" :key="evento.id" @click="openActividadesEvento(evento.id)" class="bg-white dark:bg-gray-900 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-gray-800 hover:shadow-md hover:border-umsa-blue transition-all group cursor-pointer flex flex-col relative overflow-hidden">
-        
         <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-white/0 to-slate-50/50 dark:to-white/5 rounded-bl-full -z-0"></div>
-
         <div class="flex justify-between items-start mb-6 relative z-10">
           <div :class="evento.color" class="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-md shadow-slate-200 dark:shadow-none">
             <span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">{{ evento.icon }}</span>
@@ -73,30 +71,17 @@ const openActividadesEvento = (eventoId: any) => {
             {{ evento.status }}
           </span>
         </div>
-
         <div class="flex-1 relative z-10">
           <p class="text-[9px] font-bold text-umsa-gold dark:text-blue-400 uppercase tracking-widest mb-2">Gestión {{ evento.gestion }}</p>
           <h3 class="text-xl font-black text-primary-dark dark:text-white leading-tight mb-2 group-hover:text-umsa-blue transition-colors">{{ evento.title }}</h3>
           <p class="text-xs font-medium text-slate-500">{{ evento.actividadesCount }} actividades a tu cargo</p>
         </div>
-
         <div class="mt-6 space-y-3 pt-5 border-t border-slate-100 dark:border-gray-800 relative z-10">
           <div class="flex items-center text-slate-500 dark:text-gray-400 bg-slate-50 dark:bg-gray-800/50 p-2 rounded-lg">
             <span class="material-symbols-outlined text-[16px] mr-3 text-slate-400">calendar_today</span>
             <span class="text-xs font-bold">{{ evento.date }}</span>
           </div>
-          
-          <div class="mt-4">
-            <div class="flex justify-between text-xs mb-2">
-              <span class="font-bold text-slate-500 uppercase tracking-widest text-[9px]">Desarrollo del Programa</span>
-              <span :class="evento.progress === 100 ? 'text-emerald-500' : 'text-umsa-blue'" class="font-black">{{ evento.progress }}%</span>
-            </div>
-            <div class="w-full bg-slate-100 dark:bg-gray-800 rounded-full h-2.5">
-              <div :class="[evento.progress === 100 ? 'bg-emerald-500' : 'bg-umsa-blue', 'h-2.5 rounded-full transition-all duration-1000']" :style="{ width: evento.progress + '%' }"></div>
-            </div>
-          </div>
         </div>
-
       </div>
     </div>
   </div>

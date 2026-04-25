@@ -87,6 +87,7 @@ export class InscripcionesService {
       ...rest,
       usuario: { id: id_usuario },
       actividadAcademica: { id: id_actividad_academica },
+      datos_adicionales: dto.datos_adicionales,
     });
     return this.inscripcionRepository.save(inscripcion);
   }
@@ -106,7 +107,14 @@ export class InscripcionesService {
 
   findAll() {
     return this.inscripcionRepository.find({
-      relations: ['usuario', 'usuario.persona', 'actividadAcademica', 'actividadAcademica.evento'],
+      relations: [
+        'usuario', 
+        'usuario.persona', 
+        'usuario.afiliaciones', 
+        'usuario.afiliaciones.gradoAcademico',
+        'actividadAcademica', 
+        'actividadAcademica.evento'
+      ],
     });
   }
 
@@ -125,3 +133,4 @@ export class InscripcionesService {
     return this.inscripcionRepository.delete(id);
   }
 }
+

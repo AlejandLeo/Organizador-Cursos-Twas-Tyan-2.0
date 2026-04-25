@@ -2,8 +2,9 @@
 import { ref, onMounted, computed } from 'vue';
 import api from '@/services/api';
 import Swal from 'sweetalert2';
+import type { Usuario } from '@/types/admin';
 
-const usuarios = ref<any[]>([]);
+const usuarios = ref<Usuario[]>([]);
 const loading = ref(true);
 const searchQuery = ref('');
 
@@ -36,24 +37,43 @@ const parseName = (p: any) => `${p?.primer_apellido || ''} ${p?.segundo_apellido
 </script>
 
 <template>
-    <div class="flex flex-col lg:flex-row lg:items-center justify-between border-b border-slate-200 dark:border-gray-800 mb-8 pb-6 gap-6">
-        <div class="text-center lg:text-left">
-            <h2 class="text-2xl md:text-3xl font-black text-primary-dark dark:text-white uppercase italic">Directorio de Coordinación</h2>
-            <p class="text-[9px] md:text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Personal administrativo con rol de Coordinador</p>
+    <div class="relative bg-white dark:bg-slate-800 rounded-[2.5rem] p-8 md:p-12 overflow-hidden shadow-sm border border-sky-100 dark:border-slate-700 group mb-10">
+      <!-- Decoración sutil -->
+      <div class="absolute top-0 left-0 w-80 h-80 bg-sky-50 dark:bg-sky-900/10 rounded-full -ml-20 -mt-20 blur-3xl"></div>
+      <div class="absolute inset-0 bg-gradient-to-br from-indigo-50/30 to-transparent dark:from-indigo-900/5 pointer-events-none"></div>
+      
+      <div class="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
+        <div class="flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
+          <div class="w-20 h-20 bg-sky-100 dark:bg-sky-900/30 rounded-3xl flex items-center justify-center shadow-sm border border-sky-200 dark:border-sky-800 transition-transform duration-500">
+            <span class="material-symbols-outlined text-4xl text-sky-600 dark:text-sky-400">manage_accounts</span>
+          </div>
+          <div>
+            <h2 class="text-4xl md:text-5xl font-black text-sky-950 dark:text-white italic uppercase tracking-tighter leading-none">
+              Directorio de <span class="text-sky-600">Coordinación</span>
+            </h2>
+            <p class="text-slate-400 dark:text-slate-500 text-[10px] md:text-xs font-black uppercase tracking-[0.3em] mt-3 flex items-center justify-center md:justify-start gap-2">
+               <span class="w-5 h-px bg-sky-400"></span> Personal Administrativo de Gestión
+            </p>
+          </div>
         </div>
-        <div class="bg-blue-50 dark:bg-blue-900/10 px-4 md:px-6 py-3 rounded-2xl border border-blue-100 dark:border-blue-800 flex items-center gap-3 self-center lg:self-auto">
-            <span class="material-symbols-outlined text-blue-500 text-sm md:text-base">info</span>
-            <p class="text-[8px] md:text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase leading-tight">Vista de solo lectura.<br>Contacta al Super-Admin para cambios.</p>
-        </div>
-    </div>
 
-    <!-- Buscador -->
-    <div class="relative w-full max-w-md group mx-auto lg:mx-0">
-        <label class="absolute -top-3 left-6 px-2 bg-slate-50 dark:bg-gray-950 lg:bg-[#f8f9fc] lg:dark:bg-black z-10 text-[9px] font-black text-slate-400 uppercase tracking-widest italic transition-colors">Buscar coordinador</label>
-        <span class="absolute inset-y-0 left-5 flex items-center text-slate-400">
-            <span class="material-symbols-outlined text-xl group-focus-within:text-umsa-blue transition-colors">search</span>
-        </span>
-        <input v-model="searchQuery" class="w-full pl-14 pr-6 py-4 bg-white dark:bg-gray-900 border-2 border-slate-200 dark:border-gray-800 rounded-full shadow-sm text-sm focus:ring-4 focus:ring-umsa-blue/10 focus:border-umsa-blue outline-none transition-all font-bold text-primary-dark dark:text-gray-200 placeholder-slate-400" placeholder="Nombre o correo..." type="text">
+        <div class="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+          <div class="relative w-full sm:w-96 group/search">
+            <label class="absolute -top-2.5 left-5 px-2 bg-white dark:bg-slate-800 text-[9px] font-black text-sky-600 dark:text-sky-400 uppercase tracking-widest z-10">Búsqueda rápida</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-4 flex items-center text-sky-400">
+                <span class="material-symbols-outlined text-[20px]">search</span>
+              </span>
+              <input v-model="searchQuery" class="w-full pl-12 pr-6 py-4 bg-slate-50 dark:bg-slate-900/50 border border-sky-100 dark:border-slate-700 text-sky-900 dark:text-white rounded-2xl text-xs font-bold outline-none focus:border-sky-400 transition-all placeholder:text-slate-400" placeholder="Nombre o correo electrónico...">
+            </div>
+          </div>
+          
+          <div class="bg-indigo-50/50 dark:bg-slate-900/50 px-5 py-3 rounded-2xl border border-indigo-100 dark:border-slate-700 flex items-center gap-3">
+             <div class="w-1.5 h-1.5 bg-indigo-400 rounded-full"></div>
+             <p class="text-[9px] font-black text-indigo-700 dark:text-indigo-400 uppercase leading-tight tracking-widest">Acceso<br>Coordinador</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Tabla con Scroll -->
