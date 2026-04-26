@@ -522,6 +522,20 @@ export class UsuariosService {
     return { mensaje: 'Contraseña actualizada correctamente.' };
   }
 
+  /**
+   * Cambia la contraseña de un usuario SIN verificar la contraseña actual.
+   * Exclusivo para el flujo de recuperación por token (forgot-password).
+   * La nueva contraseña se hashea con bcrypt antes de persistir.
+   */
+  async forzarCambioPassword(
+    id: number,
+    nuevaPassword: string,
+  ): Promise<{ mensaje: string }> {
+    const hash = await bcrypt.hash(nuevaPassword, 10);
+    await this.usuarioRepository.update(id, { password: hash });
+    return { mensaje: 'Contraseña actualizada correctamente.' };
+  }
+
   // ══════════════════════════════════════════════════════════
   //  REGISTRO COMPLETO (Usuario + Persona + Rol + Afiliación)
   // ══════════════════════════════════════════════════════════
@@ -696,6 +710,90 @@ export class UsuariosService {
       where: { email },
       relations: ['persona', 'usuariosRoles', 'usuariosRoles.rol'],
     });
+  }
+
+  /**
+   * Elimina un rol específico de un usuario.
+   * Solo ejecutable por Super Usuario.
+   */
+  async quitarRol(
+    usuarioId: number,
+    rolId: number,
+  ): Promise<Omit<Usuario, 'password'>> {
+    await this.findOne(usuarioId); // valida existencia
+
+    const relacion = await this.dataSource
+      .getRepository(UsuarioRol)
+      .findOne({
+        where: {
+          usuario: { id: usuarioId },
+          rol: { id: rolId },
+        },
+      });
+
+    if (!relacion) {
+      throw new NotFoundException(
+        `El usuario ${usuarioId} no tiene el rol ${rolId} asignado.`,
+      );
+    }
+
+    await this.dataSource.getRepository(UsuarioRol).delete(relacion.id);
+    return this.getPerfil(usuarioId);
+  }
+
+  /**
+   * Devuelve las inscripciones de un usuario con datos de actividad y notas.
+   * Usado por el coordinador para consultar el historial de un estudiante.
+   */
+  async findInscripciones(usuarioId: number) {
+    await this.findOne(usuarioId); // valida existencia
+    return this.dataSource.query(
+      `SELECT
+         i.id,
+         i.estado,
+         i.nota_principal,
+         i.miembro_tyan,
+         i.razon,
+         i.observacion,
+         i.fecha_creacion,
+         a.id            AS actividad_id,
+         a.nombre        AS actividad_nombre,
+         a.descripcion   AS actividad_descripcion,
+         e.id            AS evento_id,
+         e.nombre        AS evento_nombre
+       FROM inscripciones i
+       INNER JOIN actividades_academicas a ON a.id = i.id_actividad_academica
+       INNER JOIN eventos e ON e.id = a.id_evento
+       WHERE i.id_usuario = $1
+       ORDER BY i.fecha_creacion DESC`,
+      [usuarioId],
+    );
+  }
+
+  /**
+   * Devuelve los certificados emitidos para un usuario.
+   * Usado por el coordinador y el propio estudiante.
+   */
+  async findCertificados(usuarioId: number) {
+    await this.findOne(usuarioId); // valida existencia
+    return this.dataSource.query(
+      `SELECT
+         c.id,
+         c.codigo_certificado,
+         c.tipo,
+         c.estado,
+         c.fecha_emision,
+         a.nombre  AS actividad_nombre,
+         e.nombre  AS evento_nombre,
+         ic.titulo AS tipo_certificado
+       FROM certificados c
+       INNER JOIN actividades_academicas a ON a.id = c.id_actividad_academica
+       INNER JOIN eventos e ON e.id = a.id_evento
+       LEFT  JOIN info_certificados ic ON ic.id = c.id_info_certificado
+       WHERE c.id_usuario = $1
+       ORDER BY c.fecha_emision DESC`,
+      [usuarioId],
+    );
   }
 
   // ══════════════════════════════════════════════════════════
