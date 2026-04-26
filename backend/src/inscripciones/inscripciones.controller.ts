@@ -11,10 +11,18 @@ import {
   UseGuards,
   Request,
   Patch,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { InscripcionesService } from './inscripciones.service';
 import { CreateInscripcionDto } from './dto/create-inscripcion.dto';
+import { RegistrarAsistenciaPinDto } from './dto/registrar-asistencia-pin.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -50,10 +58,26 @@ export class InscripcionesController {
     });
   }
 
+  // ══════════════════════════════════════════════════════════
+  //  REGISTRO DE ASISTENCIA POR PIN (público, sin JWT)
+  //  El estudiante ingresa su email + sesión + PIN para
+  //  marcar su asistencia sin necesidad de iniciar sesión.
+  // ══════════════════════════════════════════════════════════
+
+  @Post('registrar-asistencia-pin')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Registrar asistencia con PIN (público — sin JWT). Requiere email + id_sesion + pin.',
+  })
+  registrarAsistenciaPorPin(@Body() dto: RegistrarAsistenciaPinDto) {
+    return this.service.registrarAsistenciaPorPin(dto);
+  }
+
   // ── Coordinador ─────────────────────────────────────────────
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('Coordinador', 'Super Usuario')
+  @Roles('Coordinador', 'Super Usuario', 'Logística')
   @ApiBearerAuth()
   @Get()
   @ApiOperation({ summary: 'Listar inscripciones de un evento (Coordinador)' })
@@ -73,8 +97,22 @@ export class InscripcionesController {
     return this.service.findAll();
   }
 
+  /**
+   * GET /inscripciones/usuario/:id
+   * Lista las inscripciones de un usuario específico.
+   * Uso exclusivo del coordinador para consultar el historial de un estudiante.
+   */
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('Coordinador', 'Super Usuario')
+  @Roles('Coordinador', 'Super Usuario', 'Logística')
+  @ApiBearerAuth()
+  @Get('usuario/:id')
+  @ApiOperation({ summary: 'Inscripciones de un usuario por ID (Coordinador)' })
+  findByUsuario(@Param('id', ParseIntPipe) id: number) {
+    return this.service.findByUsuarioId(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Coordinador', 'Super Usuario', 'Logística')
   @ApiBearerAuth()
   @Get('actividad/:actividadId')
   @ApiOperation({ summary: 'Listar inscripciones por actividad específica' })
@@ -125,4 +163,3 @@ export class InscripcionesController {
     return this.service.remove(id);
   }
 }
-
