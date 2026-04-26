@@ -8,6 +8,7 @@ import {
   ParseIntPipe,
   UseGuards,
   Query,
+  Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ImparticionesService } from './imparticiones.service';
@@ -70,5 +71,37 @@ export class ImparticionesController {
   @ApiOperation({ summary: 'Remover asignación de ponente (Coordinador)' })
   remover(@Param('id', ParseIntPipe) id: number) {
     return this.service.remover(id);
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  PONENTE — Vista personal
+  // ══════════════════════════════════════════════════════════
+
+  /**
+   * GET /imparticiones/mis-actividades
+   * Lista las actividades académicas que imparte el ponente autenticado.
+   * El ponente no necesita pasar su ID — se extrae del JWT.
+   */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Ponente', 'Coordinador', 'Super Usuario')
+  @ApiBearerAuth()
+  @Get('mis-actividades')
+  @ApiOperation({ summary: 'Mis actividades (Ponente autenticado)' })
+  misActividades(@Request() req: any) {
+    return this.service.findMisActividades(req.user.sub || req.user.id);
+  }
+
+  /**
+   * GET /imparticiones/mis-estudiantes
+   * Lista los estudiantes inscritos en las actividades del ponente autenticado.
+   * Incluye notas y asistencias. Agrupado por actividad.
+   */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Ponente', 'Coordinador', 'Super Usuario')
+  @ApiBearerAuth()
+  @Get('mis-estudiantes')
+  @ApiOperation({ summary: 'Mis estudiantes con notas (Ponente autenticado)' })
+  misEstudiantes(@Request() req: any) {
+    return this.service.findMisEstudiantes(req.user.sub || req.user.id);
   }
 }

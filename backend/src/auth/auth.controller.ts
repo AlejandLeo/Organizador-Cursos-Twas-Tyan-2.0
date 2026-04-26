@@ -7,6 +7,7 @@ import {
   HttpStatus,
   UseGuards,
   Request,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
@@ -101,5 +102,92 @@ export class AuthController {
       this.authService.logout(token);
     }
     return { mensaje: 'Sesión cerrada correctamente.' };
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  POST /auth/forgot-password
+  //  Genera un token de recuperación de contraseña válido por
+  //  1 hora. En producción este token se envía por correo;
+  //  aquí lo devolvemos directamente para que el frontend
+  //  pueda consumirlo sin necesidad de configurar SMTP.
+  // ══════════════════════════════════════════════════════════
+  @Post('forgot-password')
+  @ApiOperation({
+    summary: 'Solicitar recuperación de contraseña (retorna token de reset)',
+  })
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body('email') email: string) {
+    if (!email) {
+      throw new BadRequestException('El campo email es requerido.');
+    }
+
+    // Buscar el usuario sin lanzar excepción si no existe (para no revelar emails)
+    const usuario = await this.usuariosService.findOptionalByEmail(email);
+
+    if (!usuario) {
+      // Retornamos el mismo mensaje para no revelar si el email está registrado
+      return {
+        mensaje:
+          'Si el correo está registrado, recibirás instrucciones de recuperación.',
+      };
+    }
+
+    const resetToken = this.authService.generarResetToken(email);
+
+    // En un entorno de producción aquí se enviaría el correo con el token.
+    // Como el módulo de email no está configurado, el token se devuelve directamente
+    // para que el frontend lo consuma desde el flujo de recuperación.
+    return {
+      mensaje:
+        'Token de recuperación generado. Úsalo en POST /auth/reset-password.',
+      reset_token: resetToken,
+    };
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  POST /auth/reset-password
+  //  Valida el token de reset (firmado por el servidor, expira
+  //  en 1h) y cambia la contraseña del usuario. El token solo
+  //  puede usarse para reset (campo tipo='reset' en el payload).
+  // ══════════════════════════════════════════════════════════
+  @Post('reset-password')
+  @ApiOperation({
+    summary: 'Restablecer contraseña con token de recuperación',
+  })
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(
+    @Body('token') token: string,
+    @Body('nueva_password') nuevaPassword: string,
+  ) {
+    if (!token || !nuevaPassword) {
+      throw new BadRequestException(
+        'Los campos token y nueva_password son requeridos.',
+      );
+    }
+
+    if (nuevaPassword.length < 6) {
+      throw new BadRequestException(
+        'La nueva contraseña debe tener al menos 6 caracteres.',
+      );
+    }
+
+    // 1. Validar el token (lanza Error si expiró o es inválido)
+    let email: string;
+    try {
+      email = this.authService.validarResetToken(token);
+    } catch (e: any) {
+      throw new BadRequestException(e.message);
+    }
+
+    // 2. Buscar usuario por email
+    const usuario = await this.usuariosService.findOptionalByEmail(email);
+    if (!usuario) {
+      throw new BadRequestException('Usuario no encontrado.');
+    }
+
+    // 3. Actualizar contraseña usando el servicio de usuarios (hashea bcrypt)
+    await this.usuariosService.forzarCambioPassword(usuario.id, nuevaPassword);
+
+    return { mensaje: 'Contraseña actualizada correctamente.' };
   }
 }

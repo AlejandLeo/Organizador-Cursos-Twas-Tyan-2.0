@@ -103,6 +103,72 @@ export class ImparticionesService {
 
   // ── Métodos legacy (scaffold default) ──────────────────────
 
+  // ══════════════════════════════════════════════════════════
+  //  PONENTE — Vista personal
+  // ══════════════════════════════════════════════════════════
+
+  /**
+   * Devuelve las actividades académicas que imparte el ponente autenticado.
+   * Incluye datos del evento y el conteo de inscritos por actividad.
+   */
+  async findMisActividades(usuarioId: number) {
+    return this.imparticionRepository.find({
+      where: { usuario: { id: usuarioId } },
+      relations: [
+        'actividadAcademica',
+        'actividadAcademica.evento',
+        'actividadAcademica.modalidades',
+        'actividadAcademica.inscripciones',
+        'evento',
+      ],
+      order: { fecha_creacion: 'DESC' },
+    });
+  }
+
+  /**
+   * Devuelve los estudiantes inscritos en las actividades del ponente.
+   * Incluye datos personales, notas y número de asistencias por modalidad.
+   * Agrupado por actividad para fácil procesamiento en el frontend.
+   */
+  async findMisEstudiantes(usuarioId: number) {
+    const imparticiones = await this.imparticionRepository.find({
+      where: { usuario: { id: usuarioId } },
+      relations: [
+        'actividadAcademica',
+        'actividadAcademica.inscripciones',
+        'actividadAcademica.inscripciones.usuario',
+        'actividadAcademica.inscripciones.usuario.persona',
+        'actividadAcademica.inscripciones.usuario.afiliaciones',
+        'actividadAcademica.inscripciones.modalidades',
+        'actividadAcademica.inscripciones.modalidades.cursoModalidad',
+        'evento',
+      ],
+    });
+
+    return imparticiones.map((imp) => ({
+      actividad_id: imp.actividadAcademica?.id,
+      actividad_nombre: (imp.actividadAcademica as any)?.nombre,
+      evento_nombre: imp.evento?.nombre,
+      estudiantes: (imp.actividadAcademica?.inscripciones ?? []).map((ins) => ({
+        inscripcion_id: ins.id,
+        estado: ins.estado,
+        nota_principal: ins.nota_principal,
+        usuario_id: ins.usuario?.id,
+        email: ins.usuario?.email,
+        nombres: ins.usuario?.persona?.nombres,
+        primer_apellido: ins.usuario?.persona?.primer_apellido,
+        segundo_apellido: ins.usuario?.persona?.segundo_apellido,
+        modalidades: ins.modalidades?.map((m) => ({
+          id: m.id,
+          nota: m.nota,
+          num_asistencia: m.num_asistencia,
+          aprobado: m.aprobado,
+        })) ?? [],
+      })),
+    }));
+  }
+
+
   create(data: Partial<Imparticion>) {
     return this.imparticionRepository.save(this.imparticionRepository.create(data));
   }
