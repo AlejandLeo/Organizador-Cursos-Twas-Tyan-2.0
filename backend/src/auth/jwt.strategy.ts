@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
+import { UsuariosService } from '../usuarios/usuarios.service';
 import { Request } from 'express';
 
 @Injectable()
@@ -10,6 +11,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private readonly configService: ConfigService,
     private readonly authService: AuthService,
+    private readonly usuariosService: UsuariosService,
   ) {
     super({
       // Extrae el token del header Authorization: Bearer <token>
@@ -36,10 +38,23 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       );
     }
 
-    return {
-      id: payload.sub,
-      email: payload.email,
-      roles: payload.roles ?? [],
-    };
+    // Obtener estado y roles en tiempo real desde la BD
+    try {
+      const usuarioReal = await this.usuariosService.findOne(payload.sub);
+      
+      if (usuarioReal.estado === 0) {
+        throw new UnauthorizedException('Tu cuenta ha sido desactivada.');
+      }
+
+      const rolesActualizados = usuarioReal.usuariosRoles?.map(ur => ur.rol.nombre_rol) || [];
+
+      return {
+        id: payload.sub,
+        email: payload.email,
+        roles: rolesActualizados,
+      };
+    } catch (error) {
+      throw new UnauthorizedException('El usuario ya no existe o no tiene acceso.');
+    }
   }
 }
