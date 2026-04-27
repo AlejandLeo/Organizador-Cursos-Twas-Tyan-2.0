@@ -133,7 +133,7 @@ export class CertificadosService {
         codigo_certificado: certificado.codigo_certificado,
         tipo: certificado.tipo,
         fecha_emision: certificado.fecha_emision,
-        tipo_certificado: certificado.infoCertificado?.titulo ?? null,
+        tipo_certificado: certificado.infoCertificado?.cabecera ?? null,
         beneficiario: {
           nombres: certificado.usuario?.persona?.nombres,
           primer_apellido: certificado.usuario?.persona?.primer_apellido,

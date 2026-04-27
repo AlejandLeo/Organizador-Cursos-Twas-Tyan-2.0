@@ -6,12 +6,13 @@ export enum EstadoUsuario {
 
 // Entidades Base
 export interface Usuario {
-  id_usuario: string;
+  id: number;
   email: string;
-  password?: string; // Opcional porque no siempre la traemos del back
-  estado: EstadoUsuario;
+  password?: string;
+  estado: number | EstadoUsuario;
   persona?: Persona;
   roles?: Rol[];
+  usuariosRoles?: any[];
   afiliaciones?: Afiliacion[];
 }
 
@@ -32,7 +33,7 @@ export interface Persona {
 }
 
 export interface Rol {
-  id_rol: string;
+  id: number;
   nombre_rol: string;
 }
 

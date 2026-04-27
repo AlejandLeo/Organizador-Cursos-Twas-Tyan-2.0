@@ -193,7 +193,7 @@ export default class EventosSeeder implements Seeder {
             await imparticionRepository.save(imparticionRepository.create({
               actividadAcademica: nuevaActividad,
               usuario: ponente,
-              rol_imparticion: 1
+              evento: evento
             }));
             console.log(`    - Ponente asignado a la actividad ${nuevaActividad.nombre}`);
           }

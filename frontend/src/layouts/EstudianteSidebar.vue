@@ -2,10 +2,12 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { useUIStore } from '@/stores/ui';
 import api from '@/services/api';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const uiStore = useUIStore();
 const profilePhotoUrl = ref('');
 
 const loadPhoto = async () => {
@@ -23,17 +25,22 @@ onMounted(() => {
 });
 
 const navigate = (routeName: string) => {
+  uiStore.closeSidebar();
   router.push({ name: routeName });
 };
 
 const handleLogout = () => {
+  uiStore.closeSidebar();
   authStore.logout();
   router.push('/login');
 };
 </script>
 
 <template>
-  <aside class="w-64 lg:w-72 bg-white dark:bg-gray-950 text-slate-600 dark:text-gray-300 flex flex-col px-4 py-8 fixed left-0 bottom-0 top-[75px] z-50 border-r border-slate-200 dark:border-gray-800 overflow-y-auto transition-colors duration-300">
+  <aside :class="[
+    uiStore.isSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full',
+    'w-72 bg-white dark:bg-gray-950 text-slate-600 dark:text-gray-300 flex flex-col px-4 py-8 fixed left-0 bottom-0 top-[75px] z-[110] border-r border-slate-200 dark:border-gray-800 overflow-y-auto transition-all duration-300 ease-in-out'
+  ]">
     <div class="mb-8 p-5 bg-slate-50 dark:bg-gray-900 rounded-2xl border border-slate-100 dark:border-gray-800 shadow-sm relative overflow-hidden group">
       <!-- Decorative color (UMSA Green/Blue) -->
       <div class="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500 dark:bg-emerald-600"></div>

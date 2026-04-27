@@ -10,6 +10,14 @@ export const authService = {
     return api.post('/auth/register', userData);
   },
   
+  registrarSolicitud(formData: FormData) {
+    return api.post('/usuarios/solicitud', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  
   logout() {
     // Si el backend requiere invalidar token
     // return api.post('/auth/logout');

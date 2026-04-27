@@ -73,6 +73,10 @@ export class Persona {
   @Column({ length: 255, nullable: true })
   firma_dig: string;
 
+  /** Flag para indicar si el usuario ya finalizó su registro de perfil. */
+  @Column({ type: 'boolean', default: false })
+  perfil_completado: boolean;
+
   // ── Relación ─────────────────────────────────────────────────────────────
 
   /**

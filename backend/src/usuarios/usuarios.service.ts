@@ -19,6 +19,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { RegisterDto } from './dto/register.dto';
 import { CrearPonenteDto } from './dto/crear-ponente.dto';
 import { FiltrarUsuariosDto } from './dto/filtrar-usuarios.dto';
+import { SolicitudRegistroDto } from './dto/solicitud-registro.dto';
 
 // Entidades adicionales para registro y roles
 import { Rol } from '../roles/entities/rol.entity';
@@ -59,6 +60,11 @@ export class UsuariosService {
       throw new NotFoundException('Perfil no encontrado');
     }
 
+    // Bloqueo si ya está completado
+    if (usuario.persona.perfil_completado) {
+      throw new BadRequestException('Su información de perfil ya fue registrada exitosamente y no puede ser modificada.');
+    }
+
     // 1. Filtrar campos específicos para la entidad Persona
     const camposPersonaValidos = [
       'nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad', 
@@ -85,7 +91,6 @@ export class UsuariosService {
     }
 
     // 2. Extraer campos para Afiliación
-    // Notar que 'afiliacion' se mapea a 'institucion'
     const institucion = data.institucion || data.afiliacion;
     const { id_grado_academico, tipo_afiliacion, area_tematica, disciplina_cientifica } = data;
 
@@ -102,7 +107,6 @@ export class UsuariosService {
         : null;
 
       if (af) {
-        // Actualizar existente
         if (institucion !== undefined) af.institucion = institucion;
         if (id_grado_academico !== undefined) af.id_grado_academico = id_grado_academico;
         if (tipo_afiliacion !== undefined) af.tipo_afiliacion = tipo_afiliacion;
@@ -110,7 +114,6 @@ export class UsuariosService {
         if (disciplina_cientifica !== undefined) af.disciplina_cientifica = disciplina_cientifica;
         await afiliacionRepo.save(af);
       } else {
-        // Crear nueva
         const newAf = afiliacionRepo.create({
           institucion: institucion || '',
           id_grado_academico,
@@ -121,6 +124,20 @@ export class UsuariosService {
         });
         await afiliacionRepo.save(newAf);
       }
+    }
+
+    // 3. Finalización del perfil
+    if (data.finalizar) {
+      // Recargar para tener datos actualizados
+      const perfilActualizado = await this.getPerfil(id_usuario);
+      const p = perfilActualizado.persona;
+      const af = (perfilActualizado as any).afiliaciones?.[0];
+
+      if (!p.nombres || !p.primer_apellido || !p.documento_identidad || !p.celular || !af?.institucion) {
+        throw new BadRequestException('Debe completar todos los campos obligatorios antes de finalizar.');
+      }
+      
+      await this.personaRepository.update(p.id, { perfil_completado: true });
     }
 
     return this.getPerfil(id_usuario);
@@ -472,6 +489,13 @@ export class UsuariosService {
       );
     }
 
+    if (usuario.estado === 2) {
+      console.log('Error: Usuario pendiente de aprobación.');
+      throw new UnauthorizedException(
+        'Tu solicitud de registro está pendiente de aprobación por administración. Recibirás acceso una vez sea validada.',
+      );
+    }
+
     const passwordValido = await bcrypt.compare(
       loginDto.password,
       usuario.password,
@@ -689,6 +713,8 @@ export class UsuariosService {
         'usuariosRoles.rol',
         'afiliaciones',
         'afiliaciones.gradoAcademico',
+        'inscripciones',
+        'inscripciones.actividadAcademica',
       ],
     });
 
@@ -841,4 +867,135 @@ export class UsuariosService {
     }
     return null;
   }
+
+  // ══════════════════════════════════════════════════════════
+  //  SOLICITUD DE REGISTRO (estado = 2 → pendiente de aprobación)
+  // ══════════════════════════════════════════════════════════
+
+  /**
+   * Registra una solicitud de acceso.
+   * Crea el usuario en estado=2 (Pendiente), su persona y asigna el rol Estudiante.
+   * La cuenta NO puede iniciar sesión hasta ser aprobada (estado=1).
+   * El coordinador la verá en el panel de solicitudes.
+   *
+   * @param dto      Datos básicos de la solicitud
+   * @param docFile  Nombre del archivo de documento de aval subido
+   */
+  async registrarSolicitud(
+    dto: SolicitudRegistroDto,
+    docFile: string,
+  ): Promise<{ mensaje: string }> {
+    const existe = await this.usuarioRepository.findOneBy({ email: dto.email });
+    if (existe) {
+      throw new ConflictException(
+        `El email '${dto.email}' ya está registrado.`,
+      );
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const hash = await bcrypt.hash(dto.password, 10);
+
+      // estado = 2 → Pendiente de aprobación (NO puede loguear)
+      const usuario = queryRunner.manager.create(Usuario, {
+        email: dto.email,
+        password: hash,
+        estado: 2,
+      });
+      const usuarioGuardado = await queryRunner.manager.save(usuario);
+
+      // Guardar datos personales + nombre del documento de aval en firma_dig (reutilizamos el campo como referencia de archivo)
+      const persona = queryRunner.manager.create(Persona, {
+        nombres: dto.nombres,
+        primer_apellido: dto.primer_apellido,
+        segundo_apellido: dto.segundo_apellido,
+        documento_identidad: dto.documento_identidad,
+        firma_dig: docFile, // Se reutiliza para almacenar el nombre del doc. de aval
+        usuario: usuarioGuardado,
+      });
+      await queryRunner.manager.save(persona);
+
+      // Asignar rol Estudiante por defecto
+      const rol = await queryRunner.manager.findOne(Rol, {
+        where: { id: RoleId.ESTUDIANTE },
+      });
+      if (rol) {
+        const usuarioRol = queryRunner.manager.create(UsuarioRol, {
+          usuario: usuarioGuardado,
+          rol,
+          estado: 1,
+        });
+        await queryRunner.manager.save(usuarioRol);
+      }
+
+      await queryRunner.commitTransaction();
+      return {
+        mensaje:
+          'Su solicitud fue recepcionada correctamente. La confirmación de su cuenta se realizará una vez finalice el proceso de inscripciones y sea validada por administración.',
+      };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Lista los usuarios con estado = 2 (pendientes de aprobación).
+   * Solo accesible por Coordinador o Super Usuario.
+   */
+  async listarSolicitudesPendientes(): Promise<any[]> {
+    return this.usuarioRepository.find({
+      where: { estado: 2 },
+      relations: ['persona', 'usuariosRoles', 'usuariosRoles.rol'],
+      select: {
+        id: true,
+        email: true,
+        estado: true,
+        fecha_creacion: true,
+      },
+      order: { fecha_creacion: 'ASC' },
+    });
+  }
+
+  /**
+   * Aprueba (estado=1) o rechaza (estado=0) una solicitud de registro.
+   * Si se rechaza, se puede eliminar físicamente o simplemente inactivar.
+   *
+   * @param id       ID del usuario pendiente
+   * @param accion   'aprobar' | 'rechazar'
+   */
+  async aprobarRechazarSolicitud(
+    id: number,
+    accion: 'aprobar' | 'rechazar',
+  ): Promise<{ mensaje: string }> {
+    const usuario = await this.usuarioRepository.findOne({
+      where: { id },
+      relations: ['persona'],
+    });
+
+    if (!usuario) {
+      throw new NotFoundException(`Usuario ${id} no encontrado.`);
+    }
+
+    if (usuario.estado !== 2) {
+      throw new BadRequestException(
+        'Esta cuenta no está en estado pendiente de aprobación.',
+      );
+    }
+
+    if (accion === 'aprobar') {
+      await this.usuarioRepository.update(id, { estado: 1 });
+      return { mensaje: 'Solicitud aprobada. El usuario puede iniciar sesión.' };
+    } else {
+      // Rechazar: desactivar la cuenta (estado=0). El archivo de aval se conserva.
+      await this.usuarioRepository.update(id, { estado: 0 });
+      return { mensaje: 'Solicitud rechazada. La cuenta ha sido desactivada.' };
+    }
+  }
 }
+

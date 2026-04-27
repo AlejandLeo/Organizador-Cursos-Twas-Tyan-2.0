@@ -28,7 +28,7 @@ export class InscripcionesPonenteController {
     @Param('actividadId', ParseIntPipe) actividadId: number,
     @Request() req: any,
   ) {
-    return this.service.findByActividadParaPonente(actividadId, req.user.id || req.user.sub);
+    return this.service.findByActividadParaPonente(actividadId, req.user.id);
   }
 
   @Patch('actividad/:actividadId/:inscripcionId/nota')
@@ -39,6 +39,6 @@ export class InscripcionesPonenteController {
     @Body('nota') nota: number,
     @Request() req: any,
   ) {
-    return this.service.actualizarNotaParaPonente(actividadId, inscripcionId, nota, req.user.id || req.user.sub);
+    return this.service.actualizarNotaParaPonente(actividadId, inscripcionId, nota, req.user.id);
   }
 }

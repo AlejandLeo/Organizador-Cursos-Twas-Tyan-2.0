@@ -142,7 +142,7 @@ const loadActividad = async () => {
 
 const checkInscripcionStatus = async () => {
   try {
-    const res = await api.get('/inscripciones/mis-inscripciones');
+    const res = await api.get('/me/inscripciones');
     const all = res.data;
     const found = all.find((i: any) => i.actividadAcademica.id === actividadId);
     if (found) {

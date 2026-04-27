@@ -13,6 +13,6 @@ export class AsistenciasMeController {
   @Get()
   @ApiOperation({ summary: 'Mis asistencias (Estudiante autenticado)' })
   misAsistencias(@Request() req: any) {
-    return this.service.findByUsuario(req.user.sub || req.user.id);
+    return this.service.findByUsuario(req.user.id);
   }
 }

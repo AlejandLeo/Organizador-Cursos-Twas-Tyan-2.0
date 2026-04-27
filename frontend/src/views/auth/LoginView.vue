@@ -61,11 +61,11 @@ const handleLogin = async () => {
       <div class="w-full md:w-1/2 p-8 md:p-14 lg:p-20 flex flex-col justify-center">
         <div class="text-center md:text-left mb-10">
           <div class="inline-block mb-6">
-            <h2 class="text-primary-dark dark:text-primary-light font-black italic text-5xl tracking-tighter leading-none">twas</h2>
-            <p class="text-[10px] leading-tight text-primary-dark/60 dark:text-primary-light/60 uppercase font-bold tracking-widest mt-1">The World Academy of Sciences</p>
+            <h2 class="text-primary-dark dark:text-primary-light font-black italic text-5xl tracking-tighter leading-none">WELCOME</h2>
+            <p class="text-[10px] leading-tight text-primary-dark/60 dark:text-primary-light/60 uppercase font-bold tracking-widest mt-1">SISTEMA DE GESTIÓN ACADÉMICA</p>
           </div>
           <h1 class="text-3xl font-black text-primary-dark dark:text-white tracking-tight uppercase">Acceso Plataforma</h1>
-          <p class="text-slate-500 dark:text-slate-400 mt-2 text-sm font-medium">Ingresa tus credenciales para acceder a los servicios de TYAN.</p>
+          <p class="text-slate-500 dark:text-slate-400 mt-2 text-sm font-medium">Ingresa tus credenciales para acceder a los servicios.</p>
         </div>
 
         <form @submit.prevent="handleLogin" class="space-y-6">
@@ -128,24 +128,17 @@ const handleLogin = async () => {
       </div>
 
       <!-- Right Side (Visual/Image) -->
-      <div class="hidden md:flex w-1/2 relative bg-primary-dark items-center justify-center overflow-hidden">
-        <div class="absolute inset-0 bg-gradient-to-b from-primary-dark/80 via-primary-dark/60 to-primary-dark/95 z-10"></div>
+      <div class="hidden md:flex w-1/2 relative bg-primary-dark items-end justify-center overflow-hidden pb-12">
+        <div class="absolute inset-0 bg-gradient-to-b from-primary-dark/80 via-primary-dark/40 to-primary-dark/90 z-10"></div>
         <img 
-          src="https://images.unsplash.com/photo-1541339907198-e08756dedf3f?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80" 
-          alt="Campus UMSA" 
+          src="/bienvenida.png" 
+          alt="Welcome Background" 
           class="absolute inset-0 w-full h-full object-cover animate-[pulse_12s_ease-in-out_infinite] scale-110 opacity-60"
         />
         
         <div class="relative z-20 text-center px-12 text-white flex flex-col items-center">
-          <div class="mb-8 p-6 bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 shadow-2xl">
-            <span class="material-symbols-outlined text-6xl text-white">school</span>
-          </div>
-          <h2 class="text-4xl font-bold tracking-tight leading-tight mb-4 text-white">
-            Excelencia en <br/>
-            <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-white">Gestión Académica</span>
-          </h2>
-          <p class="text-blue-100 font-medium tracking-wide">
-            Plataforma oficial de eventos y cursos.
+          <p class="text-white/80 font-bold tracking-[0.3em] uppercase text-[10px] border-b border-white/20 pb-2 backdrop-blur-sm">
+            Gestión oficial de eventos y cursos
           </p>
         </div>
       </div>

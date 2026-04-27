@@ -16,6 +16,8 @@ import { SesionAcademica } from '../sesiones-academicas/entities/sesion-academic
 import { Asistencia } from '../asistencias/entities/asistencia.entity';
 import { InscripcionModalidad } from '../inscripcion-modalidades/entities/inscripcion-modalidad.entity';
 import { Imparticion } from '../imparticiones/entities/imparticion.entity';
+import { Usuario } from '../usuarios/entities/usuario.entity';
+
 @Injectable()
 export class InscripcionesService {
   constructor(
@@ -29,6 +31,8 @@ export class InscripcionesService {
     private readonly inscripcionModalidadRepository: Repository<InscripcionModalidad>,
     @InjectRepository(Imparticion)
     private readonly imparticionRepository: Repository<Imparticion>,
+    @InjectRepository(Usuario)
+    private readonly usuarioRepository: Repository<Usuario>,
   ) {}
 
   // ── Estudiante ─────────────────────────────────────────────
@@ -311,14 +315,15 @@ export class InscripcionesService {
 
   findAll() {
     return this.inscripcionRepository.find({
-      relations: [
-        'usuario',
-        'usuario.persona',
-        'usuario.afiliaciones',
-        'usuario.afiliaciones.gradoAcademico',
-        'actividadAcademica',
-        'actividadAcademica.evento',
-      ],
+      relations: {
+        usuario: {
+          persona: true,
+        },
+        actividadAcademica: {
+          evento: true,
+        },
+      },
+      order: { fecha_creacion: 'DESC' },
     });
   }
 
@@ -335,5 +340,41 @@ export class InscripcionesService {
 
   remove(id: number) {
     return this.inscripcionRepository.delete(id);
+  }
+
+  async getCoordinadorNotifications() {
+    try {
+      const [pendingInscriptions, pendingAccounts] = await Promise.all([
+        this.inscripcionRepository.find({
+          where: { estado: 0 },
+          relations: ['actividadAcademica', 'actividadAcademica.evento'],
+        }),
+        this.usuarioRepository.find({ where: { estado: 2 } }),
+      ]);
+
+      const activityMap = new Map<number, { id: number; nombre: string; eventoNombre: string; count: number }>();
+      pendingInscriptions.forEach(ins => {
+        const act = ins.actividadAcademica;
+        if (!act) return;
+        if (!activityMap.has(act.id)) {
+          activityMap.set(act.id, {
+            id: act.id,
+            nombre: act.nombre,
+            eventoNombre: act.evento?.nombre || 'Evento',
+            count: 0
+          });
+        }
+        activityMap.get(act.id)!.count++;
+      });
+
+      return {
+        total: pendingInscriptions.length + pendingAccounts.length,
+        accounts: pendingAccounts.length,
+        activities: Array.from(activityMap.values()),
+      };
+    } catch (error) {
+      console.error('ERROR IN getCoordinadorNotifications:', error);
+      return { total: 0, accounts: 0, activities: [], error: error.message };
+    }
   }
 }

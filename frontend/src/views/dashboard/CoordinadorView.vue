@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import api from '@/services/api';
 import StatCard from '@/components/dashboard/StatCard.vue';
 import {
@@ -17,6 +18,8 @@ interface Stat {
 }
 
 type TipoReporte = 'general' | 'eventos' | 'actividades';
+
+const router = useRouter();
 
 // ─────────────────────────────────────────────────────── Estado ──
 const stats = ref<Stat[]>([
@@ -40,21 +43,47 @@ const generando  = ref(false);
 async function cargarDatos() {
     cargando.value = true;
     try {
-        const [resEv, resAct, resUsr] = await Promise.all([
+        const [resEv, resAct, resUsr, resIns] = await Promise.all([
             api.get('/eventos'),
             api.get('/actividades-academicas'),
             api.get('/usuarios'),
+            api.get('/inscripciones'),
         ]);
 
-        rawEventos.value     = resEv.data  || [];
-        rawActividades.value = resAct.data || [];
+        const extractData = (res: any) => {
+            const d = res.data?.data ?? res.data;
+            return Array.isArray(d) ? d : [];
+        };
 
-        stats.value[0].value = rawEventos.value.filter((e: any) => e.estado === 1).length.toString();
-        stats.value[1].value = rawActividades.value.length.toString();
-        stats.value[2].value = (resUsr.data || []).length.toString();
+        const eventos      = extractData(resEv);
+        const actividades  = extractData(resAct);
+        const usuarios     = extractData(resUsr);
+        const inscrip      = extractData(resIns);
+
+        rawEventos.value     = eventos;
+        rawActividades.value = actividades;
+
+        // Eventos Activos
+        if (stats.value[0]) {
+            stats.value[0].value = eventos.filter((e: any) => e.estado === 1).length.toString();
+        }
+        // Actividades Totales
+        if (stats.value[1]) {
+            stats.value[1].value = actividades.length.toString();
+        }
+        // Usuarios Registrados
+        if (stats.value[2]) {
+            stats.value[2].value = usuarios.length.toString();
+        }
+        // Solicitudes Pendientes (Inscripciones a cursos + Cuentas nuevas)
+        if (stats.value[3]) {
+            const pendingInscrip = inscrip.filter((i: any) => i.estado === 0).length;
+            const pendingCuentas = usuarios.filter((u: any) => u.estado === 2).length;
+            stats.value[3].value = (pendingInscrip + pendingCuentas).toString();
+        }
 
         // Ordenar por inscritos y tomar los primeros 6
-        actividadesGrafico.value = [...rawActividades.value]
+        actividadesGrafico.value = [...actividades]
             .sort((a, b) => (b.inscripciones?.length ?? 0) - (a.inscripciones?.length ?? 0))
             .slice(0, 6)
             .map((a: any) => ({
@@ -213,7 +242,7 @@ onMounted(cargarDatos);
           <div class="absolute inset-0 rounded-full border-[10px] border-slate-50 dark:border-gray-800"></div>
           <div class="absolute inset-0 rounded-full border-[10px] border-transparent border-t-emerald-500 border-r-sky-500 rotate-45 transition-transform group-hover:rotate-[180deg] duration-1000"></div>
           <div class="absolute inset-0 flex flex-col items-center justify-center">
-            <p class="text-3xl font-black text-sky-600 dark:text-white italic leading-none">{{ stats[1].value }}</p>
+            <p class="text-3xl font-black text-sky-600 dark:text-white italic leading-none">{{ stats[1]?.value || '0' }}</p>
             <p class="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">Actividades</p>
           </div>
         </div>
@@ -225,14 +254,14 @@ onMounted(cargarDatos);
               <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
               <span class="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">Eventos activos</span>
             </div>
-            <span class="text-[11px] font-black text-emerald-800 dark:text-white">{{ stats[0].value }}</span>
+            <span class="text-[11px] font-black text-emerald-800 dark:text-white">{{ stats[0]?.value || '0' }}</span>
           </div>
           <div class="flex items-center justify-between px-4 py-2.5 bg-sky-50/60 dark:bg-sky-900/10 rounded-2xl border border-sky-100 dark:border-sky-800">
             <div class="flex items-center gap-2.5">
               <span class="w-2 h-2 rounded-full bg-sky-400 shrink-0"></span>
               <span class="text-[10px] font-black text-sky-700 dark:text-sky-400 uppercase tracking-wide">Usuarios totales</span>
             </div>
-            <span class="text-[11px] font-black text-sky-800 dark:text-white">{{ stats[2].value }}</span>
+            <span class="text-[11px] font-black text-sky-800 dark:text-white">{{ stats[2]?.value || '0' }}</span>
           </div>
         </div>
       </div>
@@ -240,9 +269,9 @@ onMounted(cargarDatos);
 
     <!-- ══════════════════ ACCESOS RÁPIDOS ══════════════════ -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-      <button @click="$router.push({ name: 'coordinador-usuarios' })"
+      <button @click="router.push({ name: 'coordinador-usuarios' })"
         class="p-6 bg-white dark:bg-gray-900 rounded-[2rem] border border-slate-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all flex items-center gap-4 group text-left">
-        <div class="w-13 h-13 p-3 rounded-2xl bg-sky-50 dark:bg-sky-900/20 text-sky-500 group-hover:bg-sky-500 group-hover:text-white transition-colors shrink-0">
+        <div class="w-12 h-12 p-3 rounded-2xl bg-sky-50 dark:bg-sky-900/20 text-sky-500 group-hover:bg-sky-500 group-hover:text-white transition-colors shrink-0">
           <span class="material-symbols-outlined text-2xl">manage_accounts</span>
         </div>
         <div>
@@ -251,9 +280,9 @@ onMounted(cargarDatos);
         </div>
       </button>
 
-      <button @click="$router.push({ name: 'coordinador-solicitudes' })"
+      <button @click="router.push({ name: 'coordinador-solicitudes' })"
         class="p-6 bg-white dark:bg-gray-900 rounded-[2rem] border border-slate-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all flex items-center gap-4 group text-left">
-        <div class="w-13 h-13 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors shrink-0">
+        <div class="w-12 h-12 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors shrink-0">
           <span class="material-symbols-outlined text-2xl">how_to_reg</span>
         </div>
         <div>
@@ -262,9 +291,9 @@ onMounted(cargarDatos);
         </div>
       </button>
 
-      <button @click="$router.push({ name: 'home' })"
+      <button @click="router.push({ name: 'home' })"
         class="p-6 bg-white dark:bg-gray-900 rounded-[2rem] border-2 border-dashed border-sky-100 dark:border-gray-700 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all flex items-center gap-4 group text-left">
-        <div class="w-13 h-13 p-3 rounded-2xl bg-slate-50 dark:bg-gray-800 text-slate-400 group-hover:bg-sky-500 group-hover:text-white transition-colors shrink-0">
+        <div class="w-12 h-12 p-3 rounded-2xl bg-slate-50 dark:bg-gray-800 text-slate-400 group-hover:bg-sky-500 group-hover:text-white transition-colors shrink-0">
           <span class="material-symbols-outlined text-2xl">visibility</span>
         </div>
         <div>
