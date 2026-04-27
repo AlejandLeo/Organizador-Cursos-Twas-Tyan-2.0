@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -14,6 +15,7 @@ import { RegistrarAsistenciaPinDto } from './dto/registrar-asistencia-pin.dto';
 import { SesionAcademica } from '../sesiones-academicas/entities/sesion-academica.entity';
 import { Asistencia } from '../asistencias/entities/asistencia.entity';
 import { InscripcionModalidad } from '../inscripcion-modalidades/entities/inscripcion-modalidad.entity';
+import { Imparticion } from '../imparticiones/entities/imparticion.entity';
 
 @Injectable()
 export class InscripcionesService {
@@ -26,6 +28,8 @@ export class InscripcionesService {
     private readonly asistenciaRepository: Repository<Asistencia>,
     @InjectRepository(InscripcionModalidad)
     private readonly inscripcionModalidadRepository: Repository<InscripcionModalidad>,
+    @InjectRepository(Imparticion)
+    private readonly imparticionRepository: Repository<Imparticion>,
   ) {}
 
   // ── Estudiante ─────────────────────────────────────────────
@@ -40,6 +44,46 @@ export class InscripcionesService {
       ],
       order: { fecha_creacion: 'DESC' },
     });
+  }
+
+  // ── Ponente ─────────────────────────────────────────────
+
+  async findByActividadParaPonente(actividadId: number, ponenteId: number) {
+    const esPonente = await this.imparticionRepository.findOne({
+      where: {
+        actividadAcademica: { id: actividadId },
+        usuario: { id: ponenteId },
+      },
+    });
+
+    if (!esPonente) {
+      throw new ForbiddenException('No estás asignado como ponente a esta actividad académica');
+    }
+
+    return this.findByActividad(actividadId);
+  }
+
+  async actualizarNotaParaPonente(actividadId: number, inscripcionId: number, nota: number, ponenteId: number) {
+    const esPonente = await this.imparticionRepository.findOne({
+      where: {
+        actividadAcademica: { id: actividadId },
+        usuario: { id: ponenteId },
+      },
+    });
+
+    if (!esPonente) {
+      throw new ForbiddenException('No estás asignado como ponente a esta actividad académica');
+    }
+
+    const inscripcion = await this.inscripcionRepository.findOne({
+      where: { id: inscripcionId, actividadAcademica: { id: actividadId } }
+    });
+
+    if (!inscripcion) {
+      throw new NotFoundException('Inscripción no encontrada en esta actividad');
+    }
+
+    return this.actualizarNota(inscripcionId, nota);
   }
 
   // ── Coordinador ─────────────────────────────────────────────

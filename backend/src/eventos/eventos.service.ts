@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Evento } from './entities/evento.entity';
 import { CreateEventoDto } from './dto/create-evento.dto';
 import { UpdateEventoDto } from './dto/update-evento.dto';
@@ -11,7 +11,26 @@ export class EventosService {
   constructor(
     @InjectRepository(Evento)
     private readonly eventoRepository: Repository<Evento>,
+    private readonly dataSource: DataSource,
   ) {}
+
+  /**
+   * Valida si el usuario logueado tiene permisos sobre el evento.
+   * Si es Super Usuario pasa de largo, si no, se busca su asignación en coordinaciones.
+   */
+  async verificarPropiedad(eventoId: number, usuario: any) {
+    if (!usuario) return;
+    if (usuario.roles?.includes('Super Usuario')) return;
+
+    const coord = await this.dataSource.query(
+      `SELECT 1 FROM coordinaciones_eventos WHERE id_evento = $1 AND id_usuario = $2`,
+      [eventoId, usuario.id]
+    );
+
+    if (coord.length === 0) {
+      throw new ForbiddenException('No tienes permisos sobre este evento. Debes ser Super Usuario o el Coordinador asignado.');
+    }
+  }
 
   create(data: Partial<Evento>) {
     const evento = this.eventoRepository.create(data);
@@ -138,9 +157,14 @@ export class EventosService {
    * Lista paginada de eventos con filtro por estado.
    * Para usar en el panel del Coordinador.
    */
-  async findAllAdmin(estado?: number, page = 1, limit = 20) {
+  async findAllAdmin(estado?: number, page = 1, limit = 20, usuario?: any) {
     const where: any = {};
     if (estado !== undefined) where.estado = estado;
+
+    // Aislamiento de datos: Si no es Super Usuario, solo ver sus coordinaciones
+    if (usuario && !usuario.roles?.includes('Super Usuario')) {
+      where.coordinaciones = { usuario: { id: usuario.id } };
+    }
 
     const [eventos, total] = await this.eventoRepository.findAndCount({
       where,
@@ -198,7 +222,12 @@ export class EventosService {
     dto: UpdateEventoDto,
     imagenPortada?: Express.Multer.File,
     imagenFondo?: Express.Multer.File,
+    usuario?: any,
   ) {
+    if (usuario) {
+      await this.verificarPropiedad(id, usuario);
+    }
+
     const evento = await this.eventoRepository.findOneBy({ id });
     if (!evento) throw new NotFoundException(`Evento ${id} no encontrado.`);
 
@@ -229,7 +258,10 @@ export class EventosService {
     };
   }
 
-  async removeAdmin(id: number) {
+  async removeAdmin(id: number, usuario?: any) {
+    if (usuario) {
+      await this.verificarPropiedad(id, usuario);
+    }
     const evento = await this.eventoRepository.findOneBy({ id });
     if (!evento) throw new NotFoundException(`Evento ${id} no encontrado.`);
     await this.eventoRepository.delete(id);
