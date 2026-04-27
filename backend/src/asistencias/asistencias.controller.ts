@@ -20,5 +20,4 @@ export class AsistenciasController {
   constructor(private readonly service: AsistenciasService) {}
 
   // Rutas públicas de asistencias (si las hubiera en el futuro)
-
 }

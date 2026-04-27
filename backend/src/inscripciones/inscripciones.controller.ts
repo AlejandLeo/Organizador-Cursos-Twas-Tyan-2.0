@@ -34,6 +34,7 @@ export class InscripcionesController {
   //  marcar su asistencia sin necesidad de iniciar sesión.
   // ══════════════════════════════════════════════════════════
 
+
   @Post('registrar-asistencia-pin')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

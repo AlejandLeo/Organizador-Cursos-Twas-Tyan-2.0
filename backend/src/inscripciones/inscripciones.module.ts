@@ -10,7 +10,6 @@ import { SesionAcademica } from '../sesiones-academicas/entities/sesion-academic
 import { Asistencia } from '../asistencias/entities/asistencia.entity';
 import { InscripcionModalidad } from '../inscripcion-modalidades/entities/inscripcion-modalidad.entity';
 import { Imparticion } from '../imparticiones/entities/imparticion.entity';
-
 @Module({
   imports: [
     TypeOrmModule.forFeature([

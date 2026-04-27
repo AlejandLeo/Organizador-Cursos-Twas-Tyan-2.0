@@ -1,14 +1,7 @@
 import {
   Controller,
   Get,
-  Post,
-  Body,
-  Put,
   Param,
-  Delete,
-  ParseIntPipe,
-  UseGuards,
-  Request,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -20,16 +13,11 @@ import { CertificadosService } from './certificados.service';
 export class CertificadosController {
   constructor(private readonly service: CertificadosService) {}
 
-  // ══════════════════════════════════════════════════════════
-  //  VERIFICACIÓN PÚBLICA
-  // ══════════════════════════════════════════════════════════
-
   /**
    * GET /certificados/verificar/:codigo
    * Endpoint PÚBLICO (sin JWT).
    * Verifica la autenticidad de un certificado usando el código que aparece
    * impreso en el QR del certificado.
-   * Equivalente al endpoint /cert/verificar/:search del sistema Flask.
    */
   @Get('verificar/:codigo')
   @HttpCode(HttpStatus.OK)
@@ -39,7 +27,5 @@ export class CertificadosController {
   })
   verificar(@Param('codigo') codigo: string) {
     return this.service.verificar(codigo);
-  }
-
   }
 }
