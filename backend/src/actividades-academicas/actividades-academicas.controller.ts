@@ -1,6 +1,6 @@
 import {
   Controller, Get, Post, Put, Delete,
-  Body, Param, ParseIntPipe, UseGuards, Query,
+  Body, Param, ParseIntPipe, UseGuards, Query, Request
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ActividadesAcademicasService } from './actividades-academicas.service';
@@ -37,8 +37,8 @@ export class ActividadesAcademicasController {
   @ApiBearerAuth()
   @Post()
   @ApiOperation({ summary: 'Crear actividad académica (Coordinador)' })
-  crear(@Body() dto: CreateActividadDto) {
-    return this.service.crear(dto);
+  crear(@Body() dto: CreateActividadDto, @Request() req: any) {
+    return this.service.crear(dto, req.user);
   }
 
   /** PUT /actividades-academicas/:id */
@@ -50,8 +50,9 @@ export class ActividadesAcademicasController {
   actualizar(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateActividadDto,
+    @Request() req: any,
   ) {
-    return this.service.actualizar(id, dto);
+    return this.service.actualizar(id, dto, req.user);
   }
 
   /** DELETE /actividades-academicas/:id */
@@ -60,7 +61,7 @@ export class ActividadesAcademicasController {
   @ApiBearerAuth()
   @Delete(':id')
   @ApiOperation({ summary: 'Eliminar actividad académica (Coordinador)' })
-  eliminar(@Param('id', ParseIntPipe) id: number) {
-    return this.service.eliminar(id);
+  eliminar(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.service.eliminar(id, req.user);
   }
 }

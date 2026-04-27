@@ -46,4 +46,39 @@ export class AuthService {
   isTokenBlacklisted(token: string): boolean {
     return this.tokenBlacklist.has(token);
   }
+
+  // ══════════════════════════════════════════════════════════
+  //  RECUPERACIÓN DE CONTRASEÑA
+  // ══════════════════════════════════════════════════════════
+
+  /**
+   * Genera un JWT de corta duración (1 hora) para reset de contraseña.
+   * El payload incluye el email y el campo tipo='reset' para distinguirlo
+   * de un access token normal y evitar su reutilización como autenticación.
+   */
+  generarResetToken(email: string): string {
+    const payload = { email, tipo: 'reset' };
+    return this.jwtService.sign(payload, { expiresIn: '1h' });
+  }
+
+  /**
+   * Valida el token de reset de contraseña.
+   * Lanza un Error descriptivo si el token expiró, tiene firma inválida
+   * o si el campo 'tipo' no es 'reset'.
+   * Retorna el email embebido en el payload para buscar al usuario.
+   */
+  validarResetToken(token: string): string {
+    try {
+      const payload = this.jwtService.verify(token) as {
+        email: string;
+        tipo: string;
+      };
+      if (payload.tipo !== 'reset') {
+        throw new Error('Token inválido para reset de contraseña.');
+      }
+      return payload.email;
+    } catch {
+      throw new Error('Token de recuperación inválido o expirado.');
+    }
+  }
 }

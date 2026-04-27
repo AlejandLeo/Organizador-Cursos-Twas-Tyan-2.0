@@ -85,6 +85,85 @@ export class CertificadosService {
 
   // ── Legacy ──────────────────────────────────────────────────
 
+  // ══════════════════════════════════════════════════════════
+  //  VERIFICACIÓN PÚBLICA Y CONSULTA DE ESTUDIANTE
+  // ══════════════════════════════════════════════════════════
+
+  /**
+   * Verifica la autenticidad de un certificado por su código público.
+   * Este código es el que aparece en el QR impreso en el certificado PDF.
+   * Endpoint público (sin JWT): cualquier persona puede verificar.
+   *
+   * Retorna datos del beneficiario, la actividad y el estado del certificado.
+   * Si el certificado está revocado (estado=0), lo indica en la respuesta.
+   */
+  async verificar(codigo: string) {
+    const certificado = await this.certificadoRepository.findOne({
+      where: { codigo_certificado: codigo },
+      relations: [
+        'usuario',
+        'usuario.persona',
+        'actividadAcademica',
+        'actividadAcademica.evento',
+        'infoCertificado',
+        'usuariosCertificados',
+        'usuariosCertificados.usuario',
+        'usuariosCertificados.usuario.persona',
+      ],
+    });
+
+    if (!certificado) {
+      return {
+        valido: false,
+        mensaje:
+          'Certificado no encontrado. El código no corresponde a ningún certificado emitido.',
+      };
+    }
+
+    const esValido = certificado.estado === 1;
+
+    return {
+      valido: esValido,
+      estado: esValido ? 'VIGENTE' : 'REVOCADO',
+      mensaje: esValido
+        ? 'Certificado válido y vigente.'
+        : 'Este certificado ha sido revocado y ya no es válido.',
+      certificado: {
+        id: certificado.id,
+        codigo_certificado: certificado.codigo_certificado,
+        tipo: certificado.tipo,
+        fecha_emision: certificado.fecha_emision,
+        tipo_certificado: certificado.infoCertificado?.titulo ?? null,
+        beneficiario: {
+          nombres: certificado.usuario?.persona?.nombres,
+          primer_apellido: certificado.usuario?.persona?.primer_apellido,
+          segundo_apellido: certificado.usuario?.persona?.segundo_apellido,
+          email: certificado.usuario?.email,
+        },
+        actividad: {
+          nombre: (certificado.actividadAcademica as any)?.nombre,
+          evento: certificado.actividadAcademica?.evento?.nombre,
+        },
+      },
+    };
+  }
+
+  /**
+   * Devuelve los certificados emitidos para un usuario específico.
+   * Usado por el estudiante autenticado y por el coordinador.
+   */
+  async findByUsuario(usuarioId: number) {
+    return this.certificadoRepository.find({
+      where: { usuario: { id: usuarioId } },
+      relations: [
+        'actividadAcademica',
+        'actividadAcademica.evento',
+        'infoCertificado',
+      ],
+      order: { fecha_emision: 'DESC' },
+    });
+  }
+
   create(data: Partial<Certificado>) {
     return this.certificadoRepository.save(this.certificadoRepository.create(data));
   }

@@ -377,5 +377,70 @@ export class UsuariosController {
   deshabilitarUsuario(@Param('id', ParseIntPipe) id: number) {
     return this.usuariosService.deshabilitarUsuario(id);
   }
+
+  // ══════════════════════════════════════════════════════════
+  //  INSCRIPCIONES Y CERTIFICADOS DE UN USUARIO (Coordinador)
+  // ══════════════════════════════════════════════════════════
+
+  /**
+   * GET /usuarios/:id/inscripciones
+   * Historial de inscripciones de un usuario con datos de actividad y nota.
+   * Accesible por Coordinador y Super Usuario.
+   */
+  @Roles('Coordinador', 'Super Usuario', 'Logística')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Get(':id/inscripciones')
+  @ApiOperation({ summary: 'Inscripciones de un usuario (Coord/Admin)' })
+  findInscripciones(@Param('id', ParseIntPipe) id: number) {
+    return this.usuariosService.findInscripciones(id);
+  }
+
+  /**
+   * GET /usuarios/:id/certificados
+   * Certificados emitidos para un usuario.
+   * Accesible por Coordinador, Super Usuario y el propio estudiante.
+   */
+  @Roles('Coordinador', 'Super Usuario', 'Logística')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Get(':id/certificados')
+  @ApiOperation({ summary: 'Certificados emitidos de un usuario (Coord/Admin)' })
+  findCertificados(@Param('id', ParseIntPipe) id: number) {
+    return this.usuariosService.findCertificados(id);
+  }
+
+  /**
+   * GET /usuarios/me/certificados
+   * Certificados del usuario autenticado. Endpoint dedicado para el estudiante.
+   */
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('me/certificados')
+  @ApiOperation({ summary: 'Mis certificados (Estudiante autenticado)' })
+  misCertificados(@Request() req: any) {
+    return this.usuariosService.findCertificados(req.user.sub);
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  GESTIÓN DE ROLES AVANZADA
+  // ══════════════════════════════════════════════════════════
+
+  /**
+   * DELETE /usuarios/:id/roles/:rolId
+   * Desasigna un rol específico de un usuario.
+   * Exclusivo para Super Usuario.
+   */
+  @Roles('Super Usuario')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Delete(':id/roles/:rolId')
+  @ApiOperation({ summary: 'Quitar un rol de un usuario (Solo Super Usuario)' })
+  quitarRol(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('rolId', ParseIntPipe) rolId: number,
+  ) {
+    return this.usuariosService.quitarRol(id, rolId);
+  }
 }
 

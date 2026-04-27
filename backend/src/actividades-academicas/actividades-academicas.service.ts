@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { ActividadAcademica } from './entities/actividad-academica.entity';
 import { CreateActividadDto } from './dto/create-actividad.dto';
 import { UpdateActividadDto } from './dto/update-actividad.dto';
@@ -10,7 +10,22 @@ export class ActividadesAcademicasService {
   constructor(
     @InjectRepository(ActividadAcademica)
     private readonly actividadRepository: Repository<ActividadAcademica>,
+    private readonly dataSource: DataSource,
   ) {}
+
+  async verificarPropiedad(eventoId: number, usuario: any) {
+    if (!usuario) return;
+    if (usuario.roles?.includes('Super Usuario')) return;
+
+    const coord = await this.dataSource.query(
+      `SELECT 1 FROM coordinaciones_eventos WHERE id_evento = $1 AND id_usuario = $2`,
+      [eventoId, usuario.id]
+    );
+
+    if (coord.length === 0) {
+      throw new ForbiddenException('No tienes permisos sobre el evento de esta actividad académica.');
+    }
+  }
 
   // ── CRUD básico ────────────────────────────────────────────
 
@@ -30,16 +45,26 @@ export class ActividadesAcademicasService {
   // ── Coordinador ─────────────────────────────────────────────
 
   /** Lista todas las actividades de un evento (para el panel del coordinador) */
-  findByEvento(eventoId: number) {
-    return this.actividadRepository.find({
-      where: { evento: { id: eventoId } },
-      relations: ['modalidades'],
-      order: { fecha_inicio: 'ASC' },
-    });
+  findByEvento(eventoId: number, usuario?: any) {
+    const query = this.actividadRepository.createQueryBuilder('a')
+      .leftJoinAndSelect('a.modalidades', 'm')
+      .innerJoin('a.evento', 'e')
+      .where('e.id = :eventoId', { eventoId })
+      .orderBy('a.fecha_inicio', 'ASC');
+
+    if (usuario && !usuario.roles?.includes('Super Usuario')) {
+      query.innerJoin('e.coordinaciones', 'c')
+           .andWhere('c.usuario.id = :usuarioId', { usuarioId: usuario.id });
+    }
+
+    return query.getMany();
   }
 
   /** Crea una actividad asignándola al evento indicado en el DTO */
-  async crear(dto: CreateActividadDto) {
+  async crear(dto: CreateActividadDto, usuario?: any) {
+    if (usuario) {
+      await this.verificarPropiedad(dto.id_evento, usuario);
+    }
     const { id_evento, ...campos } = dto;
     const actividad = this.actividadRepository.create({
       ...campos,
@@ -48,8 +73,18 @@ export class ActividadesAcademicasService {
     return this.actividadRepository.save(actividad);
   }
 
-  async actualizar(id: number, dto: UpdateActividadDto) {
-    await this.findOne(id);
+  async actualizar(id: number, dto: UpdateActividadDto, usuario?: any) {
+    const act = await this.findOne(id);
+    
+    if (usuario) {
+      // Verificar permiso en el evento original
+      await this.verificarPropiedad(act.evento.id, usuario);
+      // Si cambia de evento, verificar permiso en el nuevo evento
+      if (dto.id_evento && dto.id_evento !== act.evento.id) {
+        await this.verificarPropiedad(dto.id_evento, usuario);
+      }
+    }
+
     const { id_evento, ...campos } = dto;
     const data: any = { ...campos };
     if (id_evento) data.evento = { id: id_evento };
@@ -57,8 +92,11 @@ export class ActividadesAcademicasService {
     return this.findOne(id);
   }
 
-  async eliminar(id: number) {
-    await this.findOne(id);
+  async eliminar(id: number, usuario?: any) {
+    const act = await this.findOne(id);
+    if (usuario) {
+      await this.verificarPropiedad(act.evento.id, usuario);
+    }
     await this.actividadRepository.delete(id);
     return { mensaje: `Actividad ${id} eliminada correctamente.` };
   }
