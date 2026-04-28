@@ -64,15 +64,6 @@ export class UsuariosController {
         fecha: usuario.fecha_creacion,
         prioridad: 'alta'
       });
-    } else {
-      alertas.push({
-        id: 'perfil-completado',
-        titulo: 'Perfil Finalizado',
-        mensaje: 'Su información de perfil fue registrada exitosamente y ya no podrá ser modificada.',
-        tipo: 'success',
-        fecha: usuario.persona.fecha_actualizacion || new Date(),
-        prioridad: 'baja'
-      });
     }
 
     // 2. Notificaciones de Actividades Aceptadas
@@ -133,10 +124,13 @@ export class UsuariosController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: './uploads/profiles',
+        destination: (_req, _file, cb) => {
+          const p = join(process.cwd(), 'uploads', 'perfiles');
+          if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
+          cb(null, p);
+        },
         filename: (req: any, file, cb) => {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-          const id = req.user?.sub;
+          const id = req.user?.id || 'unknown';
           const ext = extname(file.originalname).toLowerCase();
           cb(null, `user_${id}${ext}`);
         },
@@ -152,9 +146,16 @@ export class UsuariosController {
   )
   @ApiOperation({ summary: 'Subir foto de perfil (JPG/PNG)' })
   uploadFoto(@Request() req: any, @UploadedFile() file: Express.Multer.File) {
-    if (!file) throw new Error('No se pudo subir la foto de perfil');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    const idUsuario = req.user.id;
+    const idUsuario = req.user?.id;
+    fs.appendFileSync('upload_debug.log', `[${new Date().toISOString()}] Inicio upload para usuario: ${idUsuario}\n`);
+    
+    if (!file) {
+      fs.appendFileSync('upload_debug.log', `[${new Date().toISOString()}] Error: No hay archivo en el request\n`);
+      throw new Error('No se pudo subir la foto de perfil');
+    }
+    
+    fs.appendFileSync('upload_debug.log', `[${new Date().toISOString()}] Archivo recibido: ${file.originalname}, size: ${file.size}, path: ${file.path}\n`);
+    
     const currentExt = extname(file.originalname).toLowerCase();
 
     // Clean up other extensions
@@ -163,12 +164,17 @@ export class UsuariosController {
       if (e !== currentExt) {
         const p = join(
           process.cwd(),
-          'uploads/profiles',
+          'uploads/perfiles',
           `user_${idUsuario}${e}`,
         );
-        if (fs.existsSync(p)) fs.unlinkSync(p);
+        try {
+          if (fs.existsSync(p)) fs.unlinkSync(p);
+        } catch (err) {
+          fs.appendFileSync('upload_debug.log', `[${new Date().toISOString()}] Error limpiando archivo viejo ${p}: ${err}\n`);
+        }
       }
     }
+    fs.appendFileSync('upload_debug.log', `[${new Date().toISOString()}] Upload exitoso para usuario: ${idUsuario}\n`);
     return { message: 'Foto actualizada' };
   }
 
@@ -183,7 +189,7 @@ export class UsuariosController {
     let filePath: string | null = null;
 
     for (const ext of exts) {
-      const p = join(process.cwd(), 'uploads/profiles', `user_${id}${ext}`);
+      const p = join(process.cwd(), 'uploads/perfiles', `user_${id}${ext}`);
       if (fs.existsSync(p)) {
         filePath = p;
         break;

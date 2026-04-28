@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useEventoStore } from '../stores/eventoStore'
 import { useUIStore } from '../stores/ui'
 import { useAuthStore } from '../stores/auth'
@@ -20,6 +20,8 @@ const notifications = ref({
 const showNotifications = ref(false)
 const studentNotifications = ref([] as any[])
 const showStudentNotifications = ref(false)
+const coordinatorNotificationsRef = ref<HTMLElement | null>(null);
+const studentNotificationsRef = ref<HTMLElement | null>(null);
 
 const isCoordinadorOrAdmin = computed(() => {
   const roles = Array.isArray(authStore.user?.usuariosRoles) 
@@ -64,6 +66,15 @@ const toggleDark = () => {
   localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
 }
 
+const closeDropdowns = (e: MouseEvent) => {
+  if (coordinatorNotificationsRef.value && !coordinatorNotificationsRef.value.contains(e.target as Node)) {
+    showNotifications.value = false;
+  }
+  if (studentNotificationsRef.value && !studentNotificationsRef.value.contains(e.target as Node)) {
+    showStudentNotifications.value = false;
+  }
+};
+
 onMounted(async () => {
   await eventoStore.fetchEventosInfo();
   const savedTheme = localStorage.getItem('theme')
@@ -71,6 +82,11 @@ onMounted(async () => {
     isDark.value = true
     document.documentElement.classList.add('dark')
   }
+  document.addEventListener('click', closeDropdowns);
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeDropdowns);
 })
 
 // Reactivar fetch cuando el usuario esté listo o cambie
@@ -149,7 +165,7 @@ const onNombreChange = (event: Event) => {
     <div class="flex items-center space-x-2 md:space-x-4 shrink-0">
       
       <!-- Campanita de Notificaciones (Solo Coordinador/Admin) -->
-      <div v-if="isCoordinadorOrAdmin" class="relative">
+      <div v-if="isCoordinadorOrAdmin" class="relative" ref="coordinatorNotificationsRef">
         <button @click="showNotifications = !showNotifications; showStudentNotifications = false" 
           class="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-slate-100 dark:bg-gray-800 text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-gray-700 hover:bg-slate-200 dark:hover:bg-gray-700 transition-all relative">
           <span class="material-symbols-outlined text-[18px] md:text-[20px] transition-transform" :class="notifications.total > 0 ? 'animate-bounce' : ''">notifications</span>
@@ -207,7 +223,7 @@ const onNombreChange = (event: Event) => {
       </div>
 
       <!-- Campanita de Notificaciones (Estudiante / Usuario Regular) -->
-      <div v-if="isStudent" class="relative">
+      <div v-if="isStudent" class="relative" ref="studentNotificationsRef">
         <button @click="showStudentNotifications = !showStudentNotifications; showNotifications = false" 
           class="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-slate-100 dark:bg-gray-800 text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-gray-700 hover:bg-slate-200 dark:hover:bg-gray-700 transition-all relative">
           <span class="material-symbols-outlined text-[18px] md:text-[20px]" :class="studentNotifications.some(n => n.prioridad === 'alta') ? 'animate-pulse text-primary-dark dark:text-white' : ''">notifications</span>

@@ -5,9 +5,18 @@ import { existsSync } from 'fs';
 
 @Controller('uploads')
 export class UploadsController {
-  @Get('imagenes/:nombreArchivo')
-  getImagen(@Param('nombreArchivo') nombreArchivo: string, @Res() res: express.Response) {
-    const imagePath = join(process.cwd(), 'uploads', 'imagenes', nombreArchivo);
+  @Get(':carpeta/:nombreArchivo')
+  getImagen(
+    @Param('carpeta') carpeta: string, 
+    @Param('nombreArchivo') nombreArchivo: string, 
+    @Res() res: express.Response
+  ) {
+    const validFolders = ['imagenes', 'perfiles', 'fondos', 'eventos', 'cursos', 'inscripciones'];
+    if (!validFolders.includes(carpeta)) {
+      throw new NotFoundException('Carpeta no válida');
+    }
+
+    const imagePath = join(process.cwd(), 'uploads', carpeta, nombreArchivo);
     
     if (existsSync(imagePath)) {
       return res.sendFile(imagePath);

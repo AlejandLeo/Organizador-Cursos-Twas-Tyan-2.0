@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useUIStore } from '@/stores/ui';
 import api from '@/services/api';
@@ -9,6 +9,8 @@ const isDark = ref(false);
 const authStore = useAuthStore();
 const uiStore = useUIStore();
 const profilePhotoUrl = ref('');
+const profileRef = ref<HTMLElement | null>(null);
+const notificationsRef = ref<HTMLElement | null>(null);
 
 const studentNotifications = ref([] as any[])
 const showStudentNotifications = ref(false)
@@ -28,6 +30,15 @@ const fetchStudentNotifications = async () => {
   }
 }
 
+const closeDropdowns = (e: MouseEvent) => {
+  if (profileRef.value && !profileRef.value.contains(e.target as Node)) {
+    isProfileOpen.value = false;
+  }
+  if (notificationsRef.value && !notificationsRef.value.contains(e.target as Node)) {
+    showStudentNotifications.value = false;
+  }
+};
+
 onMounted(async () => {
   const savedTheme = localStorage.getItem('theme');
   if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -45,6 +56,12 @@ onMounted(async () => {
   } catch (e) {
     profilePhotoUrl.value = '';
   }
+
+  document.addEventListener('click', closeDropdowns);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeDropdowns);
 });
 </script>
 
@@ -91,7 +108,7 @@ onMounted(async () => {
         <span class="material-symbols-outlined text-[20px]">{{ isDark ? 'light_mode' : 'dark_mode' }}</span>
       </button>
 
-      <div class="relative">
+      <div class="relative" ref="notificationsRef">
         <button
           @click="showStudentNotifications = !showStudentNotifications"
           class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 dark:bg-gray-800 text-slate-500 dark:text-gray-400 hover:text-umsa-blue hover:bg-slate-100 dark:hover:text-blue-500 dark:hover:bg-gray-700 transition-all shadow-sm border border-slate-200 dark:border-gray-700 relative"
@@ -143,7 +160,7 @@ onMounted(async () => {
       <div class="w-px h-8 bg-slate-200 dark:bg-gray-800 mx-2 hidden sm:block"></div>
       
       <!-- Profile Button matched exactly to Ponente -->
-      <div class="relative" @click.stop>
+      <div class="relative" ref="profileRef">
         <button @click="isProfileOpen = !isProfileOpen" class="flex items-center gap-2 md:gap-3 bg-slate-50 dark:bg-gray-900 border border-slate-200 dark:border-gray-700 hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors rounded-xl pr-2 md:pr-3 py-1 pl-1 shadow-sm">
           <div class="h-8 w-8 rounded-full overflow-hidden bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 p-0 flex flex-shrink-0 items-center justify-center">
             <img v-if="profilePhotoUrl" :src="profilePhotoUrl" alt="Foto" class="w-full h-full object-cover" />

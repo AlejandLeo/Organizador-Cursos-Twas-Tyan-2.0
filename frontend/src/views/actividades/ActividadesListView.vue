@@ -329,15 +329,18 @@ const nuevaActividad = ref({
             nombres: true,
             primer_apellido: true,
             segundo_apellido: true,
-            email: true,
             documento_identidad: true,
-            genero: false,
-            pais_origen: false,
+            genero: true,
+            email: true,
             celular: true,
-            afiliacion: false,
+            pais_origen: false,
+            afiliacion: true,
             grado_academico: false
         },
-        custom: [] as any[]
+        custom: [
+            { label: 'Matrícula / Título / Aval (Documento de Respaldo)', type: 'file', mandatory: true }
+        ],
+        lockTipo: false
     }
 });
 
@@ -359,11 +362,14 @@ const resetNuevaActividad = (eventoId: number) => {
         requisitos: {
             base: {
                 nombres: true, primer_apellido: true, segundo_apellido: true,
-                email: true, documento_identidad: true, genero: false,
-                pais_origen: false, celular: true, afiliacion: false,
+                email: true, documento_identidad: true, genero: true,
+                celular: true, pais_origen: false, afiliacion: true,
                 grado_academico: false
             },
-            custom: []
+            custom: [
+                { label: 'Matrícula / Título / Aval (Documento de Respaldo)', type: 'file', mandatory: true }
+            ],
+            lockTipo: false
         }
     };
     imagenArchivo.value = null;
@@ -514,9 +520,15 @@ const publicarActividad = async () => {
         });
 
         // Determinar el tipo final (si es Otro, usar el personalizado)
-        const tipoFinal = nuevaActividad.value.tipo === 'Otro' 
+        let tipoFinal = nuevaActividad.value.tipo === 'Otro' 
             ? nuevaActividad.value.tipoPersonalizado 
             : nuevaActividad.value.tipo;
+        
+        // Normalización: Primera letra Mayúscula, resto minúscula (Ej: Curso, Diplomado)
+        if (tipoFinal) {
+            tipoFinal = tipoFinal.trim();
+            tipoFinal = tipoFinal.charAt(0).toUpperCase() + tipoFinal.slice(1).toLowerCase();
+        }
 
         // PAYLOAD LIMPIO: Ajustado estrictamente al DTO del backend
         const payload = {
@@ -616,14 +628,16 @@ const toggleActividades = (evento: any) => {
   evento.mostrarActividades = !evento.mostrarActividades;
 };
 
-// Agrupar actividades por Tipo para la vista estilo Netflix
+// Agrupar actividades por Tipo para la vista estilo Netflix (Case Insensitive)
 const getActividadesAgrupadas = (actividades: any[]) => {
   const grupos: Record<string, any[]> = {};
   actividades.forEach((act: any) => {
-    if (!grupos[act.type]) {
-      grupos[act.type] = [];
+    // Normalizar a mayúsculas para la clave del grupo
+    const normalizedType = (act.type || 'Actividad').trim().toUpperCase();
+    if (!grupos[normalizedType]) {
+      grupos[normalizedType] = [];
     }
-    grupos[act.type]!.push(act);
+    grupos[normalizedType]!.push(act);
   });
   return grupos;
 };
@@ -751,7 +765,7 @@ const changeStep = (delta: number) => {
                 <h3 class="text-xl md:text-2xl font-black text-primary-dark dark:text-white uppercase tracking-tighter">{{ categoria }}</h3>
                 <p class="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest mt-1">Explorar {{ (acts as any[]).length }} disponibles</p>
               </div>
-              <button @click="isCreating = true; nuevaActividad.id_evento = evento.id; nuevaActividad.tipo = String(categoria); currentStep = 1;" class="text-[10px] font-black uppercase tracking-widest bg-white dark:bg-gray-800 hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 border border-slate-200 dark:border-gray-700 px-4 py-2 rounded-xl transition-all flex items-center gap-2 relative z-20 cursor-pointer shadow-sm hover:shadow-md">
+              <button @click="resetNuevaActividad(evento.id); isCreating = true; nuevaActividad.tipo = String(categoria); nuevaActividad.lockTipo = true; currentStep = 1;" class="text-[10px] font-black uppercase tracking-widest bg-white dark:bg-gray-800 hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 border border-slate-200 dark:border-gray-700 px-4 py-2 rounded-xl transition-all flex items-center gap-2 relative z-20 cursor-pointer shadow-sm hover:shadow-md">
                 <span class="material-symbols-outlined text-[14px]">add</span> Crear {{ categoria }}
               </button>
             </div>
@@ -897,11 +911,12 @@ const changeStep = (delta: number) => {
                       </div>
                       <div>
                           <label class="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest block mb-2">Tipo de Actividad</label>
-                          <select v-model="nuevaActividad.tipo" class="w-full bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-umsa-blue font-bold text-primary-dark dark:text-gray-200 uppercase">
+                          <select v-model="nuevaActividad.tipo" :disabled="nuevaActividad.lockTipo" :class="nuevaActividad.lockTipo ? 'bg-slate-100 dark:bg-gray-700 cursor-not-allowed opacity-70' : 'bg-slate-50 dark:bg-gray-800 cursor-pointer'" class="w-full border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-umsa-blue font-bold text-primary-dark dark:text-gray-200 uppercase transition-all">
                               <option value="Diplomado">Diplomado</option>
                               <option value="Especialidad">Especialidad</option>
                               <option value="Taller">Taller</option>
                               <option value="Seminario">Seminario</option>
+                              <option value="Curso">Curso</option>
                               <option value="Otro">Otro (Especificar)</option>
                           </select>
                       </div>
@@ -1074,9 +1089,16 @@ const changeStep = (delta: number) => {
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div v-for="(val, key) in nuevaActividad.requisitos.base" :key="key" 
                                class="flex items-center justify-between p-4 bg-slate-50 dark:bg-gray-800/50 rounded-2xl border border-slate-100 dark:border-gray-800 transition-all hover:border-blue-300">
-                              <span class="text-[10px] font-bold text-slate-600 dark:text-gray-300 uppercase truncate pr-2">{{ key.replace(/_/g, ' ') }}</span>
-                              <label class="relative inline-flex items-center cursor-pointer">
-                                  <input type="checkbox" v-model="nuevaActividad.requisitos.base[key]" class="sr-only peer">
+                              <span class="text-[10px] font-bold text-slate-600 dark:text-gray-300 uppercase truncate pr-2">
+                                  {{ key.replace(/_/g, ' ') }}
+                                  <span v-if="['nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad', 'genero', 'celular', 'afiliacion'].includes(key)" class="text-red-500 font-black">*</span>
+                              </span>
+                              <label class="relative inline-flex items-center" :class="['nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad', 'genero', 'celular', 'afiliacion'].includes(key) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
+                                  <input type="checkbox" 
+                                         :checked="['nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad', 'genero', 'celular', 'afiliacion'].includes(key) ? true : nuevaActividad.requisitos.base[key]"
+                                         @change="!['nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad', 'genero', 'celular', 'afiliacion'].includes(key) ? nuevaActividad.requisitos.base[key] = !nuevaActividad.requisitos.base[key] : null"
+                                         :disabled="['nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad', 'genero', 'celular', 'afiliacion'].includes(key)" 
+                                         class="sr-only peer">
                                   <div class="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all dark:border-gray-600 peer-checked:bg-umsa-blue"></div>
                               </label>
                           </div>
@@ -1103,9 +1125,10 @@ const changeStep = (delta: number) => {
                                   <p class="text-xs font-black text-slate-700 dark:text-white truncate">{{ req.label }}</p>
                                   <p class="text-[9px] font-bold text-slate-400 uppercase">{{ req.type }} <span v-if="req.type === 'select'">({{ req.options.length }} opciones)</span></p>
                               </div>
-                              <button @click="nuevaActividad.requisitos.custom.splice(idx, 1)" class="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-all">
+                              <button v-if="!req.mandatory" @click="nuevaActividad.requisitos.custom.splice(idx, 1)" class="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-all">
                                   <span class="material-symbols-outlined text-sm">delete</span>
                               </button>
+                              <span v-else class="text-[8px] font-black text-blue-500 uppercase px-2 italic">Fijo</span>
                           </div>
                       </div>
 

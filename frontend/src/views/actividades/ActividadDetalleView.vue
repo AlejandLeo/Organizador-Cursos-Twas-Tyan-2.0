@@ -64,7 +64,7 @@ const fetchData = async () => {
 
         // Carga de inscripciones (crítica - muestra solicitudes y alumnos)
         try {
-            const insRes = await api.get(`/inscripciones/actividad/${route.params.id}`);
+            const insRes = await api.get(`/admin/inscripciones/actividad/${route.params.id}`);
             inscritos.value = Array.isArray(insRes.data) ? insRes.data : (insRes.data?.data || []);
         } catch (e) {
             console.warn('No se pudieron cargar las inscripciones:', e);
@@ -189,7 +189,7 @@ const cambiarEstadoInscripcion = async (id: number, nuevoEstado: number) => {
         }
 
         Swal.fire({ title: 'Procesando...', didOpen: () => Swal.showLoading() });
-        await api.put(`/inscripciones/${id}`, { estado: nuevoEstado, observacion });
+        await api.put(`/admin/inscripciones/${id}`, { estado: nuevoEstado, observacion });
         
         Swal.fire('Completado', `La solicitud ha sido gestionada con éxito.`, 'success');
         if (solicitudSeleccionada.value) closeModal('modal-detalle-postulante');
@@ -216,7 +216,7 @@ const getGeneroLabel = (genero: number) => {
 
 const guardarNota = async (id: number, nota: number) => {
     try {
-        await api.patch(`/inscripciones/${id}/nota`, { nota });
+        await api.patch(`/admin/inscripciones/${id}/nota`, { nota });
         Swal.fire({
             title: 'Nota Guardada',
             icon: 'success',

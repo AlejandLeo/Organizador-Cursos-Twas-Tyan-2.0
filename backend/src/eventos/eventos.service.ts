@@ -23,7 +23,7 @@ export class EventosService {
     if (usuario.roles?.includes('Super Usuario')) return;
 
     const coord = await this.dataSource.query(
-      `SELECT 1 FROM coordinaciones_eventos WHERE id_evento = $1 AND id_usuario = $2`,
+      `SELECT 1 FROM coordinacion_eventos WHERE id_evento = $1 AND id_usuario = $2`,
       [eventoId, usuario.id]
     );
 
@@ -37,12 +37,12 @@ export class EventosService {
     return this.eventoRepository.save(evento);
   }
 
-  private formatImageUrl(filenameOrUrl: string): string | null {
+  private formatImageUrl(filenameOrUrl: string, folder: string = 'imagenes'): string | null {
     if (!filenameOrUrl) return null;
     if (filenameOrUrl.startsWith('http')) return filenameOrUrl;
     
     const baseUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
-    return `${baseUrl}/uploads/imagenes/${filenameOrUrl}`;
+    return `${baseUrl}/uploads/${folder}/${filenameOrUrl}`;
   }
 
   async findAll() {
@@ -51,11 +51,11 @@ export class EventosService {
     });
     return eventos.map(evento => ({
       ...evento,
-      logo: this.formatImageUrl(evento.logo),
-      imagen_fondo: this.formatImageUrl(evento.imagen_fondo),
+      logo: this.formatImageUrl(evento.logo, 'eventos'),
+      imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
       actividades: (evento.actividades || []).map(act => ({
         ...act,
-        imagen: this.formatImageUrl(act.imagen)
+        imagen: this.formatImageUrl(act.imagen, 'cursos')
       }))
     }));
   }
@@ -65,8 +65,8 @@ export class EventosService {
     if (evento) {
       return {
         ...evento,
-        logo: this.formatImageUrl(evento.logo),
-        imagen_fondo: this.formatImageUrl(evento.imagen_fondo)
+        logo: this.formatImageUrl(evento.logo, 'eventos'),
+        imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos')
       };
     }
     return evento;
@@ -115,7 +115,7 @@ export class EventosService {
           segundo_apellido: persona.segundo_apellido,
           profesion: u.afiliaciones?.[0]?.institucion || 'Expositor',
           grado_abreviacion: ga.abreviacion || '',
-          foto: this.formatImageUrl(persona.firma_dig), // Usamos firma_dig o un campo de foto si existiera
+          foto: this.formatImageUrl(persona.firma_dig, 'perfiles'), // Usamos perfiles para fotos
         });
       }
     });
@@ -180,11 +180,11 @@ export class EventosService {
 
     const data = eventos.map((evento) => ({
       ...evento,
-      logo: this.formatImageUrl(evento.logo),
-      imagen_fondo: this.formatImageUrl(evento.imagen_fondo),
+      logo: this.formatImageUrl(evento.logo, 'eventos'),
+      imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
       actividades: (evento.actividades || []).map(act => ({
         ...act,
-        imagen: this.formatImageUrl(act.imagen)
+        imagen: this.formatImageUrl(act.imagen, 'cursos')
       }))
     }));
 
@@ -208,8 +208,8 @@ export class EventosService {
     const guardado = await this.eventoRepository.save(evento);
     return {
       ...guardado,
-      logo: this.formatImageUrl(guardado.logo),
-      imagen_fondo: this.formatImageUrl(guardado.imagen_fondo),
+      logo: this.formatImageUrl(guardado.logo, 'eventos'),
+      imagen_fondo: this.formatImageUrl(guardado.imagen_fondo, 'fondos'),
     };
   }
 
@@ -253,8 +253,8 @@ export class EventosService {
     const actualizado = await this.eventoRepository.findOneBy({ id });
     return {
       ...actualizado,
-      logo: this.formatImageUrl(actualizado!.logo),
-      imagen_fondo: this.formatImageUrl(actualizado!.imagen_fondo),
+      logo: this.formatImageUrl(actualizado!.logo, 'eventos'),
+      imagen_fondo: this.formatImageUrl(actualizado!.imagen_fondo, 'fondos'),
     };
   }
 

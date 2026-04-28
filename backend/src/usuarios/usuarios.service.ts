@@ -60,10 +60,8 @@ export class UsuariosService {
       throw new NotFoundException('Perfil no encontrado');
     }
 
-    // Bloqueo si ya está completado
-    if (usuario.persona.perfil_completado) {
-      throw new BadRequestException('Su información de perfil ya fue registrada exitosamente y no puede ser modificada.');
-    }
+    // Bloqueo inteligente: si ya está completado, solo permitiremos actualizar campos que estén vacíos
+    const isCompleted = usuario.persona.perfil_completado;
 
     // 1. Filtrar campos específicos para la entidad Persona
     const camposPersonaValidos = [
@@ -74,6 +72,9 @@ export class UsuariosService {
     const datosPersona: any = {};
     camposPersonaValidos.forEach(key => {
       if (data[key] !== undefined) {
+        // Bloqueo: si ya está completado y el campo ya tiene valor, no dejamos editar
+        if (isCompleted && (usuario.persona as any)[key]) return;
+
         // Manejo especial para género si viene como string
         if (key === 'genero' && typeof data[key] === 'string') {
            const g = data[key];
@@ -107,8 +108,13 @@ export class UsuariosService {
         : null;
 
       if (af) {
-        if (institucion !== undefined) af.institucion = institucion;
-        if (id_grado_academico !== undefined) af.id_grado_academico = id_grado_academico;
+        if (institucion !== undefined) {
+          // Bloqueo: si ya está completado y ya tiene institución, ignoramos
+          if (!(isCompleted && af.institucion)) af.institucion = institucion;
+        }
+        if (id_grado_academico !== undefined) {
+           if (!(isCompleted && af.id_grado_academico)) af.id_grado_academico = id_grado_academico;
+        }
         if (tipo_afiliacion !== undefined) af.tipo_afiliacion = tipo_afiliacion;
         if (area_tematica !== undefined) af.area_tematica = area_tematica;
         if (disciplina_cientifica !== undefined) af.disciplina_cientifica = disciplina_cientifica;

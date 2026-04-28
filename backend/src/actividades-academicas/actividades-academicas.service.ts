@@ -18,7 +18,7 @@ export class ActividadesAcademicasService {
     if (usuario.roles?.includes('Super Usuario')) return;
 
     const coord = await this.dataSource.query(
-      `SELECT 1 FROM coordinaciones_eventos WHERE id_evento = $1 AND id_usuario = $2`,
+      `SELECT 1 FROM coordinacion_eventos WHERE id_evento = $1 AND id_usuario = $2`,
       [eventoId, usuario.id]
     );
 
