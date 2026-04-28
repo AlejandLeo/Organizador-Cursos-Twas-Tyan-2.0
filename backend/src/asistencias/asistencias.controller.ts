@@ -13,6 +13,8 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { AsistenciasService } from './asistencias.service';
+
 
 @ApiTags('Asistencias')
 @Controller('asistencias')

@@ -21,6 +21,7 @@ const formData = ref({
 });
 
 const profilePhotoUrl = ref('');
+const originalData = ref<Record<string, any>>({});
 
 // Lista estática o dinámica de grados académicos
 const gradosAcademicos = ref([
@@ -34,11 +35,14 @@ const gradosAcademicos = ref([
   { id: 8, nombre: 'Otro / Other' }
 ]);
 
+const isCompleted = ref(false);
+
 const loadProfile = async () => {
   try {
     const res = await api.get('/auth/me'); 
     
     if (res.data?.persona) {
+      isCompleted.value = res.data.persona.perfil_completado || false;
       formData.value = { ...formData.value, ...res.data.persona };
       if (formData.value.fecha_nacimiento) {
         const isoStr = new Date(formData.value.fecha_nacimiento).toISOString();
@@ -52,7 +56,8 @@ const loadProfile = async () => {
       formData.value.id_grado_academico = afiliacion.id_grado_academico;
     }
     
-    // Attempt to load photo
+    originalData.value = { ...formData.value };
+    
     await loadPhoto();
   } catch (err) {
     console.error('Error loading profile', err);
@@ -69,15 +74,26 @@ const loadPhoto = async () => {
   }
 };
 
-const handleUpdateProfile = async () => {
+const handleUpdateProfile = async (finalizar = false) => {
+  const hasMissingFields = Object.keys(originalData.value).some(k => !originalData.value[k]);
+  if (isCompleted.value && !hasMissingFields) return;
+  
   loading.value = true;
   error.value = '';
   success.value = '';
   try {
-     
-    const dataToSend = { ...formData.value };
+    const dataToSend = { ...formData.value, finalizar };
     await api.patch('/usuarios/perfil/datos', dataToSend);
-    success.value = 'Perfil actualizado correctamente.';
+    
+    if (finalizar) {
+      success.value = '¡Su información de perfil fue registrada exitosamente y ya no podrá ser modificada!';
+      isCompleted.value = true;
+    } else {
+      success.value = 'Perfil actualizado temporalmente. Recuerde finalizar para bloquear el registro.';
+    }
+    
+    // Recargar para sincronizar estado
+    await loadProfile();
   } catch (e: unknown) {
     const errorRes = e as { response?: { data?: { message?: string } } };
     error.value = errorRes.response?.data?.message || 'Ocurrió un error al actualizar el perfil.';
@@ -89,6 +105,7 @@ const handleUpdateProfile = async () => {
 const photoRef = ref<HTMLInputElement | null>(null);
 
 const handlePhotoUpload = async (e: Event) => {
+  if (isCompleted.value && !!profilePhotoUrl.value) return;
   const target = e.target as HTMLInputElement;
   if (!target.files || !target.files.length) return;
   const file = target.files[0];
@@ -117,18 +134,26 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="p-6 md:p-8 max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-    <div class="flex items-center justify-between border-b border-slate-200 dark:border-gray-800 pb-6 mb-8">
-      <div>
-        <h1 class="text-2xl md:text-3xl font-black text-slate-800 dark:text-white uppercase tracking-tight">Mi Perfil</h1>
-        <p class="text-sm font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Gestiona tus datos personales y afiliación</p>
+  <div class="p-4 md:p-8 max-w-4xl mx-auto space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div class="flex items-center justify-between border-b border-slate-200 dark:border-gray-800 pb-6 mb-4 md:mb-8">
+      <div class="max-w-[70%]">
+        <h1 class="text-xl md:text-3xl font-black text-slate-800 dark:text-white uppercase tracking-tight truncate">Mi Perfil</h1>
+        <p class="text-[10px] md:text-sm font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Gestiona tus datos personales</p>
       </div>
-      <div class="h-12 w-12 rounded-2xl bg-umsa-blue/10 dark:bg-blue-900/20 text-umsa-blue dark:text-blue-400 flex items-center justify-center border border-umsa-blue/20">
-        <span class="material-symbols-outlined text-[24px]">manage_accounts</span>
+      <div class="h-10 w-10 md:h-12 md:w-12 rounded-xl md:rounded-2xl bg-umsa-blue/10 dark:bg-blue-900/20 text-umsa-blue dark:text-blue-400 flex items-center justify-center border border-umsa-blue/20">
+        <span class="material-symbols-outlined text-[20px] md:text-[24px]">manage_accounts</span>
       </div>
     </div>
 
-    <div v-if="error" class="bg-red-50 text-red-600 p-4 rounded-xl text-sm font-bold border border-red-200">{{ error }}</div>
+    <div v-if="isCompleted" class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-4 md:p-6 rounded-2xl flex items-start gap-3 md:gap-4">
+      <span class="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-2xl md:text-3xl shrink-0">verified_user</span>
+      <div>
+        <h4 class="text-emerald-800 dark:text-emerald-300 font-black uppercase text-xs md:text-sm">Perfil Finalizado</h4>
+        <p class="text-emerald-600/80 dark:text-emerald-400/80 text-[10px] md:text-xs mt-1 leading-relaxed">Su información ha sido bloqueada. Para cambios críticos, contacte a soporte.</p>
+      </div>
+    </div>
+
+    <div v-if="error" class="bg-red-50 text-red-600 p-4 rounded-xl text-sm font-bold border border-red-200 animate-pulse">{{ error }}</div>
     <div v-if="success" class="bg-emerald-50 text-emerald-600 p-4 rounded-xl text-sm font-bold border border-emerald-200">{{ success }}</div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -141,64 +166,79 @@ onMounted(() => {
             <img v-if="profilePhotoUrl" :src="profilePhotoUrl" alt="Foto" class="w-full h-full object-cover" @error="profilePhotoUrl = ''" />
             <span v-else class="material-symbols-outlined text-6xl text-slate-300 dark:text-gray-600 h-full flex items-center justify-center">account_circle</span>
           </div>
-          <h3 class="text-sm font-black uppercase text-slate-700 dark:text-gray-200">Foto de Perfil (Opcional)</h3>
-          <p class="text-[10px] text-slate-400 mb-4 mt-1">Formatos JPG, PNG<br>Dimensiones recomendadas: 300x300px o 1:1<br>Tamaño máximo 2MB</p>
+          <h3 class="text-sm font-black uppercase text-slate-700 dark:text-gray-200">Foto de Perfil</h3>
+          <p class="text-[10px] text-slate-400 mb-4 mt-1">Formatos JPG, PNG<br>Dimensiones: Cuadrada (Tipo 5x5)<br>Fondo sugerido: Blanco / Claro</p>
           
           <input type="file" ref="photoRef" class="hidden" accept="image/jpeg, image/png" @change="handlePhotoUpload" />
-          <button @click="photoRef?.click()" :disabled="loading" class="text-xs px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 font-bold rounded-lg transition-colors border border-slate-200 dark:border-gray-700 w-full uppercase tracking-wider">
-            Subir Foto
+          <button @click="photoRef?.click()" :disabled="loading || (isCompleted && !!profilePhotoUrl)" 
+            class="text-xs px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 font-bold rounded-lg transition-colors border border-slate-200 dark:border-gray-700 w-full uppercase tracking-wider disabled:opacity-50">
+            {{ (isCompleted && !!profilePhotoUrl) ? 'Bloqueado' : 'Subir Foto' }}
           </button>
         </div>
       </div>
 
       <!-- Formulario de Datos Personales -->
       <div class="md:col-span-2 bg-white dark:bg-gray-900 p-6 md:p-8 rounded-2xl border border-slate-200 dark:border-gray-800 shadow-sm">
-        <h3 class="text-sm font-black uppercase text-slate-800 dark:text-white mb-6 tracking-widest border-b border-slate-100 dark:border-gray-800 pb-4">Datos Personales y Afiliación</h3>
+        <h3 class="text-sm font-black uppercase text-slate-800 dark:text-white mb-6 tracking-widest border-b border-slate-100 dark:border-gray-800 pb-4 flex items-center justify-between">
+          <span>Datos Personales y Afiliación</span>
+          <span v-if="isCompleted" class="text-[9px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full">SOLO LECTURA</span>
+        </h3>
         
-        <form @submit.prevent="handleUpdateProfile" class="space-y-5">
+        <form @submit.prevent="handleUpdateProfile(false)" class="space-y-5">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Nombres</label>
-              <input v-model="formData.nombres" type="text" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none" required />
+              <input v-model="formData.nombres" type="text" :disabled="isCompleted && !!originalData.nombres" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none disabled:bg-slate-100 dark:disabled:bg-gray-950 disabled:text-slate-400" required />
             </div>
             <div>
               <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Primer Apellido</label>
-              <input v-model="formData.primer_apellido" type="text" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none" required />
+              <input v-model="formData.primer_apellido" type="text" :disabled="isCompleted && !!originalData.primer_apellido" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none disabled:bg-slate-100 dark:disabled:bg-gray-950 disabled:text-slate-400" required />
             </div>
             <div>
               <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Segundo Apellido</label>
-              <input v-model="formData.segundo_apellido" type="text" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none" />
+              <input v-model="formData.segundo_apellido" type="text" :disabled="isCompleted && !!originalData.segundo_apellido" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none disabled:bg-slate-100 dark:disabled:bg-gray-950 disabled:text-slate-400" />
             </div>
             <div>
-              <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Documento Identidad</label>
-              <input v-model="formData.documento_identidad" type="text" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none" required />
+              <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">
+                {{ formData.documento_identidad?.includes(':') ? formData.documento_identidad.split(':')[0] : 'Documento Identidad' }}
+              </label>
+              <input :value="formData.documento_identidad?.includes(':') ? (formData.documento_identidad.split(':')[1] || '').trim() : formData.documento_identidad" 
+                     @input="(e) => { 
+                       const val = (e.target as HTMLInputElement).value;
+                       if (formData.documento_identidad?.includes(':')) {
+                         formData.documento_identidad = (formData.documento_identidad.split(':')[0] || 'Documento') + ': ' + val;
+                       } else {
+                         formData.documento_identidad = val;
+                       }
+                     }"
+                     type="text" :disabled="isCompleted && !!originalData.documento_identidad" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none disabled:bg-slate-100 dark:disabled:bg-gray-950 disabled:text-slate-400" required />
             </div>
             <div>
               <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Fecha de Nacimiento</label>
-              <input v-model="formData.fecha_nacimiento" type="date" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none" />
+              <input v-model="formData.fecha_nacimiento" type="date" :disabled="isCompleted && !!originalData.fecha_nacimiento" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none disabled:bg-slate-100 dark:disabled:bg-gray-950 disabled:text-slate-400" />
             </div>
              <div>
               <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Celular</label>
-              <input v-model="formData.celular" type="text" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none" />
+              <input v-model="formData.celular" type="text" :disabled="isCompleted && !!originalData.celular" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none disabled:bg-slate-100 dark:disabled:bg-gray-950 disabled:text-slate-400" />
             </div>
             <div>
               <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">País Origen</label>
-              <input v-model="formData.pais_origen" type="text" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none" />
+              <input v-model="formData.pais_origen" type="text" :disabled="isCompleted && !!originalData.pais_origen" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none disabled:bg-slate-100 dark:disabled:bg-gray-950 disabled:text-slate-400" />
             </div>
             <div>
               <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">País Residencia</label>
-              <input v-model="formData.pais_residencia" type="text" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none" />
+              <input v-model="formData.pais_residencia" type="text" :disabled="isCompleted && !!originalData.pais_residencia" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none disabled:bg-slate-100 dark:disabled:bg-gray-950 disabled:text-slate-400" />
             </div>
           </div>
           
           <div class="mt-6 border-t border-slate-100 dark:border-gray-800 pt-6 grid grid-cols-1 md:grid-cols-2 gap-5">
             <div class="md:col-span-2">
               <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Institución / Universidad</label>
-              <input v-model="formData.institucion" type="text" placeholder="Ej. Universidad Mayor de San Andrés" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none" />
+              <input v-model="formData.institucion" type="text" :disabled="isCompleted && !!originalData.institucion" placeholder="Ej. Universidad Mayor de San Andrés" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none disabled:bg-slate-100 dark:disabled:bg-gray-950 disabled:text-slate-400" />
             </div>
             <div class="md:col-span-2">
               <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Grado Académico</label>
-              <select v-model="formData.id_grado_academico" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none text-slate-700 dark:text-gray-200">
+              <select v-model="formData.id_grado_academico" :disabled="isCompleted && !!originalData.id_grado_academico" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none text-slate-700 dark:text-gray-200 disabled:bg-slate-100 dark:disabled:bg-gray-950">
                 <option :value="null">Seleccione un grado académico</option>
                 <option v-for="grado in gradosAcademicos" :key="grado.id" :value="grado.id">
                   {{ grado.nombre }}
@@ -207,9 +247,12 @@ onMounted(() => {
             </div>
           </div>
           
-          <div class="pt-4 flex justify-end">
-            <button type="submit" :disabled="loading" class="bg-umsa-blue hover:bg-blue-800 text-white font-black text-xs uppercase tracking-widest px-6 py-3 rounded-lg shadow-md transition-colors disabled:opacity-50">
-              {{ loading ? 'Guardando...' : 'Guardar Cambios' }}
+          <div class="pt-8 flex flex-col md:flex-row items-center justify-end gap-4">
+            <button type="submit" v-if="!isCompleted || Object.keys(originalData).some(k => !originalData[k])" :disabled="loading" class="w-full md:w-auto px-6 py-3 border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-300 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50">
+              {{ loading ? '...' : 'Guardar Progreso' }}
+            </button>
+            <button type="button" v-if="!isCompleted" @click="handleUpdateProfile(true)" :disabled="loading" class="w-full md:w-auto px-8 py-3 bg-umsa-blue hover:bg-blue-800 text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-lg shadow-umsa-blue/20 transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50">
+              {{ loading ? 'Procesando...' : 'Finalizar y Bloquear Perfil' }}
             </button>
           </div>
         </form>

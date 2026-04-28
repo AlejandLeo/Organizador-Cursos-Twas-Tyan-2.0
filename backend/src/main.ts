@@ -2,9 +2,20 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Asegurar carpetas de uploads
+  const uploadDirs = ['uploads', 'uploads/perfiles', 'uploads/fondos', 'uploads/eventos', 'uploads/cursos', 'uploads/imagenes', 'uploads/inscripciones'];
+  uploadDirs.forEach(dir => {
+    const p = path.join(process.cwd(), dir);
+    if (!fs.existsSync(p)) {
+      fs.mkdirSync(p, { recursive: true });
+    }
+  });
 
   // Configuración global de validación
   app.useGlobalPipes(

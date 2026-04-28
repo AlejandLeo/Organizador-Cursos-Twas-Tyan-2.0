@@ -5,6 +5,10 @@ export interface Persona {
   segundo_apellido?: string;
   documento_identidad?: string;
   celular?: string;
+  genero?: number;
+  fecha_nacimiento?: string;
+  pais_origen?: string;
+  pais_residencia?: string;
   fecha_registro?: string;
 }
 
@@ -16,6 +20,7 @@ export interface Usuario {
   roles?: any[];
   inscripciones?: Inscripcion[];
   imparticiones?: any[]; // Actividades que el ponente dicta
+  afiliaciones?: any[];
 }
 
 export interface Evento {
@@ -23,6 +28,7 @@ export interface Evento {
   nombre?: string;
   descripcion?: string;
   gestion?: string;
+  estado?: number;
 }
 
 export interface Actividad {
@@ -30,6 +36,7 @@ export interface Actividad {
   tipo: string;
   nombre: string;
   evento?: Evento;
+  inscripciones?: Inscripcion[];
 }
 
 export interface Inscripcion {
@@ -43,6 +50,7 @@ export interface Inscripcion {
   estado: number; // 0: Pendiente, 1: Aprobado, 2: Rechazado
   usuario?: Usuario;
   actividadAcademica?: Actividad;
+  datos_adicionales?: Record<string, string>;
 }
 
 export interface Ponente {

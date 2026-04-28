@@ -18,18 +18,18 @@ const eventoData = ref({
   id: 1,
   nombreCorto: 'Mis Cursos',
   nombreLargo: 'Mis Cursos y Actividades Inscritas',
-  version: 'Edición The World Academy of Sciences',
-  descripcion: 'Tu historial de pre-inscripciones e inscripciones. Ingresa a las actividades para ver tu progreso, calificaciones y descargar tu certificado de participación una vez finalizado.',
+  version: 'Edición General',
+  descripcion: 'Gestiona tu progreso, material y certificados de participación de manera sencilla y eficiente.',
   estado: 'En Progreso',
   colorEstado: 'bg-emerald-500 text-white border border-emerald-400',
-  imagen: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=1600&q=80',
+  imagen: '/bienvenida.png',
   mostrarActividades: true,
   actividadesInscritas: [] as any[]
 });
 
 const fetchInscripciones = async () => {
   try {
-    const response = await api.get('/inscripciones/mis-inscripciones');
+    const response = await api.get('/me/inscripciones');
     
     // Mapeamos las inscripciones
     const inscripcionesReales = response.data; // Incluimos todas (inscrito, pre-inscrito, etc) para visualizarlas
@@ -92,7 +92,7 @@ const getStatusColor = (status: string) => {
     <div class="border-b border-slate-200 dark:border-gray-800 pb-6 mb-8 mt-2 flex justify-between items-end">
       <div>
         <h2 class="text-3xl font-black text-primary-dark dark:text-white uppercase italic">Hola, {{ nombreUsuario }}</h2>
-        <p class="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Gestiona tu progreso, material y certificados de The World Academy of Sciences</p>
+        <p class="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Gestiona tu progreso, material y certificados desde tu plataforma académica</p>
       </div>
       <div>
         <button @click="$router.push({ name: 'estudiante-catalogo' })" class="bg-umsa-blue hover:bg-blue-800 text-white px-5 py-2 rounded-xl font-bold shadow-lg shadow-umsa-blue/30 transition-all flex items-center space-x-2 text-sm uppercase tracking-widest">

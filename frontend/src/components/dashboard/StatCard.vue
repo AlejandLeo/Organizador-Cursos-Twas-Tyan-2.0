@@ -5,7 +5,7 @@ const props = defineProps<{
   title: string;
   value: string | number;
   icon: string;
-  variant?: 'primary' | 'success' | 'warning' | 'info';
+  variant?: 'primary' | 'success' | 'warning' | 'info' | 'danger';
 }>();
 
 // Estilos dinámicos basados en la variable variant
@@ -19,6 +19,10 @@ const wrapperClass = computed(() => {
       return `${base} bg-gradient-to-br from-white to-emerald-50/30 dark:from-gray-900 dark:to-emerald-900/10 border-emerald-100 dark:border-emerald-800 shadow-emerald-500/5`;
     case 'warning':
       return `${base} bg-gradient-to-br from-white to-amber-50/30 dark:from-gray-900 dark:to-amber-900/10 border-amber-100 dark:border-amber-800 shadow-amber-500/5`;
+    case 'info':
+      return `${base} bg-gradient-to-br from-white to-sky-50/30 dark:from-gray-900 dark:to-sky-900/10 border-sky-100 dark:border-sky-800 shadow-sky-500/5`;
+    case 'danger':
+      return `${base} bg-gradient-to-br from-white to-rose-50/30 dark:from-gray-900 dark:to-rose-900/10 border-rose-100 dark:border-rose-800 shadow-rose-500/5`;
     default:
       return `${base} bg-white dark:bg-gray-900 border-slate-100 dark:border-gray-800`;
   }
@@ -28,6 +32,8 @@ const titleClass = computed(() => {
   if (props.variant === 'primary') return "text-umsa-blue dark:text-blue-400";
   if (props.variant === 'success') return "text-emerald-600 dark:text-emerald-400";
   if (props.variant === 'warning') return "text-amber-600 dark:text-amber-400";
+  if (props.variant === 'info')    return "text-sky-600 dark:text-sky-400";
+  if (props.variant === 'danger')  return "text-rose-600 dark:text-rose-400";
   return "text-slate-500 dark:text-gray-500";
 });
 
@@ -37,6 +43,8 @@ const iconClass = computed(() => {
   if (props.variant === 'primary') return "text-umsa-blue/10 dark:text-blue-400/10";
   if (props.variant === 'success') return "text-emerald-600/10 dark:text-emerald-400/10";
   if (props.variant === 'warning') return "text-amber-600/10 dark:text-amber-400/10";
+  if (props.variant === 'info')    return "text-sky-600/10 dark:text-sky-400/10";
+  if (props.variant === 'danger')  return "text-rose-600/10 dark:text-rose-400/10";
   return "text-slate-100 dark:text-gray-800";
 });
 
@@ -44,6 +52,8 @@ const iconColor = computed(() => {
     if (props.variant === 'primary') return "text-umsa-blue dark:text-blue-400";
     if (props.variant === 'success') return "text-emerald-600 dark:text-emerald-400";
     if (props.variant === 'warning') return "text-amber-600 dark:text-amber-400";
+    if (props.variant === 'info')    return "text-sky-600 dark:text-sky-400";
+    if (props.variant === 'danger')  return "text-rose-600 dark:text-rose-400";
     return "text-slate-400 dark:text-gray-600";
 });
 </script>

@@ -11,7 +11,7 @@ const fetchEventos = async () => {
   try {
     const [responseEventos, responseInsc] = await Promise.all([
       api.get('/eventos'),
-      api.get('/inscripciones/mis-inscripciones')
+      api.get('/me/inscripciones')
     ]);
 
     const misInsc = responseInsc.data;

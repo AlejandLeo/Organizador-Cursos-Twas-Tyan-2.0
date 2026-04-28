@@ -28,8 +28,17 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 
 /** Configuración de multer para guardar imágenes en uploads/imagenes/ */
+/** Configuración de multer para guardar imágenes en subcarpetas organizadas */
 const imageStorage = diskStorage({
-  destination: './uploads/imagenes',
+  destination: (_req, file, cb) => {
+    if (file.fieldname === 'imagen_portada') {
+      cb(null, './uploads/eventos');
+    } else if (file.fieldname === 'imagen_fondo') {
+      cb(null, './uploads/fondos');
+    } else {
+      cb(null, './uploads/imagenes');
+    }
+  },
   filename: (_req, file, cb) =>
     cb(null, `${uuidv4()}${extname(file.originalname)}`),
 });

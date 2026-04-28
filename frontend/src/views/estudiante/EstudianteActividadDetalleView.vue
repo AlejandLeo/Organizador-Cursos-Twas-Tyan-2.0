@@ -26,6 +26,8 @@ const preinscripcionForm = ref({
 const respuestasDinamicas = ref<Record<string, any>>({});
 // Campos del perfil que se están completando/editando
 const datosPerfilEdit = ref<Record<string, any>>({});
+// Copia original para saber qué campos estaban vacíos y permitir su edición
+const perfilOriginal = ref<Record<string, any>>({});
 
 const actividad = ref({
   id: actividadId,
@@ -126,13 +128,14 @@ const loadActividad = async () => {
                 } else {
                     datosPerfilEdit.value[key] = persona?.[key] || '';
                 }
+                perfilOriginal.value[key] = !!datosPerfilEdit.value[key]; // Guardamos si originalmente tenía valor
             }
         });
     }
     // Inicializar campos dinámicos
     if (actividad.value.requisitos?.custom) {
         actividad.value.requisitos.custom.forEach((c: any) => {
-            respuestasDinamicas.value[c.label] = '';
+            respuestasDinamicas.value[c.label] = c.type === 'file' ? null : '';
         });
     }
   } catch (e) {
@@ -142,7 +145,7 @@ const loadActividad = async () => {
 
 const checkInscripcionStatus = async () => {
   try {
-    const res = await api.get('/inscripciones/mis-inscripciones');
+    const res = await api.get('/me/inscripciones');
     const all = res.data;
     const found = all.find((i: any) => i.actividadAcademica.id === actividadId);
     if (found) {
@@ -171,11 +174,18 @@ onMounted(async () => {
   loading.value = false;
 });
 
+const handleFileReqChange = (e: any, label: string) => {
+    const file = e.target.files[0];
+    if (file) {
+        respuestasDinamicas.value[label] = file;
+    }
+};
+
 const submitPreinscripcion = async () => {
   preinscribiendo.value = true;
   errorMensaje.value = '';
   try {
-    // 1. Actualizar perfil si hay cambios en datos base
+    // 1. Actualizar perfil si hay cambios en datos base (los que estaban vacíos)
     if (Object.keys(datosPerfilEdit.value).length > 0) {
         try {
             await api.patch('/usuarios/perfil/datos', datosPerfilEdit.value);
@@ -184,12 +194,27 @@ const submitPreinscripcion = async () => {
         }
     }
 
-    // 2. Enviar inscripción
-    await api.post('/inscripciones/preinscribir', {
-      id_actividad: actividadId,
-      miembro_tyan: Number(preinscripcionForm.value.miembro_tyan),
-      razon: preinscripcionForm.value.razon,
-      datos_adicionales: respuestasDinamicas.value
+    // 2. Preparar Payload (FormData para soportar archivos)
+    const formData = new FormData();
+    formData.append('id_actividad', actividadId.toString());
+    formData.append('miembro_tyan', preinscripcionForm.value.miembro_tyan.toString());
+    formData.append('razon', preinscripcionForm.value.razon);
+    
+    // Procesar respuestas dinámicas (archivos vs otros)
+    const datosDinamicosJson: Record<string, any> = {};
+    for (const [label, value] of Object.entries(respuestasDinamicas.value)) {
+        if (value instanceof File) {
+            formData.append(`file_${label}`, value);
+            datosDinamicosJson[label] = `[FILE]:${value.name}`;
+        } else {
+            datosDinamicosJson[label] = value;
+        }
+    }
+    formData.append('datos_adicionales', JSON.stringify(datosDinamicosJson));
+
+    // 3. Enviar inscripción
+    await api.post('/me/inscripciones/preinscribir', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
     });
 
     preinscripcionMenu.value = false;
@@ -502,10 +527,27 @@ const goBack = () => {
                 <div class="grid grid-cols-1 gap-4">
                     <template v-for="(required, key) in actividad.requisitos.base" :key="key">
                         <div v-if="required" class="flex flex-col">
-                            <label class="text-[9px] font-black text-slate-400 uppercase mb-1">{{ key.toString().replace(/_/g, ' ') }}</label>
-                            <input v-model="datosPerfilEdit[key]" 
+                            <label class="text-[9px] font-black text-slate-400 uppercase mb-1">
+                                {{ key === 'documento_identidad' && datosPerfilEdit[key]?.includes(':') ? (datosPerfilEdit[key].split(':')[0] || 'Documento') : key.toString().replace(/_/g, ' ') }}
+                            </label>
+                            
+                            <!-- Si es Documento Identidad y está bloqueado -->
+                            <input v-if="key === 'documento_identidad' && perfilOriginal[key]"
+                                   :value="datosPerfilEdit[key]?.includes(':') ? (datosPerfilEdit[key].split(':')[1] || '').trim() : datosPerfilEdit[key]" 
+                                   readonly
+                                   class="w-full px-4 py-2 text-xs font-bold bg-slate-100 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl outline-none text-slate-500 dark:text-gray-400 cursor-not-allowed transition-all">
+                            
+                            <!-- Para cualquier otro campo bloqueado -->
+                            <input v-else-if="perfilOriginal[key]"
+                                   :value="datosPerfilEdit[key]" 
+                                   readonly
+                                   class="w-full px-4 py-2 text-xs font-bold bg-slate-100 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl outline-none text-slate-500 dark:text-gray-400 cursor-not-allowed transition-all">
+                            
+                            <!-- Para campos vacíos que deben poder llenarse -->
+                            <input v-else
+                                   v-model="datosPerfilEdit[key]" 
                                    :placeholder="'Ingresa tu ' + key"
-                                   class="w-full px-4 py-2 text-xs font-bold bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl outline-none focus:border-blue-500 transition-all">
+                                   class="w-full px-4 py-2 text-xs font-bold bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl outline-none focus:border-blue-500 text-slate-800 dark:text-white transition-all">
                         </div>
                     </template>
                 </div>
@@ -531,6 +573,20 @@ const goBack = () => {
                             <option value="">Seleccione una opción</option>
                             <option v-for="opt in req.options" :key="opt" :value="opt">{{ opt }}</option>
                         </select>
+
+                        <!-- Input tipo Archivo -->
+                        <div v-else-if="req.type === 'file'" class="relative group">
+                            <input type="file" 
+                                   @change="(e) => handleFileReqChange(e, req.label)"
+                                   class="hidden" 
+                                   :id="'file-' + idx">
+                            <label :for="'file-' + idx" class="w-full px-4 py-3 bg-white dark:bg-gray-950 border-2 border-dashed border-blue-100 dark:border-blue-800/50 rounded-xl flex items-center gap-3 cursor-pointer hover:border-blue-500 hover:bg-blue-50/30 transition-all">
+                                <span class="material-symbols-outlined text-blue-500">{{ respuestasDinamicas[req.label] ? 'check_circle' : 'upload_file' }}</span>
+                                <span class="text-[10px] font-bold text-slate-500 truncate">
+                                    {{ respuestasDinamicas[req.label] ? respuestasDinamicas[req.label].name : 'Subir ' + req.label }}
+                                </span>
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>

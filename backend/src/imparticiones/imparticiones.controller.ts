@@ -88,7 +88,7 @@ export class ImparticionesController {
   @Get('mis-actividades')
   @ApiOperation({ summary: 'Mis actividades (Ponente autenticado)' })
   misActividades(@Request() req: any) {
-    return this.service.findMisActividades(req.user.sub || req.user.id);
+    return this.service.findMisActividades(req.user.id);
   }
 
   /**
@@ -102,6 +102,6 @@ export class ImparticionesController {
   @Get('mis-estudiantes')
   @ApiOperation({ summary: 'Mis estudiantes con notas (Ponente autenticado)' })
   misEstudiantes(@Request() req: any) {
-    return this.service.findMisEstudiantes(req.user.sub || req.user.id);
+    return this.service.findMisEstudiantes(req.user.id);
   }
 }

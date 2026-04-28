@@ -13,10 +13,12 @@ import {
   Query,
   UseInterceptors,
   UploadedFile,
+  UploadedFiles,
   Res,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
@@ -29,6 +31,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { RegisterDto } from './dto/register.dto';
 import { CrearPonenteDto } from './dto/crear-ponente.dto';
 import { FiltrarUsuariosDto } from './dto/filtrar-usuarios.dto';
+import { SolicitudRegistroDto } from './dto/solicitud-registro.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -37,6 +40,52 @@ import { Roles } from '../auth/roles.decorator';
 @Controller('usuarios')
 export class UsuariosController {
   constructor(private readonly usuariosService: UsuariosService) {}
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('alertas/estudiante')
+  @ApiOperation({ summary: 'Obtener notificaciones dinámicas para el estudiante (bienvenida, perfil incompleto)' })
+  async getAlertasEstudiante(@Request() req: any) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const userId = Number(req.user.id);
+    
+    const usuario = await this.usuariosService.getPerfil(userId);
+    const alertas: any[] = [];
+    
+    if (!usuario) return [];
+
+    // 1. Notificación de Perfil
+    if (!usuario.persona?.perfil_completado) {
+      alertas.push({
+        id: 'perfil-incompleto',
+        titulo: '¡Bienvenido(a) al sistema!',
+        mensaje: 'Complete toda la información de su perfil y guarde los cambios para continuar correctamente con su proceso.',
+        tipo: 'warning',
+        fecha: usuario.fecha_creacion,
+        prioridad: 'alta'
+      });
+    }
+
+    // 2. Notificaciones de Actividades Aceptadas
+    if (usuario.inscripciones && usuario.inscripciones.length > 0) {
+      usuario.inscripciones.forEach((insc: any) => {
+        // Estado 1 = Aceptado/Inscrito
+        if (insc.estado === 1) {
+          alertas.push({
+            id: `inscripcion-aceptada-${insc.id}`,
+            titulo: 'Solicitud Aprobada',
+            mensaje: `Has sido aceptado(a) en la actividad: "${insc.actividadAcademica?.nombre || 'Actividad'}". Ya puedes acceder al material.`,
+            tipo: 'info',
+            fecha: insc.fecha_actualizacion || insc.fecha_creacion,
+            prioridad: 'media',
+            link: { name: 'estudiante-actividades-detalle', params: { id: insc.actividadAcademica?.id } }
+          });
+        }
+      });
+    }
+
+    return alertas;
+  }
 
   // ══════════════════════════════════════════════════════════
   //  AUTH
@@ -66,7 +115,7 @@ export class UsuariosController {
   @ApiOperation({ summary: 'Actualizar datos personales del perfil' })
   async updatePerfil(@Request() req: any, @Body() data: any) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
-    return this.usuariosService.actualizarPerfil(req.user.sub, data);
+    return this.usuariosService.actualizarPerfil(req.user.id, data);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -75,10 +124,13 @@ export class UsuariosController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: './uploads/profiles',
+        destination: (_req, _file, cb) => {
+          const p = join(process.cwd(), 'uploads', 'perfiles');
+          if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
+          cb(null, p);
+        },
         filename: (req: any, file, cb) => {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-          const id = req.user?.sub;
+          const id = req.user?.id || 'unknown';
           const ext = extname(file.originalname).toLowerCase();
           cb(null, `user_${id}${ext}`);
         },
@@ -94,9 +146,16 @@ export class UsuariosController {
   )
   @ApiOperation({ summary: 'Subir foto de perfil (JPG/PNG)' })
   uploadFoto(@Request() req: any, @UploadedFile() file: Express.Multer.File) {
-    if (!file) throw new Error('No se pudo subir la foto de perfil');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    const idUsuario = req.user.sub;
+    const idUsuario = req.user?.id;
+    fs.appendFileSync('upload_debug.log', `[${new Date().toISOString()}] Inicio upload para usuario: ${idUsuario}\n`);
+    
+    if (!file) {
+      fs.appendFileSync('upload_debug.log', `[${new Date().toISOString()}] Error: No hay archivo en el request\n`);
+      throw new Error('No se pudo subir la foto de perfil');
+    }
+    
+    fs.appendFileSync('upload_debug.log', `[${new Date().toISOString()}] Archivo recibido: ${file.originalname}, size: ${file.size}, path: ${file.path}\n`);
+    
     const currentExt = extname(file.originalname).toLowerCase();
 
     // Clean up other extensions
@@ -105,12 +164,17 @@ export class UsuariosController {
       if (e !== currentExt) {
         const p = join(
           process.cwd(),
-          'uploads/profiles',
+          'uploads/perfiles',
           `user_${idUsuario}${e}`,
         );
-        if (fs.existsSync(p)) fs.unlinkSync(p);
+        try {
+          if (fs.existsSync(p)) fs.unlinkSync(p);
+        } catch (err) {
+          fs.appendFileSync('upload_debug.log', `[${new Date().toISOString()}] Error limpiando archivo viejo ${p}: ${err}\n`);
+        }
       }
     }
+    fs.appendFileSync('upload_debug.log', `[${new Date().toISOString()}] Upload exitoso para usuario: ${idUsuario}\n`);
     return { message: 'Foto actualizada' };
   }
 
@@ -120,12 +184,12 @@ export class UsuariosController {
   @ApiOperation({ summary: 'Obtener la foto de perfil' })
   getFoto(@Request() req: any, @Res() res: Response) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    const id = req.user.sub;
+    const id = req.user.id;
     const exts = ['.jpg', '.jpeg', '.png'];
     let filePath: string | null = null;
 
     for (const ext of exts) {
-      const p = join(process.cwd(), 'uploads/profiles', `user_${id}${ext}`);
+      const p = join(process.cwd(), 'uploads/perfiles', `user_${id}${ext}`);
       if (fs.existsSync(p)) {
         filePath = p;
         break;
@@ -173,7 +237,7 @@ export class UsuariosController {
     if (!file) throw new Error('No se pudo subir la firma digital');
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const idUsuario = req.user.sub as number;
+    const idUsuario = req.user.id as number;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
     await (this.usuariosService as any).actualizarFirmaLocal(
       idUsuario,
@@ -188,7 +252,7 @@ export class UsuariosController {
   @ApiOperation({ summary: 'Obtener la firma digital (Ponente)' })
   async getFirma(@Request() req: any, @Res() res: Response) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const idUsuario = req.user.sub as number;
+    const idUsuario = req.user.id as number;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const filePath = await (this.usuariosService as any).obtenerRutaFirmaLocal(
       idUsuario,
@@ -419,7 +483,7 @@ export class UsuariosController {
   @Get('me/certificados')
   @ApiOperation({ summary: 'Mis certificados (Estudiante autenticado)' })
   misCertificados(@Request() req: any) {
-    return this.usuariosService.findCertificados(req.user.sub);
+    return this.usuariosService.findCertificados(req.user.id);
   }
 
   // ══════════════════════════════════════════════════════════
@@ -441,6 +505,131 @@ export class UsuariosController {
     @Param('rolId', ParseIntPipe) rolId: number,
   ) {
     return this.usuariosService.quitarRol(id, rolId);
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  SOLICITUDES DE REGISTRO
+  // ══════════════════════════════════════════════════════════
+
+  @Post('solicitud')
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'file', maxCount: 1 },
+        { name: 'fileReverso', maxCount: 1 },
+      ],
+      {
+        storage: diskStorage({
+          destination: './uploads/firmas',
+          filename: (req, file, cb) => {
+            const ext = extname(file.originalname).toLowerCase();
+            cb(null, `aval_${uuidv4()}${ext}`);
+          },
+        }),
+        fileFilter: (req, file, cb) => {
+          if (
+            file.mimetype === 'application/pdf' ||
+            file.mimetype.startsWith('image/')
+          ) {
+            cb(null, true);
+          } else {
+            cb(
+              new BadRequestException(
+                'Solo se permiten archivos PDF o imágenes (JPG, PNG).',
+              ),
+              false,
+            );
+          }
+        },
+      },
+    ),
+  )
+  @ApiOperation({
+    summary: 'Registrar solicitud con aval adjunto (estado=2, no loguea aún)',
+  })
+  async registrarSolicitud(
+    @Body() dto: SolicitudRegistroDto,
+    @UploadedFiles()
+    files: {
+      file?: Express.Multer.File[];
+      fileReverso?: Express.Multer.File[];
+    },
+  ) {
+    const mainFile = files.file?.[0];
+    const reversoFile = files.fileReverso?.[0];
+
+    if (!mainFile) {
+      throw new BadRequestException('El documento de aval es obligatorio.');
+    }
+
+    // Si es imagen, concatenamos nombres si existe reverso
+    const docPath = reversoFile
+      ? `${mainFile.filename}|${reversoFile.filename}`
+      : mainFile.filename;
+
+    return this.usuariosService.registrarSolicitud(dto, docPath);
+  }
+
+  @Roles('Coordinador', 'Super Usuario')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Get('solicitudes/pendientes')
+  @ApiOperation({
+    summary: 'Listar usuarios en estado pendiente de aprobación (estado=2)',
+  })
+  async listarSolicitudesPendientes() {
+    return this.usuariosService.listarSolicitudesPendientes();
+  }
+
+  @Roles('Coordinador', 'Super Usuario')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Patch(':id/solicitud/:accion')
+  @ApiOperation({ summary: 'Aprobar o rechazar solicitud (accion: aprobar|rechazar)' })
+  async aprobarRechazarSolicitud(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('accion') accion: 'aprobar' | 'rechazar',
+  ) {
+    if (accion !== 'aprobar' && accion !== 'rechazar') {
+      throw new BadRequestException('Acción inválida. Use aprobar o rechazar.');
+    }
+    return this.usuariosService.aprobarRechazarSolicitud(id, accion);
+  }
+
+  @Roles('Coordinador', 'Super Usuario')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Get(':id/doc-aval')
+  @ApiOperation({ summary: 'Descargar/Ver documento de aval del usuario' })
+  async obtenerDocAval(
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+    @Query('parte') parte?: string,
+  ) {
+    const docPathStr = await (this.usuariosService as any).obtenerRutaFirmaLocal(
+      id,
+    );
+    if (!docPathStr) {
+      throw new BadRequestException(
+        'El usuario no tiene un documento de aval o no existe.',
+      );
+    }
+
+    // Si contiene |, es que hay anverso y reverso
+    const files = docPathStr.split('|');
+    let targetFile = files[0];
+
+    if (parte === 'reverso' && files.length > 1) {
+      targetFile = files[1];
+    }
+
+    const absolutePath = join(process.cwd(), 'uploads', 'firmas', targetFile);
+
+    if (!fs.existsSync(absolutePath)) {
+      throw new BadRequestException('El archivo físico no existe en el servidor.');
+    }
+
+    res.sendFile(absolutePath);
   }
 }
 

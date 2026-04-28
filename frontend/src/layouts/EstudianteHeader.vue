@@ -1,17 +1,42 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useAuthStore } from '@/stores/auth';
+import { useUIStore } from '@/stores/ui';
 import api from '@/services/api';
 
 const isProfileOpen = ref(false);
 const isDark = ref(false);
 const authStore = useAuthStore();
+const uiStore = useUIStore();
 const profilePhotoUrl = ref('');
+const profileRef = ref<HTMLElement | null>(null);
+const notificationsRef = ref<HTMLElement | null>(null);
+
+const studentNotifications = ref([] as any[])
+const showStudentNotifications = ref(false)
 
 const toggleDark = () => {
   isDark.value = !isDark.value;
   document.documentElement.classList.toggle('dark', isDark.value);
   localStorage.setItem('theme', isDark.value ? 'dark' : 'light');
+};
+
+const fetchStudentNotifications = async () => {
+  try {
+    const res = await api.get('/usuarios/alertas/estudiante');
+    studentNotifications.value = res.data;
+  } catch (error) {
+    console.error('Error fetching student notifications', error);
+  }
+}
+
+const closeDropdowns = (e: MouseEvent) => {
+  if (profileRef.value && !profileRef.value.contains(e.target as Node)) {
+    isProfileOpen.value = false;
+  }
+  if (notificationsRef.value && !notificationsRef.value.contains(e.target as Node)) {
+    showStudentNotifications.value = false;
+  }
 };
 
 onMounted(async () => {
@@ -21,6 +46,9 @@ onMounted(async () => {
     document.documentElement.classList.add('dark');
   }
 
+  fetchStudentNotifications();
+  setInterval(fetchStudentNotifications, 60000);
+
   try {
     const photoRes = await api.get('/usuarios/perfil/foto', { responseType: 'blob' });
     if (profilePhotoUrl.value) URL.revokeObjectURL(profilePhotoUrl.value);
@@ -28,19 +56,30 @@ onMounted(async () => {
   } catch (e) {
     profilePhotoUrl.value = '';
   }
+
+  document.addEventListener('click', closeDropdowns);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeDropdowns);
 });
 </script>
 
 <template>
   <header class="fixed top-0 left-0 right-0 h-[75px] bg-white dark:bg-gray-900 border-b border-slate-200 dark:border-gray-800 z-[100] px-4 md:px-8 flex items-center justify-between shadow-sm transition-colors duration-300">       
     <!-- Logo & Title matching Ponente -->
-    <div class="flex items-center flex-1 space-x-6">
-      <div class="hidden md:flex flex-col flex-shrink-0 cursor-pointer border-r border-slate-200 dark:border-gray-800 pr-6">
+    <!-- Logo & Title -->
+    <div class="flex items-center flex-1 space-x-4 md:space-x-6">
+      <button @click="uiStore.toggleSidebar()" class="lg:hidden w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-50 dark:hover:bg-gray-800 text-slate-500">
+        <span class="material-symbols-outlined text-[24px]">menu</span>
+      </button>
+
+      <div class="hidden sm:flex flex-col flex-shrink-0 cursor-pointer border-r border-slate-200 dark:border-gray-800 pr-6">
         <h2 class="text-primary-dark dark:text-white font-black italic text-2xl tracking-tighter leading-none">twas</h2>
         <p class="text-[6px] leading-tight text-primary-dark/60 dark:text-gray-400 uppercase font-bold tracking-tighter">The World Academy of Sciences</p>
       </div>
 
-      <h1 class="text-base md:text-lg font-black text-umsa-blue dark:text-blue-500 tracking-widest uppercase italic hidden lg:block border-r border-slate-200 dark:border-gray-800 pr-6">
+      <h1 class="text-xs md:text-sm font-black text-umsa-blue dark:text-blue-500 tracking-widest uppercase italic hidden md:block">
         Portal Estudiante
       </h1>
     </div>
@@ -69,15 +108,59 @@ onMounted(async () => {
         <span class="material-symbols-outlined text-[20px]">{{ isDark ? 'light_mode' : 'dark_mode' }}</span>
       </button>
 
-      <button class="relative p-2.5 text-slate-400 hover:text-umsa-blue hover:bg-slate-50 dark:hover:bg-gray-900 rounded-xl transition-all hidden sm:block">
-        <span class="material-symbols-outlined text-[24px]">notifications</span>
-        <span class="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-950"></span>
-      </button>
+      <div class="relative" ref="notificationsRef">
+        <button
+          @click="showStudentNotifications = !showStudentNotifications"
+          class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 dark:bg-gray-800 text-slate-500 dark:text-gray-400 hover:text-umsa-blue hover:bg-slate-100 dark:hover:text-blue-500 dark:hover:bg-gray-700 transition-all shadow-sm border border-slate-200 dark:border-gray-700 relative"
+          aria-label="Notificaciones"
+        >
+          <span class="material-symbols-outlined text-[22px]" :class="studentNotifications.some(n => n.prioridad === 'alta') ? 'animate-pulse text-primary-dark dark:text-white' : ''">notifications</span>
+          <span v-if="studentNotifications.length > 0" class="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-gray-950" :class="studentNotifications.some(n => n.prioridad === 'alta') ? 'animate-ping' : ''"></span>
+          <span v-if="studentNotifications.length > 0" class="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-gray-950"></span>
+        </button>
+
+        <!-- Dropdown Estudiante -->
+        <div v-if="showStudentNotifications" @click.stop
+          class="absolute right-0 mt-4 w-72 md:w-80 bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-gray-800 z-[200] overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
+          <div class="p-5 border-b border-slate-100 dark:border-gray-800 flex justify-between items-center bg-slate-50/50 dark:bg-gray-800/50">
+            <h3 class="text-[10px] font-black text-primary-dark dark:text-white uppercase tracking-widest">Alertas del Sistema</h3>
+            <span class="text-[8px] font-bold text-slate-400 uppercase bg-slate-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">{{ studentNotifications.length }}</span>
+          </div>
+          
+          <div class="max-h-[60vh] overflow-y-auto overscroll-contain">
+            <div v-for="notif in studentNotifications" :key="notif.id"
+              @click="$router.push('/estudiante/perfil'); showStudentNotifications = false"
+              class="p-4 hover:bg-slate-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer border-b border-slate-50 dark:border-gray-800 last:border-0 group">
+              <div class="flex items-start gap-3">
+                <div :class="[
+                  'w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 shrink-0',
+                  notif.tipo === 'success' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
+                ]">
+                  <span class="material-symbols-outlined text-[20px]">{{ notif.tipo === 'success' ? 'verified' : 'priority_high' }}</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-[10px] font-black text-primary-dark dark:text-white uppercase leading-tight truncate">{{ notif.titulo }}</p>
+                  <p class="text-[9px] text-slate-500 dark:text-gray-400 mt-1 leading-relaxed">{{ notif.mensaje }}</p>
+                  <div class="flex items-center gap-1 mt-2 text-[7px] font-bold text-slate-400 uppercase tracking-tighter">
+                    <span class="material-symbols-outlined text-[10px]">schedule</span>
+                    {{ new Date(notif.fecha).toLocaleDateString() }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="studentNotifications.length === 0" class="p-10 text-center">
+              <span class="material-symbols-outlined text-4xl text-slate-200 dark:text-gray-800 mb-2">notifications_off</span>
+              <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">No hay nuevas alertas</p>
+            </div>
+          </div>
+        </div>
+      </div>
       
       <div class="w-px h-8 bg-slate-200 dark:bg-gray-800 mx-2 hidden sm:block"></div>
       
       <!-- Profile Button matched exactly to Ponente -->
-      <div class="relative" @click.stop>
+      <div class="relative" ref="profileRef">
         <button @click="isProfileOpen = !isProfileOpen" class="flex items-center gap-2 md:gap-3 bg-slate-50 dark:bg-gray-900 border border-slate-200 dark:border-gray-700 hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors rounded-xl pr-2 md:pr-3 py-1 pl-1 shadow-sm">
           <div class="h-8 w-8 rounded-full overflow-hidden bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 p-0 flex flex-shrink-0 items-center justify-center">
             <img v-if="profilePhotoUrl" :src="profilePhotoUrl" alt="Foto" class="w-full h-full object-cover" />
