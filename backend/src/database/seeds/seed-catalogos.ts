@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../../app.module';
 import { DataSource } from 'typeorm';
-import { GradoAcademico } from '../../grados-academicos/entities/grado-academico.entity';
+import { GradoAcademico } from '../../modules/Usuario/grados-academicos/entities/grado-academico.entity';
 
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);

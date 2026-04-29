@@ -5,41 +5,41 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 
 // --- Usuarios y Accesos ---
-import { UsuariosModule } from './usuarios/usuarios.module';
-import { PersonasModule } from './personas/personas.module';
-import { RolesModule } from './roles/roles.module';
-import { UsuariosRolesModule } from './usuarios-roles/usuarios-roles.module';
-import { AfiliacionesModule } from './afiliaciones/afiliaciones.module';
-import { GradosAcademicosModule } from './grados-academicos/grados-academicos.module';
+import { UsuariosModule } from './modules/Usuario/usuarios/usuarios.module';
+import { PersonasModule } from './modules/Usuario/personas/personas.module';
+import { RolesModule } from './modules/Usuario/roles/roles.module';
+import { UsuariosRolesModule } from './modules/Usuario/usuarios-roles/usuarios-roles.module';
+import { AfiliacionesModule } from './modules/Usuario/afiliaciones/afiliaciones.module';
+import { GradosAcademicosModule } from './modules/Usuario/grados-academicos/grados-academicos.module';
 
 // --- Eventos y Actividades ---
-import { EventosModule } from './eventos/eventos.module';
-import { CoordinacionesModule } from './coordinaciones/coordinaciones.module';
-import { ActividadesAcademicasModule } from './actividades-academicas/actividades-academicas.module';
-import { ImparticionesModule } from './imparticiones/imparticiones.module';
+import { EventosModule } from './modules/Academico/eventos/eventos.module';
+import { CoordinacionesModule } from './modules/Academico/coordinaciones/coordinaciones.module';
+import { ActividadesAcademicasModule } from './modules/Academico/actividades-academicas/actividades-academicas.module';
+import { ImparticionesModule } from './modules/Academico/imparticiones/imparticiones.module';
 
 // --- Modalidades y Sesiones ---
-import { CursoModalidadesModule } from './curso-modalidades/curso-modalidades.module';
-import { SesionesAcademicasModule } from './sesiones-academicas/sesiones-academicas.module';
+import { CursoModalidadesModule } from './modules/Academico/curso-modalidades/curso-modalidades.module';
+import { SesionesAcademicasModule } from './modules/Academico/sesiones-academicas/sesiones-academicas.module';
 
 // --- Inscripciones y Asistencias ---
-import { InscripcionesModule } from './inscripciones/inscripciones.module';
-import { InscripcionModalidadesModule } from './inscripcion-modalidades/inscripcion-modalidades.module';
-import { AsistenciasModule } from './asistencias/asistencias.module';
+import { InscripcionesModule } from './modules/Inscripciones/inscripciones/inscripciones.module';
+import { InscripcionModalidadesModule } from './modules/Inscripciones/inscripcion-modalidades/inscripcion-modalidades.module';
+import { AsistenciasModule } from './modules/Inscripciones/asistencias/asistencias.module';
 
 // --- Certificados ---
-import { InfoCertificadosModule } from './info-certificados/info-certificados.module';
-import { CertificadosModule } from './certificados/certificados.module';
-import { UsuariosCertificadosModule } from './usuarios-certificados/usuarios-certificados.module';
+import { InfoCertificadosModule } from './modules/Certificacion/info-certificados/info-certificados.module';
+import { CertificadosModule } from './modules/Certificacion/certificados/certificados.module';
+import { UsuariosCertificadosModule } from './modules/Certificacion/usuarios-certificados/usuarios-certificados.module';
 
 // --- Auth ---
-import { AuthModule } from './auth/auth.module';
+import { AuthModule } from './modules/Seguridad/auth/auth.module';
 
 // --- Archivos ---
-import { UploadsModule } from './uploads/uploads.module';
+import { UploadsModule } from './modules/Comun/uploads/uploads.module';
 
 // --- Dashboard ---
-import { CoordinadorModule } from './coordinador/coordinador.module';
+import { CoordinadorModule } from './modules/Academico/coordinador/coordinador.module';
 
 @Module({
   imports: [
