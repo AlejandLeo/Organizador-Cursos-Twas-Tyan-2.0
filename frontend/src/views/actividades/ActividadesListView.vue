@@ -339,9 +339,9 @@ const nuevaActividad = ref({
         },
         custom: [
             { label: 'Matrícula / Título / Aval (Documento de Respaldo)', type: 'file', mandatory: true }
-        ],
-        lockTipo: false
-    }
+        ] as any[]
+    },
+    lockTipo: false
 });
 
 const resetNuevaActividad = (eventoId: number) => {
@@ -368,9 +368,9 @@ const resetNuevaActividad = (eventoId: number) => {
             },
             custom: [
                 { label: 'Matrícula / Título / Aval (Documento de Respaldo)', type: 'file', mandatory: true }
-            ],
-            lockTipo: false
-        }
+            ] as any[]
+        },
+        lockTipo: false
     };
     imagenArchivo.value = null;
     imagenPreview.value = null;
@@ -396,6 +396,7 @@ const editarActividad = async (act: any) => {
             fecha_inicio: act.fecha_inicio_raw || '',
             fecha_fin: act.fecha_fin_raw || '',
             sesiones: [],
+            lockTipo: false,
             requisitos: act.requisitos || { base: {}, custom: [] }
         };
         
