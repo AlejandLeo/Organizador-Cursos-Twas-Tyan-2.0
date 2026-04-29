@@ -1,9 +1,9 @@
 import { Seeder } from 'typeorm-extension';
 import { DataSource } from 'typeorm';
-import { Usuario } from '../../../usuarios/entities/usuario.entity';
-import { Persona } from '../../../personas/entities/persona.entity';
-import { Rol } from '../../../roles/entities/rol.entity';
-import { UsuarioRol } from '../../../usuarios-roles/entities/usuario-rol.entity';
+import { Usuario } from '../../../modules/Usuario/usuarios/entities/usuario.entity';
+import { Persona } from '../../../modules/Usuario/personas/entities/persona.entity';
+import { Rol } from '../../../modules/Usuario/roles/entities/rol.entity';
+import { UsuarioRol } from '../../../modules/Usuario/usuarios-roles/entities/usuario-rol.entity';
 import * as bcrypt from 'bcrypt';
 
 export default class SuperadminSeeder implements Seeder {

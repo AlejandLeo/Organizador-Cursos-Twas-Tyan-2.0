@@ -1,10 +1,10 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../../app.module';
 import { DataSource } from 'typeorm';
-import { Evento } from '../../eventos/entities/evento.entity';
-import { ActividadAcademica } from '../../actividades-academicas/entities/actividad-academica.entity';
-import { Usuario } from '../../usuarios/entities/usuario.entity';
-import { Imparticion } from '../../imparticiones/entities/imparticion.entity';
+import { Evento } from '../../modules/Academico/eventos/entities/evento.entity';
+import { ActividadAcademica } from '../../modules/Academico/actividades-academicas/entities/actividad-academica.entity';
+import { Usuario } from '../../modules/Usuario/usuarios/entities/usuario.entity';
+import { Imparticion } from '../../modules/Academico/imparticiones/entities/imparticion.entity';
 
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);
