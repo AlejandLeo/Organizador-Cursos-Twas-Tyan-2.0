@@ -1,6 +1,6 @@
 import { Seeder } from 'typeorm-extension';
 import { DataSource } from 'typeorm';
-import { Usuario } from '../../../usuarios/entities/usuario.entity';
+import { Usuario } from '../../../modules/Usuario/usuarios/entities/usuario.entity';
 
 export default class CleanUsersSeeder implements Seeder {
   public async run(dataSource: DataSource): Promise<void> {

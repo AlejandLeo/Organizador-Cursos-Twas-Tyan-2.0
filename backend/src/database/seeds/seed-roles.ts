@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../../app.module';
 import { DataSource } from 'typeorm';
-import { Rol } from '../../roles/entities/rol.entity';
+import { Rol } from '../../modules/Usuario/roles/entities/rol.entity';
 
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);

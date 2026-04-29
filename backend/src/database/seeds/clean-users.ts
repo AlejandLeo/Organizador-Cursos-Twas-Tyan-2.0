@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../../app.module';
 import { DataSource } from 'typeorm';
-import { Usuario } from '../../usuarios/entities/usuario.entity';
+import { Usuario } from '../../modules/Usuario/usuarios/entities/usuario.entity';
 
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);

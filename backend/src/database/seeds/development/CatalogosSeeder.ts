@@ -1,6 +1,6 @@
 import { Seeder } from 'typeorm-extension';
 import { DataSource } from 'typeorm';
-import { GradoAcademico } from '../../../grados-academicos/entities/grado-academico.entity';
+import { GradoAcademico } from '../../../modules/Usuario/grados-academicos/entities/grado-academico.entity';
 
 export default class CatalogosSeeder implements Seeder {
   public async run(dataSource: DataSource): Promise<void> {
