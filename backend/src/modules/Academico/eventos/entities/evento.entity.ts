@@ -59,6 +59,12 @@ export class Evento {
   @Column({ length: 255, nullable: true })
   logo: string;
 
+  @Column({ length: 50, nullable: true })
+  telefono: string;
+
+  @Column({ length: 150, nullable: true })
+  email: string;
+
   /** UUID o URL para la imagen de fondo de las vistas del evento */
   @Column({ length: 255, nullable: true })
   imagen_fondo: string;
@@ -81,6 +87,9 @@ export class Evento {
   /** Almacena el cronograma en formato JSON o texto */
   @Column({ type: 'text', nullable: true })
   cronograma: string;
+
+  @Column({ type: 'text', nullable: true })
+  organizadores: string;
 
   // ── Relaciones ────────────────────────────────────────────────────────────
 

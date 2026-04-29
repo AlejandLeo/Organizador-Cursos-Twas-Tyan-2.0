@@ -13,7 +13,9 @@ import { Persona } from '../../Usuario/personas/entities/persona.entity';
  * el módulo importa TypeOrmModule — no hay que declararlo explícitamente.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Usuario, Persona])],
+  imports: [
+    TypeOrmModule.forFeature([Usuario, Persona]),
+  ],
   controllers: [UsuariosController],
   providers: [UsuariosService],
   exports: [UsuariosService],

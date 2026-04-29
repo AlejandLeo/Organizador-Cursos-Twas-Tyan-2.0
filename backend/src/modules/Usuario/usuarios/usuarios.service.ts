@@ -578,7 +578,7 @@ export class UsuariosService {
     const existe = await this.usuarioRepository.findOneBy({ email: dto.email });
     if (existe) {
       throw new ConflictException(
-        `El email '${dto.email}' ya está registrado.`,
+        'El correo electrónico seleccionado ya fue registrado o solicitado previamente.',
       );
     }
 
@@ -894,7 +894,7 @@ export class UsuariosService {
     const existe = await this.usuarioRepository.findOneBy({ email: dto.email });
     if (existe) {
       throw new ConflictException(
-        `El email '${dto.email}' ya está registrado.`,
+        'El correo electrónico seleccionado ya fue registrado o solicitado previamente.',
       );
     }
 
@@ -919,6 +919,7 @@ export class UsuariosService {
         primer_apellido: dto.primer_apellido,
         segundo_apellido: dto.segundo_apellido,
         documento_identidad: dto.documento_identidad,
+        genero: dto.genero,
         firma_dig: docFile, // Se reutiliza para almacenar el nombre del doc. de aval
         usuario: usuarioGuardado,
       });
@@ -938,6 +939,7 @@ export class UsuariosService {
       }
 
       await queryRunner.commitTransaction();
+
       return {
         mensaje:
           'Su solicitud fue recepcionada correctamente. La confirmación de su cuenta se realizará una vez finalice el proceso de inscripciones y sea validada por administración.',

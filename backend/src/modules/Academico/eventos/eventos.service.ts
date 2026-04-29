@@ -42,7 +42,7 @@ export class EventosService {
     if (filenameOrUrl.startsWith('http')) return filenameOrUrl;
     
     const baseUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
-    return `${baseUrl}/uploads/${folder}/${filenameOrUrl}`;
+    return `${baseUrl}/uploads/${folder}/${encodeURIComponent(filenameOrUrl)}`;
   }
 
   async findAll() {
@@ -51,7 +51,7 @@ export class EventosService {
     });
     return eventos.map(evento => ({
       ...evento,
-      logo: this.formatImageUrl(evento.logo, 'eventos'),
+      logo: this.formatImageUrl(evento.logo, 'logo'),
       imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
       actividades: (evento.actividades || []).map(act => ({
         ...act,
@@ -65,7 +65,7 @@ export class EventosService {
     if (evento) {
       return {
         ...evento,
-        logo: this.formatImageUrl(evento.logo, 'eventos'),
+        logo: this.formatImageUrl(evento.logo, 'logo'),
         imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos')
       };
     }
@@ -180,7 +180,7 @@ export class EventosService {
 
     const data = eventos.map((evento) => ({
       ...evento,
-      logo: this.formatImageUrl(evento.logo, 'eventos'),
+      logo: this.formatImageUrl(evento.logo, 'logo'),
       imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
       actividades: (evento.actividades || []).map(act => ({
         ...act,
@@ -208,7 +208,7 @@ export class EventosService {
     const guardado = await this.eventoRepository.save(evento);
     return {
       ...guardado,
-      logo: this.formatImageUrl(guardado.logo, 'eventos'),
+      logo: this.formatImageUrl(guardado.logo, 'logo'),
       imagen_fondo: this.formatImageUrl(guardado.imagen_fondo, 'fondos'),
     };
   }
@@ -253,7 +253,7 @@ export class EventosService {
     const actualizado = await this.eventoRepository.findOneBy({ id });
     return {
       ...actualizado,
-      logo: this.formatImageUrl(actualizado!.logo, 'eventos'),
+      logo: this.formatImageUrl(actualizado!.logo, 'logo'),
       imagen_fondo: this.formatImageUrl(actualizado!.imagen_fondo, 'fondos'),
     };
   }

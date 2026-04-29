@@ -29,6 +29,18 @@ export class CreateEventoDto {
   @IsString()
   direccion?: string;
 
+  @ApiPropertyOptional({ example: '+591 2 2792238' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  telefono?: string;
+
+  @ApiPropertyOptional({ example: 'contacto@evento.com' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  email?: string;
+
   @ApiPropertyOptional({ example: '2025-07-14' })
   @IsOptional()
   @IsDateString()
@@ -82,4 +94,9 @@ export class CreateEventoDto {
   @IsOptional()
   @IsString()
   cronograma?: string;
+
+  @ApiPropertyOptional({ example: 'TWAS, TYAN, UMSA' })
+  @IsOptional()
+  @IsString()
+  organizadores?: string;
 }

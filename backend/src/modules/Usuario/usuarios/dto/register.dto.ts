@@ -10,6 +10,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 /**
  * DTO para registro completo: crea USUARIO + PERSONA en una sola petición.
@@ -42,11 +43,12 @@ export class RegisterDto {
   @IsString()
   documento_identidad?: string;
 
-  @IsOptional()
-  @IsInt({ message: 'El género debe ser un número entero (0-3).' })
+  @IsNotEmpty({ message: 'El sexo es obligatorio.' })
+  @Type(() => Number)
+  @IsInt({ message: 'El sexo debe ser un número entero (0: Masculino, 1: Femenino, 2: Otro).' })
   @Min(0)
-  @Max(3)
-  genero?: number;
+  @Max(2)
+  genero: number;
 
   @IsOptional()
   @IsString()

@@ -606,14 +606,15 @@ export class UsuariosController {
     @Res() res: Response,
     @Query('parte') parte?: string,
   ) {
-    const docPathStr = await (this.usuariosService as any).obtenerRutaFirmaLocal(
-      id,
-    );
-    if (!docPathStr) {
+    const usuario = await this.usuariosService.getPerfil(id);
+    
+    if (!usuario || !usuario.persona || !usuario.persona.firma_dig) {
       throw new BadRequestException(
         'El usuario no tiene un documento de aval o no existe.',
       );
     }
+
+    const docPathStr = usuario.persona.firma_dig;
 
     // Si contiene |, es que hay anverso y reverso
     const files = docPathStr.split('|');
