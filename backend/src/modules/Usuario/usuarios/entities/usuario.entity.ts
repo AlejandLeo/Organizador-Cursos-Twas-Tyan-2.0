@@ -37,9 +37,13 @@ export class Usuario {
   @Column({ length: 255 })
   password: string;
 
-  /** 1 = Activo | 0 = Inactivo */
+  /** 1 = Activo | 0 = Inactivo | 2 = Pendiente | -1 = Rechazado */
   @Column({ type: 'integer', default: 1 })
   estado: number;
+
+  /** Flag para obligar al cambio de contraseña en el primer acceso o tras un reset */
+  @Column({ type: 'boolean', default: false })
+  requiere_cambio_password: boolean;
 
   // ── Relaciones ────────────────────────────────────────────────────────────
 

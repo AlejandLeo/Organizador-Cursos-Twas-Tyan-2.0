@@ -17,6 +17,7 @@ import { Asistencia } from '../../Inscripciones/asistencias/entities/asistencia.
 import { InscripcionModalidad } from '../../Inscripciones/inscripcion-modalidades/entities/inscripcion-modalidad.entity';
 import { Imparticion } from '../../Academico/imparticiones/entities/imparticion.entity';
 import { Usuario } from '../../Usuario/usuarios/entities/usuario.entity';
+import { MailService } from '../../Comun/mail/mail.service';
 
 @Injectable()
 export class InscripcionesService {
@@ -33,6 +34,7 @@ export class InscripcionesService {
     private readonly imparticionRepository: Repository<Imparticion>,
     @InjectRepository(Usuario)
     private readonly usuarioRepository: Repository<Usuario>,
+    private readonly mailService: MailService,
   ) {}
 
   // ── Estudiante ─────────────────────────────────────────────
@@ -175,10 +177,34 @@ export class InscripcionesService {
   }
 
   async cambiarEstado(id: number, estado: number, observacion?: string) {
-    const inscripcion = await this.inscripcionRepository.findOneBy({ id });
+    const inscripcion = await this.inscripcionRepository.findOne({
+      where: { id },
+      relations: ['usuario', 'usuario.persona', 'actividadAcademica', 'actividadAcademica.evento'],
+    });
+
     if (!inscripcion)
       throw new NotFoundException(`Inscripción ${id} no encontrada`);
+
     await this.inscripcionRepository.update(id, { estado, observacion });
+
+    // Notificación por correo
+    try {
+      const email = inscripcion.usuario?.email;
+      const nombre = inscripcion.usuario?.persona 
+        ? `${inscripcion.usuario.persona.nombres} ${inscripcion.usuario.persona.primer_apellido}`
+        : 'Estudiante';
+      const actividad = inscripcion.actividadAcademica?.nombre || 'Actividad';
+      const evento = inscripcion.actividadAcademica?.evento?.nombre || 'Evento';
+
+      if (estado === 1) {
+        await this.mailService.sendEnrollmentConfirmedEmail(email, nombre, actividad, evento);
+      } else if (estado === 2) { // Asumiendo que 2 o similar es "Rechazado" o "Observado"
+        await this.mailService.sendEnrollmentRejectedEmail(email, nombre, actividad, observacion);
+      }
+    } catch (error) {
+      console.error('Error enviando correo de cambio de estado:', error);
+    }
+
     return this.inscripcionRepository.findOneBy({ id });
   }
 
