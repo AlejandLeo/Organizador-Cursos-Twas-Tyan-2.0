@@ -1,6 +1,9 @@
   <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
+  import { useEventoStore } from '@/stores/eventoStore';
+
   const { t } = useI18n();
+  const eventoStore = useEventoStore();
 
   const socialLinks = [
     { name: 'TWAS', href: 'https://twas.org/', img: '/images/TWAS_Logo.webp' },
@@ -23,31 +26,38 @@
           <!-- Columna de ubicación -->
           <div>
             <h3 class="font-bold text-lg mb-4 border-b-2 border-umsa-blue dark:border-blue-500 pb-2 inline-block">{{ t('footer.where_we_are') }}</h3>
-            <p class="text-gray-300 leading-relaxed">{{ t('footer.address') }}</p>
+            <p class="text-gray-300 leading-relaxed">{{ eventoStore.activeEvento?.direccion || eventoStore.activeEvento?.ubicacion || t('footer.address') }}</p>
           </div>
           
           <!-- Columna de contacto -->
           <div>
             <h3 class="font-bold text-lg mb-4 border-b-2 border-umsa-blue dark:border-blue-500 pb-2 inline-block">{{ t('footer.contact_us') }}</h3>
-            <p class="text-gray-300 leading-relaxed">{{ t('footer.phone') }}: +591 76706873</p>
-            <p class="text-gray-300 leading-relaxed">{{ t('footer.email') }}: lktejeda@umsa.bo</p>
+            <p class="text-gray-300 leading-relaxed">{{ t('footer.phone') }}: {{ eventoStore.activeEvento?.telefono || '+591 76706873' }}</p>
+            <p class="text-gray-300 leading-relaxed">{{ t('footer.email') }}: {{ eventoStore.activeEvento?.email || 'lktejeda@umsa.bo' }}</p>
           </div>
           
-          <!-- Columna de logos -->
+          <!-- Columna de logos / Organización -->
           <div>
               <h3 class="font-bold text-lg mb-4 border-b-2 border-umsa-blue dark:border-blue-500 pb-2 inline-block">{{ t('footer.organization') }}</h3>
-              <div class="flex flex-wrap items-center gap-6 mb-4">
-                  <a v-for="link in socialLinks" :key="link.name" :href="link.href" target="_blank" rel="noopener noreferrer">
-                      <!-- <img :src="link.img" :alt="link.name" class="h-12 hover:opacity-80 transition-opacity"> -->
-                      <span class="hover:text-umsa-blue dark:hover:text-blue-400 font-semibold transition-colors">{{ link.name }}</span>
-                  </a>
+              
+              <!-- Si el evento tiene organizadores personalizados -->
+              <div v-if="eventoStore.activeEvento?.organizadores" class="text-gray-300 leading-relaxed font-semibold">
+                {{ eventoStore.activeEvento.organizadores }}
               </div>
-              <div class="flex flex-wrap items-center gap-6">
-                  <a v-for="link in universityLinks" :key="link.name" :href="link.href" target="_blank" rel="noopener noreferrer">
-                      <!-- <img :src="link.img" :alt="link.name" class="h-12 hover:opacity-80 transition-opacity"> -->
-                      <span class="hover:text-umsa-blue dark:hover:text-blue-400 font-semibold transition-colors">{{ link.name }}</span>
-                  </a>
-              </div>
+
+              <!-- Fallback: Logos Institucionales por defecto -->
+              <template v-else>
+                <div class="flex flex-wrap items-center gap-6 mb-4">
+                    <a v-for="link in socialLinks" :key="link.name" :href="link.href" target="_blank" rel="noopener noreferrer">
+                        <span class="hover:text-umsa-blue dark:hover:text-blue-400 font-semibold transition-colors">{{ link.name }}</span>
+                    </a>
+                </div>
+                <div class="flex flex-wrap items-center gap-6">
+                    <a v-for="link in universityLinks" :key="link.name" :href="link.href" target="_blank" rel="noopener noreferrer">
+                        <span class="hover:text-umsa-blue dark:hover:text-blue-400 font-semibold transition-colors">{{ link.name }}</span>
+                    </a>
+                </div>
+              </template>
           </div>
         </div>
 

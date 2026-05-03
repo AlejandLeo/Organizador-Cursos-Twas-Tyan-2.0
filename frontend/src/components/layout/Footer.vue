@@ -1,4 +1,10 @@
-﻿<template>
+<script setup lang="ts">
+import { useEventoStore } from '@/stores/eventoStore'
+
+const eventoStore = useEventoStore()
+</script>
+
+<template>
   <footer id="footer" class="bg-gray-100 border-t border-gray-200 mt-auto font-sans text-sm">
     <div class="max-w-7xl mx-auto px-4 py-8">
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -6,14 +12,20 @@
         <!-- Dónde estamos -->
         <div>
            <strong class="block text-gray-800 mb-2">Dónde estamos:</strong>
-           <p class="text-gray-600">Cota Cota, Calle 27, Edif. Facultad de Ciencias Puras y Naturales - La Paz, Bolivia</p>
+           <p class="text-gray-600">
+             {{ eventoStore.activeEvento?.direccion || eventoStore.activeEvento?.ubicacion || 'Cota Cota, Calle 27, Edif. Facultad de Ciencias Puras y Naturales - La Paz, Bolivia' }}
+           </p>
         </div>
 
         <!-- Contáctanos -->
         <div>
            <strong class="block text-gray-800 mb-2">Contáctanos:</strong>
-           <p class="text-gray-600">Telefono Movil ref.: +591 76706873</p>
-           <p class="text-gray-600">Email: lktejeda@umsa.bo</p>
+           <p class="text-gray-600">
+             Telefono: {{ eventoStore.activeEvento?.telefono || '+591 76706873' }}
+           </p>
+           <p class="text-gray-600">
+             Email: {{ eventoStore.activeEvento?.email || 'lktejeda@umsa.bo' }}
+           </p>
         </div>
 
         <!-- Logos Partners -->

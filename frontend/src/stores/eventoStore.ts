@@ -26,10 +26,16 @@ export const useEventoStore = defineStore('eventoGlobal', () => {
         id: ev.id,
         nombre: ev.nombre,
         gestion: ev.gestion,
-        version: ev.version || `${ev.gestion}`, // Usar edición real o gestión por defecto
+        version: ev.version || `${ev.gestion}`,
         edicion: ev.version ? `${ev.version}` : `Versión ${ev.gestion}`, 
         estado: ev.estado,
-        estadoStr: getEstadoStr(ev.estado)
+        estadoStr: getEstadoStr(ev.estado),
+        logo: ev.logo,
+        telefono: ev.telefono,
+        email: ev.email,
+        direccion: ev.direccion,
+        ubicacion: ev.ubicacion,
+        organizadores: ev.organizadores
       }));
 
       // Seleccionar el primero o activo si no hay nada

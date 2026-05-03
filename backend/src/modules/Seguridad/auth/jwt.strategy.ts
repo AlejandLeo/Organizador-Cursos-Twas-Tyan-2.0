@@ -41,7 +41,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // Obtener estado y roles en tiempo real desde la BD
     try {
       const usuarioReal = await this.usuariosService.findOne(payload.sub);
-      
+
       if (usuarioReal.estado === 0) {
         throw new UnauthorizedException('Tu cuenta ha sido desactivada.');
       }

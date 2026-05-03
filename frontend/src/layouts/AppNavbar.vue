@@ -2,10 +2,12 @@
 import { ref, onMounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter, useRoute } from 'vue-router';
+import { useEventoStore } from '@/stores/eventoStore';
 
 const { t, locale } = useI18n();
 const router = useRouter();
 const route = useRoute();
+const eventoStore = useEventoStore();
 
 const navLinks = computed(() => [
   { name: t('navbar.home'), href: '#inicio' },
@@ -55,11 +57,19 @@ const toggleLang = () => {
   localStorage.setItem('lang', locale.value);
 };
 
-onMounted(() => {
+onMounted(async () => {
   if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
     isDark.value = true;
     document.documentElement.classList.add('dark');
   }
+  
+  // Asegurar que tenemos la info de los eventos para el logo/contacto
+  console.log('AppNavbar mounted, checking eventos store...');
+  if (eventoStore.eventosAplanados.length === 0) {
+    console.log('Store empty, fetching eventos info...');
+    await eventoStore.fetchEventosInfo();
+  }
+  console.log('Active Evento in Navbar:', eventoStore.activeEvento);
 });
 </script>
 
@@ -68,17 +78,39 @@ onMounted(() => {
     <div class="w-full px-4 md:px-12 lg:px-24">
       <div class="flex justify-between items-center h-20">
         
-        <!-- Left: Logos -->
-        <div class="flex items-center gap-4 shrink-0">
-          <a href="https://twas.org/" target="_blank" rel="noopener noreferrer" class="flex flex-col items-center">
-            <!-- Text fallback for UNESCO-TWAS -->
-            <span class="text-[0.6rem] leading-none text-blue-900 dark:text-blue-300 font-bold uppercase tracking-tighter">The World Academy of Sciences</span>
-            <span class="text-xs text-blue-900 dark:text-blue-300 font-semibold">UNESCO</span>
-          </a>
-          <a href="https://twas.org/tyan" target="_blank" rel="noopener noreferrer" class="flex items-center bg-[#0074b3] dark:bg-blue-600 text-white px-3 py-1 rounded-sm">
-            <!-- Text fallback for TYAN -->
-            <span class="font-bold text-xl tracking-wider">TYAN</span>
-          </a>
+        <!-- SECCIÓN DE LOGOS (IZQUIERDA) -->
+        <div class="flex items-center gap-6 shrink-0 h-full">
+          <RouterLink to="/" @click="scrollTo('#inicio')" class="flex items-center gap-6 group cursor-pointer">
+            
+            <!-- 1. LOGO PRINCIPAL FIJO -->
+            <div class="relative flex items-center">
+              <!-- Filtro para modo oscuro si el logo tiene fondo blanco -->
+              <img src="http://localhost:3000/uploads/logo/logo%20jpg.jpg" alt="Institución" class="h-10 md:h-14 w-auto object-contain transition-all duration-300 group-hover:scale-105 dark:brightness-110 dark:contrast-125" />
+            </div>
+
+            <!-- Divisor Vertical Elegante -->
+            <div class="h-8 w-px bg-gray-200 dark:bg-gray-700 hidden sm:block"></div>
+
+            <!-- 2. MARCA DINÁMICA DEL EVENTO -->
+            <div class="flex items-center min-w-[120px] md:min-w-[150px]">
+              <!-- Logo Dinámico -->
+              <template v-if="eventoStore.activeEvento?.logo && !eventoStore.activeEvento.logo.includes('null')">
+                <img :src="eventoStore.activeEvento.logo" :alt="eventoStore.activeEvento.nombre" class="h-10 md:h-14 w-auto object-contain animate-in fade-in zoom-in duration-500 dark:brightness-110" />
+              </template>
+              
+              <!-- Fallback Institucional -->
+              <div v-else class="flex items-center gap-3 md:gap-4 animate-in fade-in duration-500">
+                <div class="flex flex-col items-start">
+                  <span class="text-[0.5rem] md:text-[0.6rem] leading-none text-blue-900 dark:text-blue-300 font-black uppercase tracking-tighter">The World Academy of Sciences</span>
+                  <span class="text-[10px] md:text-[11px] text-blue-800 dark:text-blue-400 font-bold">UNESCO</span>
+                </div>
+                <div class="bg-[#0074b3] dark:bg-blue-600 text-white px-2 py-0.5 md:px-3 md:py-1 rounded shadow-md border border-blue-400/20">
+                  <span class="font-black text-lg md:text-xl tracking-tighter italic">TYAN</span>
+                </div>
+              </div>
+            </div>
+            
+          </RouterLink>
         </div>
 
         <!-- Mobile Menu Button -->

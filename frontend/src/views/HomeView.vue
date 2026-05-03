@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import api from '@/services/api';
+import { useEventoStore } from '@/stores/eventoStore';
+
+const eventoStore = useEventoStore();
 
 const eventosActivos = ref<any[]>([]);
 const ponentesDB = ref<any[]>([]);
@@ -87,6 +90,10 @@ const cargarEventos = async () => {
         // Set default to first active event
         if (eventosActivos.value.length > 0) {
             eventoSeleccionado.value = eventosActivos.value[0];
+            // Sincronizar con el store global si no hay uno seleccionado
+            if (!eventoStore.selectedEventoId) {
+                eventoStore.setVersion(eventoSeleccionado.value.id);
+            }
         } else {
             eventoSeleccionado.value = {
                 title: 'Bienvenidos al Portal TYAN',
@@ -110,6 +117,7 @@ onMounted(() => {
 
 const seleccionarEvento = (evento: any) => {
   eventoSeleccionado.value = evento;
+  eventoStore.setVersion(evento.id); // Sincronizar con el resto de la app (logo, contacto, etc)
   isDropdownOpen.value = false;
 };
 

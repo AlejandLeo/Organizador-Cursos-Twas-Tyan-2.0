@@ -1,5 +1,8 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import { useEventoStore } from '@/stores/eventoStore'
+
+const eventoStore = useEventoStore()
 </script>
 
 <template>
@@ -7,16 +10,17 @@ import { RouterLink } from 'vue-router'
     <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex flex-col md:flex-row justify-between items-center h-auto md:h-24 py-2">
         
-        <!-- Logos IZQUIERDA (UNESCO - TYAN) -->
+        <!-- Logos IZQUIERDA (Dinámico por Evento) -->
         <div class="flex items-center gap-4 mb-2 md:mb-0">
-          <a href="https://twas.org/" target="_blank" class="hover:opacity-80 transition-opacity">
-            <!-- Placeholder UNESCO -->
-            <div class="h-12 w-12 bg-blue-100 flex items-center justify-center text-blue-800 text-xs font-bold rounded">UNESCO TWAS</div>
-          </a>
-          <a href="https://twas.org/tyan" target="_blank" class="hover:opacity-80 transition-opacity">
-             <!-- Placeholder TYAN -->
-             <div class="h-10 w-24 bg-green-100 flex items-center justify-center text-green-800 text-xs font-bold rounded">TYAN</div>
-          </a>
+          <RouterLink to="/" class="hover:opacity-80 transition-opacity flex items-center">
+            <template v-if="eventoStore.activeEvento?.logo">
+              <img :src="eventoStore.activeEvento.logo" alt="Logo Evento" class="h-16 w-auto object-contain" />
+            </template>
+            <div v-else class="flex items-center gap-3">
+              <div class="h-12 w-12 bg-blue-100 flex items-center justify-center text-blue-800 text-[10px] font-bold rounded text-center leading-tight p-1">UNESCO TWAS</div>
+              <div class="h-10 w-20 bg-green-100 flex items-center justify-center text-green-800 text-[10px] font-bold rounded text-center p-1">TYAN</div>
+            </div>
+          </RouterLink>
         </div>
 
         <!-- MENU CENTRO -->
