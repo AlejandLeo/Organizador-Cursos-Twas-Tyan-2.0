@@ -77,6 +77,10 @@ export class Persona {
   @Column({ type: 'boolean', default: false })
   perfil_completado: boolean;
 
+  /** Flag para indicar si el ponente ya activó su portal. */
+  @Column({ type: 'boolean', default: false })
+  ponente_configurado: boolean;
+
   // ── Relación ─────────────────────────────────────────────────────────────
 
   /**

@@ -91,6 +91,12 @@ export class Evento {
   @Column({ type: 'text', nullable: true })
   organizadores: string;
 
+  @Column({ length: 100, nullable: true })
+  sigla: string;
+
+  @Column({ length: 50, nullable: true })
+  color_principal: string;
+
   // ── Relaciones ────────────────────────────────────────────────────────────
 
   /** Un evento tiene múltiples actividades (cursos, talleres, conferencias). */

@@ -29,6 +29,8 @@ export interface Persona {
   celular?: string;
   fecha_registro: string;
   firma_dig?: string;
+  perfil_completado?: boolean;
+  ponente_configurado?: boolean;
   id_usuario: string;
 }
 

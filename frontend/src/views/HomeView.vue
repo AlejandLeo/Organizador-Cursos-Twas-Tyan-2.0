@@ -67,11 +67,16 @@ const cargarEventos = async () => {
                 color: colors[index % colors.length],
                 icon: icons[index % icons.length],
                 imagen_fondo: ev.imagen_fondo || 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?w=1600&q=80',
+                logo: ev.imagen_portada || null,
                 google_maps_link: ev.google_maps_link || null,
                 direccion: ev.direccion || null,
                 sobre_evento_1: ev.sobre_evento_1 || null,
-                sobre_evento_2: ev.sobre_evento_2 || null,
                 frase_destacada: ev.frase_destacada || null,
+                sigla: ev.sigla || 'TYAN',
+                color_principal: ev.color_principal || '#0070b4',
+                institucion_badge: ev.institucion_badge || 'Evento Oficial OEA/TYAN',
+                link_facebook: ev.link_facebook || null,
+                link_web: ev.link_web || null,
                 cronograma: (() => {
                     if (!ev.cronograma) return null;
                     try { 
@@ -137,18 +142,17 @@ const abrirMapa = (url: string) => {
         <div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/80 to-transparent dark:from-black dark:via-black/80 z-20"></div>
 
         <div class="relative z-30 w-full px-6 md:px-16 lg:px-24 max-w-[2500px] mx-auto flex flex-col items-start mt-auto">
-            
             <!-- ROW 1: SELECTOR DE EVENTO Y BADGE OFICIAL (Lineales Izquierda) -->
             <div class="flex flex-col md:flex-row items-center justify-start gap-4 mb-8 w-full md:w-auto relative z-50 animate-in fade-in slide-in-from-bottom-2 duration-500">
                <!-- Elegante Selector de Eventos -->
                <div class="relative w-full sm:w-auto min-w-[300px]">
                    <button @click="isDropdownOpen = !isDropdownOpen" class="w-full flex items-center justify-between gap-4 px-5 py-3.5 bg-black/40 backdrop-blur-xl border border-white/10 hover:border-emerald-400/50 rounded-2xl text-white shadow-2xl transition-all group">
                        <div class="flex items-center gap-3">
-                           <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-lg bg-emerald-500">
+                           <div :style="{ backgroundColor: eventoSeleccionado?.color_principal || '#10b981' }" class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-lg">
                               <span class="material-symbols-outlined text-white text-[16px] group-hover:animate-pulse">event_available</span>
                            </div>
                            <div class="text-left overflow-hidden">
-                               <p class="text-[8px] font-black uppercase tracking-widest text-emerald-400 mb-0.5">Gestión Actual</p>
+                               <p :style="{ color: eventoSeleccionado?.color_principal || '#10b981' }" class="text-[8px] font-black uppercase tracking-widest mb-0.5">Gestión Actual</p>
                                <p class="text-xs font-black truncate max-w-[200px]">{{ eventoSeleccionado?.title || 'Seleccionar Evento' }}</p>
                            </div>
                        </div>
@@ -167,19 +171,16 @@ const abrirMapa = (url: string) => {
                                        <p class="text-[13px] font-black text-white leading-tight truncate">{{ evento.title }}</p>
                                    </div>
                                    <span v-if="eventoSeleccionado?.id === evento.id" class="material-symbols-outlined text-emerald-400 shrink-0 text-[18px]">check_circle</span>
-                               </button>
-                               <div v-if="eventosActivos.length === 0" class="p-6 text-center">
-                                   <p class="text-xs font-bold text-slate-400">No hay eventos disponibles</p>
-                               </div>
+                                </button>
                            </div>
                        </div>
                    </transition>
                </div>
                
-               <!-- Etiqueta Oficial -->
-               <span class="inline-flex items-center w-full sm:w-auto h-[56px] px-6 bg-emerald-500 text-white border border-emerald-400/30 text-[10px] md:text-sm font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-emerald-500/20">
-                 <span class="material-symbols-outlined text-[18px] mr-2">public</span> Evento Oficial OEA/TYAN
-               </span>
+               <!-- Etiqueta Oficial Dinámica -->
+                <span :style="{ backgroundColor: eventoSeleccionado?.color_principal || '#10b981' }" class="inline-flex items-center w-full sm:w-auto h-[56px] px-6 text-white border border-white/20 text-[10px] md:text-sm font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-black/20 animate-in slide-in-from-right-4 duration-700">
+                  <span class="material-symbols-outlined text-[18px] mr-2">public</span> {{ eventoSeleccionado?.institucion_badge || 'Evento Oficial OEA/TYAN' }}
+                </span>
             </div>
             
             <!-- ROW 2: TÍTULO PRINCIPAL -->
@@ -194,7 +195,7 @@ const abrirMapa = (url: string) => {
             
             <!-- ROW 4: BADGES ADICIONALES (Versión, Fechas, Ubicación) -->
             <div :key="`tags-${eventoSeleccionado?.id}`" class="flex flex-row flex-wrap items-center justify-start gap-3 mb-6 relative z-40 animate-in fade-in slide-in-from-bottom-5 duration-700 delay-100">
-               <span v-if="eventoSeleccionado?.version" class="inline-flex items-center gap-1.5 px-4 py-2 bg-umsa-blue border border-blue-400/30 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-umsa-blue/40">
+               <span v-if="eventoSeleccionado?.version" :style="{ backgroundColor: eventoSeleccionado?.color_principal || '#0070b4' }" class="inline-flex items-center gap-1.5 px-4 py-2 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-black/20">
                  <span class="material-symbols-outlined text-[16px]">workspace_premium</span> {{ eventoSeleccionado?.version }}
                </span>
                <span class="px-4 py-2 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-inner uppercase tracking-widest">
@@ -212,7 +213,7 @@ const abrirMapa = (url: string) => {
             
             <!-- ROW 6: BOTONES DE ACCIÓN -->
             <div class="flex flex-col sm:flex-row flex-wrap items-center justify-start gap-4 w-full relative z-40 animate-in fade-in slide-in-from-bottom-5 duration-700 delay-300">
-                <button @click="$router.push('/login')" class="w-full sm:w-auto bg-emerald-500 text-white hover:bg-emerald-400 px-8 py-4 rounded-xl font-black text-xs md:text-sm uppercase tracking-widest transition-all shadow-xl hover:shadow-2xl hover:shadow-emerald-500/40 hover:-translate-y-1 flex items-center justify-center gap-2 border border-emerald-400">
+                <button @click="$router.push('/login')" :style="{ backgroundColor: eventoSeleccionado?.color_principal || '#10b981' }" class="w-full sm:w-auto text-white px-8 py-4 rounded-xl font-black text-xs md:text-sm uppercase tracking-widest transition-all shadow-xl hover:shadow-2xl hover:shadow-black/40 hover:-translate-y-1 flex items-center justify-center gap-2 border border-white/20">
                     <span class="material-symbols-outlined text-[20px]">login</span>
                     Ingresar al Portal
                 </button>

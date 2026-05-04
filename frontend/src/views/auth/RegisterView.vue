@@ -24,6 +24,8 @@ const isImage = ref(false);
 
 const error = ref('');
 const loading = ref(false);
+const showPassword = ref(false);
+const showConfirmPassword = ref(false);
 
 const handleFileUpload = (event: Event) => {
     const input = event.target as HTMLInputElement;
@@ -191,11 +193,21 @@ const handleRegister = async () => {
             </div>
             <div>
               <label for="password" class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Contraseña <span class="text-red-500">*</span></label>
-              <input id="password" v-model="formData.password" type="password" required class="w-full py-3 px-4 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700/50 rounded-xl text-sm font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 dark:focus:bg-gray-800 outline-none transition-all" />
+              <div class="relative">
+                <input id="password" v-model="formData.password" :type="showPassword ? 'text' : 'password'" required class="w-full py-3 px-4 pr-12 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700/50 rounded-xl text-sm font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 dark:focus:bg-gray-800 outline-none transition-all" />
+                <button type="button" @click="showPassword = !showPassword" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-sky-600 transition-colors">
+                  <span class="material-symbols-outlined text-[20px]">{{ showPassword ? 'visibility_off' : 'visibility' }}</span>
+                </button>
+              </div>
             </div>
             <div>
               <label for="confirmPassword" class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Confirmar Contraseña <span class="text-red-500">*</span></label>
-              <input id="confirmPassword" v-model="formData.confirmPassword" type="password" required class="w-full py-3 px-4 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700/50 rounded-xl text-sm font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 dark:focus:bg-gray-800 outline-none transition-all" />
+              <div class="relative">
+                <input id="confirmPassword" v-model="formData.confirmPassword" :type="showConfirmPassword ? 'text' : 'password'" required class="w-full py-3 px-4 pr-12 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700/50 rounded-xl text-sm font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 dark:focus:bg-gray-800 outline-none transition-all" />
+                <button type="button" @click="showConfirmPassword = !showConfirmPassword" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-sky-600 transition-colors">
+                  <span class="material-symbols-outlined text-[20px]">{{ showConfirmPassword ? 'visibility_off' : 'visibility' }}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

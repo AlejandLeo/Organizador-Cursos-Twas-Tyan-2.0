@@ -37,6 +37,10 @@ export class Usuario {
   @Column({ length: 255 })
   password: string;
 
+  /** Contraseña específica para el portal de Ponente (Docente). */
+  @Column({ length: 255, nullable: true })
+  password_ponente: string;
+
   /** 1 = Activo | 0 = Inactivo */
   @Column({ type: 'integer', default: 1 })
   estado: number;

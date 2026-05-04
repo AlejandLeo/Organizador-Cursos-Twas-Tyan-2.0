@@ -37,6 +37,7 @@ import { AuthModule } from './modules/Seguridad/auth/auth.module';
 
 // --- Archivos ---
 import { UploadsModule } from './modules/Comun/uploads/uploads.module';
+import { SoporteModule } from './modules/Comun/soporte/soporte.module';
 
 // --- Dashboard ---
 import { CoordinadorModule } from './modules/Academico/coordinador/coordinador.module';
@@ -92,6 +93,7 @@ import { CoordinadorModule } from './modules/Academico/coordinador/coordinador.m
 
     // --- Archivos ---
     UploadsModule,
+    SoporteModule,
 
     // --- Especiales ---
     CoordinadorModule,

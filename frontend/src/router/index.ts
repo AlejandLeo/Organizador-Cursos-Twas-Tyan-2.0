@@ -155,6 +155,11 @@ const router = createRouter({
           name: 'admin-ponentes',
           component: () => import('../views/directorios/PonentesGlobalView.vue'),
         },
+        {
+          path: 'soporte',
+          name: 'admin-soporte',
+          component: () => import('../views/admin/AdminSoporteView.vue'),
+        },
       ]
     },
     // ─── RUTAS COORDINADOR ────────────────────────────────────────────────────

@@ -48,18 +48,18 @@ const fetchData = async () => {
         const actRes = await api.get(`/actividades-academicas/${route.params.id}`);
         actividad.value = actRes.data;
 
-        // Preparar formulario de edición
+        // Preparar formulario de edición con valores seguros
         const mod = actividad.value.modalidades?.[0];
         editForm.value = {
-            nombre: actividad.value.nombre,
-            tipo: actividad.value.tipo,
+            nombre: actividad.value.nombre || '',
+            tipo: actividad.value.tipo || '',
             descripcion: actividad.value.descripcion || '',
             modalidad: mod?.tipo || 'Presencial',
-            min_nota: mod?.min_nota || 71,
-            min_asistencia: mod?.min_asistencia || 80,
+            min_nota: mod?.min_nota ?? 71,
+            min_asistencia: mod?.min_asistencia ?? 80,
             fecha_inicio: actividad.value.fecha_inicio || '',
             fecha_fin: actividad.value.fecha_fin || '',
-            sesiones: mod?.sesiones || []
+            sesiones: Array.isArray(mod?.sesiones) ? JSON.parse(JSON.stringify(mod.sesiones)) : []
         };
 
         // Carga de inscripciones (crítica - muestra solicitudes y alumnos)
@@ -294,7 +294,7 @@ const eliminarPonente = async (id: number) => {
     </button>
 
     <div v-if="actividad" class="rounded-[3rem] p-10 flex flex-col md:flex-row items-center justify-between shadow-2xl relative overflow-hidden border-r-8 border-umsa-gold min-h-[200px]"
-         :style="{ backgroundImage: `url(${actividad.imagen})`, backgroundSize: 'cover', backgroundPosition: 'center' }">
+         :style="actividad.imagen ? { backgroundImage: `url(${actividad.imagen})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { backgroundColor: '#1e293b' }">
       <!-- Overlay degradado para adaptar a la paleta institucional -->
       <div class="absolute inset-0 bg-gradient-to-r from-umsa-blue/95 via-primary-dark/80 to-transparent"></div>
       

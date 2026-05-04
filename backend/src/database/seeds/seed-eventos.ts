@@ -26,8 +26,9 @@ async function bootstrap() {
         fecha_inicio: new Date('2025-05-15'),
         fecha_fin: new Date('2025-05-20'),
         estado: 1,
-        // Usamos una imagen de stock llamativa para el banner (lo que usa el frontend en "logo / imagen")
-        logo: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80',
+        sigla: 'TWAS-TYAN',
+        color_principal: '#004a99',
+        logo: 'logo%20fcpn.png',
         imagen_fondo: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80',
         actividades: [
           {
@@ -69,7 +70,9 @@ async function bootstrap() {
         fecha_inicio: new Date('2026-08-10'),
         fecha_fin: new Date('2026-08-12'),
         estado: 1,
-        logo: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1600&q=80',
+        sigla: 'FIT 2026',
+        color_principal: '#10b981',
+        logo: 'Logo%20UMSA.png',
         imagen_fondo: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1600&q=80',
         actividades: [
           {
@@ -102,7 +105,9 @@ async function bootstrap() {
         fecha_inicio: new Date('2025-06-01'),
         fecha_fin: new Date('2025-12-15'),
         estado: 1,
-        logo: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1600&q=80',
+        sigla: 'IA-DATA',
+        color_principal: '#7c3aed',
+        logo: 'logo%20fcpn.png',
         imagen_fondo: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1600&q=80',
         actividades: [
           {
@@ -135,7 +140,9 @@ async function bootstrap() {
         fecha_inicio: new Date('2025-09-10'),
         fecha_fin: new Date('2025-09-12'),
         estado: 1,
-        logo: 'https://images.unsplash.com/photo-1466611653911-954ffaa137a8?w=1600&q=80',
+        sigla: 'CPER 2025',
+        color_principal: '#f59e0b',
+        logo: 'Logo%20UMSA.png',
         imagen_fondo: 'https://images.unsplash.com/photo-1466611653911-954ffaa137a8?w=1600&q=80',
         actividades: [
           {
@@ -159,7 +166,9 @@ async function bootstrap() {
         fecha_inicio: new Date('2025-11-20'),
         fecha_fin: new Date('2025-11-25'),
         estado: 1,
-        logo: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=1600&q=80',
+        sigla: 'WIBA',
+        color_principal: '#db2777',
+        logo: 'logo%20fcpn.png',
         imagen_fondo: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=1600&q=80',
         actividades: [
           {

@@ -85,4 +85,26 @@ export class MailService {
     `;
     return this.sendMail(email, subject, html);
   }
+
+  async sendResetPassword(email: string, nombre: string, token: string) {
+    const subject = 'Restablecer Contraseña - TYAN';
+    const resetUrl = `${this.configService.get<string>('FRONTEND_URL')}/reset-password?token=${token}`;
+    const html = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+        <h2 style="color: #003a70;">Hola, ${nombre}</h2>
+        <p>Has solicitado restablecer tu contraseña para acceder al sistema <b>TYAN</b>.</p>
+        <p>Haz clic en el siguiente botón para crear una nueva contraseña. Este enlace es válido por 1 hora.</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${resetUrl}" 
+             style="background-color: #003a70; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+            Restablecer Contraseña
+          </a>
+        </div>
+        <p>Si no solicitaste este cambio, puedes ignorar este correo de forma segura.</p>
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+        <p style="font-size: 12px; color: #666;">Sistema Organizador de Cursos - TYAN</p>
+      </div>
+    `;
+    return this.sendMail(email, subject, html);
+  }
 }
