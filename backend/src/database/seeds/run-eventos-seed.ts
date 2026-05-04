@@ -5,6 +5,7 @@ import { Evento } from '../../modules/Academico/eventos/entities/evento.entity';
 import { ActividadAcademica } from '../../modules/Academico/actividades-academicas/entities/actividad-academica.entity';
 import { Usuario } from '../../modules/Usuario/usuarios/entities/usuario.entity';
 import { Imparticion } from '../../modules/Academico/imparticiones/entities/imparticion.entity';
+import { CoordinacionEvento } from '../../modules/Academico/coordinaciones/entities/coordinacion.entity';
 
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);
@@ -15,12 +16,12 @@ async function bootstrap() {
   await queryRunner.startTransaction();
 
   try {
-    // 1. LIMPIEZA DE DATOS EXISTENTES (PARA TENER EXACTAMENTE 3)
-    // Eliminamos en orden de dependencia para evitar errores de FK
-    await queryRunner.manager.delete(Imparticion, {});
-    await queryRunner.manager.delete(ActividadAcademica, {});
-    await queryRunner.manager.delete(Evento, {});
-    console.log('🗑️ Base de datos de eventos limpiada con éxito.');
+    // 1. LIMPIEZA DE DATOS EXISTENTES (Uso de SQL crudo para evitar errores de criterios vacíos)
+    await queryRunner.manager.query('TRUNCATE TABLE coordinacion_eventos CASCADE');
+    await queryRunner.manager.query('TRUNCATE TABLE imparticiones CASCADE');
+    await queryRunner.manager.query('TRUNCATE TABLE actividades_academicas CASCADE');
+    await queryRunner.manager.query('TRUNCATE TABLE eventos CASCADE');
+    console.log('🗑️ Base de datos de eventos y coordinaciones limpiada con éxito.');
 
     const eventosData = [
       {
@@ -127,8 +128,9 @@ async function bootstrap() {
       }
     ];
 
-    // Fetch ponente
+    // Fetch ponente y coordinador
     const ponente = await queryRunner.manager.findOne(Usuario, { where: { email: 'ponente@gmail.com' } });
+    const coordinador = await queryRunner.manager.findOne(Usuario, { where: { email: 'coordinador@gmail.com' } });
 
     for (const data of eventosData) {
       const { actividades, ...eventoInfo } = data;
@@ -136,6 +138,16 @@ async function bootstrap() {
       const evento = queryRunner.manager.create(Evento, eventoInfo);
       await queryRunner.manager.save(evento);
       console.log(`✅ Evento creado: ${evento.nombre}`);
+
+      // Asignar Coordinador para que tenga permisos en el Dashboard
+      if (coordinador) {
+        const coordinacion = queryRunner.manager.create(CoordinacionEvento, {
+          usuario: coordinador,
+          evento: evento
+        });
+        await queryRunner.manager.save(coordinacion);
+        console.log(`    - Coordinador asignado a ${evento.nombre}`);
+      }
 
       // Crear sus actividades
       for (const act of actividades) {

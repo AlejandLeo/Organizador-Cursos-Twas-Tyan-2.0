@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed, watch, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useEventoStore } from '@/stores/eventoStore';
 
@@ -34,8 +34,22 @@ const editActividadId = ref<number | null>(null);
 const editEventoId = ref<number | null>(null);
 const currentStep = ref(1);
 const totalSteps = 6;
-const nextStep = () => { if (currentStep.value < totalSteps) currentStep.value++; };
-const prevStep = () => { if (currentStep.value > 1) currentStep.value--; };
+const slideDir = ref<'forward' | 'backward'>('forward');
+const previewTransition = computed(() =>
+    slideDir.value === 'forward' ? 'preview-slide-forward' : 'preview-slide-backward'
+);
+const nextStep = () => {
+    if (currentStep.value < totalSteps) {
+        slideDir.value = 'forward';
+        currentStep.value++;
+    }
+};
+const prevStep = () => {
+    if (currentStep.value > 1) {
+        slideDir.value = 'backward';
+        currentStep.value--;
+    }
+};
 const filtroBusqueda = ref('');
 
 const ponentesDB = ref<any[]>([]);
@@ -64,11 +78,23 @@ const formEvento = ref({
   link_web: '',
   sigla: '',
   color_principal: '#0070b4',
+  color_sigla: '#ffffff',
+  color_texto_header: '#0070b4',
+  color_titulo_2: '#ffffff',
+  color_badge_gestion: '#0070b4',
+  color_badge_institucion: '#0070b4',
+  color_badge_fecha: '#0070b4',
   institucion_badge: 'Evento Oficial OEA/TYAN',
   ponentes_seleccionados: [] as number[],
   cronograma: '',
   cronograma_lista: [] as any[],
-  version: ''
+  version: '',
+  nombre_2: '',
+  // Paso 6: Contacto, Organización y Auspicios
+  contacto_donde: '',
+  contacto_telefono: '',
+  contacto_email: '',
+  auspicios: [] as { nombre: string; link: string }[]
 });
 
 const formatDate = (dateStr: string) => {
@@ -90,9 +116,21 @@ const resetFormEvento = () => {
         fecha_inicio: '', fecha_fin: '', ubicacion: '', direccion: '',
         estado: 2, fondo_img: null, logo_img: null, google_maps_link: '',
         sobre_evento_1: '', sobre_evento_2: '', frase_destacada: '',
-        link_facebook: '', link_web: '', sigla: '', color_principal: '#0070b4',
+        link_facebook: '', link_web: '', sigla: '', 
+        color_principal: '#0070b4',
+        color_sigla: '#000000', 
+        color_texto_header: '#0070b4', 
+        color_titulo_2: '#ffffff',
+        color_badge_gestion: '#0070b4',
+        color_badge_institucion: '#0070b4',
+        color_badge_fecha: '#0070b4',
         institucion_badge: 'Evento Oficial OEA/TYAN',
-        ponentes_seleccionados: [], cronograma: '', cronograma_lista: [], version: ''
+        ponentes_seleccionados: [], cronograma: '', cronograma_lista: [], version: '',
+        nombre_2: '',
+        contacto_donde: '',
+        contacto_telefono: '',
+        contacto_email: '',
+        auspicios: []
     };
 };
 
@@ -252,6 +290,28 @@ const fetchEventos = async () => {
 };
 
 const handleSaveEvento = async () => {
+    // VALIDACIÓN PREVENTIVA (REQUERIMIENTO OFICIAL)
+    if (!formEvento.value.nombre?.trim()) {
+        Swal.fire('Atención', 'El NOMBRE del evento es obligatorio (Paso 1)', 'warning');
+        currentStep.value = 1;
+        return;
+    }
+    if (!formEvento.value.gestion?.trim()) {
+        Swal.fire('Atención', 'La GESTIÓN es obligatoria (Paso 1)', 'warning');
+        currentStep.value = 1;
+        return;
+    }
+    if (!formEvento.value.fecha_inicio) {
+        Swal.fire('Atención', 'La FECHA DE INICIO es obligatoria (Paso 1)', 'warning');
+        currentStep.value = 1;
+        return;
+    }
+    if (!formEvento.value.fecha_fin) {
+        Swal.fire('Atención', 'La FECHA DE FIN es obligatoria (Paso 1)', 'warning');
+        currentStep.value = 1;
+        return;
+    }
+
     try {
         isLoading.value = true;
         const formData = new FormData();
@@ -272,6 +332,20 @@ const handleSaveEvento = async () => {
         formData.append('link_facebook', formEvento.value.link_facebook);
         formData.append('link_web', formEvento.value.link_web);
         formData.append('color_principal', formEvento.value.color_principal);
+        formData.append('color_sigla', formEvento.value.color_sigla);
+        formData.append('color_texto_header', formEvento.value.color_texto_header);
+        formData.append('color_titulo_2', formEvento.value.color_titulo_2);
+        formData.append('color_badge_gestion', formEvento.value.color_badge_gestion);
+        formData.append('color_badge_institucion', formEvento.value.color_badge_institucion);
+        formData.append('color_badge_fecha', formEvento.value.color_badge_fecha);
+        formData.append('nombre_2', formEvento.value.nombre_2 || '');
+
+        // Contacto y Auspicios
+        formData.append('telefono', formEvento.value.contacto_telefono || '');
+        formData.append('email', formEvento.value.contacto_email || '');
+        // El campo contacto_donde se puede manejar como un complemento a la dirección o un campo extra en el futuro si se requiere, pero por ahora guardamos telefono/email/organizadores.
+        const cleanedAuspicios = formEvento.value.auspicios.filter(a => a.nombre?.trim());
+        formData.append('organizadores', JSON.stringify(cleanedAuspicios));
 
         // Cronograma
         const cleanedCronograma = formEvento.value.cronograma_lista.map(d => ({
@@ -339,14 +413,29 @@ const editarEvento = (evento: any) => {
         link_web: evento.link_web || '',
         sigla: evento.sigla || '',
         color_principal: evento.color_principal || '#0070b4',
+        color_sigla: evento.color_sigla || '#ffffff',
+        color_texto_header: evento.color_texto_header || '#0070b4',
+        color_titulo_2: evento.color_titulo_2 || '#ffffff',
+        color_badge_gestion: evento.color_badge_gestion || '#0070b4',
+        color_badge_institucion: evento.color_badge_institucion || '#0070b4',
+        color_badge_fecha: evento.color_badge_fecha || '#0070b4',
         institucion_badge: evento.institucion_badge || 'Evento Oficial OEA/TYAN',
         estado: evento.estado === 'Activo' ? 1 : (evento.estado === 'Cerrado' ? 0 : 2),
         fondo_img: null,
         logo_img: null,
         ponentes_seleccionados: [],
         cronograma: '',
-        cronograma_lista: []
+        cronograma_lista: [],
+        nombre_2: evento.nombre_2 || '',
+        contacto_donde: evento.direccion || '',
+        contacto_telefono: evento.telefono || '',
+        contacto_email: evento.email || '',
+        auspicios: []
     };
+
+    if (evento.organizadores) {
+        try { formEvento.value.auspicios = typeof evento.organizadores === 'string' ? JSON.parse(evento.organizadores) : evento.organizadores; } catch(e) {}
+    }
 
     if (evento.cronograma) {
         try { formEvento.value.cronograma_lista = typeof evento.cronograma === 'string' ? JSON.parse(evento.cronograma) : evento.cronograma; } catch(e) {}
@@ -389,8 +478,6 @@ const inhabilitarEvento = async (id: number, nombre: string) => {
 const eventosPublicados = ref<any[]>([]);
 
 const eventosFiltrados = computed(() => {
-    // Ahora mostramos SIEMPRE todos los eventos para que sea un catálogo global,
-    // pero si el usuario busca algo, filtramos por nombre de actividad o evento.
     const search = (filtroBusqueda.value || '').toLowerCase();
     if (!search) return eventosPublicados.value;
 
@@ -474,7 +561,6 @@ const editarActividad = async (act: any) => {
         isEditingActividad.value = true;
         editActividadId.value = act.id;
         
-        // Cargamos lo que ya tenemos
         nuevaActividad.value = {
             nombre: act.title,
             tipo: act.type || 'Curso',
@@ -492,7 +578,6 @@ const editarActividad = async (act: any) => {
             requisitos: act.requisitos || { base: {}, custom: [] }
         };
         
-        // Intentar obtener descripción completa y campos extras si no están
         const res = await api.get(`/actividades-academicas/${act.id}`);
         const fullAct = res.data;
         
@@ -527,7 +612,7 @@ const inhabilitarActividad = async (id: number, nombre: string) => {
     if (motivo) {
         try {
             await api.patch(`/actividades-academicas/${id}`, { 
-                estado: -1, // Estado inhabilitado
+                estado: -1, 
                 descripcion: `[INHABILITACION_MOTIVO]:${motivo}\n[FECHA]:${new Date().toLocaleString()}\n` 
             });
             registrarAccion('actividad', 'eliminar', `Actividad inhabilitada: "${nombre}"`, { entidadId: id.toString(), entidadNombre: nombre });
@@ -597,7 +682,6 @@ const publicarActividad = async () => {
 
         isLoading.value = true;
         
-        // --- ALERTA DE PROCESANDO (PREMIUM) ---
         Swal.fire({
             title: 'Publicando Actividad',
             html: 'Estamos preparando todo en el servidor...',
@@ -612,18 +696,15 @@ const publicarActividad = async () => {
             }
         });
 
-        // Determinar el tipo final (si es Otro, usar el personalizado)
         let tipoFinal = nuevaActividad.value.tipo === 'Otro' 
             ? nuevaActividad.value.tipoPersonalizado 
             : nuevaActividad.value.tipo;
         
-        // Normalización: Primera letra Mayúscula, resto minúscula (Ej: Curso, Diplomado)
         if (tipoFinal) {
             tipoFinal = tipoFinal.trim();
             tipoFinal = tipoFinal.charAt(0).toUpperCase() + tipoFinal.slice(1).toLowerCase();
         }
 
-        // PAYLOAD LIMPIO: Ajustado estrictamente al DTO del backend
         const payload = {
             nombre: nuevaActividad.value.nombre,
             tipo: tipoFinal || 'Actividad',
@@ -640,7 +721,6 @@ const publicarActividad = async () => {
             await api.post('/actividades-academicas', payload);
         }
 
-        // --- ALERTA EXITOSA (PREMIUM) ---
         Swal.fire({
             icon: 'success',
             title: '¡PUBLICACIÓN EXITOSA!',
@@ -656,8 +736,6 @@ const publicarActividad = async () => {
 
         isCreating.value = false;
         
-
-        // Registrar en historial
         registrarAccion(
           'actividad',
           isEditingActividad.value ? 'editar' : 'crear',
@@ -675,8 +753,6 @@ const publicarActividad = async () => {
           }
         );
         
-
-        // Resetear form
         imagenArchivo.value = null;
         imagenPreview.value = null;
         nuevaActividad.value.sesiones = [];
@@ -684,7 +760,6 @@ const publicarActividad = async () => {
         fetchEventos();
     } catch (error: any) {
         console.error(error);
-        // --- ALERTA ERROR (PREMIUM) ---
         Swal.fire({
             icon: 'error',
             title: 'ERROR DE PUBLICACIÓN',
@@ -712,7 +787,6 @@ onMounted(async () => {
     fetchPonentesYGrados();
 });
 
-// Refrescar listado si el filtro global cambia
 watch(() => eventoStore.selectedEventoId, () => {
     fetchEventos();
 });
@@ -721,11 +795,9 @@ const toggleActividades = (evento: any) => {
   evento.mostrarActividades = !evento.mostrarActividades;
 };
 
-// Agrupar actividades por Tipo para la vista estilo Netflix (Case Insensitive)
 const getActividadesAgrupadas = (actividades: any[]) => {
   const grupos: Record<string, any[]> = {};
   actividades.forEach((act: any) => {
-    // Normalizar a mayúsculas para la clave del grupo
     const normalizedType = (act.type || 'Actividad').trim().toUpperCase();
     if (!grupos[normalizedType]) {
       grupos[normalizedType] = [];
@@ -742,17 +814,17 @@ const getStatusColor = (status: string) => {
 };
 
 const openDetalleCurso = (courseId: any) => {
-  // Detectar contexto: ¿estamos en /admin o /coordinador?
   const isAdminContext = route.path.startsWith('/admin');
-  const prefix = isAdminContext ? '/admin' : '/coordinador';
-
+  const routeName = isAdminContext ? 'admin-gestion-eventos-detalle' : 'coordinador-gestion-eventos-detalle';
+  
+  let query = {};
   if (route.name === 'coordinador-estudiantes-global' || route.name === 'admin-estudiantes') {
-    router.push({ path: `${prefix}/actividades/${courseId}`, query: { tab: 'estudiantes' } });
+    query = { tab: 'estudiantes' };
   } else if (route.name === 'coordinador-ponentes-global' || route.name === 'admin-ponentes') {
-    router.push({ path: `${prefix}/actividades/${courseId}`, query: { tab: 'ponentes' } });
-  } else {
-    router.push({ path: `${prefix}/actividades/${courseId}` });
+    query = { tab: 'ponentes' };
   }
+
+  router.push({ name: routeName, params: { id: courseId }, query });
 };
 
 const changeStep = (delta: number) => {
@@ -770,11 +842,11 @@ const changeStep = (delta: number) => {
     <div v-show="!isCreating && !isCreatingEvento" id="view-listado" class="space-y-8">
       <div class="flex justify-center mb-8">
         <div class="relative w-full max-w-2xl group">
-          <label class="absolute -top-3 left-6 px-2 bg-[#f8f9fc] dark:bg-black z-10 text-[9px] font-black text-slate-400 uppercase tracking-widest italic transition-colors">Buscador de Eventos y Actividades</label>
+          <label class="absolute -top-3 left-6 px-2 bg-[#f8f9fc] dark:bg-black z-10 text-[9px] font-black text-slate-400 uppercase tracking-widest italic transition-colors">Buscador de Eventos y Contenido</label>
           <span class="absolute inset-y-0 left-5 flex items-center text-slate-400">
             <span class="material-symbols-outlined text-xl group-focus-within:text-umsa-blue transition-colors">search</span>
           </span>
-          <input v-model="filtroBusqueda" class="w-full pl-14 pr-6 py-4 bg-white dark:bg-gray-900 border-2 border-slate-200 dark:border-gray-800 rounded-full shadow-sm text-sm focus:ring-4 focus:ring-umsa-blue/10 focus:border-umsa-blue outline-none transition-all font-bold text-primary-dark dark:text-gray-200 placeholder-slate-400" placeholder="Busca Actividades Académicas..." type="text">
+          <input v-model="filtroBusqueda" class="w-full pl-14 pr-6 py-4 bg-white dark:bg-gray-900 border-2 border-slate-200 dark:border-gray-800 rounded-full shadow-sm text-sm focus:ring-4 focus:ring-umsa-blue/10 focus:border-umsa-blue outline-none transition-all font-bold text-primary-dark dark:text-gray-200 placeholder-slate-400" placeholder="Busca Puntos de Agenda o Eventos..." type="text">
         </div>
       </div>
       
@@ -792,7 +864,6 @@ const changeStep = (delta: number) => {
         </div>
         
         <div class="flex items-center gap-3">
-          <!-- ÚNICO BOTÓN MAESTRO: NUEVO EVENTO -->
           <button @click="isCreatingEvento = true; isEditingEvento = false; resetFormEvento()" 
             class="bg-blue-600 hover:bg-blue-700 text-white font-black px-8 py-4 rounded-2xl text-[12px] uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:shadow-blue-500/40 hover:-translate-y-1 active:translate-y-0 transition-all flex items-center gap-3">
             <span class="material-symbols-outlined text-[24px]">add_business</span> NUEVO EVENTO
@@ -819,7 +890,6 @@ const changeStep = (delta: number) => {
                 <p class="text-sm font-medium text-gray-300 max-w-2xl line-clamp-2 leading-relaxed">{{ evento.descripcion }}</p>
               </div>
 
-              <!-- ACCIONES DE EVENTO Y ACORDEÓN -->
               <div class="flex items-center gap-3 z-30 relative">
                 <button @click="editarEvento(evento)" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 px-4 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 group/btn cursor-pointer" title="Configurar Eventos">
                    <span class="material-symbols-outlined text-[18px]">settings</span>
@@ -835,7 +905,7 @@ const changeStep = (delta: number) => {
                 </button>
 
                 <button @click="toggleActividades(evento)" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 px-6 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 group/btn cursor-pointer">
-                  <span class="text-xs font-bold uppercase tracking-widest">{{ evento.mostrarActividades ? 'Ocultar' : 'Ver' }} Actividades</span>
+                  <span class="text-xs font-bold uppercase tracking-widest">{{ evento.mostrarActividades ? 'Ocultar' : 'Ver' }} Puntos de Agenda</span>
                   <span class="material-symbols-outlined text-[16px] transition-transform duration-300" :class="evento.mostrarActividades ? 'rotate-180' : ''">expand_more</span>
                 </button>
               </div>
@@ -843,16 +913,13 @@ const changeStep = (delta: number) => {
           </div>
         </div>
 
-        <!-- Grid de Actividades Académicas (Estilo Catálogo Horizontal) -->
         <div v-show="evento.mostrarActividades" class="py-8 bg-slate-50 dark:bg-gray-950/50 w-full animate-in slide-in-from-top-4 duration-500 fade-in border-t border-slate-100 dark:border-gray-900">
           
-          <!-- Botón Superior General Crear Actividad y Certificados -->
           <div class="px-8 pb-6 flex justify-start lg:justify-between items-center mb-8">
-            <h3 class="hidden lg:block text-lg font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest italic">Actividades Académicas del Evento</h3>
+            <h3 class="hidden lg:block text-lg font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest italic">Puntos de Agenda del Evento</h3>
           </div>
 
           <div v-for="(acts, categoria) in getActividadesAgrupadas(evento.actividades)" :key="categoria" class="mb-10 w-full overflow-hidden">
-            <!-- Row Header -->
             <div class="flex items-end justify-between px-8 mb-4">
               <div>
                 <h3 class="text-xl md:text-2xl font-black text-primary-dark dark:text-white uppercase tracking-tighter">{{ categoria }}</h3>
@@ -863,16 +930,13 @@ const changeStep = (delta: number) => {
               </button>
             </div>
 
-            <!-- Horizontal Scroll Row -->
             <div class="flex overflow-x-auto gap-6 px-8 pb-8 pt-2 snap-x snap-mandatory flex-nowrap" style="scrollbar-width: none; -ms-overflow-style: none;">
-              <!-- Tarjeta -->
               <div v-for="act in acts" :key="act.id" @click="openDetalleCurso(act.id)" class="flex-none w-[280px] md:w-[320px] bg-white dark:bg-gray-900 rounded-[1.5rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none border border-slate-200/60 dark:border-gray-800 hover:border-primary-light/50 dark:hover:border-gray-600 transition-all hover:-translate-y-1 hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] cursor-pointer group flex flex-col snap-start relative">
                 
                 <div class="relative h-48 w-full overflow-hidden shrink-0">
                   <div class="absolute inset-0 bg-primary-dark/10 group-hover:bg-transparent transition-colors z-10"></div>
                   <img :src="act.imagen || act.image" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" :alt="act.title">   
                   
-                  <!-- ACCIONES RAPIDAS (FLOTANTES) -->
                   <div class="absolute top-3 left-3 z-30 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0 duration-300">
                     <button @click.stop="editarActividad(act)" class="p-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-lg shadow-lg text-umsa-blue hover:scale-110 transition-all border border-blue-50/20" title="Editar Actividad">
                         <span class="material-symbols-outlined text-[18px]">edit</span>
@@ -885,7 +949,6 @@ const changeStep = (delta: number) => {
                   <span class="absolute top-3 right-3 z-20 text-[8px] font-black uppercase px-2 py-1 rounded-md tracking-widest shadow-sm bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm" :class="getStatusColor(act.status)">
                     {{ act.status }}
                   </span>
-                  <!-- Suave sombra inferior para que conecte con la tarjeta blanca -->
                   <div class="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-white dark:from-gray-900 to-transparent z-10 opacity-60"></div>
                 </div>
 
@@ -908,7 +971,6 @@ const changeStep = (delta: number) => {
                     </div>
                   </div>
                 </div>
-
               </div>
             </div>
           </div>
@@ -936,7 +998,6 @@ const changeStep = (delta: number) => {
           <div class="flex items-center justify-between relative">
               <div class="absolute top-1/2 left-0 w-full h-0.5 bg-slate-200 dark:bg-gray-800 -z-10 -translate-y-1/2"></div>
               
-              <!-- Step 1 -->
               <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
                        :class="currentStep === 1 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(188,156,49,0.4)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
@@ -945,7 +1006,6 @@ const changeStep = (delta: number) => {
                   <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 1 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Diseño</span>
               </div>
               
-              <!-- Step 2 -->
               <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
                        :class="currentStep >= 2 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
@@ -954,7 +1014,6 @@ const changeStep = (delta: number) => {
                   <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 2 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Aprobación</span>
               </div>
 
-              <!-- Step 3 -->
               <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
                        :class="currentStep >= 3 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
@@ -963,7 +1022,6 @@ const changeStep = (delta: number) => {
                   <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 3 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Horarios</span>
               </div>
 
-              <!-- Step 4 -->
               <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
                        :class="currentStep >= 4 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
@@ -972,7 +1030,6 @@ const changeStep = (delta: number) => {
                   <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 4 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Requisitos</span>
               </div>
 
-              <!-- Step 5 -->
               <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
                        :class="currentStep === 5 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(188,156,49,0.4)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
@@ -983,7 +1040,6 @@ const changeStep = (delta: number) => {
           </div>
       </div>
 
-      <!-- Contenido del Step 1 -->
       <div v-show="currentStep === 1" class="space-y-8 animate-in slide-in-from-right-8 duration-500">
           <div class="bg-white dark:bg-gray-900 p-8 rounded-[2rem] shadow-sm border border-slate-100 dark:border-gray-800">
               <div class="flex items-center justify-between mb-8">
@@ -1054,7 +1110,6 @@ const changeStep = (delta: number) => {
           </div>
       </div>
 
-      <!-- Contenido del Step 2 -->
       <div v-show="currentStep === 2" class="space-y-8 animate-in slide-in-from-right-8 duration-500">
           <div class="bg-white dark:bg-gray-900 p-8 rounded-[2rem] shadow-sm border border-slate-100 dark:border-gray-800">
               <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic mb-8">2. Parámetros de Aprobación</h3>
@@ -1071,12 +1126,10 @@ const changeStep = (delta: number) => {
           </div>
       </div>
 
-      <!-- Contenido del Step 3 -->
       <div v-show="currentStep === 3" class="space-y-8 animate-in slide-in-from-right-8 duration-500">
           <div class="bg-white dark:bg-gray-900 p-8 rounded-[2rem] shadow-sm border border-slate-100 dark:border-gray-800">
               <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic mb-8">3. Cronograma y Modalidad</h3>
               
-              <!-- SELECTOR DE MODALIDAD -->
               <div class="mb-10 p-8 rounded-[2.5rem] bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 border-l-[12px] border-l-umsa-blue shadow-inner relative overflow-hidden group">
                   <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:rotate-12 transition-transform duration-500">
                       <span class="material-symbols-outlined text-7xl text-umsa-blue">location_on</span>
@@ -1116,7 +1169,6 @@ const changeStep = (delta: number) => {
                   </div>
               </div>
 
-              <!-- LISTA DE HORARIOS AÑADIDOS -->
               <div v-if="nuevaActividad.sesiones.length > 0" class="mb-6 space-y-2">
                   <div v-for="(s, idx) in nuevaActividad.sesiones" :key="idx" class="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
                       <div class="flex items-center gap-6">
@@ -1161,7 +1213,6 @@ const changeStep = (delta: number) => {
           </div>
       </div>
 
-      <!-- Contenido del Paso 4: Requisitos de Pre-inscripción -->
       <div v-show="currentStep === 4" class="space-y-8 animate-in slide-in-from-right-8 duration-500">
           <div class="bg-white dark:bg-gray-900 p-8 rounded-[2rem] shadow-sm border border-slate-100 dark:border-gray-800">
               <div class="flex items-center justify-between mb-8">
@@ -1176,7 +1227,6 @@ const changeStep = (delta: number) => {
               </div>
 
               <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                  <!-- Columna: Datos Base del Perfil -->
                   <div class="space-y-6">
                       <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2 mb-4">Datos del Perfil (Entidad Persona)</h4>
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1198,7 +1248,6 @@ const changeStep = (delta: number) => {
                       </div>
                   </div>
 
-                  <!-- Columna: Campos Personalizados -->
                   <div class="space-y-6">
                       <div class="flex items-center justify-between border-b pb-2 mb-4">
                           <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Requisitos Personalizados (Máx. 10)</h4>
@@ -1246,14 +1295,12 @@ const changeStep = (delta: number) => {
           </div>
       </div>
 
-      <!-- Contenido del Paso 5 (Anterior 4) -->
       <div v-show="currentStep === 5" class="space-y-8 animate-in zoom-in-95 duration-500">
           <div class="bg-white dark:bg-gray-900 p-8 rounded-[2rem] shadow-sm border-l-[10px] border-l-umsa-gold dark:border-l-yellow-600 border border-slate-100 dark:border-gray-800">
               <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic mb-4">5. Confirmación y Revisión</h3>
               <p class="text-sm font-bold text-slate-500 dark:text-gray-400 mb-8 italic">Por favor, verifica los detalles finales antes de publicar la actividad en el sistema.</p>
 
               <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <!-- Columna Resumen Texto -->
                   <div class="lg:col-span-2 space-y-6">
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div class="p-5 bg-slate-50 dark:bg-gray-800/50 rounded-2xl border border-slate-100 dark:border-gray-800">
@@ -1300,7 +1347,6 @@ const changeStep = (delta: number) => {
                           </div>
                       </div>
 
-                      <!-- BLOQUE DE REQUISITOS (RESUMEN) -->
                       <div class="p-6 bg-blue-50/50 dark:bg-blue-950/20 rounded-[2rem] border-2 border-dashed border-blue-100 dark:border-blue-900/30">
                           <div class="flex items-center gap-2 mb-4">
                               <span class="material-symbols-outlined text-blue-600 text-lg">fact_check</span>
@@ -1334,7 +1380,6 @@ const changeStep = (delta: number) => {
                       </div>
                   </div>
 
-                  <!-- Columna Preview Imagen -->
                   <div class="relative rounded-[2rem] overflow-hidden border-2 border-slate-100 dark:border-gray-800 bg-slate-50 dark:bg-gray-800 aspect-square lg:aspect-auto">
                       <div v-if="imagenPreview" class="absolute inset-0">
                           <img :src="imagenPreview" class="w-full h-full object-cover">
@@ -1375,7 +1420,6 @@ const changeStep = (delta: number) => {
     </div>
 
     <!-- PANEL FUSIÓN: CLON LITERAL DE GESTIÓN DE EVENTOS -->
-    <!-- PANEL FUSIÓN: CLON LITERAL DE GESTIÓN DE EVENTOS (MEJORADO CON WIZARD) -->
     <div v-if="isCreatingEvento" class="bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl shadow-umsa-blue/10 dark:shadow-black/50 border border-blue-100 dark:border-gray-800 animate-in slide-in-from-top-4 duration-500 overflow-hidden relative mb-20">
         <div class="bg-gradient-to-r from-umsa-blue to-emerald-500 p-8 pb-10 relative overflow-hidden">
             <span class="material-symbols-outlined absolute -right-4 -top-8 text-[120px] text-white/10 rotate-12">design_services</span>
@@ -1391,7 +1435,6 @@ const changeStep = (delta: number) => {
             </div>
         </div>
 
-        <!-- BARRA DE NAVEGACIÓN DEL WIZARD (PASOS) -->
         <div class="bg-slate-50 dark:bg-gray-800/50 border-b border-slate-100 dark:border-gray-800 px-8 py-4 flex items-center justify-between overflow-x-auto thin-scrollbar">
             <div v-for="step in totalSteps" :key="step" class="flex items-center gap-2 shrink-0">
                 <div :class="[
@@ -1406,9 +1449,9 @@ const changeStep = (delta: number) => {
                     {{ 
                         step === 1 ? 'Identidad' : 
                         step === 2 ? 'Narrativa' : 
-                        step === 3 ? 'Directorio' : 
-                        step === 4 ? 'Logística' : 
-                        step === 5 ? 'Ubicación' : 'Cronograma' 
+                        step === 3 ? 'Cronograma' : 
+                        step === 4 ? 'Directorio' : 
+                        step === 5 ? 'Ubicación' : 'Contacto' 
                     }}
                 </span>
                 <div v-if="step < totalSteps" class="h-[2px] w-8 bg-slate-200 dark:bg-gray-700 mx-2 hidden lg:block"></div>
@@ -1419,79 +1462,139 @@ const changeStep = (delta: number) => {
             
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 flex-1">
                 
-                <!-- ÁREA DE EDICIÓN (PASOS) -->
                 <div class="lg:col-span-7 space-y-8 animate-in slide-in-from-left-8 duration-500">
                     
                     <!-- PASO 1: IDENTIDAD VISUAL -->
                     <div v-if="currentStep === 1" class="space-y-6">
                         <div class="flex items-center gap-3 border-b border-slate-100 dark:border-gray-800 pb-4 mb-6">
                             <span class="material-symbols-outlined text-umsa-blue">palette</span>
-                            <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase italic">Paso 1: Identidad Visual y Portada</h4>
+                            <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase italic">Paso 1: Identidad Visual y Configuración de Colores</h4>
                         </div>
-                        <div>
-                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Nombre Principal del Evento</label>
-                            <input v-model="formEvento.nombre" type="text" required placeholder="Ej: Congreso Internacional de Ciencias" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 focus:border-umsa-blue outline-none rounded-2xl px-5 py-4 text-sm font-bold shadow-sm" />
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Sigla / Abreviación (Para el Header)</label>
-                                <input v-model="formEvento.sigla" type="text" placeholder="Ej: TYAN" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 focus:border-umsa-blue rounded-2xl px-5 py-3 text-sm font-black uppercase" />
+
+                        <!-- SECCIÓN A: IDENTIDAD EN NAVBAR (ARRIBA) -->
+                        <div class="p-6 bg-slate-50/50 dark:bg-gray-900/50 rounded-3xl border border-slate-100 dark:border-gray-800 space-y-6">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-slate-400 text-sm">tab</span>
+                                <h5 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Identidad en Barra Superior (Navbar)</h5>
                             </div>
-                            <div>
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Texto del Badge (Botón Verde)</label>
-                                <input v-model="formEvento.institucion_badge" type="text" placeholder="Ej: Evento Oficial OEA/TYAN" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 focus:border-umsa-blue rounded-2xl px-5 py-3 text-sm font-bold uppercase" />
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Versión / Slogan</label>
-                                <input v-model="formEvento.version" type="text" placeholder="Ej: 4ta Edición" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 focus:border-umsa-blue rounded-2xl px-5 py-3 text-sm font-bold" />
-                            </div>
-                            <div>
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Gestión</label>
-                                <input v-model="formEvento.gestion" type="text" placeholder="2025" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 focus:border-umsa-blue rounded-2xl px-5 py-3 text-sm font-bold" />
-                            </div>
-                            <div>
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Color de Identidad</label>
-                                <div class="flex items-center gap-3 bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-2xl px-4 py-2">
-                                    <input v-model="formEvento.color_principal" type="color" class="w-10 h-10 border-none bg-transparent cursor-pointer" />
-                                    <span class="text-[10px] font-black uppercase text-slate-500">{{ formEvento.color_principal }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-6">
-                            <div class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Logo del Evento</label>
-                                    <p class="text-[8px] font-bold text-slate-400 uppercase mt-0.5">PNG/SVG Transparente • 512x512px</p>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Nombre en Navbar (Izquierda)</label>
+                                    <div class="flex gap-2">
+                                        <input v-model="formEvento.nombre" type="text" placeholder="NOMBRE DEL EVENTO" class="flex-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-black uppercase" />
+                                        <div class="flex flex-col items-center justify-center bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-2">
+                                            <input v-model="formEvento.color_texto_header" type="color" class="w-6 h-6 border-none bg-transparent cursor-pointer" />
+                                            <span class="text-[7px] font-bold text-slate-400 uppercase mt-1">COLOR</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="relative h-32 bg-slate-50 dark:bg-gray-800 border-2 border-dashed border-slate-200 dark:border-gray-700 rounded-2xl flex flex-col items-center justify-center p-4">
-                                    <img v-if="resolvedLogo" :src="resolvedLogo" class="w-full h-full object-contain">
-                                    <template v-else>
-                                        <span class="material-symbols-outlined text-slate-300 text-3xl">image</span>
-                                        <span class="text-[8px] text-slate-400 font-bold uppercase">Subir Logo Oficial</span>
-                                    </template>
-                                    <input type="file" @change="onLogoChange" class="absolute inset-0 opacity-0 cursor-pointer">
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Sigla / Acrónimo (Derecha)</label>
+                                    <div class="flex gap-2">
+                                        <input v-model="formEvento.sigla" type="text" placeholder="SIGLA" class="flex-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-black uppercase" />
+                                        <div class="flex flex-col items-center justify-center bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-2">
+                                            <input v-model="formEvento.color_sigla" type="color" class="w-6 h-6 border-none bg-transparent cursor-pointer" />
+                                            <span class="text-[7px] font-bold text-slate-400 uppercase mt-1">COLOR</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="space-y-4">
+                        </div>
+
+                        <!-- SECCIÓN B: TÍTULOS EN HERO (FONDO) -->
+                        <div class="p-6 bg-white dark:bg-gray-900 rounded-3xl border border-slate-100 dark:border-gray-800 space-y-6">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-umsa-blue text-sm">title</span>
+                                <h5 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Títulos sobre Imagen de Fondo (Hero)</h5>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Banner Principal (Hero)</label>
-                                    <p class="text-[8px] font-bold text-slate-400 uppercase mt-0.5">JPG/PNG • Full HD (1920x1080px)</p>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Título Línea 1</label>
+                                    <div class="flex gap-2">
+                                        <input v-model="formEvento.nombre" type="text" class="flex-1 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-black uppercase" />
+                                        <div class="flex flex-col items-center justify-center bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-2">
+                                            <input v-model="formEvento.color_principal" type="color" class="w-6 h-6 border-none bg-transparent cursor-pointer" />
+                                            <span class="text-[7px] font-bold text-slate-400 uppercase mt-1">COLOR</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="relative h-32 bg-slate-50 dark:bg-gray-800 border-2 border-dashed border-slate-200 dark:border-gray-700 rounded-2xl flex flex-col items-center justify-center p-4">
-                                    <img v-if="resolvedBanner" :src="resolvedBanner" class="w-full h-full object-cover">
-                                    <template v-else>
-                                        <span class="material-symbols-outlined text-slate-300 text-3xl">wallpaper</span>
-                                        <span class="text-[8px] text-slate-400 font-bold uppercase">Subir Fondo Hero</span>
-                                    </template>
-                                    <input type="file" @change="onFondoChange" class="absolute inset-0 opacity-0 cursor-pointer">
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Título Línea 2</label>
+                                    <div class="flex gap-2">
+                                        <input v-model="formEvento.nombre_2" type="text" placeholder="PARTE 2" class="flex-1 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-black uppercase" />
+                                        <div class="flex flex-col items-center justify-center bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-2">
+                                            <input v-model="formEvento.color_titulo_2" type="color" class="w-6 h-6 border-none bg-transparent cursor-pointer" />
+                                            <span class="text-[7px] font-bold text-slate-400 uppercase mt-1">COLOR</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SECCIÓN C: DATOS Y BADGES (LOGÍSTICA) -->
+                        <div class="p-6 bg-slate-50/50 dark:bg-gray-900/50 rounded-3xl border border-slate-100 dark:border-gray-800 space-y-6">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-emerald-500 text-sm">dynamic_feed</span>
+                                <h5 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Información y Colores de Badges</h5>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Gestión / Edición</label>
+                                    <div class="flex gap-2">
+                                        <input v-model="formEvento.gestion" type="text" class="flex-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold" />
+                                        <input v-model="formEvento.color_badge_gestion" type="color" class="w-10 h-10 border-none bg-transparent cursor-pointer mt-1" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Fecha de Inicio</label>
+                                    <div class="flex gap-2">
+                                        <input v-model="formEvento.fecha_inicio" type="date" class="flex-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold" />
+                                        <input v-model="formEvento.color_badge_fecha" type="color" class="w-10 h-10 border-none bg-transparent cursor-pointer mt-1" />
+                                    </div>
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Badge Institucional (Texto y Color)</label>
+                                    <div class="flex gap-3">
+                                        <input v-model="formEvento.institucion_badge" type="text" class="flex-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-xs font-black uppercase" />
+                                        <div class="flex flex-col items-center justify-center bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-3">
+                                            <input v-model="formEvento.color_badge_institucion" type="color" class="w-6 h-6 border-none bg-transparent cursor-pointer" />
+                                            <span class="text-[7px] font-bold text-slate-400 uppercase mt-1">FONDO</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="md:col-span-1">
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Ciudad / Sede</label>
+                                    <input v-model="formEvento.ubicacion" type="text" class="w-full bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-xs font-bold" />
+                                </div>
+                                <div class="md:col-span-1">
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Dirección Física</label>
+                                    <input v-model="formEvento.direccion" type="text" class="w-full bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-xs font-bold" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SECCIÓN D: MULTIMEDIA -->
+                        <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                            <div class="md:col-span-4 p-4 bg-white dark:bg-gray-900 rounded-3xl border border-slate-100 dark:border-gray-800 flex flex-col gap-2">
+                                <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block">Logo Oficial</label>
+                                <div class="flex-1 relative bg-slate-50 dark:bg-gray-800 border border-dashed border-slate-200 dark:border-gray-700 rounded-2xl flex flex-col items-center justify-center overflow-hidden min-h-[100px]">
+                                    <img v-if="resolvedLogo" :src="resolvedLogo" class="w-full h-full object-contain p-2" />
+                                    <span v-else class="material-symbols-outlined text-slate-300">add_photo_alternate</span>
+                                    <input type="file" @change="onLogoChange" class="absolute inset-0 opacity-0 cursor-pointer" />
+                                </div>
+                            </div>
+                            <div class="md:col-span-8 p-4 bg-white dark:bg-gray-900 rounded-3xl border border-slate-100 dark:border-gray-800 flex flex-col gap-2">
+                                <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block">Fondo Hero (Banner)</label>
+                                <div class="flex-1 relative bg-slate-50 dark:bg-gray-800 border border-dashed border-slate-200 dark:border-gray-700 rounded-2xl flex items-center justify-center overflow-hidden min-h-[100px]">
+                                    <img v-if="resolvedBanner" :src="resolvedBanner" class="w-full h-full object-cover opacity-50" />
+                                    <span v-else class="material-symbols-outlined text-slate-300">wallpaper</span>
+                                    <input type="file" @change="onFondoChange" class="absolute inset-0 opacity-0 cursor-pointer" />
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- PASO 2: NARRATIVA Y LINKS -->
+                    <!-- PASO 2: NARRATIVA -->
                     <div v-if="currentStep === 2" class="space-y-6">
                         <div class="flex items-center gap-3 border-b border-slate-100 dark:border-gray-800 pb-4 mb-6">
                             <span class="material-symbols-outlined text-umsa-blue">auto_stories</span>
@@ -1523,18 +1626,70 @@ const changeStep = (delta: number) => {
                         </div>
                     </div>
 
-                    <!-- PASO 3: DIRECTORIO -->
+                    <!-- PASO 3: CRONOGRAMA Y FECHAS -->
                     <div v-if="currentStep === 3" class="space-y-6">
                         <div class="flex items-center justify-between border-b border-slate-100 dark:border-gray-800 pb-4 mb-6">
                             <div class="flex items-center gap-3">
-                                <span class="material-symbols-outlined text-emerald-600">group</span>
-                                <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase italic">Paso 3: Directorio del Evento</h4>
+                                <span class="material-symbols-outlined text-umsa-gold">view_timeline</span>
+                                <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase italic">Paso 3: Cronograma y Fechas</h4>
                             </div>
-                            <button @click.prevent="showRegistroRapidoPonente = true" class="text-[9px] font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg">REGISTRAR NUEVO</button>
                         </div>
+                        
+                        <div class="grid grid-cols-2 gap-6 bg-slate-50 dark:bg-gray-800 p-4 rounded-2xl border border-slate-100 dark:border-gray-700">
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Fecha de Inicio General</label>
+                                <input v-model="formEvento.fecha_inicio" type="date" required class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-600 rounded-xl px-4 py-3 text-sm font-bold" />
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Fecha de Fin General</label>
+                                <input v-model="formEvento.fecha_fin" type="date" required class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-600 rounded-xl px-4 py-3 text-sm font-bold" />
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end">
+                            <button @click.prevent="agregarDiaEvento" class="bg-umsa-gold text-white px-4 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-yellow-500 transition-colors">+ AGREGAR DÍA</button>
+                        </div>
+
+                        <div class="space-y-4 max-h-[350px] overflow-y-auto thin-scrollbar pr-2">
+                            <div v-for="(dia, dIdx) in formEvento.cronograma_lista" :key="dIdx" class="bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl p-6 relative">
+                                <div class="flex items-center justify-between mb-4">
+                                    <span class="text-[10px] font-black text-umsa-gold uppercase tracking-tighter">Día #{{ dia.day }}</span>
+                                    <button @click.prevent="eliminarDiaEvento(dIdx)" class="text-slate-300 hover:text-red-500 transition-colors"><span class="material-symbols-outlined">delete</span></button>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                                    <input v-model="dia.name" placeholder="Nombre del día..." class="w-full bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-700 rounded-xl px-4 py-2 text-xs font-bold" />
+                                    <input v-model="dia.date" type="date" class="w-full bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-700 rounded-xl px-4 py-2 text-xs font-bold" />
+                                </div>
+                                <div class="space-y-2">
+                                    <div v-for="(act, aIdx) in dia.events" :key="aIdx" class="flex items-center gap-2">
+                                        <input v-model="act.time" type="time" class="w-24 bg-white dark:bg-gray-900 border border-slate-100 rounded-lg px-2 py-1 text-[10px] font-black" />
+                                        <input v-model="act.title" placeholder="Descripción del punto o sesión..." class="flex-1 bg-white dark:bg-gray-900 border border-slate-100 rounded-lg px-3 py-1 text-[10px] font-bold" />
+                                        <button @click.prevent="eliminarActividadEvento(dIdx, aIdx)" class="text-slate-300 hover:text-red-500"><span class="material-symbols-outlined text-sm">remove_circle</span></button>
+                                    </div>
+                                    <button @click.prevent="agregarActividadEvento(dIdx)" class="text-[8px] font-black text-emerald-600 uppercase tracking-widest mt-2 flex items-center gap-1">+ Añadir Punto de Agenda</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PASO 4: DIRECTORIO -->
+                    <div v-if="currentStep === 4" class="space-y-6">
+                        <div class="flex items-center justify-between border-b border-slate-100 dark:border-gray-800 pb-4 mb-6">
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-emerald-600">group</span>
+                                <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase italic">Paso 4: Directorio del Evento</h4>
+                            </div>
+                            <button @click.prevent="showRegistroRapidoPonente = true" class="text-[9px] font-black text-emerald-600 bg-emerald-50 dark:bg-gray-800 px-3 py-1 rounded-lg">REGISTRAR EXTRA</button>
+                        </div>
+                        
+                        <div class="bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 p-4 rounded-2xl border border-blue-100 dark:border-blue-800 flex gap-3 text-xs mb-4">
+                            <span class="material-symbols-outlined text-xl">info</span>
+                            <p><strong>Nota:</strong> Los ponentes o expositores del evento se agregarán <strong>automáticamente</strong> desde las actividades del evento (Cursos, Talleres). Aquí puedes visualizar el directorio o agregar personal adicional manualmente (ej. coordinador general).</p>
+                        </div>
+
                         <div class="space-y-4">
                             <div class="relative">
-                                <input v-model="filtroPonente" type="text" placeholder="Buscar personal..." class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 pl-10 text-xs font-bold" />
+                                <input v-model="filtroPonente" type="text" placeholder="Buscar personal adicional..." class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 pl-10 text-xs font-bold" />
                                 <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
                             </div>
                             <div class="bg-slate-50 dark:bg-gray-950 border-2 border-slate-100 dark:border-gray-800 rounded-2xl p-4 max-h-[300px] overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3 thin-scrollbar">
@@ -1546,33 +1701,6 @@ const changeStep = (delta: number) => {
                                     </div>
                                 </label>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- PASO 4: LOGÍSTICA -->
-                    <div v-if="currentStep === 4" class="space-y-6">
-                        <div class="flex items-center gap-3 border-b border-slate-100 dark:border-gray-800 pb-4 mb-6">
-                            <span class="material-symbols-outlined text-umsa-blue">schedule</span>
-                            <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase italic">Paso 4: Logística y Fechas</h4>
-                        </div>
-                        <div class="grid grid-cols-2 gap-6">
-                            <div>
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Fecha de Inicio</label>
-                                <input v-model="formEvento.fecha_inicio" type="date" required class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold" />
-                            </div>
-                            <div>
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Fecha de Fin</label>
-                                <input v-model="formEvento.fecha_fin" type="date" required class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold" />
-                            </div>
-                        </div>
-                        <div>
-                             <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Estado de Publicación</label>
-                             <select v-model="formEvento.estado" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-black uppercase text-emerald-600">
-                                 <option :value="2">Planificación</option>
-                                 <option :value="1">Activo / Publicado</option>
-                                 <option :value="0">Concluido / Histórico</option>
-                                 <option :value="3">Borrador / Invisible</option>
-                             </select>
                         </div>
                     </div>
 
@@ -1598,32 +1726,52 @@ const changeStep = (delta: number) => {
                         </div>
                     </div>
 
-                    <!-- PASO 6: CRONOGRAMA -->
+                    <!-- PASO 6: CONTACTO, ORGANIZACIÓN Y AUSPICIOS -->
                     <div v-if="currentStep === 6" class="space-y-6">
-                        <div class="flex items-center justify-between border-b border-slate-100 dark:border-gray-800 pb-4 mb-6">
-                            <div class="flex items-center gap-3">
-                                <span class="material-symbols-outlined text-umsa-gold">view_timeline</span>
-                                <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase italic">Paso 6: Cronograma Detallado</h4>
-                            </div>
-                            <button @click.prevent="agregarDiaEvento" class="bg-umsa-gold text-white px-4 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg">+ AGREGAR DÍA</button>
+                        <div class="flex items-center gap-3 border-b border-slate-100 dark:border-gray-800 pb-4 mb-6">
+                            <span class="material-symbols-outlined text-umsa-blue">contact_support</span>
+                            <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase italic">Paso 6: Contacto, Organización y Auspicios</h4>
                         </div>
-                        <div class="space-y-4 max-h-[400px] overflow-y-auto thin-scrollbar pr-2">
-                            <div v-for="(dia, dIdx) in formEvento.cronograma_lista" :key="dIdx" class="bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl p-6 relative">
-                                <div class="flex items-center justify-between mb-4">
-                                    <span class="text-[10px] font-black text-umsa-gold uppercase tracking-tighter">Día #{{ dia.day }}</span>
-                                    <button @click.prevent="eliminarDiaEvento(dIdx)" class="text-slate-300 hover:text-red-500 transition-colors"><span class="material-symbols-outlined">delete</span></button>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Dónde Estamos & Contacto -->
+                            <div class="space-y-4">
+                                <h5 class="text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100 pb-2">Información de Contacto</h5>
+                                <div>
+                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Dónde estamos</label>
+                                    <textarea v-model="formEvento.contacto_donde" rows="2" placeholder="Ej: Campus Central UMSA, Avenida Villazón" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-xs font-bold resize-none"></textarea>
                                 </div>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                                    <input v-model="dia.name" placeholder="Nombre del día..." class="w-full bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-700 rounded-xl px-4 py-2 text-xs font-bold" />
-                                    <input v-model="dia.date" type="date" class="w-full bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-700 rounded-xl px-4 py-2 text-xs font-bold" />
+                                <div>
+                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Teléfono de referencia</label>
+                                    <input v-model="formEvento.contacto_telefono" type="text" placeholder="+591 76706873" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-xs font-bold" />
                                 </div>
-                                <div class="space-y-2">
-                                    <div v-for="(act, aIdx) in dia.events" :key="aIdx" class="flex items-center gap-2">
-                                        <input v-model="act.time" type="time" class="w-24 bg-white dark:bg-gray-900 border border-slate-100 rounded-lg px-2 py-1 text-[10px] font-black" />
-                                        <input v-model="act.title" placeholder="Descripción del punto o sesión..." class="flex-1 bg-white dark:bg-gray-900 border border-slate-100 rounded-lg px-3 py-1 text-[10px] font-bold" />
-                                        <button @click.prevent="eliminarActividadEvento(dIdx, aIdx)" class="text-slate-300 hover:text-red-500"><span class="material-symbols-outlined text-sm">remove_circle</span></button>
+                                <div>
+                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Correo Electrónico</label>
+                                    <input v-model="formEvento.contacto_email" type="email" placeholder="contacto@umsa.bo" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-xs font-bold" />
+                                </div>
+                            </div>
+
+                            <!-- Organización y Auspicios -->
+                            <div class="space-y-4 flex flex-col h-full">
+                                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                                    <h5 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Organización y Auspicio</h5>
+                                    <button @click.prevent="formEvento.auspicios.push({nombre: '', link: ''})" class="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded hover:bg-emerald-100 transition-colors">+ Añadir Auspiciador</button>
+                                </div>
+                                
+                                <div class="flex-1 overflow-y-auto max-h-[300px] space-y-3 thin-scrollbar pr-2">
+                                    <div v-if="formEvento.auspicios.length === 0" class="text-center py-6 text-slate-400 opacity-50 border-2 border-dashed border-slate-200 rounded-xl">
+                                        <span class="material-symbols-outlined text-2xl">handshake</span>
+                                        <p class="text-[9px] font-bold uppercase mt-1">Sin auspiciadores</p>
                                     </div>
-                                    <button @click.prevent="agregarActividadEvento(dIdx)" class="text-[8px] font-black text-emerald-600 uppercase tracking-widest mt-2 flex items-center gap-1">+ Añadir Punto de Agenda</button>
+                                    <div v-for="(ausp, idx) in formEvento.auspicios" :key="idx" class="bg-slate-50 dark:bg-gray-900 border border-slate-200 dark:border-gray-700 p-3 rounded-xl relative group">
+                                        <button @click.prevent="formEvento.auspicios.splice(idx, 1)" class="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <span class="material-symbols-outlined text-sm">close</span>
+                                        </button>
+                                        <div class="space-y-2">
+                                            <input v-model="ausp.nombre" type="text" placeholder="Nombre (Ej: TWAS)" class="w-full bg-white dark:bg-gray-800 border border-slate-100 dark:border-gray-600 rounded-lg px-3 py-2 text-[10px] font-bold" />
+                                            <input v-model="ausp.link" type="text" placeholder="Enlace (Opcional)" class="w-full bg-white dark:bg-gray-800 border border-slate-100 dark:border-gray-600 rounded-lg px-3 py-2 text-[10px]" />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1647,140 +1795,331 @@ const changeStep = (delta: number) => {
                     </div>
                 </div>
 
-                <!-- ÁREA DE PREVISUALIZACIÓN DINÁMICA -->
-                <div class="lg:col-span-5 flex flex-col">
-                    <div class="sticky top-8 space-y-6">
-                        <label class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 text-center block">Vista Previa Dinámica (Mini-Home)</label>
-                        
-                        <!-- CARD PRINCIPAL (HOME HERO) -->
-                        <div class="relative w-full aspect-video rounded-[2rem] overflow-hidden shadow-2xl border border-slate-200 dark:border-gray-700 bg-gray-900 animate-in zoom-in-95 duration-500">
+                <!-- PANEL DE PREVISUALIZACIÓN (DERECHA) -->
+                <div class="lg:col-span-5 sticky top-8">
+                    <div class="flex flex-col h-full">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] italic">Vista Previa Dinámica (Mini-Home)</span>
+                            <div class="flex gap-1">
+                                <div class="w-2 h-2 rounded-full bg-red-400"></div>
+                                <div class="w-2 h-2 rounded-full bg-amber-400"></div>
+                                <div class="w-2 h-2 rounded-full bg-emerald-400"></div>
+                            </div>
+                        </div>
+
+                        <!-- CONTENEDOR SIMULADOR (COMPACTO Y ELEGANTE) -->
+                        <div
+                            ref="heroRef"
+                            :class="[
+                                currentStep === 1 ? 'lg:h-[520px]' : 'lg:h-[200px]',
+                                currentStep === 1 ? 'ring-4 ring-umsa-blue/40 shadow-2xl shadow-umsa-blue/20' : 'ring-0'
+                            ]"
+                            class="transition-all duration-700 ease-in-out bg-slate-100 dark:bg-gray-950 rounded-[3rem] shadow-2xl border border-slate-200 dark:border-gray-800 overflow-hidden relative group"
+                        >
                             
-                            <!-- MINI HEADER PERSISTENTE -->
-                            <div class="absolute top-0 inset-x-0 h-14 bg-white/95 backdrop-blur-md z-50 flex items-center justify-between px-6 border-b border-slate-100 shadow-sm">
-                                <div class="flex items-center gap-3">
-                                    <!-- Escudo UMSA -->
-                                    <img src="https://upload.wikimedia.org/wikipedia/commons/a/af/Escudo_de_la_Universidad_Mayor_de_San_Andr%C3%A9s.png" class="h-8 w-auto object-contain">
-                                    
-                                    <div class="h-6 w-px bg-slate-200 mx-1"></div>
-
-                                    <!-- Nombre y Sigla -->
-                                    <div class="flex items-center gap-3 overflow-hidden">
-                                        <span class="text-[10px] font-black text-umsa-blue uppercase tracking-tighter truncate max-w-[150px] leading-tight">{{ formEvento.nombre || 'NOMBRE DEL EVENTO' }}</span>
-                                        <div :style="{ backgroundColor: formEvento.color_principal }" class="px-3 py-1.5 rounded-lg shadow-lg shadow-blue-500/10 transform -skew-x-12">
-                                            <span class="text-[11px] font-black text-white uppercase block transform skew-x-12 italic leading-none">{{ formEvento.sigla || 'TYAN' }}</span>
-                                        </div>
-                                    </div>
-                                </div>
+                            <!-- BARRA SUPERIOR ULTRA-LIMPIA -->
+                            <div class="absolute top-0 inset-x-0 h-14 bg-white/95 backdrop-blur-md z-50 flex items-center px-6 border-b border-slate-100/50 shadow-sm">
+                                <!-- IZQUIERDA: Logo + Sigla/Nombre apilados (igual que el home) -->
                                 <div class="flex items-center gap-2">
-                                    <!-- Logos institucionales quitados del preview -->
+                                    <img v-if="resolvedLogo" :src="resolvedLogo" class="h-7 w-auto object-contain" />
+                                    <div v-else class="h-7 w-7 bg-slate-200 rounded-full animate-pulse"></div>
+                                    <div class="flex flex-col leading-none">
+                                        <span :style="{ color: formEvento.color_sigla }" class="text-[8px] font-black uppercase tracking-widest italic">
+                                            {{ formEvento.sigla || 'TWAS-TYAN' }}
+                                        </span>
+                                        <span :style="{ color: formEvento.color_texto_header }" class="text-[7px] font-bold uppercase tracking-tight truncate max-w-[130px]">
+                                            {{ formEvento.nombre || 'Congreso Internacional' }}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- CONTENIDO HERO (Paso 1, 4, 5) -->
-                            <div v-if="[1, 4, 5].includes(currentStep)" class="h-full w-full relative">
-                                <img v-if="resolvedBanner" :src="resolvedBanner" class="w-full h-full object-cover opacity-60 animate-in fade-in duration-700">
-                                <div v-else class="w-full h-full bg-slate-800 flex items-center justify-center">
-                                    <span class="material-symbols-outlined text-4xl text-white/5">wallpaper</span>
-                                </div>
+                            <!-- CONTENIDO HERO (1:1 HOME) -->
+                            <div class="h-full w-full relative">
+                                <img v-if="resolvedBanner" :src="resolvedBanner" class="w-full h-full object-cover opacity-60" />
+                                <div v-else class="w-full h-full bg-slate-900"></div>
+                                
                                 <div class="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/40 to-transparent"></div>
-                                <div class="absolute inset-0 p-6 pt-20 flex flex-col justify-end">
-                                    <div class="flex items-center gap-2 mb-3">
-                                        <div class="px-2.5 py-1 bg-emerald-500 text-white rounded-md flex items-center gap-1 shadow-lg shadow-emerald-500/20 border border-emerald-400/50">
-                                            <span class="material-symbols-outlined text-[10px]">verified</span>
-                                            <span class="text-[7px] font-black uppercase tracking-widest">{{ formEvento.institucion_badge || 'Evento Oficial OEA/TYAN' }}</span>
+                                
+                                <div class="absolute inset-0 p-8 pt-20 flex flex-col justify-end text-left">
+                                    <!-- BADGES SUPERIORES -->
+                                    <div class="flex items-center gap-2 mb-6">
+                                        <div :style="{ backgroundColor: formEvento.color_badge_gestion }" class="flex items-center gap-2 px-3 py-1.5 backdrop-blur-md border border-white/20 rounded-xl shadow-lg shadow-black/20">
+                                            <span class="material-symbols-outlined text-[12px] text-white">event_note</span>
+                                            <span class="text-[8px] font-black text-white uppercase">Gestión Actual</span>
+                                        </div>
+                                        <div :style="{ backgroundColor: formEvento.color_badge_institucion }" class="inline-flex items-center gap-2 px-4 py-1.5 text-white rounded-xl border border-white/20 shadow-lg shadow-black/20">
+                                            <span class="material-symbols-outlined text-[12px]">verified</span>
+                                            <span class="text-[8px] font-black uppercase tracking-widest italic">{{ formEvento.institucion_badge || 'EVENTO OFICIAL' }}</span>
                                         </div>
                                     </div>
-                                    <h1 class="text-xl md:text-2xl font-black text-white tracking-tighter leading-none mb-1 uppercase italic drop-shadow-2xl">{{ formEvento.nombre || 'NOMBRE DEL EVENTO' }}</h1>
-                                    <p class="text-[7px] text-gray-400 font-bold uppercase mb-3 tracking-widest">{{ formEvento.ubicacion || 'SEDE' }} • BOLIVIA</p>
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <div class="px-3 py-1 bg-blue-600 text-white rounded-lg flex items-center gap-1 shadow-lg shadow-blue-500/20 border border-blue-500/50">
-                                            <span class="material-symbols-outlined text-[10px]">calendar_month</span>
-                                            <span class="text-[7px] font-black">{{ formEvento.gestion || '2026' }}</span>
-                                        </div>
-                                        <div class="px-3 py-1 bg-white/10 backdrop-blur-md text-white border border-white/20 rounded-lg flex items-center gap-1">
-                                            <span class="material-symbols-outlined text-[10px]">event</span>
-                                            <span class="text-[7px] font-black uppercase tracking-tighter">{{ formEvento.fecha_inicio ? formatDate(formEvento.fecha_inicio) : '13 DE MAYO' }}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
 
-                        <!-- CARD NARRATIVA - Sincronizada con Imagen 1 -->
-                        <div v-if="currentStep === 2" class="bg-white dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-[2rem] p-8 shadow-xl animate-in fade-in slide-in-from-right-8 duration-500">
-                            <div class="grid grid-cols-12 gap-8">
-                                <!-- Lado Izquierdo (Links y Recursos) -->
-                                <div class="col-span-4 space-y-4">
-                                    <div v-if="formEvento.link_facebook || formEvento.link_web" class="space-y-3">
-                                        <h5 class="text-[8px] font-black text-blue-600 uppercase tracking-widest border-l-2 border-blue-600 pl-2">Recursos y Links</h5>
-                                        <div v-if="formEvento.link_facebook" class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
-                                            <p class="text-[7px] font-black text-blue-600 dark:text-blue-400 uppercase">Facebook Oficial</p>
-                                            <p class="text-[6px] text-slate-400 truncate">{{ formEvento.link_facebook }}</p>
-                                        </div>
-                                        <div v-if="formEvento.link_web" class="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-100 dark:border-emerald-800">
-                                            <p class="text-[7px] font-black text-emerald-600 dark:text-emerald-400 uppercase">Sitio Web</p>
-                                            <p class="text-[6px] text-slate-400 truncate">{{ formEvento.link_web }}</p>
-                                        </div>
-                                    </div>
-                                    <div v-else class="h-40 bg-slate-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center border-2 border-dashed border-slate-100 dark:border-gray-800">
-                                        <p class="text-[8px] font-black text-slate-300 uppercase tracking-tighter">Sin enlaces extra</p>
-                                    </div>
-                                </div>
-
-                                <!-- Lado Derecho (Sobre el Evento) -->
-                                <div class="col-span-8 space-y-4">
-                                    <div class="flex flex-col">
-                                        <h4 class="text-xs md:text-sm font-black text-umsa-blue uppercase italic tracking-tighter leading-none">SOBRE EL EVENTO</h4>
-                                        <p class="text-[8px] font-black text-slate-400 uppercase mt-1">{{ formEvento.nombre || 'NOMBRE DEL EVENTO' }}</p>
+                                    <!-- TÍTULO BÍCRROMO IMPACTANTE -->
+                                    <div class="mb-4 flex flex-col items-start leading-none">
+                                        <h1 :style="{ color: formEvento.color_principal }" class="text-[38px] font-black tracking-tighter uppercase italic drop-shadow-2xl">
+                                            {{ formEvento.nombre || 'CONGRESO' }}
+                                        </h1>
+                                        <h1 :style="{ color: formEvento.color_titulo_2 }" class="text-[38px] font-black tracking-tighter uppercase italic drop-shadow-2xl -mt-1">
+                                            {{ formEvento.nombre_2 || 'INTERNACIONAL' }}
+                                        </h1>
                                     </div>
                                     
-                                    <div class="space-y-2">
-                                        <p class="text-[9px] text-slate-600 dark:text-gray-300 font-bold leading-relaxed line-clamp-3">{{ formEvento.sobre_evento_1 || 'Descripción principal del evento...' }}</p>
-                                        <p class="text-[8px] text-slate-400 font-medium leading-relaxed">{{ formEvento.sobre_evento_2 || 'Más detalles...' }}</p>
+                                    <!-- LUGAR (UBICACIÓN CIUDAD) -->
+                                    <p class="text-sm font-black text-slate-300 uppercase tracking-[0.2em] mb-8 italic drop-shadow-lg">
+                                        {{ formEvento.ubicacion || 'LA PAZ, BOLIVIA' }}
+                                    </p>
+                                    
+                                    <!-- TRÍADA DE INFORMACIÓN -->
+                                    <div class="flex items-center gap-2 mb-8">
+                                        <div :style="{ backgroundColor: formEvento.color_badge_gestion }" class="px-3 py-2 text-white rounded-xl flex items-center gap-2 border border-white/10 shadow-lg">
+                                            <span class="material-symbols-outlined text-[14px]">military_tech</span>
+                                            <span class="text-[9px] font-black">{{ formEvento.gestion || '2025' }}</span>
+                                        </div>
+                                        <div :style="{ backgroundColor: formEvento.color_badge_fecha }" class="px-3 py-2 text-white border border-white/10 rounded-xl flex items-center gap-2 shadow-lg">
+                                            <span class="material-symbols-outlined text-[14px] text-white">calendar_today</span>
+                                            <span class="text-[9px] font-bold uppercase italic">{{ formEvento.fecha_inicio ? formatDate(formEvento.fecha_inicio) : '13 DE MAYO' }}</span>
+                                        </div>
+                                        <div v-if="formEvento.direccion" class="px-3 py-2 bg-black/40 backdrop-blur-md text-white border border-white/10 rounded-xl flex items-center gap-2">
+                                            <span class="material-symbols-outlined text-[14px] text-blue-400">location_on</span>
+                                            <span class="text-[9px] font-bold uppercase italic truncate max-w-[150px]">{{ formEvento.direccion }}</span>
+                                        </div>
                                     </div>
 
-                                    <div class="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-2xl border-l-4 border-umsa-blue italic">
-                                        <p class="text-[10px] font-black text-umsa-blue">"{{ formEvento.frase_destacada || 'Pudes ser un buen profesional' }}"</p>
+                                    <!-- DESCRIPCIÓN ESENCIAL -->
+                                    <p class="text-[11px] text-slate-300 font-medium leading-relaxed max-w-[400px] mb-8 opacity-90 line-clamp-2">
+                                        {{ formEvento.descripcion || 'Descripción del impacto y objetivos del evento latinoamericano...' }}
+                                    </p>
+
+                                    <!-- BOTONES OFICIALES -->
+                                    <div class="flex items-center gap-3">
+                                        <div :style="{ backgroundColor: formEvento.color_principal }" class="px-6 py-3 rounded-xl text-white text-[9px] font-black uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-black/30">
+                                            <span class="material-symbols-outlined text-sm">login</span> INGRESAR AL PORTAL
+                                        </div>
+                                        <div class="px-6 py-3 rounded-xl bg-white/10 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest border border-white/20 flex items-center gap-2">
+                                            <span class="material-symbols-outlined text-sm">visibility</span> DETALLES
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- CARD CRONOGRAMA - Visible en Paso 6 -->
-                        <div v-if="currentStep === 6" class="bg-slate-900 rounded-[2rem] p-8 shadow-2xl animate-in zoom-in-95 duration-500">
-                            <div class="flex items-center gap-3 mb-6">
-                                <span class="material-symbols-outlined text-umsa-gold text-xl">event_upcoming</span>
-                                <h4 class="text-xs font-black text-white uppercase italic">Vista Previa Agenda</h4>
-                            </div>
-                            <div class="space-y-4">
-                                <div v-if="formEvento.cronograma_lista.length === 0" class="text-center py-10 opacity-30">
-                                    <span class="material-symbols-outlined text-4xl text-white mb-2">view_timeline</span>
-                                    <p class="text-[9px] font-black text-white uppercase">Sin cronograma</p>
-                                </div>
-                                <div v-for="dia in formEvento.cronograma_lista" :key="dia.day" class="p-4 bg-white/5 border border-white/10 rounded-2xl">
-                                    <p class="text-[8px] font-black text-umsa-gold uppercase italic mb-2">Día {{ dia.day }}: {{ dia.name }}</p>
-                                    <div v-for="act in dia.events" :key="act.time" class="flex gap-2 items-center opacity-60">
-                                        <span class="text-[7px] font-bold w-10 text-white">{{ act.time }}</span>
-                                        <span class="text-[7px] truncate flex-1 text-gray-300">{{ act.title }}</span>
+                    <!-- SECCIONES REACTIVAS: animación de deslizamiento direccional -->
+                    <Transition :name="previewTransition" mode="out-in">
+                    <div :key="currentStep" class="mt-8">
+                        <!-- SECCIÓN NARRATIVA (PASO 2) -->
+                        <div
+                            ref="previewStep2Ref"
+                            v-if="currentStep === 2"
+                            class="bg-white dark:bg-gray-800 border-2 border-umsa-blue/20 dark:border-blue-900/40 rounded-[2.5rem] overflow-hidden shadow-2xl shadow-blue-500/10 animate-in slide-in-from-right-8 duration-500 ring-4 ring-umsa-blue/30 ring-offset-2"
+                        >
+                            <!-- Header con acento visual -->
+                            <div class="bg-gradient-to-r from-umsa-blue/5 to-transparent dark:from-blue-900/20 px-8 pt-8 pb-4 border-b border-blue-100 dark:border-blue-900/30">
+                                <div class="flex items-center gap-3">
+                                    <span class="material-symbols-outlined text-umsa-blue text-2xl">article</span>
+                                    <div>
+                                        <p class="text-[8px] font-black text-umsa-blue/60 uppercase tracking-[0.2em]">Previsualización — Sección del Home</p>
+                                        <h2 class="text-lg font-black text-umsa-blue dark:text-white uppercase italic tracking-tighter leading-none">Sobre el Evento</h2>
                                     </div>
+                                </div>
+                            </div>
+                            <!-- Contenido -->
+                            <div class="p-8 space-y-5">
+                                <!-- Nombre del evento -->
+                                <div>
+                                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Nombre del Evento</p>
+                                    <p class="text-sm font-black text-primary-dark dark:text-white uppercase italic tracking-tight">
+                                        {{ formEvento.nombre || 'CONGRESO INTERNACIONAL' }} {{ formEvento.nombre_2 || '' }}
+                                    </p>
+                                </div>
+                                <!-- Descripción principal -->
+                                <div>
+                                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2">Descripción Principal (Párrafo 1)</p>
+                                    <p class="text-[11px] text-slate-600 dark:text-gray-300 font-medium leading-relaxed border-l-3 border-umsa-blue pl-4" style="border-left-width: 3px; border-left-color: var(--umsa-blue, #0070b4);">
+                                        {{ formEvento.sobre_evento_1 || 'El texto del párrafo 1 aparecerá aquí...' }}
+                                    </p>
+                                </div>
+                                <!-- Frase destacada -->
+                                <div v-if="formEvento.frase_destacada" class="bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-900/10 p-5 rounded-2xl border-l-4 border-umsa-blue relative">
+                                    <span class="material-symbols-outlined absolute right-3 top-3 text-blue-100 dark:text-blue-900 text-3xl">format_quote</span>
+                                    <p class="text-xs font-black text-umsa-blue dark:text-blue-300 italic leading-snug relative z-10">
+                                        "{{ formEvento.frase_destacada }}"
+                                    </p>
+                                </div>
+                                <div v-else class="bg-slate-50 dark:bg-gray-900/50 p-4 rounded-2xl border border-dashed border-slate-200 dark:border-gray-700 text-center">
+                                    <p class="text-[8px] font-bold text-slate-400 italic">La frase destacada aparecerá aquí...</p>
+                                </div>
+                                <!-- Párrafo 2 -->
+                                <div v-if="formEvento.sobre_evento_2">
+                                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Información Adicional (Párrafo 2)</p>
+                                    <p class="text-[10px] text-slate-500 dark:text-gray-400 font-medium leading-relaxed">
+                                        {{ formEvento.sobre_evento_2 }}
+                                    </p>
+                                </div>
+                                <!-- Links externos (Web y Facebook) -->
+                                <div v-if="formEvento.link_web || formEvento.link_facebook" class="pt-4 border-t border-slate-100 dark:border-gray-700 space-y-2">
+                                    <p class="text-[7px] font-black text-slate-400 uppercase tracking-[0.2em]">Más información oficial</p>
+                                    <div class="flex flex-wrap gap-2">
+                                        <a v-if="formEvento.link_web" :href="formEvento.link_web" target="_blank" :style="{ borderColor: formEvento.color_principal, color: formEvento.color_principal }" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 bg-white dark:bg-gray-900 font-black text-[8px] uppercase tracking-wider shadow-sm hover:-translate-y-0.5 transition-all group">
+                                            <span class="material-symbols-outlined text-[13px]">language</span>
+                                            Sitio Web
+                                            <span class="material-symbols-outlined text-[10px] opacity-50 group-hover:opacity-100 transition-all">arrow_outward</span>
+                                        </a>
+                                        <a v-if="formEvento.link_facebook" :href="formEvento.link_facebook" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 border-[#1877F2] text-[#1877F2] bg-white dark:bg-gray-900 font-black text-[8px] uppercase tracking-wider shadow-sm hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:-translate-y-0.5 transition-all group">
+                                            <svg class="w-3 h-3 fill-current shrink-0" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                                            Facebook
+                                            <span class="material-symbols-outlined text-[10px] opacity-50 group-hover:opacity-100 transition-all">arrow_outward</span>
+                                        </a>
+                                    </div>
+                                </div>
+                                <div v-else class="pt-4 border-t border-dashed border-slate-100 dark:border-gray-700">
+                                    <p class="text-[7px] font-bold text-slate-300 italic">Links de Web y Facebook aparecerán aquí si los configuras...</p>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- CARD DIRECTORIO - Visible en Paso 3 -->
-                        <div v-if="currentStep === 3" class="bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-100 dark:border-emerald-800 rounded-[2rem] p-8 animate-in slide-in-from-bottom-8 duration-500">
-                             <h4 class="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase italic mb-4">Personal Destacado</h4>
-                             <div class="flex -space-x-4 mb-4">
-                                <div v-for="i in 5" :key="i" class="w-10 h-10 rounded-full border-2 border-white dark:border-gray-800 bg-emerald-100 dark:bg-gray-700 flex items-center justify-center">
-                                    <span class="material-symbols-outlined text-sm text-emerald-400">person</span>
+                        <!-- SECCIÓN UBICACIÓN (PASO 5) -->
+                        <div
+                            ref="previewStep5Ref"
+                            v-if="currentStep === 5"
+                            class="bg-white dark:bg-gray-800 border border-slate-100 dark:border-gray-700 rounded-[2.5rem] overflow-hidden shadow-2xl animate-in slide-in-from-right-8 duration-500 ring-4 ring-emerald-400/40 ring-offset-2"
+                        >
+                             <div class="p-8 space-y-6">
+                                <div class="flex flex-col gap-1">
+                                    <h2 class="text-xl font-black text-primary-dark dark:text-white uppercase italic tracking-tighter">Sede del Evento</h2>
+                                    <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                                        <span class="material-symbols-outlined text-[14px] text-emerald-500">place</span>
+                                        {{ formEvento.direccion || 'Ubicación pendiente de asignar' }}
+                                    </p>
+                                </div>
+                                
+                                <div class="aspect-video bg-slate-100 dark:bg-gray-900 rounded-2xl border-2 border-dashed border-slate-200 dark:border-gray-700 flex flex-col items-center justify-center p-6 text-center group">
+                                    <div v-if="formEvento.google_maps_link" class="space-y-3">
+                                        <span class="material-symbols-outlined text-4xl text-umsa-blue animate-bounce">location_on</span>
+                                        <p class="text-[10px] font-black text-primary-dark dark:text-white uppercase">Mapa de Google Vinculado</p>
+                                        <p class="text-[7px] text-slate-400 truncate max-w-[200px]">{{ formEvento.google_maps_link }}</p>
+                                    </div>
+                                    <div v-else class="opacity-30 space-y-2">
+                                        <span class="material-symbols-outlined text-4xl">map</span>
+                                        <p class="text-[8px] font-black uppercase">Pendiente vincular Google Maps</p>
+                                    </div>
                                 </div>
                              </div>
-                             <p class="text-[9px] font-bold text-emerald-600">{{ formEvento.ponentes_seleccionados.length }} personal/ponentes seleccionados para mostrar en el Home.</p>
+                        </div>
+
+                        <!-- SECCIÓN DIRECTORIO (PASO 4) -->
+                        <div
+                            ref="previewStep4Ref"
+                            v-if="currentStep === 4"
+                            class="bg-slate-50 dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-[2.5rem] overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8 duration-500 ring-4 ring-umsa-blue/30 ring-offset-2"
+                        >
+                             <div class="p-8">
+                                <div class="flex flex-col items-center text-center mb-8">
+                                    <span class="text-[8px] font-black text-umsa-blue uppercase tracking-widest mb-1">Directorio Oficial</span>
+                                    <h2 class="text-xl font-black text-primary-dark dark:text-white uppercase italic tracking-tighter">Expositores y Ponentes</h2>
+                                </div>
+
+                                <div v-if="formEvento.ponentes_seleccionados.length > 0" class="grid grid-cols-2 gap-3">
+                                    <div v-for="id in formEvento.ponentes_seleccionados.slice(0, 4)" :key="id" class="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-slate-100 dark:border-gray-700 shadow-sm flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-full bg-slate-100 dark:bg-gray-700 flex items-center justify-center border-2 border-emerald-500/30">
+                                            <span class="material-symbols-outlined text-emerald-500">person</span>
+                                        </div>
+                                        <div class="flex-1 overflow-hidden">
+                                            <p class="text-[8px] font-black text-primary-dark dark:text-white truncate uppercase">{{ ponentesDB.find(p => p.id === id)?.displayName || 'Nombre Ponente' }}</p>
+                                            <p class="text-[6px] text-slate-400 uppercase font-bold">{{ ponentesDB.find(p => p.id === id)?.roleLabel || 'Expositor' }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div v-else class="py-12 flex flex-col items-center justify-center opacity-20 border-2 border-dashed border-slate-200 dark:border-gray-800 rounded-3xl">
+                                    <span class="material-symbols-outlined text-5xl">groups</span>
+                                    <p class="text-[9px] font-black uppercase mt-2">Sin personal seleccionado</p>
+                                </div>
+                                
+                                <p class="text-[8px] font-black text-slate-400 uppercase mt-6 text-center tracking-widest">{{ formEvento.ponentes_seleccionados.length }} Personas registradas en esta gestión</p>
+                             </div>
+                        </div>
+
+                        <!-- SECCIÓN CRONOGRAMA (PASO 3) -->
+                        <div
+                            ref="previewStep3Ref"
+                            v-if="currentStep === 3"
+                            class="bg-slate-50 dark:bg-gray-950 rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-200 dark:border-gray-800 animate-in slide-in-from-bottom-8 duration-500 ring-4 ring-emerald-500/30 ring-offset-2"
+                        >
+                            <div class="p-8">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <div class="h-1 w-8 bg-emerald-500 rounded-full"></div>
+                                    <span class="text-emerald-600 dark:text-emerald-500 font-bold uppercase tracking-widest text-[8px]">Actividades Programadas</span>
+                                </div>
+                                <div class="flex items-end justify-between mb-8">
+                                  <h2 class="text-xl font-black text-primary-dark dark:text-white uppercase tracking-tighter italic leading-none">Cronograma {{ formEvento.gestion }}</h2>
+                                  <p v-if="formEvento.fecha_inicio" class="text-[8px] text-umsa-blue font-bold uppercase tracking-widest bg-blue-50 dark:bg-umsa-blue/10 px-2 py-1 rounded-lg border border-blue-100 dark:border-umsa-blue/30">{{ formatDate(formEvento.fecha_inicio) }}</p>
+                                </div>
+
+                                <div class="flex gap-3 overflow-x-auto pb-4 thin-scrollbar">
+                                    <div v-if="formEvento.cronograma_lista.length === 0" class="w-full py-12 text-center opacity-40 flex flex-col items-center border-2 border-dashed border-slate-300 dark:border-gray-700 rounded-3xl">
+                                        <span class="material-symbols-outlined text-4xl mb-2 text-slate-400">calendar_today</span>
+                                        <p class="text-[9px] font-black uppercase text-slate-500">Agrega días al cronograma</p>
+                                    </div>
+                                    <div v-for="dia in formEvento.cronograma_lista" :key="dia.day" class="min-w-[140px] bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-2xl shadow-sm flex flex-col shrink-0">
+                                        <div class="bg-slate-100 dark:bg-gray-800 p-4 relative overflow-hidden rounded-t-2xl">
+                                           <div class="text-5xl font-black opacity-5 absolute -top-2 -right-2 text-umsa-blue">{{ dia.day }}</div>
+                                           <span class="block text-3xl font-black text-umsa-blue dark:text-blue-300 relative z-10 font-serif leading-none mb-1">{{ dia.day }}</span>
+                                           <span class="block text-[8px] uppercase tracking-widest font-bold text-slate-400 relative z-10">{{ dia.name }}</span>
+                                        </div>
+                                        <div class="flex-1 p-4 space-y-3 bg-white/50 dark:bg-black/20">
+                                          <div v-for="(act, idx) in dia.events.slice(0, 3)" :key="idx" class="relative pl-3 before:content-[''] before:absolute before:left-0 before:top-1 before:w-1.5 before:h-1.5 before:bg-emerald-500 before:rounded-full after:content-[''] after:absolute after:left-[2px] after:top-2.5 after:bottom-[-12px] after:w-[1.5px] after:bg-slate-200 dark:after:bg-gray-700 last:after:hidden">
+                                             <div class="flex flex-col gap-0.5 -mt-1">
+                                                <span class="text-umsa-blue text-[7px] uppercase font-black tracking-widest">{{ act.time }}</span>
+                                                <span class="text-[8px] font-bold text-slate-600 dark:text-gray-300 leading-tight uppercase line-clamp-2">{{ act.title || '...' }}</span>
+                                             </div>
+                                          </div>
+                                          <p v-if="dia.events.length > 3" class="text-[6px] text-slate-400 font-bold uppercase mt-1 pl-3">+ {{ dia.events.length - 3 }} más</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SECCIÓN CONTACTO Y FOOTER (PASO 6) -->
+                        <div
+                            ref="previewStep6Ref"
+                            v-if="currentStep === 6"
+                            class="bg-primary-dark dark:bg-gray-900 rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-800 animate-in fade-in duration-500 ring-4 ring-primary-dark/40 ring-offset-2 flex flex-col justify-end"
+                        >
+                             <div class="p-6 text-white text-[7px] font-sans">
+                                <div class="grid grid-cols-3 gap-4 mb-6">
+                                    <div>
+                                        <h4 class="font-bold text-[8px] mb-3 border-b border-umsa-blue pb-1 inline-block">Dónde estamos</h4>
+                                        <p class="text-gray-300 leading-relaxed">{{ formEvento.contacto_donde || 'Dirección no configurada...' }}</p>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-bold text-[8px] mb-3 border-b border-umsa-blue pb-1 inline-block">Contáctanos</h4>
+                                        <p class="text-gray-300 leading-relaxed">Teléfono de referencia: {{ formEvento.contacto_telefono || 'No definido' }}</p>
+                                        <p class="text-gray-300 leading-relaxed mt-1">Email: {{ formEvento.contacto_email || 'No definido' }}</p>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-bold text-[8px] mb-3 border-b border-umsa-blue pb-1 inline-block">Organización y Auspicio</h4>
+                                        <div class="flex flex-wrap gap-x-2 gap-y-1">
+                                            <template v-if="formEvento.auspicios.length > 0">
+                                                <a v-for="(ausp, i) in formEvento.auspicios" :key="i" :href="ausp.link || '#'" target="_blank" class="font-bold text-gray-300 hover:text-white transition-colors">
+                                                    {{ ausp.nombre }}
+                                                </a>
+                                            </template>
+                                            <p v-else class="text-gray-500 italic">Sin auspicios...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="border-t border-gray-700 pt-3 text-center flex justify-between items-center text-[6px] text-gray-400">
+                                    <p>© {{ formEvento.gestion || '2025' }} - Todos los derechos reservados - BattleBread</p>
+                                    <p>Desarrollado por <span class="text-umsa-blue font-medium">BattleBread Academy</span></p>
+                                </div>
+                             </div>
                         </div>
                     </div>
+                    </Transition>
                 </div>
             </div>
-        </form>
+        </div>
+    </form>
     </div>
 
     <!-- MODAL REGISTRO RÁPIDO -->
@@ -1804,8 +2143,18 @@ const changeStep = (delta: number) => {
             </div>
         </div>
     </div>
-  </div>
+    </div>
 </template>
-
-
-
+<style scoped>
+/* === ANIMACIONES DIRECTIONALES DE LA PREVISUALIZACIÓN === */
+.preview-slide-forward-enter-active,
+.preview-slide-forward-leave-active,
+.preview-slide-backward-enter-active,
+.preview-slide-backward-leave-active {
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.preview-slide-forward-enter-from { transform: translateX(60px); opacity: 0; filter: blur(3px); }
+.preview-slide-forward-leave-to   { transform: translateX(-60px); opacity: 0; filter: blur(3px); }
+.preview-slide-backward-enter-from { transform: translateX(-60px); opacity: 0; filter: blur(3px); }
+.preview-slide-backward-leave-to   { transform: translateX(60px); opacity: 0; filter: blur(3px); }
+</style>

@@ -97,6 +97,36 @@ export class Evento {
   @Column({ length: 50, nullable: true })
   color_principal: string;
 
+  @Column({ length: 255, nullable: true })
+  institucion_badge: string;
+
+  @Column({ length: 255, nullable: true })
+  link_facebook: string;
+
+  @Column({ length: 255, nullable: true })
+  link_web: string;
+
+  @Column({ length: 50, nullable: true })
+  color_sigla: string;
+
+  @Column({ length: 50, nullable: true })
+  color_texto_header: string;
+
+  @Column({ length: 50, nullable: true })
+  color_titulo_2: string;
+
+  @Column({ length: 50, nullable: true })
+  color_badge_gestion: string;
+
+  @Column({ length: 50, nullable: true })
+  color_badge_institucion: string;
+
+  @Column({ length: 50, nullable: true })
+  color_badge_fecha: string;
+
+  @Column({ length: 255, nullable: true })
+  nombre_2: string;
+
   // ── Relaciones ────────────────────────────────────────────────────────────
 
   /** Un evento tiene múltiples actividades (cursos, talleres, conferencias). */

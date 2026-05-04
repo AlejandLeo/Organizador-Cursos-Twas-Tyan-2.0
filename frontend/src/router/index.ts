@@ -34,9 +34,9 @@ const router = createRouter({
           component: () => import('../views/dashboard/CoordinadorView.vue'),
         },
         {
-          path: 'actividades',
-          name: 'coordinador-actividades',
-          component: () => import('../views/actividades/ActividadesListView.vue'),
+          path: 'gestion-eventos',
+          name: 'coordinador-gestion-eventos',
+          component: () => import('../views/eventos/GestionEventoMaster.vue'),
         },
         {
           path: 'solicitudes',
@@ -44,8 +44,8 @@ const router = createRouter({
           component: () => import('../views/coordinador/CoordinadorSolicitudesView.vue'),
         },
         {
-          path: 'actividades/:id',
-          name: 'coordinador-actividades-detalle',
+          path: 'gestion-eventos/:id',
+          name: 'coordinador-gestion-eventos-detalle',
           component: () => import('../views/actividades/ActividadDetalleView.vue'),
         },
         {
@@ -76,7 +76,7 @@ const router = createRouter({
         {
           path: 'eventos',
           name: 'coordinador-eventos',
-          component: () => import('../views/eventos/EventosView.vue'),
+          component: () => import('../views/eventos/ListaEventosView.vue'),
         },
         {
           path: 'eventos/:id',
@@ -116,17 +116,17 @@ const router = createRouter({
           component: () => import('../views/admin/AdminGestionView.vue'),
         },
         {
-          path: 'actividades',
-          name: 'admin-actividades',
+          path: 'gestion-eventos',
+          name: 'admin-gestion-eventos',
           component: () => import('../views/admin/AdminGestionView.vue'),
         },
         {
-          path: 'actividades/:id',
-          name: 'admin-actividades-detalle',
+          path: 'gestion-eventos/:id',
+          name: 'admin-gestion-eventos-detalle',
           component: () => import('../views/actividades/ActividadDetalleView.vue'),
         },
         {
-          path: 'actividades/:id/certificado/workplace',
+          path: 'gestion-eventos/:id/certificado/workplace',
           name: 'admin-certificado-workplace',
           component: () => import('../views/actividades/CertificadoWorkplaceView.vue'),
         },

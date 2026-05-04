@@ -100,6 +100,11 @@ const nuevoEvento = ref({
   sobre_evento_1: '',
   sobre_evento_2: '',
   frase_destacada: '',
+  link_facebook: '',
+  link_web: '',
+  sigla: '',
+  color_principal: '#0070b4',
+  institucion_badge: 'Evento Oficial OEA/TYAN',
   ponentes_seleccionados: [] as number[],
   cronograma: '',
   cronograma_lista: [] as any[],
@@ -127,6 +132,15 @@ const agregarActividad = (dayIdx: any) => {
 
 const eliminarActividad = (dayIdx: any, actIdx: any) => {
     nuevoEvento.value.cronograma_lista[dayIdx].events.splice(actIdx, 1);
+};
+
+const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    // Ajuste de zona horaria para inputs de fecha
+    const d = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+    return `${d.getDate() + 1} de ${months[d.getMonth()]}`;
 };
 
 const nuevoPonenteRegistro = ref({
@@ -167,6 +181,19 @@ const logoPreview = ref<string | null>(null);
 const fondoPreview = ref<string | null>(null);
 const logoQuality = ref<{status: 'hd' | 'low' | 'ok' | null, msg: string}>({status: null, msg: ''});
 const fondoQuality = ref<{status: 'hd' | 'low' | 'ok' | null, msg: string}>({status: null, msg: ''});
+
+// Resolución inteligente de URLs para Vista Previa
+const resolvedLogo = computed(() => {
+    if (!logoPreview.value) return null;
+    if (logoPreview.value.startsWith('data:') || logoPreview.value.startsWith('http')) return logoPreview.value;
+    return `http://localhost:3000/uploads/logo/${logoPreview.value}`;
+});
+
+const resolvedBanner = computed(() => {
+    if (!fondoPreview.value) return null;
+    if (fondoPreview.value.startsWith('data:') || fondoPreview.value.startsWith('http')) return fondoPreview.value;
+    return `http://localhost:3000/uploads/banner/${fondoPreview.value}`;
+});
 
 const onLogoChange = (e: any) => {
     const file = e.target.files[0];
@@ -307,6 +334,12 @@ const handleCreateEvento = async () => {
       if (nuevoEvento.value.sobre_evento_1) formData.append('sobre_evento_1', nuevoEvento.value.sobre_evento_1);
       if (nuevoEvento.value.sobre_evento_2) formData.append('sobre_evento_2', nuevoEvento.value.sobre_evento_2);
       if (nuevoEvento.value.frase_destacada) formData.append('frase_destacada', nuevoEvento.value.frase_destacada);
+      
+      formData.append('sigla', nuevoEvento.value.sigla || '');
+      formData.append('color_principal', nuevoEvento.value.color_principal || '#0070b4');
+      formData.append('institucion_badge', nuevoEvento.value.institucion_badge || 'Evento Oficial OEA/TYAN');
+      formData.append('link_facebook', nuevoEvento.value.link_facebook || '');
+      formData.append('link_web', nuevoEvento.value.link_web || '');
 
       let finalDescripcion = nuevoEvento.value.descripcion;
       const ponentesStr = nuevoEvento.value.ponentes_seleccionados.map(id => {
@@ -391,6 +424,11 @@ const handleCreateEvento = async () => {
          sobre_evento_1: '',
          sobre_evento_2: '',
          frase_destacada: '',
+         sigla: '',
+         color_principal: '#0070b4',
+         institucion_badge: 'Evento Oficial OEA/TYAN',
+         link_facebook: '',
+         link_web: '',
          ponentes_seleccionados: [],
          cronograma: '',
          cronograma_lista: []
@@ -439,6 +477,11 @@ const editarGestion = (gestion: any) => {
         sobre_evento_1: gestion.sobre_evento_1 || '',
         sobre_evento_2: gestion.sobre_evento_2 || '',
         frase_destacada: gestion.frase_destacada || '',
+        sigla: gestion.sigla || '',
+        color_principal: gestion.color_principal || '#0070b4',
+        institucion_badge: gestion.institucion_badge || 'Evento Oficial OEA/TYAN',
+        link_facebook: gestion.link_facebook || '',
+        link_web: gestion.link_web || '',
         estado: gestion.estado,
         fondo_img: null,
         logo_img: null,
@@ -541,6 +584,16 @@ const editarGestion = (gestion: any) => {
                         </div>
                         <div class="grid grid-cols-2 gap-4">
                             <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Sigla / Abreviación (Para el Header)</label>
+                                <input v-model="nuevoEvento.sigla" type="text" placeholder="Ej: TYAN" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 focus:border-umsa-blue rounded-2xl px-5 py-3 text-sm font-black uppercase" />
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Texto del Badge (Botón Verde)</label>
+                                <input v-model="nuevoEvento.institucion_badge" type="text" placeholder="Ej: Evento Oficial OEA/TYAN" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 focus:border-umsa-blue rounded-2xl px-5 py-3 text-sm font-bold uppercase" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
                                 <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Versión / Slogan</label>
                                 <input v-model="nuevoEvento.version" type="text" placeholder="Ej: 4ta Edición" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 focus:border-umsa-blue rounded-2xl px-5 py-3 text-sm font-bold" />
                             </div>
@@ -548,21 +601,31 @@ const editarGestion = (gestion: any) => {
                                 <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Gestión / Año</label>
                                 <input v-model="nuevoEvento.gestion" type="text" placeholder="2025" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 focus:border-umsa-blue rounded-2xl px-5 py-3 text-sm font-bold" />
                             </div>
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Color de Identidad</label>
+                                <div class="flex items-center gap-3 bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-2xl px-4 py-2">
+                                    <input v-model="nuevoEvento.color_principal" type="color" class="w-10 h-10 border-none bg-transparent cursor-pointer" />
+                                    <span class="text-[10px] font-black uppercase text-slate-500">{{ nuevoEvento.color_principal }}</span>
+                                </div>
+                            </div>
                         </div>
                         <div class="grid grid-cols-2 gap-6 pt-2">
                             <!-- Logo -->
                             <div class="space-y-3">
                                 <div class="flex items-center justify-between">
-                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Logo del Evento</label>
+                                    <div>
+                                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Logo del Evento</label>
+                                        <p class="text-[8px] font-bold text-slate-400/80 uppercase mt-0.5 tracking-tighter">PNG/SVG Transparente • Mín. 512x512px</p>
+                                    </div>
                                     <span v-if="logoQuality.status" :class="logoQuality.status === 'hd' ? 'text-emerald-500 bg-emerald-50' : (logoQuality.status === 'low' ? 'text-red-500 bg-red-50' : 'text-amber-500 bg-amber-50')" class="text-[8px] font-black px-2 py-0.5 rounded-full border border-current">
                                         {{ logoQuality.status === 'hd' ? 'HD' : (logoQuality.status === 'low' ? 'BAJA CALIDAD' : 'OK') }}
                                     </span>
                                 </div>
-                                <div class="relative group h-32 bg-slate-50 dark:bg-gray-800 border-2 border-dashed border-slate-200 dark:border-gray-700 rounded-2xl flex flex-col items-center justify-center p-4 overflow-hidden transition-all group-hover:border-blue-400">
+                                <div class="relative group h-32 bg-slate-50 dark:bg-gray-800 border-2 border-dashed border-slate-200 dark:border-gray-700 rounded-2xl flex flex-col items-center justify-center p-4 overflow-hidden transition-all hover:border-blue-400">
                                     <img v-if="logoPreview" :src="logoPreview" class="w-full h-full object-contain">
                                     <template v-else>
                                         <span class="material-symbols-outlined text-slate-300 text-3xl mb-1">image</span>
-                                        <span class="text-[8px] text-slate-400 font-bold uppercase">Subir Logo</span>
+                                        <span class="text-[8px] text-slate-400 font-bold uppercase">Subir Logo Oficial</span>
                                     </template>
                                     <input type="file" @change="onLogoChange" class="absolute inset-0 opacity-0 cursor-pointer">
                                 </div>
@@ -570,16 +633,19 @@ const editarGestion = (gestion: any) => {
                             <!-- Fondo -->
                             <div class="space-y-3">
                                 <div class="flex items-center justify-between">
-                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Imagen de Banner (Hero)</label>
+                                    <div>
+                                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Imagen de Banner (Hero)</label>
+                                        <p class="text-[8px] font-bold text-slate-400/80 uppercase mt-0.5 tracking-tighter">JPG/PNG • Full HD (1920x1080px)</p>
+                                    </div>
                                     <span v-if="fondoQuality.status" :class="fondoQuality.status === 'hd' ? 'text-emerald-500 bg-emerald-50' : (fondoQuality.status === 'low' ? 'text-red-500 bg-red-50' : 'text-amber-500 bg-amber-50')" class="text-[8px] font-black px-2 py-0.5 rounded-full border border-current">
                                         {{ fondoQuality.status === 'hd' ? 'CALIDAD HD' : (fondoQuality.status === 'low' ? 'PÍXEL DETECTADO' : 'ACEPTABLE') }}
                                     </span>
                                 </div>
-                                <div class="relative group h-32 bg-slate-50 dark:bg-gray-800 border-2 border-dashed border-slate-200 dark:border-gray-700 rounded-2xl flex flex-col items-center justify-center p-4 overflow-hidden transition-all group-hover:border-blue-400">
+                                <div class="relative group h-32 bg-slate-50 dark:bg-gray-800 border-2 border-dashed border-slate-200 dark:border-gray-700 rounded-2xl flex flex-col items-center justify-center p-4 overflow-hidden transition-all hover:border-blue-400">
                                     <img v-if="fondoPreview" :src="fondoPreview" class="w-full h-full object-cover">
                                     <template v-else>
                                         <span class="material-symbols-outlined text-slate-300 text-3xl mb-1">wallpaper</span>
-                                        <span class="text-[8px] text-slate-400 font-bold uppercase">Subir Banner</span>
+                                        <span class="text-[8px] text-slate-400 font-bold uppercase">Subir Fondo Principal</span>
                                     </template>
                                     <input type="file" @change="onFondoChange" class="absolute inset-0 opacity-0 cursor-pointer">
                                 </div>
@@ -705,10 +771,12 @@ const editarGestion = (gestion: any) => {
                                 <div class="space-y-2">
                                     <div v-for="(act, aIdx) in dia.events" :key="aIdx" class="flex items-center gap-2">
                                         <input v-model="act.time" type="time" class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-[10px] font-bold" />
-                                        <input v-model="act.title" class="flex-1 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-[10px] font-bold" />
-                                        <button @click.prevent="eliminarActividad(dIdx, aIdx)" class="text-slate-300"><span class="material-symbols-outlined text-sm">remove_circle</span></button>
+                                        <input v-model="act.title" placeholder="Descripción de la sesión o ponencia..." class="flex-1 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-[10px] font-bold" />
+                                        <button @click.prevent="eliminarActividad(dIdx, aIdx)" class="text-slate-300 hover:text-red-500 transition-colors"><span class="material-symbols-outlined text-sm">remove_circle</span></button>
                                     </div>
-                                    <button @click.prevent="agregarActividad(dIdx)" class="text-[8px] font-black text-emerald-600 mt-2">+ ITEM</button>
+                                    <button @click.prevent="agregarActividad(dIdx)" class="text-[8px] font-black text-emerald-600 mt-2 flex items-center gap-1">
+                                        <span class="material-symbols-outlined text-sm">add_circle</span> + AÑADIR PUNTO DE AGENDA
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -749,7 +817,7 @@ const editarGestion = (gestion: any) => {
                             <!-- HERO PREVIEW -->
                             <div class="relative aspect-[16/10] bg-slate-900 overflow-hidden">
                                 <!-- Banner -->
-                                <img v-if="fondoPreview" :src="fondoPreview" class="absolute inset-0 w-full h-full object-cover opacity-60 animate-in fade-in duration-700">
+                                <img v-if="resolvedBanner" :src="resolvedBanner" class="absolute inset-0 w-full h-full object-cover opacity-60 animate-in fade-in duration-700">
                                 <div v-else class="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center">
                                     <span class="material-symbols-outlined text-4xl text-white/10">wallpaper</span>
                                 </div>
@@ -760,7 +828,7 @@ const editarGestion = (gestion: any) => {
                                 <!-- Logo del Evento -->
                                 <div class="absolute top-4 left-4 z-20">
                                     <div class="w-12 h-12 bg-white/95 backdrop-blur shadow-xl rounded-xl p-2 border border-white/20 flex items-center justify-center transform -rotate-3 hover:rotate-0 transition-transform duration-500">
-                                        <img v-if="logoPreview" :src="logoPreview" class="w-full h-full object-contain animate-in zoom-in-50 duration-500">
+                                        <img v-if="resolvedLogo" :src="resolvedLogo" class="w-full h-full object-contain animate-in zoom-in-50 duration-500">
                                         <span v-else class="material-symbols-outlined text-slate-300">image</span>
                                     </div>
                                 </div>
@@ -773,25 +841,37 @@ const editarGestion = (gestion: any) => {
 
                                 <!-- Contenido del Hero -->
                                 <div class="absolute inset-x-0 bottom-0 p-6 space-y-3 z-10">
-                                    <h1 class="text-xl md:text-2xl font-black text-white italic uppercase leading-[0.9] tracking-tighter drop-shadow-2xl">
-                                        {{ nuevoEvento.nombre || 'Nombre del Evento' }}
-                                    </h1>
+                                    <div class="flex items-center gap-2">
+                                        <div class="px-2.5 py-1 bg-emerald-500 text-white rounded-md flex items-center gap-1 shadow-lg shadow-emerald-500/20 border border-emerald-400/50">
+                                            <span class="material-symbols-outlined text-[10px]">verified</span>
+                                            <span class="text-[7px] font-black uppercase tracking-widest">{{ nuevoEvento.institucion_badge || 'Evento Oficial OEA/TYAN' }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-start gap-4">
+                                        <h1 class="flex-1 text-xl md:text-2xl font-black text-white italic uppercase leading-[0.9] tracking-tighter drop-shadow-2xl">
+                                            {{ nuevoEvento.nombre || 'Nombre del Evento' }}
+                                        </h1>
+                                        <div v-if="nuevoEvento.sigla" :style="{ backgroundColor: nuevoEvento.color_principal }" class="px-3 py-2 rounded-xl shadow-2xl transform -skew-x-12 border border-white/20">
+                                            <span class="text-[12px] font-black text-white uppercase block transform skew-x-12 italic leading-none">{{ nuevoEvento.sigla }}</span>
+                                        </div>
+                                    </div>
                                     
                                     <div class="flex flex-wrap gap-2 pt-1">
                                         <!-- Gestión -->
-                                        <div class="flex items-center gap-1.5 px-2.5 py-1 bg-sky-500/20 backdrop-blur-md border border-sky-400/30 text-sky-200 rounded-lg text-[8px] font-black uppercase">
+                                        <div :style="{ borderColor: nuevoEvento.color_principal + '40' }" class="flex items-center gap-1.5 px-2.5 py-1 bg-white/5 backdrop-blur-md border text-white rounded-lg text-[8px] font-black uppercase">
                                             <span class="material-symbols-outlined text-[12px]">calendar_today</span>
                                             {{ nuevoEvento.gestion || '202X' }}
                                         </div>
                                         <!-- Fecha -->
-                                        <div class="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/20 backdrop-blur-md border border-emerald-400/30 text-emerald-200 rounded-lg text-[8px] font-black uppercase">
+                                        <div class="flex items-center gap-1.5 px-2.5 py-1 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-lg text-[8px] font-black uppercase">
                                             <span class="material-symbols-outlined text-[12px]">schedule</span>
-                                            {{ nuevoEvento.fecha_inicio ? new Date(nuevoEvento.fecha_inicio + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' }) : 'Fecha' }}
+                                            {{ nuevoEvento.fecha_inicio ? formatDate(nuevoEvento.fecha_inicio) : '13 DE MAYO' }}
                                         </div>
                                         <!-- Lugar -->
                                         <div class="flex items-center gap-1.5 px-2.5 py-1 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-lg text-[8px] font-black uppercase">
                                             <span class="material-symbols-outlined text-[12px]">location_on</span>
-                                            {{ nuevoEvento.ubicacion || 'Sede' }}
+                                            {{ nuevoEvento.ubicacion || 'SEDE' }}
                                         </div>
                                     </div>
                                 </div>
