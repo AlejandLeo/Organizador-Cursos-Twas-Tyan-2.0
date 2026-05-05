@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
+import { existsSync, unlinkSync } from 'fs';
 import { ActividadAcademica } from './entities/actividad-academica.entity';
 import { CreateActividadDto } from './dto/create-actividad.dto';
 import { UpdateActividadDto } from './dto/update-actividad.dto';
@@ -27,25 +28,40 @@ export class ActividadesAcademicasService {
     }
   }
 
+  private formatImageUrl(filenameOrUrl: string, folder: string = 'cursos'): string | null {
+    if (!filenameOrUrl) return null;
+    if (filenameOrUrl.startsWith('http')) return filenameOrUrl;
+    
+    const baseUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
+    return `${baseUrl}/uploads/${folder}/${encodeURIComponent(filenameOrUrl)}`;
+  }
+
   // ── CRUD básico ────────────────────────────────────────────
 
-  findAll() {
-    return this.actividadRepository.find({ relations: ['evento', 'inscripciones'] });
+  async findAll() {
+    const acts = await this.actividadRepository.find({ relations: ['evento', 'inscripciones'] });
+    return acts.map(act => ({
+      ...act,
+      imagen: this.formatImageUrl(act.imagen)
+    }));
   }
 
   async findOne(id: number) {
     const act = await this.actividadRepository.findOne({
       where: { id },
-      relations: ['evento', 'modalidades', 'imparticiones', 'imparticiones.usuario', 'imparticiones.usuario.persona'],
+      relations: ['evento', 'modalidades', 'modalidades.sesiones', 'imparticiones', 'imparticiones.usuario', 'imparticiones.usuario.persona'],
     });
     if (!act) throw new NotFoundException(`Actividad ${id} no encontrada.`);
-    return act;
+    return {
+      ...act,
+      imagen: this.formatImageUrl(act.imagen)
+    };
   }
 
   // ── Coordinador ─────────────────────────────────────────────
 
   /** Lista todas las actividades de un evento (para el panel del coordinador) */
-  findByEvento(eventoId: number, usuario?: any) {
+  async findByEvento(eventoId: number, usuario?: any) {
     const query = this.actividadRepository.createQueryBuilder('a')
       .leftJoinAndSelect('a.modalidades', 'm')
       .innerJoin('a.evento', 'e')
@@ -57,38 +73,117 @@ export class ActividadesAcademicasService {
            .andWhere('c.usuario.id = :usuarioId', { usuarioId: usuario.id });
     }
 
-    return query.getMany();
+    const results = await query.getMany();
+    return results.map(act => ({
+      ...act,
+      imagen: this.formatImageUrl(act.imagen)
+    }));
   }
 
   /** Crea una actividad asignándola al evento indicado en el DTO */
-  async crear(dto: CreateActividadDto, usuario?: any) {
+  async crear(dto: CreateActividadDto, usuario?: any, file?: Express.Multer.File) {
     if (usuario) {
       await this.verificarPropiedad(dto.id_evento, usuario);
     }
     const { id_evento, ...campos } = dto;
-    const actividad = this.actividadRepository.create({
+    const data: any = {
       ...campos,
       evento: { id: id_evento },
-    });
-    return this.actividadRepository.save(actividad);
+    };
+    if (file) data.imagen = file.filename;
+
+    const actividad = this.actividadRepository.create(data as any) as unknown as ActividadAcademica;
+    const saved = await this.actividadRepository.save(actividad);
+    return {
+      ...saved,
+      imagen: this.formatImageUrl(saved.imagen)
+    };
   }
 
-  async actualizar(id: number, dto: UpdateActividadDto, usuario?: any) {
-    const act = await this.findOne(id);
-    
+  async actualizar(id: number, dto: UpdateActividadDto, usuario?: any, file?: Express.Multer.File) {
+    // 1. Obtener la entidad raw (sin URLs formateadas)
+    const actRaw = await this.actividadRepository.findOne({
+      where: { id },
+      relations: ['evento', 'modalidades']
+    });
+    if (!actRaw) throw new NotFoundException(`Actividad ${id} no encontrada.`);
+
     if (usuario) {
-      // Verificar permiso en el evento original
-      await this.verificarPropiedad(act.evento.id, usuario);
-      // Si cambia de evento, verificar permiso en el nuevo evento
-      if (dto.id_evento && dto.id_evento !== act.evento.id) {
+      await this.verificarPropiedad(actRaw.evento.id, usuario);
+      if (dto.id_evento && dto.id_evento !== actRaw.evento.id) {
         await this.verificarPropiedad(dto.id_evento, usuario);
       }
     }
 
-    const { id_evento, ...campos } = dto;
-    const data: any = { ...campos };
-    if (id_evento) data.evento = { id: id_evento };
-    await this.actividadRepository.update(id, data);
+    const { id_evento, modalidad, min_nota, min_asistencia, sesiones, imagen, ...campos } = dto;
+    
+    // 2. Manejo de imagen y limpieza de la anterior
+    if (file) {
+      if (actRaw.imagen && !actRaw.imagen.startsWith('http')) {
+        const oldPath = `./uploads/cursos/${actRaw.imagen}`;
+        if (existsSync(oldPath)) unlinkSync(oldPath);
+      }
+      actRaw.imagen = file.filename;
+    }
+
+    // 3. Actualizar campos básicos
+    const camposAny = campos as any;
+    if (camposAny.fecha_inicio === '') camposAny.fecha_inicio = null;
+    if (camposAny.fecha_fin === '') camposAny.fecha_fin = null;
+    
+    Object.assign(actRaw, camposAny);
+    if (id_evento) actRaw.evento = { id: id_evento } as any;
+
+    await this.actividadRepository.save(actRaw);
+
+    // Actualizar Modalidad (primera encontrada)
+    if (modalidad !== undefined || min_nota !== undefined || min_asistencia !== undefined || sesiones !== undefined) {
+      const queryRunner = this.dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+      try {
+        let mod = actRaw.modalidades?.[0];
+        if (!mod) {
+          const res = await queryRunner.manager.query(
+            `INSERT INTO curso_modalidades (id_actividad_academica, tipo, min_nota, min_asistencia) VALUES ($1, $2, $3, $4) RETURNING id`,
+            [id, modalidad || 'Presencial', min_nota || 0, min_asistencia || 0]
+          );
+          mod = { id: res[0].id } as any;
+        } else {
+          const updateFields: string[] = [];
+          const values: any[] = [];
+          if (modalidad !== undefined) { updateFields.push(`tipo = $${values.length + 1}`); values.push(modalidad); }
+          if (min_nota !== undefined) { updateFields.push(`min_nota = $${values.length + 1}`); values.push(min_nota); }
+          if (min_asistencia !== undefined) { updateFields.push(`min_asistencia = $${values.length + 1}`); values.push(min_asistencia); }
+          
+          if (updateFields.length > 0) {
+            values.push(mod.id);
+            await queryRunner.manager.query(
+              `UPDATE curso_modalidades SET ${updateFields.join(', ')} WHERE id = $${values.length}`,
+              values
+            );
+          }
+        }
+
+        // Actualizar Sesiones
+        if (sesiones !== undefined && Array.isArray(sesiones)) {
+          await queryRunner.manager.query(`DELETE FROM sesiones_academicas WHERE id_curso_modalidad = $1`, [mod.id]);
+          for (const s of sesiones) {
+            await queryRunner.manager.query(
+              `INSERT INTO sesiones_academicas (id_curso_modalidad, dia, hora_inicio, hora_fin) VALUES ($1, $2, $3, $4)`,
+              [mod.id, s.dia, s.hora_inicio, s.hora_fin]
+            );
+          }
+        }
+        await queryRunner.commitTransaction();
+      } catch (err) {
+        await queryRunner.rollbackTransaction();
+        throw err;
+      } finally {
+        await queryRunner.release();
+      }
+    }
+
     return this.findOne(id);
   }
 

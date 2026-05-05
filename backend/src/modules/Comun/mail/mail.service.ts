@@ -39,8 +39,10 @@ export class MailService {
       this.logger.log(`Correo enviado exitosamente a ${to}. MessageId: ${info.messageId}`);
       return info;
     } catch (error) {
+      // Solo logueamos el error — NO lo relanzamos para que los flujos de negocio
+      // (aprobación, rechazo) no fallen por un problema de correo
       this.logger.error(`Error enviando correo a ${to}: ${error.message}`, error.stack);
-      throw error;
+      return null; // Retorna null en lugar de lanzar excepción
     }
   }
 
@@ -109,6 +111,20 @@ export class MailService {
       'Actualización de tu Inscripción',
       'enrollment-rejected',
       { name, actividad, reason },
+    );
+  }
+  
+  /**
+   * Notifica a administración sobre una nueva solicitud de cuenta pendiente.
+   */
+  async sendNewRegistrationRequestNotification(studentName: string, studentEmail: string) {
+    // Usamos el mismo MAIL_USER como destino si no hay un admin email específico
+    const adminEmail = process.env.MAIL_USER || 'coursemanagementsystemumsa@gmail.com';
+    return this.sendMail(
+      adminEmail,
+      'Nueva Solicitud de Registro Pendiente',
+      'admin-notification',
+      { studentName, studentEmail },
     );
   }
 

@@ -147,6 +147,72 @@ export class AsistenciasService {
   // ══════════════════════════════════════════════════════════
 
   /**
+   * Registra la asistencia de un estudiante escaneando el QR del Ponente.
+   * El QR del ponente contiene el id_sesion.
+   */
+  async registrarPorQrEstudiante(usuarioId: number, id_sesion: number): Promise<{ mensaje: string; asistencia_id: number }> {
+    // 1. Verificar que la sesión existe
+    const sesion = await this.asistenciaRepository.manager
+      .getRepository('sesiones_academicas')
+      .findOne({ where: { id: id_sesion } });
+
+    if (!sesion) {
+      throw new NotFoundException(`Sesión ${id_sesion} no encontrada.`);
+    }
+
+    // 2. Buscar la inscripción modalidad del estudiante para esta sesión
+    const query = `
+      SELECT im.id
+      FROM inscripciones_modalidades im
+      JOIN inscripciones i ON im.id_inscripcion = i.id
+      WHERE i.id_usuario = $1 AND im.id_curso_modalidad = $2 AND i.estado = 1
+    `;
+    const result = await this.asistenciaRepository.manager.query(query, [usuarioId, (sesion as any).id_curso_modalidad]);
+
+    if (!result || result.length === 0) {
+      throw new BadRequestException('No estás inscrito activamente en la modalidad de esta sesión.');
+    }
+
+    const id_inscripcion_modalidad = result[0].id;
+
+    // 3. Anti-duplicado
+    const yaRegistro = await this.asistenciaRepository.findOne({
+      where: {
+        sesionAcademica: { id: id_sesion },
+        inscripcionModalidad: { id: id_inscripcion_modalidad },
+      },
+    });
+
+    if (yaRegistro) {
+      return {
+        asistencia_id: yaRegistro.id,
+        mensaje: 'Ya tenías asistencia registrada en esta sesión.',
+      };
+    }
+
+    // 4. Insertar asistencia
+    const nuevaAsistencia = this.asistenciaRepository.create({
+      sesionAcademica: { id: id_sesion },
+      inscripcionModalidad: { id: id_inscripcion_modalidad },
+      estado: 1,
+      fecha_hora_registro: new Date(),
+    });
+    const guardada = await this.asistenciaRepository.save(nuevaAsistencia);
+
+    // Incrementar contador num_asistencia
+    await this.asistenciaRepository.manager.query(
+      `UPDATE inscripciones_modalidades SET num_asistencia = num_asistencia + 1 WHERE id = $1`,
+      [id_inscripcion_modalidad]
+    );
+
+    return {
+      asistencia_id: guardada.id,
+      mensaje: 'Asistencia registrada correctamente por QR.',
+    };
+  }
+
+
+  /**
    * Registra la asistencia de un estudiante identificado por su
    * id_inscripcion_modalidad al escanear un QR.
    *

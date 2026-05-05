@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: sans-serif; line-height: 1.6; color: #333; }
+    .container { padding: 20px; border: 1px solid #eee; border-radius: 5px; }
+    .header { color: #2c3e50; font-size: 20px; font-weight: bold; margin-bottom: 20px; }
+    .footer { margin-top: 20px; font-size: 12px; color: #777; border-top: 1px solid #eee; padding-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">Nueva Solicitud de Registro</div>
+    <p>Se ha recibido una nueva solicitud de registro en la plataforma:</p>
+    <ul>
+      <li><strong>Nombre:</strong> {{studentName}}</li>
+      <li><strong>Email:</strong> {{studentEmail}}</li>
+    </ul>
+    <p>Por favor, ingrese al portal de coordinación para revisar la documentación y aprobar o rechazar la solicitud.</p>
+    <div class="footer">
+      Este es un mensaje automático del Sistema de Gestión Académica TYAN.
+    </div>
+  </div>
+</body>
+</html>

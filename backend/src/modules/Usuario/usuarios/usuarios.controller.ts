@@ -645,14 +645,15 @@ export class UsuariosController {
   @ApiBearerAuth()
   @Patch(':id/solicitud/:accion')
   @ApiOperation({ summary: 'Aprobar o rechazar solicitud (accion: aprobar|rechazar)' })
-  async aprobarRechazarSolicitud(
+   async aprobarRechazarSolicitud(
     @Param('id', ParseIntPipe) id: number,
     @Param('accion') accion: 'aprobar' | 'rechazar',
+    @Body('motivo') motivo?: string,
   ) {
     if (accion !== 'aprobar' && accion !== 'rechazar') {
       throw new BadRequestException('Acción inválida. Use aprobar o rechazar.');
     }
-    return this.usuariosService.aprobarRechazarSolicitud(id, accion);
+    return this.usuariosService.aprobarRechazarSolicitud(id, accion, motivo);
   }
 
   @Roles('Coordinador', 'Super Usuario')

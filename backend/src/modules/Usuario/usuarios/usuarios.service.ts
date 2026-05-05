@@ -543,6 +543,12 @@ export class UsuariosService {
       
       if (passEstudianteValido) {
         contextoRol = 'Estudiante';
+
+        const esCoordinador = usuario.usuariosRoles?.some((ur: any) => 
+          ur.rol?.id === 2 || ur.rol?.nombre_rol === 'Coordinador'
+        );
+        if (esCoordinador) contextoRol = 'Coordinador';
+
         const esAdmin = usuario.usuariosRoles?.some((ur: any) => 
           ur.rol?.id === 1 || ur.rol?.nombre_rol === 'Super Usuario'
         );
@@ -651,11 +657,6 @@ export class UsuariosService {
       where: { email },
       relations: ['persona']
     });
-    await this.usuarioRepository.update(id, { 
-      password: hash,
-      requiere_cambio_password: false 
-    });
-    return { mensaje: 'Contraseña actualizada correctamente.' };
   }
 
   // ══════════════════════════════════════════════════════════
@@ -1032,6 +1033,14 @@ export class UsuariosService {
 
       await queryRunner.commitTransaction();
 
+      // Notificar a administración (opcional/no-bloqueante)
+      try {
+        const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
+        await this.mailService.sendNewRegistrationRequestNotification(nombreCompleto, dto.email);
+      } catch (e) {
+        console.error('Error enviando notificación de solicitud a admin:', e);
+      }
+
       return {
         mensaje:
           'Su solicitud fue recepcionada correctamente. La confirmación de su cuenta se realizará una vez finalice el proceso de inscripciones y sea validada por administración.',
@@ -1069,9 +1078,10 @@ export class UsuariosService {
    * @param id       ID del usuario pendiente
    * @param accion   'aprobar' | 'rechazar'
    */
-  async aprobarRechazarSolicitud(
+   async aprobarRechazarSolicitud(
     id: number,
     accion: 'aprobar' | 'rechazar',
+    motivo?: string,
   ): Promise<{ mensaje: string }> {
     const usuario = await this.usuarioRepository.findOne({
       where: { id },
@@ -1089,23 +1099,20 @@ export class UsuariosService {
     }
 
     if (accion === 'aprobar') {
-      // SI EL ESTADO ES 2: Es la primera vez (Admisión + Contraseña)
+      // SI EL ESTADO ES 2: Es la primera vez (Admisión)
       if (usuario.estado === 2) {
-        const tempPassword = Math.random().toString(36).slice(-10);
-        const hash = await bcrypt.hash(tempPassword, 10);
-        
+        // Mantenemos la contraseña original que el usuario eligió al registrarse
         await this.usuarioRepository.update(id, { 
           estado: 1, 
-          password: hash,
-          requiere_cambio_password: true 
+          requiere_cambio_password: false 
         });
         
         const nombreCompleto = usuario.persona 
           ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}` 
           : 'Usuario';
           
-        await this.mailService.sendAccountApprovalEmail(usuario.email, nombreCompleto, tempPassword);
-        return { mensaje: 'Solicitud aprobada y contraseña enviada al usuario.' };
+        await this.mailService.sendAccountApprovalEmail(usuario.email, nombreCompleto, 'La elegida en su registro');
+        return { mensaje: 'Solicitud aprobada. El usuario ya puede ingresar con su contraseña original.' };
       } 
       // SI EL ESTADO ERA 0: Es una reactivación
       else {
@@ -1127,7 +1134,7 @@ export class UsuariosService {
       await this.mailService.sendAccountRejectionEmail(
         usuario.email,
         nombreCompleto,
-        'La solicitud de registro no cumple con los criterios de validación.'
+        motivo || 'La solicitud de registro no cumple con los criterios de validación.'
       );
 
       return { mensaje: 'Solicitud rechazada (estado -1). El usuario ha sido notificado.' };
