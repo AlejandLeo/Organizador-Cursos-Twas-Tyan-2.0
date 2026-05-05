@@ -629,6 +629,7 @@ export class UsuariosService {
     tipo: 'principal' | 'ponente' = 'principal',
   ): Promise<{ mensaje: string }> {
     const hash = await bcrypt.hash(nuevaPassword, 10);
+
     if (tipo === 'ponente') {
       await this.usuarioRepository.update(id, { password_ponente: hash });
     } else {

@@ -20,9 +20,11 @@
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "pinia": "^3.0.4",
+    "qrcode.vue": "^3.9.0",
     "sweetalert2": "^11.26.24",
     "vue": "^3.5.29",
     "vue-i18n": "^9.14.5",
+    "vue-qrcode-reader": "^5.7.3",
     "vue-router": "^5.0.3",
     "xlsx": "^0.18.5"
   },

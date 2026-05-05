@@ -196,17 +196,20 @@ const navigateToCalificaciones = () => {
     </div>
 
     <!-- SECCIONES SEGURAS -->
-    <div v-if="activeTab === 'qr' && tienePermisos" class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-[2.5rem] p-12 shadow-xl flex flex-col md:flex-row items-center gap-12">
-        <div class="flex-1 max-w-lg">
-            <h3 class="text-3xl font-black text-slate-800 dark:text-white uppercase italic mb-4">Código de Asistencia</h3>
-            <p class="text-slate-500 text-sm leading-relaxed mb-8">Este código es único para ti. Proyectalo para que tus alumnos registren su entrada.</p>
-            <div class="flex gap-4">
-                <button class="bg-umsa-blue text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-umsa-blue/20">Pantalla Completa</button>
-                <button class="text-rose-500 font-black text-[10px] uppercase">Detener Sesión</button>
+    <div v-if="activeTab === 'qr' && tienePermisos" class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-[2.5rem] p-12 shadow-xl flex flex-col items-center gap-6 text-center">
+        <div class="max-w-2xl mx-auto">
+            <h3 class="text-3xl font-black text-slate-800 dark:text-white uppercase italic mb-4">Módulo de Asistencia Dinámico</h3>
+            <p class="text-slate-500 text-sm leading-relaxed mb-8">Selecciona la modalidad de asistencia que deseas activar para esta sesión. Puedes proyectar un código para que los alumnos lo escaneen, o abrir tu cámara para escanear los códigos de los alumnos a medida que ingresan.</p>
+            <div class="flex flex-col sm:flex-row justify-center gap-4">
+                <button @click="router.push({ name: 'ponente-proyectar-qr', params: { id: actividadId } })" class="bg-umsa-blue text-white px-8 py-5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-umsa-blue/20 hover:bg-blue-800 transition-all flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined">present_to_all</span>
+                    Proyectar QR a la Clase
+                </button>
+                <button @click="router.push({ name: 'ponente-escanear-alumnos', params: { id: actividadId } })" class="bg-emerald-600 text-white px-8 py-5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined">camera_alt</span>
+                    Escanear a Estudiantes
+                </button>
             </div>
-        </div>
-        <div class="bg-white p-6 rounded-[2.5rem] border-[10px] border-slate-100 shadow-2xl">
-            <img :src="qrCodeUrl" class="w-64 h-64 object-contain">
         </div>
     </div>
 

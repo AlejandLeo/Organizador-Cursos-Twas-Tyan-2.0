@@ -43,6 +43,9 @@ import { MailModule } from './modules/Comun/mail/mail.module';
 // --- Dashboard ---
 import { CoordinadorModule } from './modules/Academico/coordinador/coordinador.module';
 
+// --- Comun ---
+import { QrModule } from './modules/Comun/qr/qr.module';
+
 @Module({
   imports: [
     // --- Config ---
@@ -99,6 +102,7 @@ import { CoordinadorModule } from './modules/Academico/coordinador/coordinador.m
 
     // --- Especiales ---
     CoordinadorModule,
+    QrModule,
   ],
   controllers: [AppController],
   providers: [AppService],

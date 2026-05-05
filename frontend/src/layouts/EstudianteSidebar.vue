@@ -84,6 +84,22 @@ const handleLogout = () => {
         <span class="material-symbols-outlined text-[20px] transition-colors" :class="[ $route.name === 'estudiante-certificados' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">workspace_premium</span>
       </button>
 
+      <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 mt-6 pl-2 border-b border-slate-100 dark:border-gray-800 pb-2">Asistencias</p>
+
+      <button @click="navigate('estudiante-mi-qr')"
+        :class="[ $route.name === 'estudiante-mi-qr' ? 'nav-active bg-emerald-600 text-white shadow-md shadow-emerald-600/20' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500' ]"
+        class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group mt-2">
+        <span class="text-xs uppercase tracking-widest font-bold">Mi QR</span>
+        <span class="material-symbols-outlined text-[20px] transition-colors" :class="[ $route.name === 'estudiante-mi-qr' ? 'text-white' : 'text-slate-400 group-hover:text-emerald-600' ]">qr_code_2</span>
+      </button>
+
+      <button @click="navigate('estudiante-marcar-asistencia')"
+        :class="[ $route.name === 'estudiante-marcar-asistencia' ? 'nav-active bg-emerald-600 text-white shadow-md shadow-emerald-600/20' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500' ]"
+        class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group mt-2">
+        <span class="text-xs uppercase tracking-widest font-bold">Marcar Asistencia</span>
+        <span class="material-symbols-outlined text-[20px] transition-colors" :class="[ $route.name === 'estudiante-marcar-asistencia' ? 'text-white' : 'text-slate-400 group-hover:text-emerald-600' ]">qr_code_scanner</span>
+      </button>
+
       <!-- Botones de Calificaciones y Certificados Obsoletos debido al layout de Netflix -->
     </nav>
 
