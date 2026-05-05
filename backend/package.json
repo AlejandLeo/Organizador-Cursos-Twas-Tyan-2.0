@@ -25,7 +25,8 @@
     "migration:revert": "npm run typeorm -- migration:revert -d ./typeorm.config.ts",
     "db:reset": "npm run typeorm -- schema:drop -d ./typeorm.config.ts && npm run migration:run && npm run seed:config",
     "seed:config": "npx typeorm-extension seed:run -d ./typeorm.config.ts --seed RoleSeeder",
-    "seed:dev": "npx typeorm-extension seed:run -d ./typeorm.config.ts"
+    "seed:dev": "npx typeorm-extension seed:run -d ./typeorm.config.ts",
+    "seed:eventos": "ts-node -r tsconfig-paths/register src/database/seeds/run-eventos-seed.ts"
   },
   "dependencies": {
     "@nestjs-modules/mailer": "^2.3.4",
@@ -68,6 +69,7 @@
     "@types/jest": "^30.0.0",
     "@types/multer": "^2.1.0",
     "@types/node": "^22.10.7",
+    "@types/nodemailer": "^8.0.0",
     "@types/passport-jwt": "^4.0.1",
     "@types/supertest": "^6.0.2",
     "@types/uuid": "^10.0.0",

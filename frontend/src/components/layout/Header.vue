@@ -1,5 +1,8 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import { useEventoStore } from '@/stores/eventoStore'
+
+const eventoStore = useEventoStore()
 </script>
 
 <template>
@@ -7,46 +10,54 @@ import { RouterLink } from 'vue-router'
     <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex flex-col md:flex-row justify-between items-center h-auto md:h-24 py-2">
         
-        <!-- Logos IZQUIERDA (UNESCO - TYAN) -->
+        <!-- Logos IZQUIERDA (DISEÑO INSTITUCIONAL DINÁMICO) -->
         <div class="flex items-center gap-4 mb-2 md:mb-0">
-          <a href="https://twas.org/" target="_blank" class="hover:opacity-80 transition-opacity">
-            <!-- Placeholder UNESCO -->
-            <div class="h-12 w-12 bg-blue-100 flex items-center justify-center text-blue-800 text-xs font-bold rounded">UNESCO TWAS</div>
-          </a>
-          <a href="https://twas.org/tyan" target="_blank" class="hover:opacity-80 transition-opacity">
-             <!-- Placeholder TYAN -->
-             <div class="h-10 w-24 bg-green-100 flex items-center justify-center text-green-800 text-xs font-bold rounded">TYAN</div>
-          </a>
+          <RouterLink to="/" class="hover:opacity-80 transition-all duration-300 flex items-center gap-3">
+            <!-- Escudo Institucional UMSA -->
+            <img src="https://upload.wikimedia.org/wikipedia/commons/a/af/Escudo_de_la_Universidad_Mayor_de_San_Andr%C3%A9s.png" alt="UMSA" class="h-14 w-auto object-contain hidden sm:block" />
+            
+            <div class="h-10 w-px bg-slate-200 hidden sm:block mx-1"></div>
+
+            <!-- Nombre y Sigla del Evento -->
+            <div class="flex items-center gap-3 overflow-hidden">
+               <span class="text-[11px] md:text-sm font-black text-umsa-blue uppercase tracking-tighter truncate max-w-[200px] md:max-w-[400px] leading-tight">
+                 {{ eventoStore.activeEvento?.nombre || 'Portal Académico' }}
+               </span>
+              
+              <!-- Sigla Badge Dinámico -->
+              <div v-if="eventoStore.activeEvento?.sigla" 
+                   :style="{ backgroundColor: eventoStore.activeEvento.color_principal || '#0070b4' }"
+                   class="px-3 py-1.5 rounded-lg shadow-md shadow-blue-500/20 transform -skew-x-12">
+                <span class="text-[11px] font-black text-white uppercase block transform skew-x-12 leading-none italic">{{ eventoStore.activeEvento.sigla }}</span>
+              </div>
+            </div>
+          </RouterLink>
         </div>
 
         <!-- MENU CENTRO -->
-        <div class="flex flex-wrap justify-center gap-4 md:gap-8 text-sm font-semibold text-gray-700 uppercase tracking-wide">
-          <a href="#inicio" class="hover:text-blue-600 transition-colors border-b-2 border-transparent hover:border-blue-600 pb-1">Inicio</a>
-          <a href="#informacion" class="hover:text-blue-600 transition-colors border-b-2 border-transparent hover:border-blue-600 pb-1">Información</a>
-          <a href="#organizacion" class="hover:text-blue-600 transition-colors border-b-2 border-transparent hover:border-blue-600 pb-1">Organización</a>
-          <a href="#ubicacion" class="hover:text-blue-600 transition-colors border-b-2 border-transparent hover:border-blue-600 pb-1">Ubicación</a>
-          <a href="#footer" class="hover:text-blue-600 transition-colors border-b-2 border-transparent hover:border-blue-600 pb-1">Contacto</a>
+        <div class="flex flex-wrap justify-center gap-4 md:gap-8 text-[11px] font-black text-slate-500 uppercase tracking-widest">
+          <a href="#inicio" class="hover:text-blue-600 transition-colors">Inicio</a>
+          <a href="#informacion" class="hover:text-blue-600 transition-colors">Información</a>
+          <a href="#organizacion" class="hover:text-blue-600 transition-colors">Organización</a>
+          <a href="#ubicacion" class="hover:text-blue-600 transition-colors">Ubicación</a>
+          <a href="#footer" class="hover:text-blue-600 transition-colors">Contacto</a>
         </div>
 
-        <!-- AACCIONES DERECHA (Login, Idioma, FCPN, UMSA) -->
-        <div class="flex items-center gap-3 mt-2 md:mt-0">
-          <button class="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-gray-600">
-             ES/EN
-          </button>
+          <!-- ACCCIONES DERECHA -->
+          <div class="flex items-center gap-4 mt-2 md:mt-0">
+            <RouterLink to="/login" class="bg-umsa-blue hover:bg-primary-dark text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2">
+              <span class="material-symbols-outlined text-sm">login</span> Ingresar
+            </RouterLink>
 
-          <RouterLink to="/login" class="text-sm px-4 py-2 border border-blue-600 text-blue-600 rounded hover:bg-blue-50 font-medium transition-colors">
-            Iniciar Sesión
-          </RouterLink>
-
-          <div class="flex items-center gap-2 border-l pl-3 ml-1 border-gray-300">
-             <a href="https://www.fcpn.edu.bo/" target="_blank">
-               <div class="h-10 w-8 bg-yellow-100 flex items-center justify-center text-yellow-800 text-[10px] font-bold rounded">FCPN</div>
-             </a>
-             <a href="https://www.umsa.bo/" target="_blank">
-               <div class="h-10 w-8 bg-red-100 flex items-center justify-center text-red-800 text-[10px] font-bold rounded">UMSA</div>
-             </a>
+            <div class="flex items-center gap-2 border-l pl-4 border-slate-200">
+               <div class="w-10 h-10 rounded-full border border-slate-200 p-1 flex items-center justify-center bg-white shadow-sm overflow-hidden">
+                 <img src="https://fcpn.umsa.bo/fcpn-theme/images/logo_fcpn.png" class="w-full h-full object-contain" alt="FCPN" />
+               </div>
+               <div class="w-10 h-10 rounded-full border border-slate-200 p-1 flex items-center justify-center bg-white shadow-sm overflow-hidden">
+                 <img src="https://upload.wikimedia.org/wikipedia/commons/a/af/Escudo_de_la_Universidad_Mayor_de_San_Andr%C3%A9s.png" class="w-full h-full object-contain" alt="UMSA" />
+               </div>
+            </div>
           </div>
-        </div>
 
       </div>
     </nav>

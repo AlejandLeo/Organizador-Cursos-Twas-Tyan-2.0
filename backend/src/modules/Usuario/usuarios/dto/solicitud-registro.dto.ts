@@ -1,4 +1,5 @@
-import { IsNotEmpty, IsString, IsOptional, IsEmail, MinLength } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsEmail, MinLength, IsInt, Min, Max } from 'class-validator';
+import { Type } from 'class-transformer';
 
 /**
  * DTO para la solicitud de registro de nuevo usuario.
@@ -23,6 +24,13 @@ export class SolicitudRegistroDto {
   @IsNotEmpty({ message: 'El documento de identidad es obligatorio.' })
   @IsString()
   documento_identidad: string;
+
+  @IsNotEmpty({ message: 'El sexo es obligatorio.' })
+  @Type(() => Number)
+  @IsInt({ message: 'El sexo debe ser un número entero (0: Masculino, 1: Femenino, 2: Otro).' })
+  @Min(0)
+  @Max(2)
+  genero: number;
 
   // --- Credenciales ---
   @IsEmail({}, { message: 'Debe proporcionar un email válido.' })

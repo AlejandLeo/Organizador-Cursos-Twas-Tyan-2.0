@@ -137,36 +137,58 @@ const getStatusColor = (status: string) => {
             </button>
           </div>
 
-          <!-- Horizontal Scroll Row -->
-          <div class="flex overflow-x-auto gap-6 px-8 pb-8 pt-2 snap-x snap-mandatory flex-nowrap" style="scrollbar-width: none; -ms-overflow-style: none;">
-            
-            <div v-for="act in acts" :key="act.id" class="flex-none w-[280px] md:w-[320px] bg-white dark:bg-gray-900 rounded-[1.5rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none border border-slate-200/60 dark:border-gray-800 hover:border-primary-light/50 dark:hover:border-gray-600 transition-all hover:-translate-y-1 hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] cursor-pointer group flex flex-col snap-start relative">
+          <!-- Grid de Actividades con Diseño Premium -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 px-8 pb-8 pt-2">
+            <div v-for="act in acts" :key="act.id" 
+              class="bg-white dark:bg-gray-900 rounded-[2rem] overflow-hidden shadow-lg border border-slate-100 dark:border-gray-800 hover:border-umsa-blue transition-all duration-500 hover:-translate-y-2 cursor-pointer group relative">
               
-              <div class="relative h-48 w-full overflow-hidden shrink-0">
-                <div class="absolute inset-0 bg-primary-dark/10 group-hover:bg-transparent transition-colors z-10"></div>
-                <img :src="act.image" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" :alt="act.title">   
-                <span class="absolute top-3 right-3 z-20 text-[8px] font-black uppercase px-2 py-1 rounded-md tracking-widest shadow-sm bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm" :class="getStatusColor(act.status)">
-                  {{ act.status }}
+              <!-- Badge de Asignado (Simulado: ID 1 y 3 son del ponente) -->
+              <div v-if="act.id === 1 || act.id === 3" class="absolute top-4 left-4 z-30">
+                <span class="bg-umsa-blue text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-full shadow-xl flex items-center gap-1 border border-white/20 backdrop-blur-md">
+                  <span class="material-symbols-outlined text-[12px]">verified_user</span>
+                  ASIGNADO
                 </span>
-                <div class="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-white dark:from-gray-900 to-transparent z-10 opacity-60"></div>
               </div>
 
-              <div class="p-5 flex flex-col flex-1 relative z-20 bg-white dark:bg-gray-900">
-                <h3 class="text-sm font-black text-slate-800 dark:text-white leading-tight mb-3 group-hover:text-primary-light dark:group-hover:text-blue-400 transition-colors line-clamp-2 block h-[2.5rem]">{{ act.title }}</h3> 
+              <!-- Imagen Predominante -->
+              <div class="relative h-60 w-full overflow-hidden">
+                <img :src="act.image" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000">   
+                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                
+                <span class="absolute top-4 right-4 z-20 text-[9px] font-black uppercase px-3 py-1.5 rounded-full tracking-widest shadow-lg backdrop-blur-md border border-white/10" :class="getStatusColor(act.status)">
+                  {{ act.status }}
+                </span>
 
-                <div class="mt-auto flex flex-col gap-3 pt-3 border-t border-slate-100 dark:border-gray-800">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <span class="text-[9px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest border border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-800 px-2 py-0.5 rounded-md">{{ act.date }}</span>
-                  </div>
-                  <div class="flex justify-between items-center text-slate-500 dark:text-gray-400">
-                    <div class="flex items-center">   
-                      <span class="material-symbols-outlined text-[16px] mr-1.5 text-primary-light dark:text-blue-400">groups</span>
-                      <span class="text-[10px] font-bold">{{ act.students }} Pre-inscritos</span>    
-                    </div>
-                  </div>
+                <div class="absolute bottom-4 left-6 right-6 z-20">
+                  <p class="text-[10px] font-bold text-umsa-gold uppercase tracking-[0.2em] mb-1 drop-shadow-md">
+                    {{ evento.nombreCorto }}
+                  </p>
+                  <h3 class="text-lg font-black text-white leading-tight uppercase italic group-hover:text-umsa-gold transition-colors drop-shadow-lg line-clamp-2">
+                    {{ act.title }}
+                  </h3>
                 </div>
               </div>
 
+              <!-- Información Inferior -->
+              <div class="p-6 flex flex-col bg-white dark:bg-gray-900">
+                <div class="flex items-center justify-between text-slate-500 dark:text-gray-400 mb-4">
+                  <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm text-umsa-blue">calendar_month</span>
+                    <span class="text-[10px] font-bold uppercase tracking-wider">{{ act.date }}</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm text-umsa-blue">groups</span>
+                    <span class="text-[10px] font-bold uppercase tracking-wider">{{ act.students }} Inscritos</span>
+                  </div>
+                </div>
+
+                <div class="flex justify-between items-center pt-4 border-t border-slate-100 dark:border-gray-800">
+                    <div class="flex items-center text-umsa-blue font-black group/btn">
+                        <span class="text-[11px] uppercase tracking-widest">Ver Detalles</span>
+                        <span class="material-symbols-outlined text-[18px] ml-2 group-hover/btn:translate-x-1 transition-transform">visibility</span>
+                    </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

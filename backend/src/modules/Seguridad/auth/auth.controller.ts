@@ -11,9 +11,9 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { UsuariosService } from 'src/usuarios/usuarios.service';
-import { LoginDto } from 'src/usuarios/dto/login.dto';
-import { RegisterDto } from 'src/usuarios/dto/register.dto';
+import { UsuariosService } from '../../Usuario/usuarios/usuarios.service';
+import { LoginDto } from '../../Usuario/usuarios/dto/login.dto';
+import { RegisterDto } from '../../Usuario/usuarios/dto/register.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { ExtractJwt } from 'passport-jwt';
 

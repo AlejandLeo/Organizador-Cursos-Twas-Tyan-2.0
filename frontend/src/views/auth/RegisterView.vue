@@ -14,7 +14,8 @@ const formData = ref({
   numero_documento: '',
   email: '',
   password: '',
-  confirmPassword: ''
+  confirmPassword: '',
+  genero: ''
 });
 
 const archivoAval = ref<File | null>(null);
@@ -23,6 +24,8 @@ const isImage = ref(false);
 
 const error = ref('');
 const loading = ref(false);
+const showPassword = ref(false);
+const showConfirmPassword = ref(false);
 
 const handleFileUpload = (event: Event) => {
     const input = event.target as HTMLInputElement;
@@ -76,6 +79,7 @@ const handleRegister = async () => {
         payload.append('documento_identidad', `${formData.value.tipo_documento}: ${formData.value.numero_documento}`);
         payload.append('email', formData.value.email);
         payload.append('password', formData.value.password);
+        payload.append('genero', formData.value.genero);
         payload.append('file', archivoAval.value);
         if (archivoReverso.value) {
             payload.append('fileReverso', archivoReverso.value);
@@ -146,6 +150,16 @@ const handleRegister = async () => {
               <label for="segundo_apellido" class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Seg. Apellido (Opcional)</label>
               <input id="segundo_apellido" v-model="formData.segundo_apellido" type="text" class="w-full py-3 px-4 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700/50 rounded-xl text-sm font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 dark:focus:bg-gray-800 outline-none transition-all" />
             </div>
+
+            <div>
+              <label for="genero" class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Sexo <span class="text-red-500">*</span></label>
+              <select id="genero" v-model="formData.genero" required class="w-full py-3 px-4 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700/50 rounded-xl text-sm font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 dark:focus:bg-gray-800 outline-none transition-all appearance-none cursor-pointer">
+                <option value="" disabled>Seleccione...</option>
+                <option value="0">Masculino</option>
+                <option value="1">Femenino</option>
+                <option value="2">Otro</option>
+              </select>
+            </div>
             
             <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -179,11 +193,21 @@ const handleRegister = async () => {
             </div>
             <div>
               <label for="password" class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Contraseña <span class="text-red-500">*</span></label>
-              <input id="password" v-model="formData.password" type="password" required class="w-full py-3 px-4 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700/50 rounded-xl text-sm font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 dark:focus:bg-gray-800 outline-none transition-all" />
+              <div class="relative">
+                <input id="password" v-model="formData.password" :type="showPassword ? 'text' : 'password'" required class="w-full py-3 px-4 pr-12 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700/50 rounded-xl text-sm font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 dark:focus:bg-gray-800 outline-none transition-all" />
+                <button type="button" @click="showPassword = !showPassword" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-sky-600 transition-colors">
+                  <span class="material-symbols-outlined text-[20px]">{{ showPassword ? 'visibility_off' : 'visibility' }}</span>
+                </button>
+              </div>
             </div>
             <div>
               <label for="confirmPassword" class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Confirmar Contraseña <span class="text-red-500">*</span></label>
-              <input id="confirmPassword" v-model="formData.confirmPassword" type="password" required class="w-full py-3 px-4 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700/50 rounded-xl text-sm font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 dark:focus:bg-gray-800 outline-none transition-all" />
+              <div class="relative">
+                <input id="confirmPassword" v-model="formData.confirmPassword" :type="showConfirmPassword ? 'text' : 'password'" required class="w-full py-3 px-4 pr-12 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700/50 rounded-xl text-sm font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 dark:focus:bg-gray-800 outline-none transition-all" />
+                <button type="button" @click="showConfirmPassword = !showConfirmPassword" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-sky-600 transition-colors">
+                  <span class="material-symbols-outlined text-[20px]">{{ showConfirmPassword ? 'visibility_off' : 'visibility' }}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

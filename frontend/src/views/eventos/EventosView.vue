@@ -95,10 +95,16 @@ const nuevoEvento = ref({
   direccion: '',
   estado: 2, // 2 = Planificación
   fondo_img: null as any,
+  logo_img: null as any, // Campo para el logo del evento
   google_maps_link: '',
   sobre_evento_1: '',
   sobre_evento_2: '',
   frase_destacada: '',
+  link_facebook: '',
+  link_web: '',
+  sigla: '',
+  color_principal: '#0070b4',
+  institucion_badge: 'Evento Oficial OEA/TYAN',
   ponentes_seleccionados: [] as number[],
   cronograma: '',
   cronograma_lista: [] as any[],
@@ -126,6 +132,15 @@ const agregarActividad = (dayIdx: any) => {
 
 const eliminarActividad = (dayIdx: any, actIdx: any) => {
     nuevoEvento.value.cronograma_lista[dayIdx].events.splice(actIdx, 1);
+};
+
+const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    // Ajuste de zona horaria para inputs de fecha
+    const d = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+    return `${d.getDate() + 1} de ${months[d.getMonth()]}`;
 };
 
 const nuevoPonenteRegistro = ref({
@@ -156,17 +171,74 @@ const registrarNuevoPonente = async () => {
     }
 };
 
-const previewImg = ref<string | null>(null);
+const currentStep = ref(1);
+const totalSteps = 6;
 
-const onFileChange = (e: any) => {
-  const file = e.target.files[0];
-  if (!file) {
-    previewImg.value = null;
-    nuevoEvento.value.fondo_img = null;
-    return;
-  }
-  nuevoEvento.value.fondo_img = file;
-  previewImg.value = URL.createObjectURL(file);
+const nextStep = () => { if (currentStep.value < totalSteps) currentStep.value++; };
+const prevStep = () => { if (currentStep.value > 1) currentStep.value--; };
+
+const logoPreview = ref<string | null>(null);
+const fondoPreview = ref<string | null>(null);
+const logoQuality = ref<{status: 'hd' | 'low' | 'ok' | null, msg: string}>({status: null, msg: ''});
+const fondoQuality = ref<{status: 'hd' | 'low' | 'ok' | null, msg: string}>({status: null, msg: ''});
+
+// Resolución inteligente de URLs para Vista Previa
+const resolvedLogo = computed(() => {
+    if (!logoPreview.value) return null;
+    if (logoPreview.value.startsWith('data:') || logoPreview.value.startsWith('http')) return logoPreview.value;
+    return `http://localhost:3000/uploads/logo/${logoPreview.value}`;
+});
+
+const resolvedBanner = computed(() => {
+    if (!fondoPreview.value) return null;
+    if (fondoPreview.value.startsWith('data:') || fondoPreview.value.startsWith('http')) return fondoPreview.value;
+    return `http://localhost:3000/uploads/banner/${fondoPreview.value}`;
+});
+
+const onLogoChange = (e: any) => {
+    const file = e.target.files[0];
+    if (file) {
+        if (!['image/png', 'image/jpeg', 'image/svg+xml'].includes(file.type)) {
+            Swal.fire('Formato no válido', 'Usa PNG (recomendado) o JPG.', 'error');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (event: any) => {
+            const img = new Image();
+            img.onload = () => {
+                const isHD = img.width >= 512 && img.height >= 512;
+                logoQuality.value = {
+                    status: isHD ? 'hd' : (img.width < 200 ? 'low' : 'ok'),
+                    msg: `${img.width}x${img.height}px`
+                };
+                logoPreview.value = event.target.result;
+                nuevoEvento.value.logo_img = file;
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+};
+
+const onFondoChange = (e: any) => {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (event: any) => {
+            const img = new Image();
+            img.onload = () => {
+                const isHD = img.width >= 1920;
+                fondoQuality.value = {
+                    status: isHD ? 'hd' : (img.width < 1280 ? 'low' : 'ok'),
+                    msg: isHD ? 'Excelente (Full HD)' : (img.width < 1280 ? 'Baja Resolución (Pixelado)' : 'Calidad Estándar')
+                };
+                fondoPreview.value = event.target.result;
+                nuevoEvento.value.fondo_img = file;
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
 };
 
 const eventosAgrupados = computed(() => {
@@ -175,8 +247,9 @@ const eventosAgrupados = computed(() => {
     if (!map.has(ev.nombre)) {
       map.set(ev.nombre, {
         nombre: ev.nombre,
-        descripcion: ev.descripcion,
-        imagen_fondo: ev.imagen_fondo || ev.logo || '',
+        descripcion: ev.sobre_evento_1 || ev.descripcion || '',
+        imagen_fondo: ev.imagen_fondo || '',
+        logo_img: ev.logo || '',
         estadoGeneral: getEstadoLabel(ev.estado) === 'Activo' ? 'Activo' : getEstadoLabel(ev.estado),
         gestiones: []
       });
@@ -261,6 +334,12 @@ const handleCreateEvento = async () => {
       if (nuevoEvento.value.sobre_evento_1) formData.append('sobre_evento_1', nuevoEvento.value.sobre_evento_1);
       if (nuevoEvento.value.sobre_evento_2) formData.append('sobre_evento_2', nuevoEvento.value.sobre_evento_2);
       if (nuevoEvento.value.frase_destacada) formData.append('frase_destacada', nuevoEvento.value.frase_destacada);
+      
+      formData.append('sigla', nuevoEvento.value.sigla || '');
+      formData.append('color_principal', nuevoEvento.value.color_principal || '#0070b4');
+      formData.append('institucion_badge', nuevoEvento.value.institucion_badge || 'Evento Oficial OEA/TYAN');
+      formData.append('link_facebook', nuevoEvento.value.link_facebook || '');
+      formData.append('link_web', nuevoEvento.value.link_web || '');
 
       let finalDescripcion = nuevoEvento.value.descripcion;
       const ponentesStr = nuevoEvento.value.ponentes_seleccionados.map(id => {
@@ -296,10 +375,11 @@ const handleCreateEvento = async () => {
           formData.append('estado', nuevoEvento.value.estado.toString());
       }
 
-      const fileToUpload = nuevoEvento.value.fondo_img;
-      if (fileToUpload && typeof fileToUpload !== 'string') {
-          formData.append('imagen_fondo', fileToUpload);
-          formData.append('imagen_portada', fileToUpload); 
+      if (nuevoEvento.value.fondo_img instanceof File) {
+          formData.append('imagen_fondo', nuevoEvento.value.fondo_img);
+      }
+      if (nuevoEvento.value.logo_img instanceof File) {
+          formData.append('imagen_portada', nuevoEvento.value.logo_img);
       }
       
       if (isEditing.value && editId.value) {
@@ -339,15 +419,22 @@ const handleCreateEvento = async () => {
          estado: 2,
          version: '',
          fondo_img: null,
+         logo_img: null, // Incluimos logo_img para evitar error de TS
          google_maps_link: '',
          sobre_evento_1: '',
          sobre_evento_2: '',
          frase_destacada: '',
+         sigla: '',
+         color_principal: '#0070b4',
+         institucion_badge: 'Evento Oficial OEA/TYAN',
+         link_facebook: '',
+         link_web: '',
          ponentes_seleccionados: [],
          cronograma: '',
          cronograma_lista: []
       };
-      previewImg.value = null;
+      logoPreview.value = null;
+      fondoPreview.value = null;
       await fetchEventos();
       await eventoStore.fetchEventosInfo(); // REFRESCAR SELECTOR GLOBAL
     } catch(err: any) {
@@ -390,8 +477,14 @@ const editarGestion = (gestion: any) => {
         sobre_evento_1: gestion.sobre_evento_1 || '',
         sobre_evento_2: gestion.sobre_evento_2 || '',
         frase_destacada: gestion.frase_destacada || '',
+        sigla: gestion.sigla || '',
+        color_principal: gestion.color_principal || '#0070b4',
+        institucion_badge: gestion.institucion_badge || 'Evento Oficial OEA/TYAN',
+        link_facebook: gestion.link_facebook || '',
+        link_web: gestion.link_web || '',
         estado: gestion.estado,
         fondo_img: null,
+        logo_img: null,
         ponentes_seleccionados: [],
         cronograma: '',
         cronograma_lista: []
@@ -415,11 +508,8 @@ const editarGestion = (gestion: any) => {
         nuevoEvento.value.ponentes_seleccionados = seleccionados;
     }
     
-    if (gestion.imagen_fondo) {
-        previewImg.value = gestion.imagen_fondo;
-    } else {
-        previewImg.value = null;
-    }
+    logoPreview.value = gestion.logo;
+    fondoPreview.value = gestion.imagen_fondo;
     
     isCreating.value = true;
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -441,162 +531,194 @@ const editarGestion = (gestion: any) => {
       </button>
     </div>
 
-    <!-- Formulario de Creación -->
-    <div v-show="isCreating" class="bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl shadow-umsa-blue/10 dark:shadow-black/50 border border-blue-100 dark:border-gray-800 animate-in slide-in-from-top-4 duration-500 overflow-hidden relative">
+    <!-- Formulario de Creación / Edición -->
+    <div v-if="isCreating || isEditing" class="bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl shadow-umsa-blue/10 dark:shadow-black/50 border border-blue-100 dark:border-gray-800 animate-in slide-in-from-top-4 duration-500 overflow-hidden relative">
         <div class="bg-gradient-to-r from-umsa-blue to-emerald-500 p-8 pb-10 relative overflow-hidden">
-            <span class="material-symbols-outlined absolute -right-4 -top-8 text-[120px] text-white/10 rotate-12">event_note</span>
+            <span class="material-symbols-outlined absolute -right-4 -top-8 text-[120px] text-white/10 rotate-12">design_services</span>
             <h3 class="text-2xl md:text-3xl font-black text-white uppercase italic tracking-tighter drop-shadow-md relative z-10 flex items-center gap-3">
                 <span class="material-symbols-outlined text-3xl">{{ isEditing ? 'edit_calendar' : 'add_circle' }}</span>
                 {{ isEditing ? 'Editar Gestión de Evento' : 'Crear Nueva Gestión de Evento' }}
             </h3>
         </div>
         
-        <form @submit.prevent="handleCreateEvento" class="space-y-10 bg-white dark:bg-gray-900 p-8 pt-10 mt-[-1.5rem] rounded-t-[2rem] relative z-20">
-            
-            <!-- SECCIÓN 1: IDENTIDAD DEL EVENTO (HERO) -->
-            <div class="space-y-6">
-                <div class="flex items-center gap-3 border-b border-slate-100 dark:border-gray-800 pb-4">
-                    <span class="material-symbols-outlined text-umsa-blue">stars</span>
-                    <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase tracking-tighter italic">Identidad y Portada</h4>
+        <!-- BARRA DE NAVEGACIÓN DEL WIZARD (PASOS) -->
+        <div class="bg-slate-50 dark:bg-gray-800/50 border-b border-slate-100 dark:border-gray-800 px-8 py-4 flex items-center justify-between overflow-x-auto thin-scrollbar">
+            <div v-for="step in totalSteps" :key="step" class="flex items-center gap-2 shrink-0">
+                <div :class="[
+                    currentStep === step ? 'bg-umsa-blue text-white ring-4 ring-blue-100 dark:ring-blue-900/30' : 
+                    (currentStep > step ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-gray-700 text-slate-500'),
+                    'w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black transition-all duration-500'
+                ]">
+                    <span v-if="currentStep > step" class="material-symbols-outlined text-sm">check</span>
+                    <span v-else>{{ step }}</span>
                 </div>
+                <span :class="currentStep === step ? 'text-primary-dark dark:text-white' : 'text-slate-400'" class="text-[9px] font-black uppercase tracking-widest hidden md:block mr-4">
+                    {{ 
+                        step === 1 ? 'Identidad' : 
+                        step === 2 ? 'Narrativa' : 
+                        step === 3 ? 'Directorio' : 
+                        step === 4 ? 'Logística' : 
+                        step === 5 ? 'Ubicación' : 'Cronograma' 
+                    }}
+                </span>
+                <div v-if="step < totalSteps" class="h-[2px] w-8 bg-slate-200 dark:bg-gray-700 mx-2 hidden lg:block"></div>
+            </div>
+        </div>
+        
+        <form @submit.prevent="handleCreateEvento" class="bg-white dark:bg-gray-900 p-8 md:p-12 min-h-[600px] flex flex-col relative z-20">
+            
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 flex-1">
                 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div class="md:col-span-2 space-y-5">
-                        <div>
-                            <label class="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wide block mb-2">Nombre Principal del Evento</label>
-                            <input v-model="nuevoEvento.nombre" type="text" required placeholder="Ej: Congreso Internacional de Ciencias Agroindustriales" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 focus:border-umsa-blue outline-none rounded-2xl px-5 py-4 text-sm font-bold text-primary-dark dark:text-gray-100 transition-all shadow-sm" />
-                            <p class="text-[10px] text-slate-500 mt-2 italic font-medium">Este título aparecerá con el tamaño más grande en el Hero del Home.</p>
+                <!-- ÁREA DE EDICIÓN (PASOS) -->
+                <div class="lg:col-span-7 space-y-8 animate-in slide-in-from-left-8 duration-500">
+                    
+                    <!-- PASO 1: IDENTIDAD VISUAL -->
+                    <div v-if="currentStep === 1" class="space-y-6">
+                        <div class="flex items-center gap-3 border-b border-slate-100 dark:border-gray-800 pb-4 mb-6">
+                            <span class="material-symbols-outlined text-umsa-blue">palette</span>
+                            <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase italic">Paso 1: Identidad Visual y Portada</h4>
                         </div>
-                        
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Nombre Principal del Evento</label>
+                            <input v-model="nuevoEvento.nombre" type="text" required placeholder="Ej: Congreso Internacional de Ciencias" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 focus:border-umsa-blue outline-none rounded-2xl px-5 py-4 text-sm font-bold shadow-sm" />
+                        </div>
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <label class="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wide block mb-2">Gestión / Año</label>
-                                <input v-model="nuevoEvento.gestion" type="number" min="2020" max="2100" required class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 focus:border-umsa-blue rounded-2xl px-5 py-3 text-sm font-bold" />
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Sigla / Abreviación (Para el Header)</label>
+                                <input v-model="nuevoEvento.sigla" type="text" placeholder="Ej: TYAN" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 focus:border-umsa-blue rounded-2xl px-5 py-3 text-sm font-black uppercase" />
                             </div>
                             <div>
-                                <label class="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wide block mb-2">Versión / Edición</label>
-                                <input v-model="nuevoEvento.version" type="text" placeholder="Ej: 3ra Edición" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 focus:border-umsa-blue rounded-2xl px-5 py-3 text-sm font-bold" />
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Texto del Badge (Botón Verde)</label>
+                                <input v-model="nuevoEvento.institucion_badge" type="text" placeholder="Ej: Evento Oficial OEA/TYAN" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 focus:border-umsa-blue rounded-2xl px-5 py-3 text-sm font-bold uppercase" />
                             </div>
                         </div>
-
-                        <div>
-                            <label class="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wide block mb-2">Descripción General Breve</label>
-                            <textarea v-model="nuevoEvento.descripcion" required rows="3" placeholder="Una frase potente sobre el propósito del evento..." class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 focus:border-umsa-blue rounded-2xl px-5 py-3 text-sm font-bold resize-none"></textarea>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Versión / Slogan</label>
+                                <input v-model="nuevoEvento.version" type="text" placeholder="Ej: 4ta Edición" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 focus:border-umsa-blue rounded-2xl px-5 py-3 text-sm font-bold" />
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Gestión / Año</label>
+                                <input v-model="nuevoEvento.gestion" type="text" placeholder="2025" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 focus:border-umsa-blue rounded-2xl px-5 py-3 text-sm font-bold" />
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Color de Identidad</label>
+                                <div class="flex items-center gap-3 bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-2xl px-4 py-2">
+                                    <input v-model="nuevoEvento.color_principal" type="color" class="w-10 h-10 border-none bg-transparent cursor-pointer" />
+                                    <span class="text-[10px] font-black uppercase text-slate-500">{{ nuevoEvento.color_principal }}</span>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-
-                    <div class="space-y-4">
-                        <label class="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wide block mb-2">Imagen Representativa (Fondo Hero)</label>
-                        <div class="relative group bg-slate-100 dark:bg-gray-800 rounded-[2rem] overflow-hidden border-2 border-dashed border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-all h-[280px] flex items-center justify-center">
-                            <img v-if="previewImg" :src="previewImg" class="absolute inset-0 w-full h-full object-cover z-0" />
-                            <div class="text-center p-6 relative z-10 backdrop-blur-sm bg-white/70 dark:bg-black/50 rounded-2xl border border-white/50">
-                                <span class="material-symbols-outlined text-4xl text-emerald-600 mb-2">photo_camera</span>
-                                <label for="evento_fondo" class="cursor-pointer block">
-                                    <span class="text-[10px] font-black text-emerald-700 dark:text-emerald-400 bg-white dark:bg-gray-900 px-4 py-2 rounded-full shadow-lg uppercase tracking-widest hover:scale-105 active:scale-95 transition-transform">Subir Imagen</span>
-                                    <input id="evento_fondo" type="file" accept="image/*" class="sr-only" @change="onFileChange">
-                                </label>
+                        <div class="grid grid-cols-2 gap-6 pt-2">
+                            <!-- Logo -->
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Logo del Evento</label>
+                                        <p class="text-[8px] font-bold text-slate-400/80 uppercase mt-0.5 tracking-tighter">PNG/SVG Transparente • Mín. 512x512px</p>
+                                    </div>
+                                    <span v-if="logoQuality.status" :class="logoQuality.status === 'hd' ? 'text-emerald-500 bg-emerald-50' : (logoQuality.status === 'low' ? 'text-red-500 bg-red-50' : 'text-amber-500 bg-amber-50')" class="text-[8px] font-black px-2 py-0.5 rounded-full border border-current">
+                                        {{ logoQuality.status === 'hd' ? 'HD' : (logoQuality.status === 'low' ? 'BAJA CALIDAD' : 'OK') }}
+                                    </span>
+                                </div>
+                                <div class="relative group h-32 bg-slate-50 dark:bg-gray-800 border-2 border-dashed border-slate-200 dark:border-gray-700 rounded-2xl flex flex-col items-center justify-center p-4 overflow-hidden transition-all hover:border-blue-400">
+                                    <img v-if="logoPreview" :src="logoPreview" class="w-full h-full object-contain">
+                                    <template v-else>
+                                        <span class="material-symbols-outlined text-slate-300 text-3xl mb-1">image</span>
+                                        <span class="text-[8px] text-slate-400 font-bold uppercase">Subir Logo Oficial</span>
+                                    </template>
+                                    <input type="file" @change="onLogoChange" class="absolute inset-0 opacity-0 cursor-pointer">
+                                </div>
+                            </div>
+                            <!-- Fondo -->
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Imagen de Banner (Hero)</label>
+                                        <p class="text-[8px] font-bold text-slate-400/80 uppercase mt-0.5 tracking-tighter">JPG/PNG • Full HD (1920x1080px)</p>
+                                    </div>
+                                    <span v-if="fondoQuality.status" :class="fondoQuality.status === 'hd' ? 'text-emerald-500 bg-emerald-50' : (fondoQuality.status === 'low' ? 'text-red-500 bg-red-50' : 'text-amber-500 bg-amber-50')" class="text-[8px] font-black px-2 py-0.5 rounded-full border border-current">
+                                        {{ fondoQuality.status === 'hd' ? 'CALIDAD HD' : (fondoQuality.status === 'low' ? 'PÍXEL DETECTADO' : 'ACEPTABLE') }}
+                                    </span>
+                                </div>
+                                <div class="relative group h-32 bg-slate-50 dark:bg-gray-800 border-2 border-dashed border-slate-200 dark:border-gray-700 rounded-2xl flex flex-col items-center justify-center p-4 overflow-hidden transition-all hover:border-blue-400">
+                                    <img v-if="fondoPreview" :src="fondoPreview" class="w-full h-full object-cover">
+                                    <template v-else>
+                                        <span class="material-symbols-outlined text-slate-300 text-3xl mb-1">wallpaper</span>
+                                        <span class="text-[8px] text-slate-400 font-bold uppercase">Subir Fondo Principal</span>
+                                    </template>
+                                    <input type="file" @change="onFondoChange" class="absolute inset-0 opacity-0 cursor-pointer">
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            <!-- SECCIÓN 2: DETALLES NARRATIVOS (SOBRE EL EVENTO) -->
-            <div class="p-10 bg-slate-50 dark:bg-gray-800/30 rounded-[3rem] border border-slate-100 dark:border-gray-800 space-y-8">
-                <div class="flex items-center gap-3">
-                    <span class="material-symbols-outlined text-umsa-blue">subject</span>
-                    <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase tracking-tighter italic">Sección Informativa (Sobre el Evento)</h4>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div class="space-y-5">
-                        <div>
-                            <label class="text-xs font-black text-umsa-blue uppercase tracking-wide block mb-2">Párrafo Principal (Columna Derecha)</label>
-                            <textarea v-model="nuevoEvento.sobre_evento_1" rows="4" placeholder="Detalla los objetivos principales aquí..." class="w-full bg-white dark:bg-gray-900 border-2 border-blue-50 dark:border-gray-700 focus:border-umsa-blue rounded-2xl px-5 py-4 text-sm font-medium"></textarea>
+                    <!-- PASO 2: NARRATIVA -->
+                    <div v-if="currentStep === 2" class="space-y-6">
+                        <div class="flex items-center gap-3 border-b border-slate-100 dark:border-gray-800 pb-4 mb-6">
+                            <span class="material-symbols-outlined text-umsa-blue">subject</span>
+                            <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase italic">Paso 2: Historia y Frase Destacada</h4>
                         </div>
-                        <div>
-                            <label class="text-xs font-black text-umsa-blue uppercase tracking-wide block mb-2">Párrafo Secundario</label>
-                            <textarea v-model="nuevoEvento.sobre_evento_2" rows="4" placeholder="Añade información adicional sobre los co-organizadores o metodologías..." class="w-full bg-white dark:bg-gray-900 border-2 border-blue-50 dark:border-gray-700 focus:border-umsa-blue rounded-2xl px-5 py-4 text-sm font-medium"></textarea>
-                        </div>
-                    </div>
-                    <div class="space-y-5">
-                        <div class="h-full bg-umsa-blue/5 dark:bg-umsa-blue/10 p-8 rounded-[2rem] border-2 border-dashed border-umsa-blue/20 flex flex-col justify-center">
-                            <label class="text-xs font-black text-umsa-blue uppercase tracking-wide block mb-4">Frase Destacada (Cita Central)</label>
-                            <textarea v-model="nuevoEvento.frase_destacada" rows="4" placeholder='Ej: "Una oportunidad única para la ciencia..."' class="w-full bg-white dark:bg-gray-900 border-2 border-umsa-blue/30 focus:border-umsa-blue rounded-2xl px-5 py-4 text-lg font-black italic text-primary-dark dark:text-blue-200 text-center resize-none"></textarea>
+                        <div class="grid grid-cols-1 gap-6">
+                            <div>
+                                <label class="text-xs font-black text-umsa-blue uppercase tracking-wide block mb-2">Párrafo Principal</label>
+                                <textarea v-model="nuevoEvento.sobre_evento_1" rows="4" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-2xl px-5 py-4 text-sm font-medium"></textarea>
+                            </div>
+                            <div>
+                                <label class="text-xs font-black text-umsa-blue uppercase tracking-wide block mb-2">Párrafo Secundario</label>
+                                <textarea v-model="nuevoEvento.sobre_evento_2" rows="4" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-2xl px-5 py-4 text-sm font-medium"></textarea>
+                            </div>
+                            <div class="bg-umsa-blue/5 p-6 rounded-[2rem] border-2 border-dashed border-umsa-blue/20">
+                                <label class="text-xs font-black text-umsa-blue uppercase tracking-wide block mb-4">Cita Central (Impacto)</label>
+                                <textarea v-model="nuevoEvento.frase_destacada" rows="3" class="w-full bg-white dark:bg-gray-900 border-2 border-umsa-blue/30 rounded-2xl px-5 py-4 text-lg font-black italic text-center shadow-inner resize-none"></textarea>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <p class="text-[10px] text-umsa-blue/60 font-bold uppercase tracking-widest flex items-center gap-2">
-                    <span class="material-symbols-outlined text-sm">info</span> Estos textos aparecerán después del Hero en la sección central del Home.
-                </p>
-            </div>
 
-            <!-- SECCIÓN 3: PERSONAL Y PONENTES -->
-            <div class="space-y-6">
-                <div class="flex items-center justify-between border-b border-slate-100 dark:border-gray-800 pb-4">
-                    <div class="flex items-center gap-3">
-                        <span class="material-symbols-outlined text-emerald-600">group</span>
-                        <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase tracking-tighter italic">Directorio del Evento</h4>
-                    </div>
-                    <button @click.prevent="showRegistroRapido = true" class="text-[10px] font-black text-emerald-700 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 px-4 py-2 rounded-xl transition-all shadow-sm">
-                        + REGISTRAR NUEVO PERSONAL
-                    </button>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div class="md:col-span-1 space-y-4">
-                        <label class="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wide block mb-2">Filtrar por Nombre</label>
+                    <!-- PASO 3: DIRECTORIO -->
+                    <div v-if="currentStep === 3" class="space-y-6">
+                        <div class="flex items-center justify-between border-b border-slate-100 dark:border-gray-800 pb-4 mb-6">
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-emerald-600">group</span>
+                                <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase italic">Paso 3: Ponentes y Directorio</h4>
+                            </div>
+                            <button @click.prevent="showRegistroRapido = true" class="text-[9px] font-black text-emerald-700 bg-emerald-100 px-4 py-2 rounded-xl">
+                                + NUEVO PERSONAL
+                            </button>
+                        </div>
                         <div class="relative">
-                            <input v-model="filtroPonente" type="text" placeholder="Buscar ponente..." class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 pl-10 text-xs font-bold" />
-                            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                            <input v-model="filtroPonente" type="text" placeholder="Buscar por nombre..." class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 pl-10 text-xs font-bold" />
+                            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
                         </div>
-                        <p class="text-[10px] text-slate-400 font-bold italic translate-y-2">Selecciona a los coordinadores y ponentes que aparecerán en la lista del Home.</p>
-                    </div>
-                    <div class="md:col-span-2">
-                        <div class="bg-slate-50 dark:bg-gray-950 border-2 border-slate-100 dark:border-gray-800 rounded-2xl p-4 max-h-[300px] overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3 thin-scrollbar">
-                           <label v-for="pn in ponentesFiltrados" :key="pn.id" class="flex items-center gap-3 p-4 bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-xl cursor-pointer hover:border-emerald-500 transition-all group">
-                               <input type="checkbox" :value="pn.id" v-model="nuevoEvento.ponentes_seleccionados" class="w-5 h-5 rounded border-2 border-slate-200 text-emerald-500 focus:ring-emerald-500" />
+                        <div class="bg-slate-50 dark:bg-gray-950 border-2 border-slate-100 dark:border-gray-800 rounded-2xl p-4 max-h-[350px] overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3 thin-scrollbar">
+                           <label v-for="pn in ponentesFiltrados" :key="pn.id" class="flex items-center gap-3 p-4 bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-xl cursor-pointer hover:border-emerald-500 transition-all">
+                               <input type="checkbox" :value="pn.id" v-model="nuevoEvento.ponentes_seleccionados" class="w-5 h-5 rounded text-emerald-500" />
                                <div class="flex flex-col min-w-0">
                                    <span class="text-xs font-black text-primary-dark dark:text-gray-200 truncate">{{ pn.displayName }}</span>
-                                   <span class="text-[9px] font-bold uppercase tracking-widest" :class="pn.roleLabel === 'Ponente' ? 'text-emerald-500' : 'text-purple-500'">{{ pn.roleLabel }}</span>
+                                   <span class="text-[8px] font-black uppercase tracking-widest text-slate-400">{{ pn.roleLabel }}</span>
                                </div>
                            </label>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            <!-- SECCIÓN 4: LOGÍSTICA (FECHAS Y MAPA) -->
-            <div class="bg-blue-50/30 dark:bg-gray-800/30 p-10 rounded-[3rem] border border-blue-100 dark:border-gray-800 space-y-8">
-                <div class="flex items-center gap-3">
-                    <span class="material-symbols-outlined text-umsa-blue">room</span>
-                    <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase tracking-tighter italic">Logística y Ubicación</h4>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
-                    <div class="space-y-6">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest block mb-2 border-b border-slate-200 dark:border-gray-700 pb-1">Fecha de Inicio</label>
-                                <input v-model="nuevoEvento.fecha_inicio" type="date" required class="w-full bg-white dark:bg-gray-900 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold text-primary-dark dark:text-white focus:border-umsa-blue outline-none" />
-                            </div>
-                            <div>
-                                <label class="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest block mb-2 border-b border-slate-200 dark:border-gray-700 pb-1">Fecha de Fin</label>
-                                <input v-model="nuevoEvento.fecha_fin" type="date" required class="w-full bg-white dark:bg-gray-900 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold text-primary-dark dark:text-white focus:border-umsa-blue outline-none" />
-                            </div>
+                    <!-- PASO 4: LOGÍSTICA -->
+                    <div v-if="currentStep === 4" class="space-y-6">
+                        <div class="flex items-center gap-3 border-b border-slate-100 dark:border-gray-800 pb-4 mb-6">
+                            <span class="material-symbols-outlined text-umsa-blue">event_note</span>
+                            <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase italic">Paso 4: Logística y Estados</h4>
                         </div>
-                        <div class="grid grid-cols-2 gap-4">
+                        <div class="grid grid-cols-2 gap-6">
                             <div>
-                                <label class="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest block mb-2 border-b border-slate-200 dark:border-gray-700 pb-1">Ciudad / Sede</label>
-                                <input v-model="nuevoEvento.ubicacion" type="text" placeholder="Ej: La Paz" class="w-full bg-white dark:bg-gray-900 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold text-primary-dark dark:text-white focus:border-umsa-blue" />
+                                <label class="text-[10px] font-black text-slate-500 uppercase block mb-2">Fecha de Inicio</label>
+                                <input v-model="nuevoEvento.fecha_inicio" type="date" required class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold" />
                             </div>
                             <div>
-                                <label class="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest block mb-2 border-b border-slate-200 dark:border-gray-700 pb-1">Dirección Exacta</label>
-                                <input v-model="nuevoEvento.direccion" type="text" placeholder="Ej: Edif. Central UMSA" class="w-full bg-white dark:bg-gray-900 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold text-primary-dark dark:text-white focus:border-umsa-blue" />
+                                <label class="text-[10px] font-black text-slate-500 uppercase block mb-2">Fecha de Fin</label>
+                                <input v-model="nuevoEvento.fecha_fin" type="date" required class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold" />
                             </div>
                         </div>
                         <div>
-                             <label class="text-xs font-black text-slate-500 uppercase tracking-widest block mb-2">Estado del Evento</label>
+                             <label class="text-[10px] font-black text-slate-500 uppercase block mb-2">Estado del Evento</label>
                              <select v-model="nuevoEvento.estado" class="w-full bg-white dark:bg-gray-900 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-black uppercase text-emerald-600 focus:border-emerald-500 outline-none cursor-pointer">
                                  <option :value="2">Planificación</option>
                                  <option :value="1">Activo / Publicado</option>
@@ -606,87 +728,211 @@ const editarGestion = (gestion: any) => {
                         </div>
                     </div>
 
-                    <div class="space-y-4">
-                        <label class="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest block mb-2 border-b border-slate-200 dark:border-gray-700 pb-1">Mapa Interactivo (Iframe de Google)</label>
-                        <textarea v-model="nuevoEvento.google_maps_link" rows="4" placeholder="Pega aquí el código <iframe ...>" class="w-full bg-white dark:bg-gray-900 border-2 border-slate-100 dark:border-gray-700 rounded-2xl px-5 py-4 text-xs font-mono text-emerald-600 dark:text-emerald-400 focus:border-emerald-500 resize-none"></textarea>
-                        <div class="bg-blue-500/10 p-4 rounded-xl border border-blue-500/20">
-                            <p class="text-[9px] font-black uppercase tracking-widest text-umsa-blue mb-1 leading-tight flex items-center gap-1"><span class="material-symbols-outlined text-sm">help</span> Recomendación</p>
-                            <p class="text-[9px] text-slate-500 dark:text-gray-400 leading-tight">Usa la opción "Incorporar mapa" en Google Maps para que la vista sea fluida en el Home.</p>
+                    <!-- PASO 5: UBICACIÓN -->
+                    <div v-if="currentStep === 5" class="space-y-6">
+                        <div class="flex items-center gap-3 border-b border-slate-100 dark:border-gray-800 pb-4 mb-6">
+                            <span class="material-symbols-outlined text-umsa-blue">room</span>
+                            <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase italic">Paso 5: Campus y Ubicación</h4>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-[10px] font-black text-slate-500 uppercase block mb-2">Ciudad / Sede</label>
+                                <input v-model="nuevoEvento.ubicacion" type="text" placeholder="Ej: La Paz" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold" />
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black text-slate-500 uppercase block mb-2">Dirección Exacta</label>
+                                <input v-model="nuevoEvento.direccion" type="text" placeholder="Ej: Edif. Central UMSA" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold" />
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase block mb-2">Mapa Interactivo (Iframe de Google)</label>
+                            <textarea v-model="nuevoEvento.google_maps_link" rows="5" placeholder="Pega aquí el código <iframe ...>" class="w-full bg-slate-50 dark:bg-gray-900 border-2 border-slate-100 dark:border-gray-700 rounded-2xl px-5 py-4 text-[10px] font-mono text-emerald-600 resize-none"></textarea>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            <!-- SECCIÓN 5: CRONOGRAMA DETALLADO -->
-            <div class="space-y-6">
-                <div class="flex items-center justify-between border-b border-slate-100 dark:border-gray-800 pb-4">
-                    <div class="flex items-center gap-3">
-                        <span class="material-symbols-outlined text-umsa-gold">view_timeline</span>
-                        <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase tracking-tighter italic">Cronograma de Actividades</h4>
-                    </div>
-                    <button @click.prevent="agregarDia" class="bg-umsa-gold hover:bg-yellow-600 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95 shadow-yellow-500/20">
-                        + AGREGAR NUEVO DÍA
-                    </button>
-                </div>
-
-                <div class="space-y-6">
-                    <div v-for="(dia, dIdx) in nuevoEvento.cronograma_lista" :key="dIdx" class="bg-white dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-[2rem] p-8 shadow-sm relative overflow-hidden group">
-                        <div class="absolute right-0 top-0 w-2 h-full bg-umsa-gold opacity-30"></div>
-                        
-                        <div class="flex flex-col lg:flex-row gap-6 items-start lg:items-center mb-8 pb-6 border-b border-slate-50 dark:border-gray-700">
-                            <div class="flex items-center gap-4 flex-1">
-                                <span class="w-12 h-12 bg-umsa-gold/10 text-umsa-gold rounded-full flex items-center justify-center font-black text-xl italic shadow-inner">#{{ dia.day }}</span>
-                                <div class="flex-1">
-                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Nombre del Día</label>
-                                    <input v-model="dia.name" placeholder="Ej: Apertura y Keynote" class="w-full bg-transparent border-b-2 border-slate-100 dark:border-gray-600 focus:border-umsa-gold outline-none text-base font-black text-primary-dark dark:text-white uppercase" />
+                    <!-- PASO 6: CRONOGRAMA -->
+                    <div v-if="currentStep === 6" class="space-y-6">
+                        <div class="flex items-center justify-between border-b border-slate-100 dark:border-gray-800 pb-4 mb-6">
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-umsa-gold">view_timeline</span>
+                                <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase italic">Paso 6: Estructura del Cronograma</h4>
+                            </div>
+                            <button @click.prevent="agregarDia" class="bg-umsa-gold text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase">
+                                + AÑADIR DÍA
+                            </button>
+                        </div>
+                        <div class="space-y-4 max-h-[400px] overflow-y-auto thin-scrollbar pr-2">
+                            <div v-for="(dia, dIdx) in nuevoEvento.cronograma_lista" :key="dIdx" class="bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-700 rounded-2xl p-6">
+                                <div class="flex items-center gap-4 mb-4 border-b border-slate-200 dark:border-gray-700 pb-3">
+                                    <span class="w-8 h-8 bg-umsa-gold text-white rounded-full flex items-center justify-center font-black text-xs italic">#{{ dia.day }}</span>
+                                    <input v-model="dia.name" class="flex-1 bg-transparent border-none outline-none text-xs font-black uppercase" />
+                                    <button @click.prevent="eliminarDia(dIdx)" class="text-slate-300 hover:text-red-500"><span class="material-symbols-outlined text-lg">delete</span></button>
+                                </div>
+                                <div class="space-y-2">
+                                    <div v-for="(act, aIdx) in dia.events" :key="aIdx" class="flex items-center gap-2">
+                                        <input v-model="act.time" type="time" class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-[10px] font-bold" />
+                                        <input v-model="act.title" placeholder="Descripción de la sesión o ponencia..." class="flex-1 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-[10px] font-bold" />
+                                        <button @click.prevent="eliminarActividad(dIdx, aIdx)" class="text-slate-300 hover:text-red-500 transition-colors"><span class="material-symbols-outlined text-sm">remove_circle</span></button>
+                                    </div>
+                                    <button @click.prevent="agregarActividad(dIdx)" class="text-[8px] font-black text-emerald-600 mt-2 flex items-center gap-1">
+                                        <span class="material-symbols-outlined text-sm">add_circle</span> + AÑADIR PUNTO DE AGENDA
+                                    </button>
                                 </div>
                             </div>
-                            <div class="w-full lg:w-auto">
-                                <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Fecha del Día</label>
-                                <input v-model="dia.date" type="date" class="w-full lg:w-auto bg-slate-50 dark:bg-gray-900 border border-slate-200 dark:border-gray-600 rounded-xl px-4 py-2 text-xs font-bold" />
-                            </div>
-                            <button @click.prevent="eliminarDia(dIdx)" class="text-slate-300 hover:text-red-500 transition-colors p-2">
-                                <span class="material-symbols-outlined text-2xl">delete_sweep</span>
-                            </button>
                         </div>
+                    </div>
 
-                        <div class="space-y-3">
-                            <div v-for="(act, aIdx) in dia.events" :key="aIdx" class="flex flex-col sm:flex-row items-center gap-3 group/act relative">
-                                <span class="text-[9px] font-black text-slate-300 dark:text-gray-600 hidden sm:block">{{ Number(aIdx) + 1 }}</span>
-                                <input v-model="act.time" type="time" class="w-full sm:w-32 bg-slate-50 dark:bg-gray-900 border border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-xs font-black text-umsa-blue" />
-                                <input v-model="act.title" placeholder="Descripción de la actividad..." class="flex-1 w-full bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold shadow-sm focus:border-emerald-500 transition-all" />
-                                <button @click.prevent="eliminarActividad(dIdx, aIdx)" class="text-slate-300 hover:text-red-500 opacity-0 group-hover/act:opacity-100 transition-all">
-                                    <span class="material-symbols-outlined text-xl">remove_circle</span>
-                                </button>
-                            </div>
-                            <button @click.prevent="agregarActividad(dIdx)" class="mt-4 text-[10px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-6 py-2.5 rounded-xl uppercase tracking-widest hover:bg-emerald-100 transition-all flex items-center gap-2">
-                                <span class="material-symbols-outlined text-sm">add</span> Añadir Item al Cronograma
+                    <!-- BOTONES DE NAVEGACIÓN -->
+                    <div class="flex items-center justify-between pt-8 border-t border-slate-100 dark:border-gray-800 mt-auto">
+                        <button v-if="currentStep > 1" @click.prevent="prevStep" type="button" class="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-primary-dark transition-colors">
+                            <span class="material-symbols-outlined text-lg">arrow_back</span> Anterior
+                        </button>
+                        <div v-else></div>
+                        
+                        <div class="flex gap-4">
+                            <button v-if="currentStep < totalSteps" @click.prevent="nextStep" type="button" class="bg-primary-dark text-white px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">
+                                Siguiente Parte
+                            </button>
+                            <button v-else type="submit" class="bg-emerald-600 text-white px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all">
+                                {{ isEditing ? 'Actualizar Evento' : 'Finalizar y Crear' }}
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <div v-if="nuevoEvento.cronograma_lista.length === 0" class="py-20 text-center border-4 border-dashed border-slate-100 dark:border-gray-800 rounded-[3rem]">
-                    <span class="material-symbols-outlined text-6xl text-slate-200 mb-4 scale-125">auto_schedule</span>
-                    <p class="text-sm font-black text-slate-300 uppercase tracking-widest mb-6">No has definido el cronograma del evento</p>
-                    <button @click.prevent="agregarDia" class="bg-umsa-blue text-white px-8 py-3 rounded-full font-black text-[11px] uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:-translate-y-1 transition-all">Empezar a estructurar</button>
-                </div>
-            </div>
+                <!-- COLUMNA DE PREVISUALIZACIÓN DINÁMICA (MINI-HOME) -->
+                <div class="lg:col-span-5 flex flex-col h-full">
+                    <div class="sticky top-8 space-y-4">
+                        <div class="flex items-center justify-between px-2">
+                            <div class="flex flex-col">
+                                <label class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Vista Previa en Vivo</label>
+                                <span class="text-[8px] font-bold text-emerald-500 uppercase">Simulación de Home Oficial</span>
+                            </div>
+                            <span class="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 text-[8px] font-black rounded-lg border border-blue-100 dark:border-blue-800 uppercase shadow-sm">Paso {{ currentStep }} / {{ totalSteps }}</span>
+                        </div>
 
-            <div class="flex justify-between items-center pt-10 border-t-2 border-slate-100 dark:border-gray-800">
-                <button type="button" @click="isCreating = false; isEditing = false" class="text-xs font-black text-slate-400 uppercase tracking-widest hover:text-red-500 transition-all flex items-center gap-2">
-                    <span class="material-symbols-outlined text-lg">close</span> Descartar Cambios
-                </button>
-                <button type="submit" class="bg-gradient-to-r from-emerald-600 to-emerald-400 hover:scale-105 transition-all text-white font-black px-12 py-5 rounded-2xl text-xs uppercase tracking-widest shadow-2xl shadow-emerald-500/30 flex items-center gap-3">
-                    <span class="material-symbols-outlined text-xl">{{ isEditing ? 'auto_fix_high' : 'playlist_add_check' }}</span> 
-                    {{ isEditing ? 'Actualizar Evento Completo' : 'Finalizar y Crear Evento' }}
-                </button>
+                        <!-- CONTENEDOR MINI-HOME UNIFICADO -->
+                        <div class="bg-white dark:bg-gray-900 rounded-[2.5rem] border border-slate-200 dark:border-gray-800 overflow-hidden shadow-2xl flex flex-col relative transition-all duration-500 hover:shadow-blue-500/10">
+                            
+                            <!-- HERO PREVIEW -->
+                            <div class="relative aspect-[16/10] bg-slate-900 overflow-hidden">
+                                <!-- Banner -->
+                                <img v-if="resolvedBanner" :src="resolvedBanner" class="absolute inset-0 w-full h-full object-cover opacity-60 animate-in fade-in duration-700">
+                                <div v-else class="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center">
+                                    <span class="material-symbols-outlined text-4xl text-white/10">wallpaper</span>
+                                </div>
+
+                                <!-- Overlay Gradiente -->
+                                <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
+
+                                <!-- Logo del Evento -->
+                                <div class="absolute top-4 left-4 z-20">
+                                    <div class="w-12 h-12 bg-white/95 backdrop-blur shadow-xl rounded-xl p-2 border border-white/20 flex items-center justify-center transform -rotate-3 hover:rotate-0 transition-transform duration-500">
+                                        <img v-if="resolvedLogo" :src="resolvedLogo" class="w-full h-full object-contain animate-in zoom-in-50 duration-500">
+                                        <span v-else class="material-symbols-outlined text-slate-300">image</span>
+                                    </div>
+                                </div>
+
+                                <!-- Badges Superiores -->
+                                <div class="absolute top-4 right-4 flex flex-col gap-1 items-end z-20">
+                                    <div class="px-2 py-1 bg-emerald-500 text-white text-[7px] font-black rounded-md shadow-lg uppercase tracking-tighter">Evento Oficial</div>
+                                    <div class="px-2 py-1 bg-white/10 backdrop-blur-md text-white text-[7px] font-black rounded-md border border-white/20 uppercase">{{ nuevoEvento.version || 'Edición' }}</div>
+                                </div>
+
+                                <!-- Contenido del Hero -->
+                                <div class="absolute inset-x-0 bottom-0 p-6 space-y-3 z-10">
+                                    <div class="flex items-center gap-2">
+                                        <div class="px-2.5 py-1 bg-emerald-500 text-white rounded-md flex items-center gap-1 shadow-lg shadow-emerald-500/20 border border-emerald-400/50">
+                                            <span class="material-symbols-outlined text-[10px]">verified</span>
+                                            <span class="text-[7px] font-black uppercase tracking-widest">{{ nuevoEvento.institucion_badge || 'Evento Oficial OEA/TYAN' }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-start gap-4">
+                                        <h1 class="flex-1 text-xl md:text-2xl font-black text-white italic uppercase leading-[0.9] tracking-tighter drop-shadow-2xl">
+                                            {{ nuevoEvento.nombre || 'Nombre del Evento' }}
+                                        </h1>
+                                        <div v-if="nuevoEvento.sigla" :style="{ backgroundColor: nuevoEvento.color_principal }" class="px-3 py-2 rounded-xl shadow-2xl transform -skew-x-12 border border-white/20">
+                                            <span class="text-[12px] font-black text-white uppercase block transform skew-x-12 italic leading-none">{{ nuevoEvento.sigla }}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex flex-wrap gap-2 pt-1">
+                                        <!-- Gestión -->
+                                        <div :style="{ borderColor: nuevoEvento.color_principal + '40' }" class="flex items-center gap-1.5 px-2.5 py-1 bg-white/5 backdrop-blur-md border text-white rounded-lg text-[8px] font-black uppercase">
+                                            <span class="material-symbols-outlined text-[12px]">calendar_today</span>
+                                            {{ nuevoEvento.gestion || '202X' }}
+                                        </div>
+                                        <!-- Fecha -->
+                                        <div class="flex items-center gap-1.5 px-2.5 py-1 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-lg text-[8px] font-black uppercase">
+                                            <span class="material-symbols-outlined text-[12px]">schedule</span>
+                                            {{ nuevoEvento.fecha_inicio ? formatDate(nuevoEvento.fecha_inicio) : '13 DE MAYO' }}
+                                        </div>
+                                        <!-- Lugar -->
+                                        <div class="flex items-center gap-1.5 px-2.5 py-1 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-lg text-[8px] font-black uppercase">
+                                            <span class="material-symbols-outlined text-[12px]">location_on</span>
+                                            {{ nuevoEvento.ubicacion || 'SEDE' }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- CONTENIDO NARRATIVO (RESUMEN) -->
+                            <div class="p-6 space-y-4 bg-white dark:bg-gray-950 flex-1 border-t border-slate-100 dark:border-gray-800">
+                                <div class="space-y-2">
+                                    <h2 class="text-[10px] font-black text-umsa-blue dark:text-sky-400 uppercase tracking-widest flex items-center gap-2">
+                                        <span class="w-4 h-[2px] bg-umsa-blue dark:bg-sky-400"></span>
+                                        Sobre el Evento
+                                    </h2>
+                                    <p class="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed font-medium line-clamp-4">
+                                        {{ nuevoEvento.sobre_evento_1 || 'Aquí aparecerá el resumen principal que describes en el Paso 2...' }}
+                                    </p>
+                                </div>
+
+                                <!-- Frase Destacada -->
+                                <div v-if="nuevoEvento.frase_destacada" class="bg-slate-50 dark:bg-gray-900 p-4 rounded-2xl border border-slate-100 dark:border-gray-800 relative">
+                                    <span class="material-symbols-outlined absolute -left-1 -top-1 text-blue-500/20 text-3xl">format_quote</span>
+                                    <p class="text-[9px] font-black italic text-center text-slate-700 dark:text-slate-300 leading-tight">
+                                        "{{ nuevoEvento.frase_destacada }}"
+                                    </p>
+                                </div>
+
+                                <!-- Botones de Simulación -->
+                                <div class="flex items-center gap-2 pt-2 opacity-50">
+                                    <div class="flex-1 h-9 bg-umsa-blue rounded-full flex items-center justify-center text-[8px] font-black text-white uppercase tracking-tighter">Ingresar al Portal</div>
+                                    <div class="flex-1 h-9 border border-slate-200 dark:border-gray-800 rounded-full flex items-center justify-center text-[8px] font-black text-slate-400 uppercase tracking-tighter">Detalles</div>
+                                </div>
+                            </div>
+
+                            <!-- Footer Simulado -->
+                            <div class="px-6 py-3 bg-slate-50 dark:bg-gray-900 border-t border-slate-100 dark:border-gray-800 flex justify-between items-center">
+                                <div class="flex gap-2">
+                                    <div class="w-4 h-4 bg-slate-200 dark:bg-gray-700 rounded-full"></div>
+                                    <div class="w-4 h-4 bg-slate-200 dark:bg-gray-700 rounded-full"></div>
+                                </div>
+                                <span class="text-[7px] font-bold text-slate-300 uppercase">Organización & Auspicio</span>
+                            </div>
+                        </div>
+
+                        <!-- Info Card de Calidad -->
+                        <div class="p-4 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="material-symbols-outlined text-emerald-500 text-sm">auto_awesome</span>
+                                <span class="text-[9px] font-black text-emerald-700 dark:text-emerald-400 uppercase">Estado de la Marca</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div class="text-[8px] font-bold text-slate-400 uppercase">Logo: <span :class="logoQuality.status === 'hd' ? 'text-emerald-600' : 'text-amber-600'">{{ logoQuality.msg || 'Pendiente' }}</span></div>
+                                <div class="text-[8px] font-bold text-slate-400 uppercase">Banner: <span :class="fondoQuality.status === 'hd' ? 'text-emerald-600' : 'text-amber-600'">{{ fondoQuality.status === 'hd' ? 'HD' : 'Estándar' }}</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </form>
     </div>
 
     <!-- Lista de eventos agrupados -->
-    <div v-show="!isCreating" class="grid grid-cols-1 gap-8 mt-4">
+    <div v-show="!isCreating && !isEditing" class="grid grid-cols-1 gap-8 mt-4">
       <div v-for="(evento, index) in eventosAgrupados" :key="index" class="bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl shadow-slate-200/40 dark:shadow-black/40 border border-slate-100 dark:border-gray-800 transition-all overflow-hidden relative group/evento">
         
         <!-- Decoration top bar / Banner -->
@@ -699,9 +945,9 @@ const editarGestion = (gestion: any) => {
             <div class="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-6">
               <div class="flex-1">
                 <div class="flex items-end gap-5 mb-4">
-                  <div class="w-24 h-24 rounded-2xl bg-white dark:bg-gray-900 shadow-xl overflow-hidden flex items-center justify-center text-umsa-blue border-4 border-white dark:border-gray-900 shrink-0 relative z-20">
-                    <img v-if="evento.imagen_fondo" :src="evento.imagen_fondo" class="w-full h-full object-cover">
-                    <span v-else class="material-symbols-outlined text-4xl">corporate_fare</span>
+                  <div class="w-24 h-24 rounded-2xl bg-white dark:bg-gray-800 shadow-xl overflow-hidden flex items-center justify-center text-umsa-blue border-4 border-white dark:border-gray-900 shrink-0 relative z-20">
+                    <img v-if="evento.logo_img" :src="evento.logo_img" class="w-full h-full object-contain p-2">
+                    <span v-else class="material-symbols-outlined text-4xl text-slate-200">image</span>
                   </div>
                   <div class="pb-[0.1rem]">
                     <span class="text-[9px] font-black uppercase px-3 py-1 rounded-full tracking-widest border mb-2 inline-block shadow-sm" :class="evento.estadoGeneral === 'Activo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/40' : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-gray-800 dark:text-gray-400'">

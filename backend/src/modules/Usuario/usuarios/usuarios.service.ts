@@ -513,55 +513,75 @@ export class UsuariosService {
    * NOTA para producción: aquí deberías generar y devolver un JWT.
    * Por ahora devolvemos el usuario como confirmación de login exitoso.
    */
-  async login(loginDto: LoginDto): Promise<Omit<Usuario, 'password'>> {
-    // Buscamos por email — no usamos findBy directo para poder cargar relaciones
-    const usuario = await this.usuarioRepository.findOne({
-      where: { email: loginDto.email },
-      relations: ['persona', 'usuariosRoles', 'usuariosRoles.rol'],
-    });
+  async login(loginDto: LoginDto): Promise<any> {
+    try {
+      // Buscamos por email
+      const usuario = await this.usuarioRepository.findOne({
+        where: { email: loginDto.email },
+        relations: ['persona', 'usuariosRoles', 'usuariosRoles.rol'],
+      });
 
-    console.log('--- INTENTO DE LOGIN ---');
-    console.log('Email:', loginDto.email);
+      if (!usuario) {
+        throw new UnauthorizedException('Credenciales incorrectas.');
+      }
 
-    if (!usuario) {
-      console.log('Error: Usuario no encontrado en la BD.');
-      throw new UnauthorizedException('Credenciales incorrectas.');
+      if (usuario.estado === 0) {
+        throw new UnauthorizedException('Tu cuenta está inactiva. Contacta al administrador.');
+      }
+
+      if (usuario.estado === 2) {
+        throw new UnauthorizedException('Tu solicitud de registro está pendiente de aprobación.');
+      }
+
+      let contextoRol = '';
+      
+      // 1. Intentar validar con la contraseña principal (Estudiante / Admin)
+      // Nota: password siempre debe existir en la BD.
+      const passEstudianteValido = usuario.password 
+        ? await bcrypt.compare(loginDto.password, usuario.password)
+        : false;
+      
+      if (passEstudianteValido) {
+        contextoRol = 'Estudiante';
+        const esAdmin = usuario.usuariosRoles?.some((ur: any) => 
+          ur.rol?.id === 1 || ur.rol?.nombre_rol === 'Super Usuario'
+        );
+        if (esAdmin) contextoRol = 'Admin';
+      } else {
+        // 2. Intentar validar con la contraseña de ponente (si existe y está configurado)
+        if (usuario.password_ponente && usuario.password_ponente.length > 10) {
+          try {
+            const passPonenteValido = await bcrypt.compare(loginDto.password, usuario.password_ponente);
+            if (passPonenteValido) {
+              contextoRol = 'Ponente';
+            }
+          } catch (e) {
+            console.error('[AUTH ERROR] Error comparando password_ponente:', e.message);
+          }
+        }
+      }
+
+      if (!contextoRol) {
+        throw new UnauthorizedException('Credenciales incorrectas.');
+      }
+
+      // Eliminamos passwords antes de devolver
+      const { password, password_ponente, ...usuarioSinPassword } = usuario;
+      
+      console.log(`[AUTH] Acceso exitoso: ${usuario.email} -> Portal: ${contextoRol}`);
+      
+      return {
+        ...usuarioSinPassword,
+        rolSugerido: contextoRol
+      };
+    } catch (error) {
+      // Si es un error de credenciales, no lo tratamos como "Crash" para no ensuciar los logs
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      console.error('[AUTH CRASH] Error crítico en el servidor:', error);
+      throw error;
     }
-
-    console.log('Usuario encontrado. ID:', usuario.id);
-    console.log('Estado:', usuario.estado);
-
-    if (usuario.estado === 0) {
-      console.log('Error: Usuario inactivo.');
-      throw new UnauthorizedException(
-        'Tu cuenta está inactiva. Contacta al administrador.',
-      );
-    }
-
-    if (usuario.estado === 2) {
-      console.log('Error: Usuario pendiente de aprobación.');
-      throw new UnauthorizedException(
-        'Tu solicitud de registro está pendiente de aprobación por administración. Recibirás acceso una vez sea validada.',
-      );
-    }
-
-    const passwordValido = await bcrypt.compare(
-      loginDto.password,
-      usuario.password,
-    );
-
-    if (!passwordValido) {
-      console.log('Error: La contraseña NO coincide.');
-      console.log('Password enviada:', loginDto.password);
-      throw new UnauthorizedException('Credenciales incorrectas.');
-    }
-
-    console.log('✅ LOGIN EXITOSO');
-
-    // Eliminamos password del objeto antes de devolver
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...usuarioSinPassword } = usuario;
-    return usuarioSinPassword as Omit<Usuario, 'password'>;
   }
 
   /**
@@ -606,8 +626,31 @@ export class UsuariosService {
   async forzarCambioPassword(
     id: number,
     nuevaPassword: string,
+    tipo: 'principal' | 'ponente' = 'principal',
   ): Promise<{ mensaje: string }> {
     const hash = await bcrypt.hash(nuevaPassword, 10);
+    if (tipo === 'ponente') {
+      await this.usuarioRepository.update(id, { password_ponente: hash });
+    } else {
+      await this.usuarioRepository.update(id, { password: hash });
+    }
+    return { mensaje: `Contraseña ${tipo} actualizada correctamente.` };
+  }
+
+  async habilitarEdicion(id: number) {
+    const usuario = await this.findOne(id);
+    if (!usuario.persona) throw new NotFoundException('El usuario no tiene un perfil vinculado');
+    
+    // Desbloqueamos el perfil
+    await this.personaRepository.update(usuario.persona.id, { perfil_completado: false });
+    return { mensaje: 'Edición habilitada correctamente' };
+  }
+
+  async findByEmail(email: string) {
+    return await this.usuarioRepository.findOne({
+      where: { email },
+      relations: ['persona']
+    });
     await this.usuarioRepository.update(id, { 
       password: hash,
       requiere_cambio_password: false 
@@ -627,7 +670,7 @@ export class UsuariosService {
     const existe = await this.usuarioRepository.findOneBy({ email: dto.email });
     if (existe) {
       throw new ConflictException(
-        `El email '${dto.email}' ya está registrado.`,
+        'El correo electrónico seleccionado ya fue registrado o solicitado previamente.',
       );
     }
 
@@ -943,7 +986,7 @@ export class UsuariosService {
     const existe = await this.usuarioRepository.findOneBy({ email: dto.email });
     if (existe) {
       throw new ConflictException(
-        `El email '${dto.email}' ya está registrado.`,
+        'El correo electrónico seleccionado ya fue registrado o solicitado previamente.',
       );
     }
 
@@ -968,6 +1011,7 @@ export class UsuariosService {
         primer_apellido: dto.primer_apellido,
         segundo_apellido: dto.segundo_apellido,
         documento_identidad: dto.documento_identidad,
+        genero: dto.genero,
         firma_dig: docFile, // Se reutiliza para almacenar el nombre del doc. de aval
         usuario: usuarioGuardado,
       });
@@ -987,6 +1031,7 @@ export class UsuariosService {
       }
 
       await queryRunner.commitTransaction();
+
       return {
         mensaje:
           'Su solicitud fue recepcionada correctamente. La confirmación de su cuenta se realizará una vez finalice el proceso de inscripciones y sea validada por administración.',
@@ -1087,6 +1132,76 @@ export class UsuariosService {
 
       return { mensaje: 'Solicitud rechazada (estado -1). El usuario ha sido notificado.' };
     }
+  }
+
+  /**
+   * Verifica si el CI proporcionado coincide con el documento de identidad del usuario.
+   * Se usa como "contraseña de respaldo" para el cambio de rol a Ponente.
+   */
+  async verificarPasswordRespaldo(id_usuario: number, ci: string): Promise<boolean> {
+    const usuario = await this.usuarioRepository.findOne({
+      where: { id: id_usuario },
+      relations: ['persona'],
+    });
+
+    if (!usuario || !usuario.persona) {
+      throw new NotFoundException('Perfil de usuario no encontrado.');
+    }
+
+    const ciAlmacenado = usuario.persona.documento_identidad;
+
+    if (!ciAlmacenado) return false;
+
+    // Función para dejar SOLO los números
+    const limpiarANumeros = (s: string) => s.replace(/\D/g, '');
+    
+    const inputNum = limpiarANumeros(ci);
+    const dbNum = limpiarANumeros(ciAlmacenado);
+
+    // 1. Si los números limpios coinciden y tienen una longitud válida (mínimo 5 dígitos)
+    if (inputNum !== '' && inputNum === dbNum && inputNum.length >= 5) {
+      console.log(`[AUDITORÍA] Coincidencia numérica EXITOSA para usuario ${id_usuario}`);
+      return true;
+    }
+
+    // 2. Fallback: Comparación normalizada (por si el documento tiene letras necesarias como en Pasaportes)
+    const normalizar = (s: string) => s.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    if (normalizar(ci) === normalizar(ciAlmacenado)) return true;
+
+    console.warn(`[DEBUG] Mismatch CI - User: ${usuario.email} | Input: "${ci}" (Limpio: ${inputNum}) | DB: "${ciAlmacenado}" (Limpio: ${dbNum})`);
+    return false;
+  }
+
+  /**
+   * Activa el portal de ponente para un usuario, estableciendo su contraseña específica
+   * y marcando el flag de configurado.
+   */
+  async activarPortalPonente(id_usuario: number, ci: string, nuevaPassword: string) {
+    console.log(`[AUDITORÍA] Intento de ACTIVACIÓN de portal Ponente - Usuario ID: ${id_usuario}`);
+    
+    // 1. Validar identidad (CI)
+    const esValido = await this.verificarPasswordRespaldo(id_usuario, ci);
+    if (!esValido) {
+      throw new BadRequestException('El documento de identidad no coincide con nuestros registros.');
+    }
+
+    // 2. Actualizar contraseña de ponente y marcar como configurado
+    const hash = await bcrypt.hash(nuevaPassword, 10);
+    await this.usuarioRepository.update(id_usuario, { password_ponente: hash });
+    
+    // 3. Marcar como configurado en la entidad Persona
+    const usuario = await this.usuarioRepository.findOne({ 
+      where: { id: id_usuario },
+      relations: ['persona']
+    });
+    
+    if (usuario && usuario.persona) {
+      usuario.persona.ponente_configurado = true;
+      await this.dataSource.getRepository(Persona).save(usuario.persona);
+    }
+
+    console.log(`[AUDITORÍA] Portal Ponente ACTIVADO CON CLAVE ESPECÍFICA - Usuario ID: ${id_usuario}`);
+    return { mensaje: 'Portal de ponente activado exitosamente.' };
   }
 }
 

@@ -8,6 +8,11 @@ const authStore = useAuthStore();
 const navigate = (routeName: string) => {
   router.push({ name: routeName });
 };
+
+const cambiarAEstudiante = () => {
+  authStore.cambiarRolActivo('Estudiante');
+  router.push('/estudiante');
+};
 </script>
 
 <template>
@@ -64,5 +69,21 @@ const navigate = (routeName: string) => {
         <span class="material-symbols-outlined text-[18px] transition-colors" :class="[ $route.name === 'ponente-certificados' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">workspace_premium</span>
       </button>
     </nav>
+
+    <!-- CAMBIO DE CONTEXTO DE ROL (Solo si también es Estudiante) -->
+    <div v-if="authStore.esEstudiante" class="mt-6 pt-4 border-t border-slate-100 dark:border-gray-800">
+      <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 pl-2">Cambiar Vista</p>
+      <button @click="cambiarAEstudiante"
+              class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-slate-500 hover:text-emerald-600 group border border-dashed border-slate-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-800">
+        <div class="flex items-center gap-3">
+          <div class="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center">
+            <span class="material-symbols-outlined text-[16px]">school</span>
+          </div>
+          <span class="text-[11px] uppercase tracking-widest font-black">Vista Estudiante</span>
+        </div>
+        <span class="material-symbols-outlined text-[18px] text-slate-400 group-hover:text-emerald-500 transition-colors">swap_horiz</span>
+      </button>
+    </div>
+
   </aside>
 </template>

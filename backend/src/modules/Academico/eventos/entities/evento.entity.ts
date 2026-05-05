@@ -59,6 +59,12 @@ export class Evento {
   @Column({ length: 255, nullable: true })
   logo: string;
 
+  @Column({ length: 50, nullable: true })
+  telefono: string;
+
+  @Column({ length: 150, nullable: true })
+  email: string;
+
   /** UUID o URL para la imagen de fondo de las vistas del evento */
   @Column({ length: 255, nullable: true })
   imagen_fondo: string;
@@ -81,6 +87,45 @@ export class Evento {
   /** Almacena el cronograma en formato JSON o texto */
   @Column({ type: 'text', nullable: true })
   cronograma: string;
+
+  @Column({ type: 'text', nullable: true })
+  organizadores: string;
+
+  @Column({ length: 100, nullable: true })
+  sigla: string;
+
+  @Column({ length: 50, nullable: true })
+  color_principal: string;
+
+  @Column({ length: 255, nullable: true })
+  institucion_badge: string;
+
+  @Column({ length: 255, nullable: true })
+  link_facebook: string;
+
+  @Column({ length: 255, nullable: true })
+  link_web: string;
+
+  @Column({ length: 50, nullable: true })
+  color_sigla: string;
+
+  @Column({ length: 50, nullable: true })
+  color_texto_header: string;
+
+  @Column({ length: 50, nullable: true })
+  color_titulo_2: string;
+
+  @Column({ length: 50, nullable: true })
+  color_badge_gestion: string;
+
+  @Column({ length: 50, nullable: true })
+  color_badge_institucion: string;
+
+  @Column({ length: 50, nullable: true })
+  color_badge_fecha: string;
+
+  @Column({ length: 255, nullable: true })
+  nombre_2: string;
 
   // ── Relaciones ────────────────────────────────────────────────────────────
 

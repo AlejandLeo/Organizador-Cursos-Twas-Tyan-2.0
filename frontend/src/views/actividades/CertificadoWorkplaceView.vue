@@ -7,7 +7,7 @@ const router = useRouter()
 const actividadId = route.params.id
 
 const goBack = () => {
-    router.push({ name: 'coordinador-actividades-detalle', params: { id: actividadId } })
+    router.push({ name: 'coordinador-gestion-eventos-detalle', params: { id: actividadId } })
 }
 </script>
 

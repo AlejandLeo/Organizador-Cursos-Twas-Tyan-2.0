@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import Swal from 'sweetalert2';
+import { useAuthStore } from '@/stores/auth';
+import api from '@/services/api';
 
+const authStore = useAuthStore();
 const isEditing = ref(false);
 const successMessage = ref('');
 
@@ -12,6 +16,74 @@ const formData = ref({
    institucion: 'Universidad Mayor de San Andrés',
    grado: 'Ph.D.'
 });
+
+const abrirSoporteDatos = () => {
+  Swal.fire({
+    title: 'Reportar Error en Datos',
+    html: `
+      <div class="text-left space-y-4">
+        <p class="text-sm text-slate-600 font-medium italic">¿Qué información deseas corregir?</p>
+        
+        <div class="space-y-2">
+          <button id="btn-soporte-datos" class="w-full p-4 bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-200 rounded-2xl flex items-center gap-3 transition-all group text-left">
+            <span class="material-symbols-outlined text-amber-500 group-hover:scale-110 transition-transform">edit_note</span>
+            <span class="text-xs font-bold text-slate-700">Hay un error en mis datos personales</span>
+          </button>
+
+          <button id="btn-soporte-otro" class="w-full p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl flex items-center gap-3 transition-all group text-left">
+            <span class="material-symbols-outlined text-slate-400 group-hover:scale-110 transition-transform">help</span>
+            <span class="text-xs font-bold text-slate-700">Tengo otro tipo de problema</span>
+          </button>
+        </div>
+      </div>
+    `,
+    showConfirmButton: false,
+    showCloseButton: true,
+    didOpen: () => {
+      const showTicketForm = (tipo: string) => {
+        Swal.fire({
+          title: 'Enviar Ticket de Corrección',
+          html: `
+            <div class="text-left space-y-4">
+              <div class="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-100 dark:border-amber-800">
+                <p class="text-[10px] font-black uppercase text-amber-600 dark:text-amber-400">Tipo de Corrección:</p>
+                <p class="text-xs font-bold text-slate-700 dark:text-gray-300">${tipo}</p>
+              </div>
+              <div class="space-y-2">
+                <label class="text-[10px] font-black uppercase text-slate-400 pl-1">Detalla los datos erróneos:</label>
+                <textarea id="swal-ticket-msg" class="swal2-textarea w-full rounded-2xl border-slate-200 text-sm" placeholder="Ej: Mi apellido correcto es..." style="margin: 0; height: 120px;"></textarea>
+              </div>
+            </div>
+          `,
+          showCancelButton: true,
+          confirmButtonText: 'Enviar Solicitud',
+          cancelButtonText: 'Volver',
+          confirmButtonColor: '#d97706',
+          showLoaderOnConfirm: true,
+          preConfirm: async () => {
+            const mensaje = (document.getElementById('swal-ticket-msg') as HTMLTextAreaElement).value;
+            if (!mensaje) { Swal.showValidationMessage('Por favor detalla el error.'); return false; }
+            try {
+              await api.post('/soporte', { tipo, mensaje });
+              return true;
+            } catch (error) {
+              Swal.showValidationMessage('Error al enviar la solicitud.');
+            }
+          }
+        }).then((result) => {
+          if (result.isConfirmed) {
+            Swal.fire({ icon: 'success', title: 'Solicitud Enviada', text: 'El SuperUsuario revisará tus datos.', timer: 2000, showConfirmButton: false });
+          } else if (result.dismiss === Swal.DismissReason.cancel) {
+            abrirSoporteDatos();
+          }
+        });
+      };
+
+      document.getElementById('btn-soporte-datos')?.addEventListener('click', () => showTicketForm('Error en mis datos personales'));
+      document.getElementById('btn-soporte-otro')?.addEventListener('click', () => showTicketForm('Problema técnico en mi perfil'));
+    }
+  });
+};
 
 const saveChanges = () => {
     isEditing.value = false;
@@ -32,14 +104,22 @@ const saveChanges = () => {
                Revisa y mantén actualizada tu información de contacto.
             </p>
         </div>
-        <button v-if="!isEditing" @click="isEditing = true" class="bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-300 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-100 dark:hover:bg-gray-700 transition-all uppercase flex items-center gap-2 shadow-sm">
-            <span class="material-symbols-outlined text-[16px]">edit</span>
-            Editar Información
-        </button>
-        <button v-else @click="saveChanges" class="bg-umsa-blue text-white shadow-md shadow-umsa-blue/20 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-primary-accent transition-all uppercase flex items-center gap-2 border border-blue-600">
-            <span class="material-symbols-outlined text-[16px]">check_circle</span>
-            Guardar Cambios
-        </button>
+        <div class="flex items-center gap-3">
+          <button v-if="!isEditing" @click="abrirSoporteDatos" class="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 text-amber-600 dark:text-amber-400 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-100 transition-all flex items-center gap-2">
+              <span class="material-symbols-outlined text-[16px]">support_agent</span>
+              ¿Error en datos?
+          </button>
+          
+          <button v-if="!isEditing" @click="isEditing = true" class="bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-300 px-5 py-2.5 rounded-xl text-[10px] font-black hover:bg-slate-100 dark:hover:bg-gray-700 transition-all uppercase flex items-center gap-2 shadow-sm tracking-widest">
+              <span class="material-symbols-outlined text-[16px]">edit</span>
+              Editar Información
+          </button>
+          
+          <button v-else @click="saveChanges" class="bg-umsa-blue text-white shadow-md shadow-umsa-blue/20 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-primary-accent transition-all uppercase flex items-center gap-2 border border-blue-600">
+              <span class="material-symbols-outlined text-[16px]">check_circle</span>
+              Guardar Cambios
+          </button>
+        </div>
     </div>
 
     <!-- Mensaje de éxito -->
