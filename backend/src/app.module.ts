@@ -37,6 +37,7 @@ import { AuthModule } from './modules/Seguridad/auth/auth.module';
 
 // --- Archivos ---
 import { UploadsModule } from './modules/Comun/uploads/uploads.module';
+import { SoporteModule } from './modules/Comun/soporte/soporte.module';
 import { MailModule } from './modules/Comun/mail/mail.module';
 
 // --- Dashboard ---
@@ -96,6 +97,7 @@ import { QrModule } from './modules/Comun/qr/qr.module';
 
     // --- Archivos ---
     UploadsModule,
+    SoporteModule,
     MailModule,
 
     // --- Especiales ---

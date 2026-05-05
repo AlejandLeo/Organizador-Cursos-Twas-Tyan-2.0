@@ -14,7 +14,7 @@ const eventosAsignados = ref([
     progress: 45,
     actividadesCount: 2,
     color: 'bg-primary-dark',
-    icon: 'event'
+    image: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80'
   },
   {
     id: 2,
@@ -25,14 +25,14 @@ const eventosAsignados = ref([
     progress: 0,
     actividadesCount: 1,
     color: 'bg-umsa-gold',
-    icon: 'event_available'
+    image: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80'
   }
 ]);
 
 const getStatusColor = (status: any) => {
-  if (status === 'En Progreso') return 'text-umsa-blue bg-blue-50 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800';
-  if (status === 'Finalizado') return 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800';
-  return 'text-slate-500 bg-slate-100 dark:bg-gray-800 dark:text-gray-400 border border-slate-200 dark:border-gray-700';
+  if (status === 'En Progreso') return 'text-white bg-emerald-500 shadow-emerald-500/30';
+  if (status === 'Finalizado') return 'text-white bg-rose-500 shadow-rose-500/30';
+  return 'text-white bg-umsa-gold shadow-yellow-500/30';
 };
 
 const openActividadesEvento = (eventoId: any) => {
@@ -43,7 +43,7 @@ const openActividadesEvento = (eventoId: any) => {
 <template>
   <div class="animate-in fade-in duration-500 max-w-7xl mx-auto space-y-8">
     
-    <div class="flex justify-center mb-8">
+    <div class="flex justify-center mb-8 mt-2">
       <div class="relative w-full max-w-2xl group">
         <label class="absolute -top-3 left-6 px-2 bg-[#f8f9fc] dark:bg-black z-10 text-[9px] font-black text-slate-400 uppercase tracking-widest italic transition-colors">Buscador de mis cursos asignados</label>
         <span class="absolute inset-y-0 left-5 flex items-center text-slate-400">
@@ -60,26 +60,47 @@ const openActividadesEvento = (eventoId: any) => {
       </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div v-for="evento in eventosAsignados" :key="evento.id" @click="openActividadesEvento(evento.id)" class="bg-white dark:bg-gray-900 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-gray-800 hover:shadow-md hover:border-umsa-blue transition-all group cursor-pointer flex flex-col relative overflow-hidden">
-        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-white/0 to-slate-50/50 dark:to-white/5 rounded-bl-full -z-0"></div>
-        <div class="flex justify-between items-start mb-6 relative z-10">
-          <div :class="evento.color" class="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-md shadow-slate-200 dark:shadow-none">
-            <span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">{{ evento.icon }}</span>
-          </div>
-          <span :class="getStatusColor(evento.status)" class="text-[9px] font-black uppercase px-3 py-1 rounded-full tracking-widest">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div v-for="evento in eventosAsignados" :key="evento.id" @click="openActividadesEvento(evento.id)" 
+        class="bg-white dark:bg-gray-900 rounded-[2.5rem] overflow-hidden shadow-lg border border-slate-100 dark:border-gray-800 hover:border-umsa-blue transition-all duration-500 hover:-translate-y-2 cursor-pointer group flex flex-col relative">
+        
+        <!-- Imagen Predominante -->
+        <div class="relative h-60 w-full overflow-hidden shrink-0">
+          <img :src="evento.image" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 ease-out">   
+          <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent"></div>
+          
+          <span class="absolute top-4 right-4 z-20 text-[9px] font-black uppercase px-3 py-1.5 rounded-full tracking-widest shadow-xl backdrop-blur-md border border-white/10" :class="getStatusColor(evento.status)">
             {{ evento.status }}
           </span>
+
+          <div class="absolute bottom-4 left-6 right-6 z-20">
+            <p class="text-[10px] font-bold text-umsa-gold uppercase tracking-[0.2em] mb-1 drop-shadow-md">
+              GESTIÓN {{ evento.gestion }}
+            </p>
+            <h3 class="text-2xl font-black text-white leading-tight uppercase italic group-hover:text-umsa-gold transition-colors drop-shadow-lg line-clamp-2">
+              {{ evento.title }}
+            </h3>
+          </div>
         </div>
-        <div class="flex-1 relative z-10">
-          <p class="text-[9px] font-bold text-umsa-gold dark:text-blue-400 uppercase tracking-widest mb-2">Gestión {{ evento.gestion }}</p>
-          <h3 class="text-xl font-black text-primary-dark dark:text-white leading-tight mb-2 group-hover:text-umsa-blue transition-colors">{{ evento.title }}</h3>
-          <p class="text-xs font-medium text-slate-500">{{ evento.actividadesCount }} actividades a tu cargo</p>
-        </div>
-        <div class="mt-6 space-y-3 pt-5 border-t border-slate-100 dark:border-gray-800 relative z-10">
-          <div class="flex items-center text-slate-500 dark:text-gray-400 bg-slate-50 dark:bg-gray-800/50 p-2 rounded-lg">
-            <span class="material-symbols-outlined text-[16px] mr-3 text-slate-400">calendar_today</span>
-            <span class="text-xs font-bold">{{ evento.date }}</span>
+
+        <!-- Información Inferior -->
+        <div class="p-6 flex flex-col flex-1 bg-white dark:bg-gray-900">
+          <div class="flex items-center justify-between text-slate-500 dark:text-gray-400 mb-6">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-sm text-umsa-blue">calendar_month</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider">{{ evento.date }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-sm text-umsa-blue">book</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider">{{ evento.actividadesCount }} Actividades</span>
+            </div>
+          </div>
+
+          <div class="mt-auto flex justify-between items-center pt-5 border-t border-slate-100 dark:border-gray-800">
+              <div class="flex items-center text-umsa-blue font-black group/btn">
+                  <span class="text-[11px] uppercase tracking-widest">Ver Actividades</span>
+                  <span class="material-symbols-outlined text-[18px] ml-2 group-hover/btn:translate-x-1 transition-transform">arrow_forward</span>
+              </div>
           </div>
         </div>
       </div>

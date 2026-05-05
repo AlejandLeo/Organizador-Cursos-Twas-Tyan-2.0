@@ -16,6 +16,7 @@ import {
   UploadedFiles,
   Res,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FileInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express';
@@ -32,6 +33,7 @@ import { RegisterDto } from './dto/register.dto';
 import { CrearPonenteDto } from './dto/crear-ponente.dto';
 import { FiltrarUsuariosDto } from './dto/filtrar-usuarios.dto';
 import { SolicitudRegistroDto } from './dto/solicitud-registro.dto';
+import { VerificarRespaldoDto } from './dto/verificar-respaldo.dto';
 import { JwtAuthGuard } from '../../Seguridad/auth/jwt-auth.guard';
 import { RolesGuard } from '../../Seguridad/auth/roles.guard';
 import { Roles } from '../../Seguridad/auth/roles.decorator';
@@ -40,6 +42,35 @@ import { Roles } from '../../Seguridad/auth/roles.decorator';
 @Controller('usuarios')
 export class UsuariosController {
   constructor(private readonly usuariosService: UsuariosService) {}
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('verificar-respaldo')
+  @ApiOperation({ summary: 'Verificar la contraseña de respaldo (CI) para cambio de rol' })
+  async verificarRespaldo(@Request() req: any, @Body() dto: VerificarRespaldoDto) {
+    const userId = Number(req.user.id);
+    const userEmail = req.user.email;
+    
+    console.log(`[AUDITORÍA] Intento de verificación de respaldo - Usuario ID: ${userId}, Email: ${userEmail}`);
+    
+    const esValido = await this.usuariosService.verificarPasswordRespaldo(userId, dto.ci);
+    
+    if (!esValido) {
+      console.warn(`[AUDITORÍA] Intento FALLIDO de verificación de respaldo - Usuario ID: ${userId}`);
+      throw new BadRequestException('La contraseña de respaldo es incorrecta.');
+    }
+    
+    console.log(`[AUDITORÍA] Verificación de respaldo EXITOSA - Usuario ID: ${userId}`);
+    return { valid: true, message: 'Verificación exitosa.' };
+  }
+  
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('activar-ponente')
+  @ApiOperation({ summary: 'Activar portal de ponente' })
+  async activarPonente(@Request() req: any, @Body() body: { ci: string, password?: string }) {
+    return this.usuariosService.activarPortalPonente(req.user.id_usuario, body.ci, body.password || '');
+  }
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -83,8 +114,44 @@ export class UsuariosController {
         }
       });
     }
+    
+    // 3. Notificación de Designación como Ponente (Persistente hasta configuración)
+    const esPonente = usuario.usuariosRoles?.some((ur: any) => ur.rol?.nombre_rol === 'Ponente');
+    if (esPonente) {
+      if (!usuario.persona?.ponente_configurado) {
+        alertas.push({
+          id: 'ponente-designado',
+          titulo: '¡Nueva Designación!',
+          mensaje: 'Usted ha sido designado como ponente. Configure su acceso desde el cambio de rol para activar su portal.',
+          tipo: 'info',
+          fecha: new Date(),
+          prioridad: 'alta'
+        });
+      } else {
+        // Notificación de Bienvenida post-activación
+        alertas.push({
+          id: 'ponente-bienvenida',
+          titulo: '¡Bienvenido al Portal!',
+          mensaje: 'Su portal de ponente ha sido activado. Aquí podrá gestionar sus actividades, notas y certificados.',
+          tipo: 'success',
+          fecha: new Date(),
+          prioridad: 'media'
+        });
+      }
+    }
 
     return alertas;
+  }
+
+  @Roles('Super Usuario')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Get('email/:email')
+  @ApiOperation({ summary: 'Buscar usuario por email' })
+  async findByEmail(@Param('email') email: string) {
+    const usuario = await this.usuariosService.findByEmail(email);
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
+    return usuario;
   }
 
   // ══════════════════════════════════════════════════════════
@@ -367,12 +434,16 @@ export class UsuariosController {
 
   /**
    * DELETE /usuarios/:id
-   * Elimina el usuario. La persona se elimina en cascada (definido en la entidad).
+   * Deshabilita el usuario (estado=0). No elimina físicamente por seguridad.
+   * Solo accesible por Coordinador o Super Usuario.
    */
+  @Roles('Coordinador', 'Super Usuario')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
   @Delete(':id')
-  @ApiOperation({ summary: 'Eliminar un usuario' })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.usuariosService.remove(id);
+  @ApiOperation({ summary: 'Deshabilitar usuario (Coord/Admin)' })
+  deshabilitarUsuario(@Param('id', ParseIntPipe) id: number) {
+    return this.usuariosService.deshabilitarUsuario(id);
   }
 
   // ══════════════════════════════════════════════════════════
@@ -428,19 +499,7 @@ export class UsuariosController {
     return this.usuariosService.actualizarDatosAdmin(id, data);
   }
 
-  /**
-   * DELETE /usuarios/:id
-   * Deshabilita el usuario (estado=0). No elimina físicamente.
-   * Solo accesible por Coordinador o Super Usuario.
-   */
-  @Roles('Coordinador', 'Super Usuario')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @ApiBearerAuth()
-  @Delete(':id')
-  @ApiOperation({ summary: 'Deshabilitar usuario (Coord/Admin)' })
-  deshabilitarUsuario(@Param('id', ParseIntPipe) id: number) {
-    return this.usuariosService.deshabilitarUsuario(id);
-  }
+  // La ruta de deshabilitar ha sido movida arriba para evitar duplicidad
 
   // ══════════════════════════════════════════════════════════
   //  INSCRIPCIONES Y CERTIFICADOS DE UN USUARIO (Coordinador)
@@ -606,14 +665,15 @@ export class UsuariosController {
     @Res() res: Response,
     @Query('parte') parte?: string,
   ) {
-    const docPathStr = await (this.usuariosService as any).obtenerRutaFirmaLocal(
-      id,
-    );
-    if (!docPathStr) {
+    const usuario = await this.usuariosService.getPerfil(id);
+    
+    if (!usuario || !usuario.persona || !usuario.persona.firma_dig) {
       throw new BadRequestException(
         'El usuario no tiene un documento de aval o no existe.',
       );
     }
+
+    const docPathStr = usuario.persona.firma_dig;
 
     // Si contiene |, es que hay anverso y reverso
     const files = docPathStr.split('|');
@@ -630,6 +690,31 @@ export class UsuariosController {
     }
 
     res.sendFile(absolutePath);
+  }
+
+  @Roles('Super Usuario')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Patch(':id/forzar-reset')
+  @ApiOperation({ summary: 'Forzar cambio de contraseña (Solo Super Usuario)' })
+  async forzarReset(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('password') nuevaPassword: string,
+    @Body('tipo') tipo: 'principal' | 'ponente' = 'principal',
+  ) {
+    if (!nuevaPassword || nuevaPassword.length < 4) {
+      throw new BadRequestException('La nueva contraseña debe tener al menos 4 caracteres.');
+    }
+    return this.usuariosService.forzarCambioPassword(id, nuevaPassword, tipo);
+  }
+
+  @Roles('Super Usuario')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Patch(':id/habilitar-edicion')
+  @ApiOperation({ summary: 'Habilitar edición de perfil (Solo Super Usuario)' })
+  async habilitarEdicion(@Param('id', ParseIntPipe) id: number) {
+    return this.usuariosService.habilitarEdicion(id);
   }
 }
 

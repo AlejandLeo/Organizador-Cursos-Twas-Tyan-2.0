@@ -85,49 +85,67 @@ const abrirEditar = (actividad: any) => {
 // --- Guardar ---
 const guardar = async () => {
   try {
+    if (!formActividad.value.evento_id) {
+        Swal.fire('Atención', 'Debes seleccionar un evento padre.', 'warning');
+        return;
+    }
+
     const payload = {
-      ...formActividad.value,
-      numero_horas: Number(formActividad.value.numero_horas),
-      cupos: Number(formActividad.value.cupos),
-      evento_id: Number(formActividad.value.evento_id),
+      nombre: formActividad.value.nombre,
+      descripcion: formActividad.value.descripcion,
+      tipo: formActividad.value.tipo,
+      fecha_inicio: formActividad.value.fecha_inicio || null,
+      fecha_fin: formActividad.value.fecha_fin || null,
+      numero_horas: Number(formActividad.value.numero_horas) || 0,
+      modalidad: formActividad.value.modalidad,
+      cupos: Number(formActividad.value.cupos) || 0,
+      id_evento: Number(formActividad.value.evento_id),
     };
 
     if (isEditing.value && editId.value) {
-      await api.patch(`/actividades-academicas/${editId.value}`, payload);
-      historialStore.registrar('actividad', 'editar', `Editó la actividad: ${formActividad.value.nombre}`, { entidadId: String(editId.value), entidadNombre: formActividad.value.nombre });
-      Swal.fire({ toast: true, icon: 'success', title: 'Actividad actualizada', timer: 2000, showConfirmButton: false, position: 'top-end' });
+      await api.put(`/actividades-academicas/${editId.value}`, payload);
+      historialStore.registrar('actividad', 'editar', `Editó actividad: ${payload.nombre}`, { entidadId: String(editId.value) });
+      Swal.fire({ icon: 'success', title: 'Actualizado', text: 'Cambios guardados con éxito.', timer: 1500, showConfirmButton: false });
     } else {
       await api.post('/actividades-academicas', payload);
-      historialStore.registrar('actividad', 'crear', `Creó la actividad: ${formActividad.value.nombre}`, { entidadNombre: formActividad.value.nombre });
-      Swal.fire({ toast: true, icon: 'success', title: 'Actividad creada', timer: 2000, showConfirmButton: false, position: 'top-end' });
+      historialStore.registrar('actividad', 'crear', `Creó actividad: ${payload.nombre}`);
+      Swal.fire({ icon: 'success', title: 'Creado', text: 'Nueva actividad registrada.', timer: 1500, showConfirmButton: false });
     }
     showModal.value = false;
     fetchActividades();
   } catch (e: any) {
-    Swal.fire('Error', e.response?.data?.message || 'No se pudo guardar', 'error');
+    Swal.fire('Error', e.response?.data?.message || 'No se pudo procesar la solicitud', 'error');
   }
 };
 
-// --- Inhabilitar (Soft Delete) ---
+// --- Inhabilitar (Soft Delete Estándar) ---
 const inhabilitarActividad = async (actividad: any) => {
-  const { isConfirmed } = await Swal.fire({
+  const { value: motivo } = await Swal.fire({
     title: '¿Inhabilitar actividad?',
-    html: `<p class="text-slate-600 text-sm">La actividad <strong>${actividad.nombre}</strong> quedará inactiva pero no se eliminará.</p>`,
-    icon: 'warning',
+    text: `Indique el motivo para inactivar "${actividad.nombre}":`,
+    input: 'textarea',
+    inputPlaceholder: 'Motivo de la inhabilitación...',
     showCancelButton: true,
-    confirmButtonColor: '#dc2626',
-    cancelButtonText: 'Cancelar',
-    confirmButtonText: 'Sí, inhabilitar',
+    confirmButtonColor: '#ef4444',
+    confirmButtonText: 'SÍ, INHABILITAR',
+    cancelButtonText: 'CANCELAR',
+    inputValidator: (value) => {
+      if (!value) return '¡El motivo es obligatorio!'
+    }
   });
-  if (!isConfirmed) return;
 
-  try {
-    await api.patch(`/actividades-academicas/${actividad.id}/estado`, { activo: false });
-    historialStore.registrar('actividad', 'eliminar', `Inhabilitó la actividad: ${actividad.nombre}`, { entidadId: String(actividad.id), entidadNombre: actividad.nombre });
-    Swal.fire({ toast: true, icon: 'info', title: 'Actividad inhabilitada', timer: 2000, showConfirmButton: false, position: 'top-end' });
-    fetchActividades();
-  } catch {
-    Swal.fire('Error', 'No se pudo inhabilitar la actividad', 'error');
+  if (motivo) {
+    try {
+      await api.patch(`/actividades-academicas/${actividad.id}`, { 
+          estado: -1,
+          descripcion: `${actividad.descripcion}\n[INHABILITACION_MOTIVO]:${motivo}` 
+      });
+      historialStore.registrar('actividad', 'eliminar', `Inhabilitó: ${actividad.nombre}`, { entidadId: String(actividad.id) });
+      Swal.fire('Inhabilitada', 'La actividad ya no será visible.', 'success');
+      fetchActividades();
+    } catch {
+      Swal.fire('Error', 'No se pudo completar la acción.', 'error');
+    }
   }
 };
 

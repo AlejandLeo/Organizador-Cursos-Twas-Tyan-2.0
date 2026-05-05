@@ -115,6 +115,17 @@ const isActive = (name: string) => route.name === name;
         </div>
       </button>
 
+      <!-- Tickets de Soporte -->
+      <button @click="navigate('admin-soporte')"
+        :class="[isActive('admin-soporte') ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5']"
+        class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold mt-1">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-[20px]">support_agent</span>
+          <span class="text-[11px] uppercase tracking-wider">Tickets de Soporte</span>
+        </div>
+        <span class="material-symbols-outlined text-[16px] opacity-0 group-hover:opacity-100 transition-opacity">chevron_right</span>
+      </button>
+
     </nav>
 
     <!-- Logout -->

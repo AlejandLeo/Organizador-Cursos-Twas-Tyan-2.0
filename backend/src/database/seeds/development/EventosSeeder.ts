@@ -23,7 +23,10 @@ export default class EventosSeeder implements Seeder {
         fecha_inicio: new Date('2025-05-15'),
         fecha_fin: new Date('2025-05-20'),
         estado: 1,
-        logo: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80',
+        logo: 'logo CMS.jpg',
+        telefono: '+591 76706873',
+        email: 'twas-unesco@umsa.bo',
+        organizadores: 'TWAS, TYAN, UMSA, FCPN, Carrera de Química, Ingeniería Química, Embajada de Brasil',
         imagen_fondo: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80',
         actividades: [
           {

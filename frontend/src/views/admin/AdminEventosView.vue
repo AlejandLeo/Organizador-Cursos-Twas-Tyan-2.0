@@ -24,6 +24,10 @@ const formEvento = ref({
   ubicacion: '',
   direccion: '',
   estado: 2,
+  telefono: '',
+  email: '',
+  organizadores: '',
+  logo: null as any
 });
 
 const estadoConfig: Record<number, { label: string; color: string; bg: string }> = {
@@ -56,7 +60,20 @@ const eventosFiltrados = computed(() => {
 const abrirCrear = () => {
   isEditing.value = false;
   editId.value = null;
-  formEvento.value = { nombre: '', descripcion: '', gestion: new Date().getFullYear().toString(), fecha_inicio: '', fecha_fin: '', ubicacion: '', direccion: '', estado: 2 };
+  formEvento.value = { 
+    nombre: '', 
+    descripcion: '', 
+    gestion: new Date().getFullYear().toString(), 
+    fecha_inicio: '', 
+    fecha_fin: '', 
+    ubicacion: '', 
+    direccion: '', 
+    estado: 2,
+    telefono: '',
+    email: '',
+    organizadores: '',
+    logo: null
+  };
   showModal.value = true;
 };
 
@@ -72,6 +89,10 @@ const abrirEditar = (evento: any) => {
     ubicacion: evento.ubicacion || '',
     direccion: evento.direccion || '',
     estado: evento.estado ?? 2,
+    telefono: evento.telefono || '',
+    email: evento.email || '',
+    organizadores: evento.organizadores || '',
+    logo: null
   };
   showModal.value = true;
 };
@@ -79,12 +100,23 @@ const abrirEditar = (evento: any) => {
 // --- Guardar ---
 const guardar = async () => {
   try {
+    const formData = new FormData();
+    Object.entries(formEvento.value).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        formData.append(key, value);
+      }
+    });
+
     if (isEditing.value && editId.value) {
-      await api.patch(`/eventos/${editId.value}`, formEvento.value);
+      await api.patch(`/eventos/${editId.value}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       historialStore.registrar('evento', 'editar', `Editó el evento: ${formEvento.value.nombre}`, { entidadId: String(editId.value), entidadNombre: formEvento.value.nombre });
       Swal.fire({ toast: true, icon: 'success', title: 'Evento actualizado', timer: 2000, showConfirmButton: false, position: 'top-end' });
     } else {
-      const res = await api.post('/eventos', formEvento.value);
+      await api.post('/eventos', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       historialStore.registrar('evento', 'crear', `Creó el evento: ${formEvento.value.nombre}`, { entidadNombre: formEvento.value.nombre });
       Swal.fire({ toast: true, icon: 'success', title: 'Evento creado', timer: 2000, showConfirmButton: false, position: 'top-end' });
     }
@@ -285,6 +317,38 @@ onMounted(fetchEventos);
                     <option v-for="(cfg, est) in estadoConfig" :key="est" :value="Number(est)">{{ cfg.label }}</option>
                   </select>
                 </div>
+              </div>
+
+              <!-- NUEVOS CAMPOS AGREGADOS -->
+              <div class="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100 dark:border-white/5 mt-2">
+                <div class="space-y-1">
+                  <label class="text-[10px] font-black text-red-600 uppercase ml-2">Teléfono de Contacto</label>
+                  <input v-model="formEvento.telefono" type="text" placeholder="+591 ..."
+                         class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-red-600/50 transition-all" />
+                </div>
+                <div class="space-y-1">
+                  <label class="text-[10px] font-black text-red-600 uppercase ml-2">Email de Contacto</label>
+                  <input v-model="formEvento.email" type="email" placeholder="ejemplo@correo.com"
+                         class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-red-600/50 transition-all" />
+                </div>
+              </div>
+
+              <div class="space-y-1">
+                <label class="text-[10px] font-black text-red-600 uppercase ml-2">Dirección Exacta (Para el Footer)</label>
+                <input v-model="formEvento.direccion" type="text" placeholder="Calle, Número, Edificio..."
+                       class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-red-600/50 transition-all" />
+              </div>
+
+              <div class="space-y-1">
+                <label class="text-[10px] font-black text-red-600 uppercase ml-2">Organización y Auspicio (Lista de nombres)</label>
+                <textarea v-model="formEvento.organizadores" rows="2" placeholder="TWAS, TYAN, UMSA, FCPN..."
+                          class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-red-600/50 transition-all resize-none"></textarea>
+              </div>
+
+              <div class="space-y-1">
+                <label class="text-[10px] font-black text-red-600 uppercase ml-2">Logo del Evento (Imagen)</label>
+                <input type="file" @change="(e: any) => formEvento.logo = e.target.files[0]" accept="image/*"
+                       class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-red-50 file:text-red-700 hover:file:bg-red-100 transition-all cursor-pointer" />
               </div>
             </div>
 
