@@ -209,6 +209,63 @@ export class AsistenciasService {
     };
   }
 
+  /**
+   * Registra la asistencia a partir del id_usuario (obtenido del QR del estudiante
+   * o del login del estudiante escaneando la sesión) y el id_sesion.
+   */
+  async registrarAsistenciaEstudiante(id_usuario: number, id_sesion: number): Promise<{ mensaje: string; asistencia_id: number }> {
+    // 1. Encontrar la sesión para saber el id_curso_modalidad
+    const sesion = await this.asistenciaRepository.manager
+      .getRepository('sesiones_academicas')
+      .findOne({ where: { id: id_sesion }, relations: ['cursoModalidad'] });
+
+    if (!sesion) throw new NotFoundException(`Sesión ${id_sesion} no encontrada.`);
+
+    const id_curso_modalidad = (sesion as any).cursoModalidad?.id;
+    if (!id_curso_modalidad) throw new BadRequestException('La sesión no tiene un curso modalidad asociado.');
+
+    // 2. Encontrar inscripcion_modalidad del usuario para ese curso_modalidad
+    const inscripcionModalidad = await this.asistenciaRepository.manager
+      .getRepository('inscripcion_modalidades')
+      .findOne({
+        where: {
+          cursoModalidad: { id: id_curso_modalidad },
+          inscripcion: { usuario: { id: id_usuario } }
+        },
+        relations: ['inscripcion']
+      });
+
+    if (!inscripcionModalidad) throw new BadRequestException('El estudiante no está inscrito en esta modalidad del curso.');
+
+    const id_inscripcion_modalidad = (inscripcionModalidad as any).id;
+
+    // 3. Anti-duplicado
+    const yaRegistro = await this.asistenciaRepository.findOne({
+      where: {
+        sesionAcademica: { id: id_sesion },
+        inscripcionModalidad: { id: id_inscripcion_modalidad },
+      },
+    });
+
+    if (yaRegistro) {
+      return { asistencia_id: yaRegistro.id, mensaje: 'El estudiante ya tiene asistencia registrada para esta sesión.' };
+    }
+
+    // 4. Insertar asistencia
+    const nuevaAsistencia = this.asistenciaRepository.create({
+      sesionAcademica: { id: id_sesion },
+      inscripcionModalidad: { id: id_inscripcion_modalidad },
+      estado: 1,
+      fecha_hora_registro: new Date(),
+    });
+    const guardada = await this.asistenciaRepository.save(nuevaAsistencia);
+
+    return {
+      asistencia_id: guardada.id,
+      mensaje: 'Asistencia registrada correctamente.',
+    };
+  }
+
   // ── CRUD estándar ──────────────────────────────────────────
 
   create(data: Partial<Asistencia>) {

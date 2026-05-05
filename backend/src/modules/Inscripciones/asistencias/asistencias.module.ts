@@ -7,9 +7,10 @@ import { AsistenciasPonenteController } from './asistencias-ponente.controller';
 import { AsistenciasLogisticaController } from './asistencias-logistica.controller';
 import { AsistenciasAdminController } from './asistencias-admin.controller';
 import { Asistencia } from './entities/asistencia.entity';
+import { QrModule } from '../../Comun/qr/qr.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Asistencia])],
+  imports: [TypeOrmModule.forFeature([Asistencia]), QrModule],
   controllers: [
     AsistenciasController,
     AsistenciasMeController,
