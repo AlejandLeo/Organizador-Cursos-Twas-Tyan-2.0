@@ -27,9 +27,9 @@ export class QrService {
       sub: id_sesion,
       tipo: 'qr_sesion',
     };
-    // El docente proyecta este QR, expira muy rápido (30s) para evitar que
+    // El docente proyecta este QR, expira en 15 minutos para evitar que
     // los alumnos le tomen foto y lo pasen. El frontend del docente lo recarga.
-    return this.jwtService.sign(payload, { expiresIn: '30s' });
+    return this.jwtService.sign(payload, { expiresIn: '15m' });
   }
 
   /**

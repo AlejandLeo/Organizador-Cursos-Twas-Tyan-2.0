@@ -32,6 +32,6 @@ export class QrController {
   @Get('sesion/:id')
   getQrSesion(@Param('id', ParseIntPipe) idSesion: number) {
     const token = this.qrService.generarTokenSesion(idSesion);
-    return { qr_token: token, expires_in: 30 }; // 30s
+    return { qr_token: token, expires_in: 900 }; // 15m = 900s
   }
 }
