@@ -10,7 +10,8 @@ import { SesionAcademica } from '../../Academico/sesiones-academicas/entities/se
 import { Asistencia } from '../../Inscripciones/asistencias/entities/asistencia.entity';
 import { InscripcionModalidad } from '../../Inscripciones/inscripcion-modalidades/entities/inscripcion-modalidad.entity';
 import { Imparticion } from '../../Academico/imparticiones/entities/imparticion.entity';
-import { Usuario } from '../../Usuario/usuarios/entities/usuario.entity';
+import { MailModule } from '../../Comun/mail/mail.module';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -21,6 +22,7 @@ import { Usuario } from '../../Usuario/usuarios/entities/usuario.entity';
       Imparticion,
       Usuario,
     ]),
+    MailModule,
   ],
   controllers: [
     InscripcionesController,

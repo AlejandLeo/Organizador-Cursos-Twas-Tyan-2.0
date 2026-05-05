@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #e67e22; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { border: 1px solid #e1e1e1; padding: 30px; border-radius: 0 0 8px 8px; background: #fff; }
+        .footer { text-align: center; font-size: 12px; color: #777; margin-top: 20px; }
+        .reason-box { background: #fffaf5; padding: 15px; border-radius: 4px; border-left: 4px solid #e67e22; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Estado de tu Inscripción</h1>
+    </div>
+    <div class="content">
+        <p>Hola <strong>{{name}}</strong>,</p>
+        <p>Te informamos sobre una actualización en el estado de tu inscripción para la siguiente actividad:</p>
+        
+        <div class="reason-box">
+            <strong>Actividad:</strong> {{actividad}}<br>
+            <strong>Estado:</strong> No Aprobado / Rechazado<br>
+            {{#if reason}}
+            <strong>Observación:</strong> {{reason}}
+            {{/if}}
+        </div>
+
+        <p>Si tienes dudas sobre este proceso, por favor contacta al coordinador del evento.</p>
+    </div>
+    <div class="footer">
+        <p>Este es un mensaje automático, por favor no respondas a este correo.</p>
+        <p>&copy; 2026 Plataforma de Eventos Académicos</p>
+    </div>
+</body>
+</html>

@@ -28,6 +28,7 @@ import { Afiliacion } from '../../Usuario/afiliaciones/entities/afiliacion.entit
 import { RoleId } from './constants/user-roles.constants';
 import * as fs from 'fs';
 import { join } from 'path';
+import { MailService } from '../../Comun/mail/mail.service';
 
 @Injectable()
 export class UsuariosService {
@@ -37,6 +38,7 @@ export class UsuariosService {
     @InjectRepository(Persona)
     private readonly personaRepository: Repository<Persona>,
     private readonly dataSource: DataSource,
+    private readonly mailService: MailService,
   ) {}
 
   // ══════════════════════════════════════════════════════════
@@ -326,9 +328,38 @@ export class UsuariosService {
    * Uso del coordinador para suspender accesos sin perder historias.
    */
   async deshabilitarUsuario(id: number): Promise<{ mensaje: string }> {
-    await this.findOne(id);
+    const usuario = await this.findOne(id);
     await this.usuarioRepository.update(id, { estado: 0 });
+    
+    // Opcional: Notificar por correo
+    const nombreCompleto = usuario.persona 
+      ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}` 
+      : 'Usuario';
+    
+    await this.mailService.sendAccountRejectionEmail(
+      usuario.email,
+      nombreCompleto,
+      'Tu cuenta ha sido deshabilitada por administración.'
+    );
+    
     return { mensaje: `Usuario ${id} deshabilitado correctamente.` };
+  }
+
+  /**
+   * Habilita un usuario (estado = 1).
+   * Uso del coordinador para reactivar accesos sin cambiar contraseñas.
+   */
+  async habilitarUsuario(id: number): Promise<{ mensaje: string }> {
+    const usuario = await this.findOne(id);
+    await this.usuarioRepository.update(id, { estado: 1 });
+    
+    const nombreCompleto = usuario.persona 
+      ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}` 
+      : 'Usuario';
+    
+    await this.mailService.sendAccountReactivationEmail(usuario.email, nombreCompleto);
+    
+    return { mensaje: `Usuario ${id} habilitado correctamente.` };
   }
 
   // ══════════════════════════════════════════════════════════
@@ -449,7 +480,19 @@ export class UsuariosService {
         await queryRunner.manager.save(usuarioRol);
       }
 
+      // Marcar que requiere cambio de password al ser creado por admin
+      await queryRunner.manager.update(Usuario, usuarioGuardado.id, { requiere_cambio_password: true });
+
       await queryRunner.commitTransaction();
+
+      // Enviar correo de bienvenida al ponente
+      try {
+        const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
+        await this.mailService.sendAccountApprovalEmail(dto.email, nombreCompleto, dto.password);
+      } catch (e) {
+        console.error('Error enviando correo a ponente:', e);
+      }
+
       return this.getPerfil(usuarioGuardado.id);
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -567,7 +610,10 @@ export class UsuariosService {
     }
 
     const nuevaHash = await bcrypt.hash(dto.password_nuevo, 10);
-    await this.usuarioRepository.update(id, { password: nuevaHash });
+    await this.usuarioRepository.update(id, { 
+      password: nuevaHash,
+      requiere_cambio_password: false 
+    });
 
     return { mensaje: 'Contraseña actualizada correctamente.' };
   }
@@ -605,6 +651,11 @@ export class UsuariosService {
       where: { email },
       relations: ['persona']
     });
+    await this.usuarioRepository.update(id, { 
+      password: hash,
+      requiere_cambio_password: false 
+    });
+    return { mensaje: 'Contraseña actualizada correctamente.' };
   }
 
   // ══════════════════════════════════════════════════════════
@@ -1038,12 +1089,48 @@ export class UsuariosService {
     }
 
     if (accion === 'aprobar') {
-      await this.usuarioRepository.update(id, { estado: 1 });
-      return { mensaje: 'Solicitud aprobada. El usuario puede iniciar sesión.' };
+      // SI EL ESTADO ES 2: Es la primera vez (Admisión + Contraseña)
+      if (usuario.estado === 2) {
+        const tempPassword = Math.random().toString(36).slice(-10);
+        const hash = await bcrypt.hash(tempPassword, 10);
+        
+        await this.usuarioRepository.update(id, { 
+          estado: 1, 
+          password: hash,
+          requiere_cambio_password: true 
+        });
+        
+        const nombreCompleto = usuario.persona 
+          ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}` 
+          : 'Usuario';
+          
+        await this.mailService.sendAccountApprovalEmail(usuario.email, nombreCompleto, tempPassword);
+        return { mensaje: 'Solicitud aprobada y contraseña enviada al usuario.' };
+      } 
+      // SI EL ESTADO ERA 0: Es una reactivación
+      else {
+        await this.usuarioRepository.update(id, { estado: 1 });
+        const nombreCompleto = usuario.persona 
+          ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}` 
+          : 'Usuario';
+        await this.mailService.sendAccountReactivationEmail(usuario.email, nombreCompleto);
+        return { mensaje: 'Cuenta reactivada y usuario notificado.' };
+      }
     } else {
-      // Rechazar: desactivar la cuenta (estado=0). El archivo de aval se conserva.
-      await this.usuarioRepository.update(id, { estado: 0 });
-      return { mensaje: 'Solicitud rechazada. La cuenta ha sido desactivada.' };
+      // Rechazar: estado = -1
+      await this.usuarioRepository.update(id, { estado: -1 });
+      
+      const nombreCompleto = usuario.persona 
+        ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}` 
+        : 'Usuario';
+        
+      await this.mailService.sendAccountRejectionEmail(
+        usuario.email,
+        nombreCompleto,
+        'La solicitud de registro no cumple con los criterios de validación.'
+      );
+
+      return { mensaje: 'Solicitud rechazada (estado -1). El usuario ha sido notificado.' };
     }
   }
 

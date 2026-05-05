@@ -5,6 +5,8 @@ import { UsuariosController } from './usuarios.controller';
 import { Usuario } from './entities/usuario.entity';
 import { Persona } from '../../Usuario/personas/entities/persona.entity';
 
+import { MailModule } from '../../Comun/mail/mail.module';
+
 /**
  * El módulo importa TAMBIÉN la entidad Persona porque el servicio
  * necesita el repositorio de Persona para el registro completo (transacción).
@@ -15,6 +17,7 @@ import { Persona } from '../../Usuario/personas/entities/persona.entity';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Usuario, Persona]),
+    MailModule,
   ],
   controllers: [UsuariosController],
   providers: [UsuariosService],
