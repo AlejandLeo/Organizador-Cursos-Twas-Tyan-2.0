@@ -140,4 +140,19 @@ export class MailService {
       `Hola ${name}, bienvenido a nuestra plataforma.`,
     );
   }
+
+  async sendActivationRequestNotification(actividadNombre: string, coordinadorNombre: string, coordinadorEmail: string) {
+    const adminEmail = process.env.MAIL_USER || 'coursemanagementsystemumsa@gmail.com';
+    return this.sendMail(
+      adminEmail,
+      'Solicitud de Reactivación de Actividad',
+      'activation-request',
+      { 
+        actividadNombre, 
+        coordinadorNombre, 
+        coordinadorEmail,
+        fecha: new Date().toLocaleString()
+      },
+    );
+  }
 }

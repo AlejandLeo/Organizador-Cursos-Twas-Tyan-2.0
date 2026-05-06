@@ -5,6 +5,7 @@ import { existsSync, unlinkSync } from 'fs';
 import { ActividadAcademica } from './entities/actividad-academica.entity';
 import { CreateActividadDto } from './dto/create-actividad.dto';
 import { UpdateActividadDto } from './dto/update-actividad.dto';
+import { MailService } from '../../Comun/mail/mail.service';
 
 @Injectable()
 export class ActividadesAcademicasService {
@@ -12,6 +13,7 @@ export class ActividadesAcademicasService {
     @InjectRepository(ActividadAcademica)
     private readonly actividadRepository: Repository<ActividadAcademica>,
     private readonly dataSource: DataSource,
+    private readonly mailService: MailService,
   ) {}
 
   async verificarPropiedad(eventoId: number, usuario: any) {
@@ -76,6 +78,7 @@ export class ActividadesAcademicasService {
     const results = await query.getMany();
     return results.map(act => ({
       ...act,
+      estado: Number(act.estado),
       imagen: this.formatImageUrl(act.imagen)
     }));
   }
@@ -131,9 +134,19 @@ export class ActividadesAcademicasService {
     if (camposAny.fecha_inicio === '') camposAny.fecha_inicio = null;
     if (camposAny.fecha_fin === '') camposAny.fecha_fin = null;
     
+    if (camposAny.estado !== undefined) {
+        await this.actividadRepository.update(id, { estado: Number(camposAny.estado) });
+        actRaw.estado = Number(camposAny.estado);
+    }
+    
     Object.assign(actRaw, camposAny);
+    // FORZAR tipo correcto después de Object.assign (que pudo poner un string)
+    if (camposAny.estado !== undefined) {
+        actRaw.estado = Number(camposAny.estado);
+    }
     if (id_evento) actRaw.evento = { id: id_evento } as any;
 
+    console.log(`[ACTIVIDAD ${id}] Guardando con estado = ${actRaw.estado} (tipo: ${typeof actRaw.estado})`);
     await this.actividadRepository.save(actRaw);
 
     // Actualizar Modalidad (primera encontrada)
@@ -194,6 +207,56 @@ export class ActividadesAcademicasService {
     }
     await this.actividadRepository.delete(id);
     return { mensaje: `Actividad ${id} eliminada correctamente.` };
+  }
+
+  async solicitarActivacion(id: number, usuario: any) {
+    const act = await this.actividadRepository.findOne({ where: { id }, relations: ['evento'] });
+    if (!act) throw new NotFoundException(`Actividad ${id} no encontrada.`);
+
+    // Marcar en la descripción que hay una solicitud pendiente
+    const tag = `[SOLICITUD_ACTIVACION]`;
+    if (!act.descripcion?.includes(tag)) {
+        act.descripcion = `${tag}\n${act.descripcion || ''}`;
+        await this.actividadRepository.save(act);
+    }
+
+    const coordinadorNombre = usuario.persona?.nombres || usuario.email;
+    
+    try {
+        await this.mailService.sendActivationRequestNotification(
+          act.nombre,
+          coordinadorNombre,
+          usuario.email
+        );
+    } catch (e) {
+        console.error("Error enviando correo de activación:", e);
+    }
+    
+    return { message: 'Solicitud enviada correctamente al Super Usuario.' };
+  }
+
+  async getSolicitudesPendientes() {
+    const solicitudes = await this.actividadRepository.createQueryBuilder('a')
+        .leftJoinAndSelect('a.evento', 'e')
+        .where('a.estado = :estado', { estado: -1 })
+        .andWhere('a.descripcion LIKE :tag', { tag: '%[SOLICITUD_ACTIVACION]%' })
+        .getMany();
+    
+    return solicitudes.map(act => ({
+        ...act,
+        imagen: this.formatImageUrl(act.imagen)
+    }));
+  }
+
+  async aprobarReactivacion(id: number) {
+    const act = await this.actividadRepository.findOneBy({ id });
+    if (!act) throw new NotFoundException(`Actividad ${id} no encontrada.`);
+
+    act.estado = 1;
+    // Limpiar el tag de solicitud
+    act.descripcion = (act.descripcion || '').replace('[SOLICITUD_ACTIVACION]\n', '').replace('[SOLICITUD_ACTIVACION]', '');
+    
+    return await this.actividadRepository.save(act);
   }
 
   // Métodos legacy

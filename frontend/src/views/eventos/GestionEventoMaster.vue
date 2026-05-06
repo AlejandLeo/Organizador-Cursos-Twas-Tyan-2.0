@@ -15,6 +15,20 @@ const eventoStore = useEventoStore();
 const historialStore = useAdminHistorialStore();
 const authStore = useAuthStore();
 
+const openDetalleCurso = (courseId: any, extraQuery = {}) => {
+  const isAdminContext = route.path.startsWith('/admin');
+  const routeName = isAdminContext ? 'admin-gestion-eventos-detalle' : 'coordinador-gestion-eventos-detalle';
+  
+  let query: any = { ...extraQuery };
+  if (route.name === 'coordinador-estudiantes-global' || route.name === 'admin-estudiantes') {
+    query.tab = 'estudiantes';
+  } else if (route.name === 'coordinador-ponentes-global' || route.name === 'admin-ponentes') {
+    query.tab = 'ponentes';
+  }
+
+  router.push({ name: routeName, params: { id: courseId }, query });
+};
+
 // Solo registrar en historial si el usuario es Super Admin
 const isAdmin = () => {
   const roles = (authStore.user as any)?.usuariosRoles || [];
@@ -254,24 +268,34 @@ const fetchEventos = async () => {
     try {
         isLoading.value = true;
         const res = await api.get('/eventos');
-        eventosPublicados.value = (res.data || []).map((ev: any) => ({
+        
+        // Usar exactamente la misma lógica que eventoStore (que sí funciona)
+        const eventosRaw = Array.isArray(res.data) ? res.data : (res.data.data || []);
+        
+        eventosPublicados.value = eventosRaw.map((ev: any) => {
+            return {
             ...ev,
-            nombreCorto: ev.nombre,
-            version: ev.gestion,
+            nombreCorto: ev.nombre || 'Sin nombre',
+            version: ev.gestion || '2025',
             imagen: ev.imagen_fondo || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80',
             estado: ev.estado === 1 ? 'Activo' : (ev.estado === 2 ? 'Planificación' : 'Cerrado'),
             colorEstado: ev.estado === 1 ? 'bg-emerald-500 text-white' : (ev.estado === 2 ? 'bg-blue-500 text-white' : 'bg-slate-500 text-white'),
             mostrarActividades: true,
-            actividades: (ev.actividades || []).map((act: any) => ({
+            mostrarInhabilitadas: false, // Nueva variable para controlar el despliegue
+            actividades: (ev.actividades || []).map((act: any) => {
+                const s_raw = Number(act.estado);
+                if (s_raw === -1) console.log(`   -> Actividad inhabilitada detectada: ${act.nombre}`);
+                return {
                 id: act.id,
                 title: act.nombre,
                 version: act.version,
-                status: 'Activo',
+                status: s_raw === 1 ? 'Activo' : (s_raw === -1 ? 'Inactivo' : 'Pendiente'),
+                status_raw: s_raw,
                 type: act.tipo || 'Curso',
                 date: act.fecha_inicio ? new Date(act.fecha_inicio).toLocaleDateString() : 'Pendiente',
                 students: act.inscripciones?.length || 0,
                 modules: 1,
-                image: act.imagen || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80',
+                image: act.imagen || act.image || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80',
                 id_evento: ev.id,
                 min_nota: act.min_nota,
                 min_asistencia: act.min_asistencia,
@@ -280,10 +304,18 @@ const fetchEventos = async () => {
                 fecha_fin_raw: act.fecha_fin ? act.fecha_fin.split('T')[0] : '',
                 requisitos: act.requisitos,
                 descripcion: act.descripcion
-            }))
-        }));
-    } catch (error) {
+            };
+            })
+        };
+        });
+    } catch (error: any) {
         console.error("Error fetching eventos:", error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error de Conexión',
+            text: `No se pudieron cargar los eventos: ${error.message} (Status: ${error.response?.status})`,
+            confirmButtonText: 'Entendido'
+        });
     } finally {
         isLoading.value = false;
     }
@@ -478,17 +510,59 @@ const inhabilitarEvento = async (id: number, nombre: string) => {
 const eventosPublicados = ref<any[]>([]);
 
 const eventosFiltrados = computed(() => {
-    const search = (filtroBusqueda.value || '').toLowerCase();
-    if (!search) return eventosPublicados.value;
+    let list = eventosPublicados.value;
 
-    return eventosPublicados.value.map(ev => ({
+    // Filtro por Evento Global Seleccionado (Header)
+    if (eventoStore.selectedEventoId) {
+        list = list.filter(ev => ev.id === eventoStore.selectedEventoId);
+    }
+
+    const search = (filtroBusqueda.value || '').toLowerCase();
+    if (!search) return list;
+
+    return list.map(ev => ({
         ...ev,
-        actividades: ev.actividades.filter((a: any) => 
+        actividades: (ev.actividades || []).filter((a: any) => 
             a.title.toLowerCase().includes(search) || 
             ev.nombreCorto.toLowerCase().includes(search)
         )
     })).filter(ev => ev.actividades.length > 0 || ev.nombreCorto.toLowerCase().includes(search));
 });
+
+// FUNCIONES DE FILTRADO DE ACTIVIDADES
+const getActividadesActivas = (actividades: any[]) => {
+    return (actividades || []).filter(a => Number(a.status_raw) === 1);
+};
+
+const getActividadesInactivas = (actividades: any[]) => {
+    // Si no es estado 1 (Activo), lo mandamos a la zona de seguridad por precaución
+    return (actividades || []).filter(a => Number(a.status_raw) !== 1);
+};
+
+const getActividadesAgrupadas = (actividades: any[]) => {
+  const activas = getActividadesActivas(actividades);
+  const grupos: Record<string, any[]> = {};
+  activas.forEach((act: any) => {
+    const normalizedType = (act.type || 'Actividad').trim().toUpperCase();
+    if (!grupos[normalizedType]) {
+      grupos[normalizedType] = [];
+    }
+    grupos[normalizedType]!.push(act);
+  });
+  return grupos;
+};
+
+// ACCIONES DE INHABILITACIÓN
+
+const solicitarActivacion = async (id: number, nombre: string) => {
+  await Swal.fire({
+    title: 'Solicitud Enviada',
+    text: `Se ha enviado una notificación al Super Usuario para reactivar "${nombre}".`,
+    icon: 'info',
+    confirmButtonText: 'Entendido'
+  });
+  // Aquí se llamaría al endpoint de notificación si existiera
+};
 
 
 const nuevaActividad = ref({
@@ -523,6 +597,9 @@ const nuevaActividad = ref({
     lockTipo: false
 });
 
+// Lista local de IDs inhabilitados (usaremos Strings para máxima compatibilidad)
+const inhabilitadosLocal = ref<string[]>([]);
+
 const resetNuevaActividad = (eventoId: number) => {
     isEditingActividad.value = false;
     editActividadId.value = null;
@@ -556,42 +633,8 @@ const resetNuevaActividad = (eventoId: number) => {
     currentStep.value = 1;
 };
 
-const editarActividad = async (act: any) => {
-    try {
-        isEditingActividad.value = true;
-        editActividadId.value = act.id;
-        
-        nuevaActividad.value = {
-            nombre: act.title,
-            tipo: act.type || 'Curso',
-            tipoPersonalizado: '',
-            descripcion: act.descripcion || '',
-
-            id_evento: act.id_evento,
-            min_nota: act.min_nota || 71,
-            min_asistencia: act.min_asistencia || 80,
-            modalidad: act.modalidad || 'Presencial',
-            fecha_inicio: act.fecha_inicio_raw || '',
-            fecha_fin: act.fecha_fin_raw || '',
-            sesiones: [],
-            lockTipo: false,
-            requisitos: act.requisitos || { base: {}, custom: [] }
-        };
-        
-        const res = await api.get(`/actividades-academicas/${act.id}`);
-        const fullAct = res.data;
-        
-        nuevaActividad.value.descripcion = fullAct.descripcion || '';
-        nuevaActividad.value.fecha_inicio = fullAct.fecha_inicio ? fullAct.fecha_inicio.split('T')[0] : '';
-        nuevaActividad.value.fecha_fin = fullAct.fecha_fin ? fullAct.fecha_fin.split('T')[0] : '';
-        nuevaActividad.value.id_evento = fullAct.evento?.id || act.id_evento;
-
-        imagenPreview.value = fullAct.imagen || null;
-        isCreating.value = true;
-        currentStep.value = 1;
-    } catch (e) {
-        Swal.fire('Error', 'No se pudo cargar la actividad', 'error');
-    }
+const editarActividad = (act: any) => {
+  openDetalleCurso(act.id, { edit: 'true' });
 };
 
 const inhabilitarActividad = async (id: number, nombre: string) => {
@@ -705,20 +748,29 @@ const publicarActividad = async () => {
             tipoFinal = tipoFinal.charAt(0).toUpperCase() + tipoFinal.slice(1).toLowerCase();
         }
 
-        const payload = {
-            nombre: nuevaActividad.value.nombre,
-            tipo: tipoFinal || 'Actividad',
-            descripcion: nuevaActividad.value.descripcion,
-            id_evento: Number(nuevaActividad.value.id_evento),
-            fecha_inicio: nuevaActividad.value.fecha_inicio || null,
-            fecha_fin: nuevaActividad.value.fecha_fin || null,
-            requisitos: nuevaActividad.value.requisitos
-        };
+        const formData = new FormData();
+        formData.append('nombre', nuevaActividad.value.nombre);
+        formData.append('tipo', tipoFinal || 'Actividad');
+        formData.append('descripcion', nuevaActividad.value.descripcion);
+        if (nuevaActividad.value.id_evento) {
+            formData.append('id_evento', String(nuevaActividad.value.id_evento));
+        }
+        if (nuevaActividad.value.fecha_inicio) formData.append('fecha_inicio', nuevaActividad.value.fecha_inicio);
+        if (nuevaActividad.value.fecha_fin) formData.append('fecha_fin', nuevaActividad.value.fecha_fin);
+        formData.append('requisitos', JSON.stringify(nuevaActividad.value.requisitos));
+        
+        if (imagenArchivo.value) {
+            formData.append('imagen', imagenArchivo.value);
+        }
 
         if (isEditingActividad.value && editActividadId.value) {
-            await api.put(`/actividades-academicas/${editActividadId.value}`, payload);
+            await api.put(`/actividades-academicas/${editActividadId.value}`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
         } else {
-            await api.post('/actividades-academicas', payload);
+            await api.post('/actividades-academicas', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
         }
 
         Swal.fire({
@@ -795,37 +847,19 @@ const toggleActividades = (evento: any) => {
   evento.mostrarActividades = !evento.mostrarActividades;
 };
 
-const getActividadesAgrupadas = (actividades: any[]) => {
-  const grupos: Record<string, any[]> = {};
-  actividades.forEach((act: any) => {
-    const normalizedType = (act.type || 'Actividad').trim().toUpperCase();
-    if (!grupos[normalizedType]) {
-      grupos[normalizedType] = [];
-    }
-    grupos[normalizedType]!.push(act);
-  });
-  return grupos;
-};
-
 const getStatusColor = (status: string) => {
   if (status === 'En curso') return 'text-green-600 bg-green-50 dark:bg-green-900/40 border border-green-200 dark:border-green-800';
   if (status === 'Inscripciones') return 'text-umsa-blue bg-blue-50 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800';
   return 'text-slate-500 bg-slate-100 dark:bg-gray-800 dark:text-gray-400 border border-slate-200 dark:border-gray-700';
 };
 
-const openDetalleCurso = (courseId: any) => {
-  const isAdminContext = route.path.startsWith('/admin');
-  const routeName = isAdminContext ? 'admin-gestion-eventos-detalle' : 'coordinador-gestion-eventos-detalle';
-  
-  let query = {};
-  if (route.name === 'coordinador-estudiantes-global' || route.name === 'admin-estudiantes') {
-    query = { tab: 'estudiantes' };
-  } else if (route.name === 'coordinador-ponentes-global' || route.name === 'admin-ponentes') {
-    query = { tab: 'ponentes' };
-  }
 
-  router.push({ name: routeName, params: { id: courseId }, query });
-};
+
+onMounted(async () => {
+    console.log("DIAGNÓSTICO: Componente montado. Iniciando carga de datos...");
+    await fetchEventos();
+    await eventoStore.fetchEventosInfo();
+});
 
 const changeStep = (delta: number) => {
   const nextStep = currentStep.value + delta;
@@ -864,6 +898,10 @@ const changeStep = (delta: number) => {
         </div>
         
         <div class="flex items-center gap-3">
+          <button @click="fetchEventos" 
+            class="bg-slate-100 dark:bg-gray-800 hover:bg-slate-200 text-slate-600 dark:text-gray-400 font-black px-6 py-4 rounded-2xl text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 border border-slate-200 dark:border-gray-700 shadow-sm">
+            <span class="material-symbols-outlined text-xl">sync</span> REFRESCAR DATOS
+          </button>
           <button @click="isCreatingEvento = true; isEditingEvento = false; resetFormEvento()" 
             class="bg-blue-600 hover:bg-blue-700 text-white font-black px-8 py-4 rounded-2xl text-[12px] uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:shadow-blue-500/40 hover:-translate-y-1 active:translate-y-0 transition-all flex items-center gap-3">
             <span class="material-symbols-outlined text-[24px]">add_business</span> NUEVO EVENTO
@@ -904,6 +942,13 @@ const changeStep = (delta: number) => {
                    <span class="material-symbols-outlined text-[18px]">add_circle</span> Nueva Actividad
                 </button>
 
+                <button v-if="getActividadesInactivas(evento.actividades).length > 0" 
+                  @click.stop="evento.mostrarInhabilitadas = !evento.mostrarInhabilitadas"
+                  class="bg-red-500/10 hover:bg-red-500/20 text-red-500 px-4 py-3 rounded-xl border border-red-500/30 flex items-center gap-2 animate-pulse cursor-pointer transition-all hover:scale-105 active:scale-95 shadow-lg shadow-red-500/10">
+                   <span class="material-symbols-outlined text-[18px]">folder_managed</span>
+                   <span class="text-[10px] font-black uppercase tracking-widest">{{ getActividadesInactivas(evento.actividades).length }} INHABILITADAS</span>
+                </button>
+
                 <button @click="toggleActividades(evento)" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 px-6 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 group/btn cursor-pointer">
                   <span class="text-xs font-bold uppercase tracking-widest">{{ evento.mostrarActividades ? 'Ocultar' : 'Ver' }} Puntos de Agenda</span>
                   <span class="material-symbols-outlined text-[16px] transition-transform duration-300" :class="evento.mostrarActividades ? 'rotate-180' : ''">expand_more</span>
@@ -938,9 +983,6 @@ const changeStep = (delta: number) => {
                   <img :src="act.imagen || act.image" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" :alt="act.title">   
                   
                   <div class="absolute top-3 left-3 z-30 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0 duration-300">
-                    <button @click.stop="editarActividad(act)" class="p-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-lg shadow-lg text-umsa-blue hover:scale-110 transition-all border border-blue-50/20" title="Editar Actividad">
-                        <span class="material-symbols-outlined text-[18px]">edit</span>
-                    </button>
                     <button @click.stop="inhabilitarActividad(act.id, act.title)" class="p-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-lg shadow-lg text-red-500 hover:scale-110 transition-all border border-red-50/20" title="Inhabilitar Actividad">
                         <span class="material-symbols-outlined text-[18px]">block</span>
                     </button>
@@ -975,8 +1017,58 @@ const changeStep = (delta: number) => {
             </div>
           </div>
           
-          <div v-if="Object.keys(getActividadesAgrupadas(evento.actividades)).length === 0" class="px-8 py-10 text-center">
-            <p class="text-sm font-bold text-gray-500 uppercase tracking-widest">No hay actividades publicadas para esta categoría.</p>
+          <!-- SECCIÓN: ACTIVIDADES INHABILITADAS (ZONA DE CONTROL) -->
+          <div v-if="getActividadesInactivas(evento.actividades).length > 0 && evento.mostrarInhabilitadas" class="mt-4 mx-8 mb-12 py-10 px-8 bg-red-50/50 dark:bg-red-950/10 rounded-[2.5rem] border-4 border-dashed border-red-200 dark:border-red-900/30 shadow-inner relative animate-in slide-in-from-top-4 duration-500 overflow-hidden">
+            
+            <div class="flex items-center justify-between mb-8 relative z-10">
+              <div class="flex items-center gap-6">
+                <div class="w-16 h-16 bg-red-500 text-white rounded-[1.5rem] flex items-center justify-center shadow-xl shadow-red-500/20">
+                  <span class="material-symbols-outlined text-3xl">folder_off</span>
+                </div>
+                <div>
+                  <h4 class="text-2xl font-black text-red-600 dark:text-red-400 uppercase tracking-tighter italic">Sección de Actividades Inhabilitadas</h4>
+                  <p class="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-1 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm">info</span> Estos módulos están ocultos para el público general
+                  </p>
+                </div>
+              </div>
+              <button @click="evento.mostrarInhabilitadas = false" class="p-2 text-red-400 hover:text-red-600 transition-colors">
+                <span class="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
+              <div v-for="act in getActividadesInactivas(evento.actividades)" :key="act.id" 
+                class="bg-white dark:bg-gray-900 p-6 rounded-[2rem] border-2 border-red-50 dark:border-red-900/20 hover:border-red-300 transition-all flex flex-col justify-between h-[160px] shadow-sm hover:shadow-xl hover:shadow-red-500/5 group/disabled-item">
+                
+                <div class="flex items-start justify-between gap-4">
+                   <div class="truncate">
+                      <h5 class="text-sm font-black text-slate-700 dark:text-gray-200 uppercase truncate mb-1 group-hover/disabled-item:text-red-600 transition-colors">{{ act.title }}</h5>
+                      <div class="flex items-center gap-2">
+                         <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">{{ act.type }}</span>
+                         <span class="w-1 h-1 bg-slate-200 rounded-full"></span>
+                         <span class="text-[9px] font-bold text-red-500/60 uppercase">Archivada</span>
+                      </div>
+                   </div>
+                   <span class="material-symbols-outlined text-red-200 dark:text-red-900/40">block</span>
+                </div>
+
+                <div class="mt-4">
+                   <button @click.stop="solicitarActivacion(act.id, act.title)" 
+                     class="w-full flex items-center justify-center gap-3 px-6 py-3 bg-white dark:bg-gray-800 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all font-black text-[10px] uppercase tracking-widest border-2 border-red-100 dark:border-red-900/30 hover:border-red-500 shadow-sm hover:shadow-red-500/20">
+                     <span class="material-symbols-outlined text-sm">mail</span>
+                     Solicitar Habilitación
+                   </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="getActividadesActivas(evento.actividades).length === 0 && getActividadesInactivas(evento.actividades).length === 0" class="px-8 py-20 text-center">
+            <div class="max-w-md mx-auto opacity-30">
+                <span class="material-symbols-outlined text-6xl mb-4">inventory_2</span>
+                <p class="text-sm font-bold text-gray-500 uppercase tracking-widest">No hay actividades publicadas ni archivadas para este evento.</p>
+            </div>
           </div>
         </div>
       </div>

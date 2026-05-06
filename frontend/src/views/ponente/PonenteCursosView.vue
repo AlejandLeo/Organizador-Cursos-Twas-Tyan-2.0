@@ -1,43 +1,72 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import api from '@/services/api';
 
+const route = useRoute();
 const router = useRouter();
 
-const eventoData = ref({
-  id: 1,
-  nombreCorto: 'Programa Especializado',
-  nombreLargo: 'Programa de Especialidad en Biofertilizantes',
-  version: 'V Edición - 2026',
-  descripcion: 'Gestiona las actividades a tu carga. Mantén el registro de asistencia y emisión de certificados.',
-  estado: 'En Progreso',
+const eventoData = ref<any>({
+  id: 0,
+  nombreCorto: '',
+  nombreLargo: 'Cargando...',
+  version: '',
+  descripcion: '',
+  estado: '',
   colorEstado: 'bg-primary-dark text-white border-blue-900',
   imagen: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=1600&q=80',
   mostrarActividades: true,
-  actividadesAsignadas: [
-    {
-      id: 1,
-      title: 'Módulo 1: Fundamentos de Biofertilizantes',
-      status: 'En curso',
-      type: 'Módulo',
-      date: '10 May - 20 Jun 2026',
-      students: 45,
-      image: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=800&q=80'
-    },
-    {
-      id: 2,
-      title: 'Taller de Aplicación de Suelos',
-      status: 'Próximamente',
-      type: 'Taller',
-      date: '25 Jun - 30 Jun 2026',
-      students: 120,
-      image: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80'
+  actividadesAsignadas: []
+});
+const isLoading = ref(false);
+
+const fetchData = async () => {
+  try {
+    isLoading.value = true;
+    const eventoId = Number(route.params.evento_id);
+    const res = await api.get('/imparticiones/mis-actividades');
+    const imparticiones = res.data || [];
+    
+    // Filtrar solo las imparticiones de este evento
+    const imparticionesEvento = imparticiones.filter((imp: any) => imp.evento?.id === eventoId);
+    
+    if (imparticionesEvento.length > 0) {
+      const ev = imparticionesEvento[0].evento;
+      eventoData.value = {
+        id: ev.id,
+        nombreCorto: 'Programa', // o extraer de ev.tipo
+        nombreLargo: ev.nombre,
+        version: new Date(ev.fecha_inicio).getFullYear().toString(),
+        descripcion: ev.descripcion || 'Gestiona las actividades a tu cargo.',
+        estado: ev.estado === 1 ? 'En Progreso' : (ev.estado === 2 ? 'Finalizado' : 'Próximamente'),
+        colorEstado: 'bg-primary-dark text-white border-blue-900',
+        imagen: ev.imagen || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=1600&q=80',
+        mostrarActividades: true,
+        actividadesAsignadas: imparticionesEvento.map((imp: any) => ({
+          id: imp.actividadAcademica?.id,
+          title: imp.actividadAcademica?.nombre,
+          status: 'En curso', // Podríamos derivarlo de las fechas de la actividad
+          type: imp.actividadAcademica?.tipo || 'Actividad',
+          date: `${new Date(imp.actividadAcademica?.fecha_inicio).toLocaleDateString()} - ${new Date(imp.actividadAcademica?.fecha_fin).toLocaleDateString()}`,
+          students: imp.actividadAcademica?.inscripciones?.length || 0,
+          image: imp.actividadAcademica?.imagen || 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=800&q=80'
+        }))
+      };
     }
-  ]
+  } catch (error) {
+    console.error('Error al cargar actividades del evento:', error);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+onMounted(() => {
+  fetchData();
 });
 
 const getActividadesAgrupadas = (actividades: any) => {
   const grupos: any = {};
+  if (!actividades) return grupos;
   actividades.forEach((act: any) => {
     if (!grupos[act.type]) {
       grupos[act.type] = [];

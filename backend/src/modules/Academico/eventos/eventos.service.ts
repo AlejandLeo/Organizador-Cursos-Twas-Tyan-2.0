@@ -53,10 +53,12 @@ export class EventosService {
       ...evento,
       logo: this.formatImageUrl(evento.logo, 'logo'),
       imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
-      actividades: (evento.actividades || []).map(act => ({
-        ...act,
-        imagen: this.formatImageUrl(act.imagen, 'cursos')
-      }))
+      actividades: (evento.actividades || [])
+        .map(act => ({
+          ...act,
+          estado: Number(act.estado),
+          imagen: this.formatImageUrl(act.imagen, 'cursos')
+        }))
     }));
   }
 
@@ -184,6 +186,7 @@ export class EventosService {
       imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
       actividades: (evento.actividades || []).map(act => ({
         ...act,
+        estado: Number(act.estado),
         imagen: this.formatImageUrl(act.imagen, 'cursos')
       }))
     }));

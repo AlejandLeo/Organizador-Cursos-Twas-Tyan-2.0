@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: sans-serif; line-height: 1.6; color: #333; }
+    .container { padding: 20px; border: 1px solid #eee; border-radius: 5px; }
+    .header { background: #003B71; color: white; padding: 15px; font-size: 18px; font-weight: bold; border-radius: 5px 5px 0 0; }
+    .content { padding: 20px; border: 1px solid #eee; border-top: none; }
+    .footer { margin-top: 20px; font-size: 11px; color: #777; }
+    .btn { display: inline-block; padding: 10px 20px; background: #BC9C31; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 15px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">Solicitud de Reactivación de Actividad</div>
+    <div class="content">
+      <p>Hola <strong>Super Usuario</strong>,</p>
+      <p>El coordinador del sistema ha solicitado la reactivación de la siguiente actividad académica que se encuentra actualmente inhabilitada:</p>
+      <ul>
+        <li><strong>Actividad:</strong> {{actividadNombre}}</li>
+        <li><strong>Solicitado por:</strong> {{coordinadorNombre}} ({{coordinadorEmail}})</li>
+        <li><strong>Fecha de solicitud:</strong> {{fecha}}</li>
+      </ul>
+      <p>Por favor, ingrese al panel de administración para revisar y reactivar si corresponde.</p>
+    </div>
+    <div class="footer">
+      Este es un mensaje automático del Sistema de Gestión Académica TYAN.
+    </div>
+  </div>
+</body>
+</html>

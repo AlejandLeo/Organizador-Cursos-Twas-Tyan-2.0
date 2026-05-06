@@ -25,7 +25,10 @@ const editForm = ref({
     min_asistencia: 80,
     fecha_inicio: '',
     fecha_fin: '',
-    sesiones: [] as any[]
+    horas: 0,
+    id_evento: null as number | null,
+    sesiones: [] as any[],
+    requisitos: {} as any
 });
 const nuevaSesion = ref({ dia: 'Lunes', hora_inicio: '19:00', hora_fin: '21:00' });
 const imagenArchivo = ref<File | null>(null);
@@ -59,7 +62,10 @@ const fetchData = async () => {
             min_asistencia: mod?.min_asistencia ?? 80,
             fecha_inicio: actividad.value.fecha_inicio || '',
             fecha_fin: actividad.value.fecha_fin || '',
-            sesiones: Array.isArray(mod?.sesiones) ? JSON.parse(JSON.stringify(mod.sesiones)) : []
+            horas: actividad.value.horas || 0,
+            id_evento: actividad.value.evento?.id || null,
+            sesiones: Array.isArray(mod?.sesiones) ? JSON.parse(JSON.stringify(mod.sesiones)) : [],
+            requisitos: actividad.value.requisitos || { fields: [] }
         };
 
         // Carga de inscripciones (crítica - muestra solicitudes y alumnos)
@@ -99,6 +105,11 @@ const fetchData = async () => {
 onMounted(() => {
     fetchData();
     if (route.query.tab) activeTab.value = route.query.tab as string;
+    if (route.query.edit === 'true') {
+        isEditing.value = true;
+        // Limpiamos el query para no reabrir el modal al recargar
+        router.replace({ query: { ...route.query, edit: undefined } });
+    }
 });
 
 const handleImageChange = (e: any) => {
@@ -122,20 +133,94 @@ const guardarCambios = async () => {
         Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading() });
         const formData = new FormData();
         Object.entries(editForm.value).forEach(([key, val]) => {
-            if (key === 'sesiones') formData.append(key, JSON.stringify(val));
-            else formData.append(key, String(val));
+            if (val === null || val === undefined || val === '') return; // Evitar enviar campos vacíos que fallen la validación (como fechas)
+            if (key === 'sesiones' || key === 'requisitos') {
+                formData.append(key, JSON.stringify(val));
+            } else {
+                formData.append(key, String(val));
+            }
         });
         if (imagenArchivo.value) formData.append('imagen', imagenArchivo.value);
 
+        console.log('Enviando datos de actualización para ID:', actividad.value.id);
         await api.put(`/actividades-academicas/${actividad.value.id}`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
         
         await fetchData();
         isEditing.value = false;
+        imagenArchivo.value = null;
+        imagenPreview.value = null;
         Swal.fire('Éxito', 'Actividad actualizada correctamente', 'success');
-    } catch (error) {
-        Swal.fire('Error', 'No se pudo actualizar la actividad', 'error');
+    } catch (error: any) {
+        console.error('Error al actualizar actividad:', error);
+        
+        // Formatear error de class-validator (array de strings) o string normal
+        let errorMsg = 'No se pudo actualizar la actividad';
+        const rawMsg = error.response?.data?.message;
+        if (Array.isArray(rawMsg)) {
+            errorMsg = rawMsg.join('<br>');
+        } else if (typeof rawMsg === 'string') {
+            errorMsg = rawMsg;
+        }
+
+        Swal.fire({
+            icon: 'error',
+            title: 'Error de Validación',
+            html: errorMsg
+        });
+    } finally {
+        isLoading.value = false;
+    }
+};
+
+const inhabilitarActividad = async () => {
+    const { value: motivo } = await Swal.fire({
+        title: '¿INHABILITAR ACTIVIDAD?',
+        text: `Indique la razón para inhabilitar "${actividad.value.nombre}":`,
+        input: 'textarea',
+        inputPlaceholder: 'Escriba el motivo aquí...',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'INHABILITAR',
+        cancelButtonText: 'CANCELAR',
+        inputValidator: (value) => {
+          if (!value) return '¡Es obligatorio indicar un motivo!'
+        }
+    });
+
+    if (motivo) {
+        try {
+            await api.patch(`/actividades-academicas/${actividad.value.id}`, { 
+                estado: -1, 
+                descripcion: `[INHABILITACION_MOTIVO]:${motivo}\n[FECHA]:${new Date().toLocaleString()}\n` 
+            });
+            await Swal.fire('Inhabilitada', 'La actividad ha sido marcada como inactiva.', 'success');
+        } catch (e) { 
+            Swal.fire('Error', 'No se pudo inhabilitar la actividad', 'error'); 
+        }
+    }
+};
+
+const solicitarActivacion = async () => {
+    const result = await Swal.fire({
+        title: '¿SOLICITAR ACTIVACIÓN?',
+        text: `Se enviará un mensaje al Super Usuario para solicitar la reactivación de "${actividad.value.nombre}".`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#003B71',
+        confirmButtonText: 'SÍ, ENVIAR SOLICITUD',
+        cancelButtonText: 'CANCELAR'
+    });
+
+    if (result.isConfirmed) {
+        try {
+            Swal.fire({ title: 'Enviando solicitud...', didOpen: () => Swal.showLoading() });
+            await api.post(`/actividades-academicas/${actividad.value.id}/solicitar-activacion`);
+            Swal.fire('Solicitud Enviada', 'El Super Usuario ha sido notificado.', 'success');
+        } catch (e) {
+            Swal.fire('Error', 'No se pudo enviar la solicitud.', 'error');
+        }
     }
 };
 
@@ -294,18 +379,34 @@ const eliminarPonente = async (id: number) => {
     </button>
 
     <div v-if="actividad" class="rounded-[3rem] p-10 flex flex-col md:flex-row items-center justify-between shadow-2xl relative overflow-hidden border-r-8 border-umsa-gold min-h-[200px]"
-         :style="actividad.imagen ? { backgroundImage: `url(${actividad.imagen})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { backgroundColor: '#1e293b' }">
+         :style="actividad.imagen ? { backgroundImage: `url(${actividad.imagen})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { backgroundColor: '#1e293b' }"
+         :class="Number(actividad.estado) === -1 ? 'grayscale' : ''">
       <!-- Overlay degradado para adaptar a la paleta institucional -->
-      <div class="absolute inset-0 bg-gradient-to-r from-umsa-blue/95 via-primary-dark/80 to-transparent"></div>
+      <div class="absolute inset-0 bg-gradient-to-r" :class="Number(actividad.estado) === -1 ? 'from-gray-900/95 via-gray-800/80 to-transparent' : 'from-umsa-blue/95 via-primary-dark/80 to-transparent'"></div>
       
       <div class="relative z-10">
+        <div v-if="Number(actividad.estado) === -1" class="flex items-center gap-2 text-red-500 mb-2">
+            <span class="material-symbols-outlined">lock</span>
+            <span class="text-[10px] font-black uppercase tracking-[0.3em]">Actividad Bloqueada - Modo Lectura</span>
+        </div>
         <h2 id="titulo-curso" class="text-3xl md:text-4xl font-black text-white italic uppercase tracking-tight">{{ actividad.nombre }}</h2>
         <p class="text-emerald-400 text-[10px] font-black uppercase tracking-[0.3em] mt-2">Panel de Administración Integral • {{ actividad.tipo }}</p>
       </div>
+
       <div class="relative z-10 flex gap-4 mt-6 md:mt-0">
-        <button @click="isEditing = true" class="bg-emerald-500 text-primary-dark px-6 py-3 rounded-2xl text-[10px] font-black shadow-lg hover:brightness-110 transition-all uppercase tracking-widest flex items-center gap-2">
-          <span class="material-symbols-outlined text-sm">settings</span> Configuración
-        </button>
+        <template v-if="Number(actividad.estado) !== -1">
+            <button @click="isEditing = true" class="bg-emerald-500 text-primary-dark px-6 py-3 rounded-2xl text-[10px] font-black shadow-lg hover:brightness-110 transition-all uppercase tracking-widest flex items-center gap-2">
+            <span class="material-symbols-outlined text-sm">settings</span> Configuración
+            </button>
+            <button @click="inhabilitarActividad" class="bg-red-500 text-white px-6 py-3 rounded-2xl text-[10px] font-black shadow-lg hover:brightness-110 transition-all uppercase tracking-widest flex items-center gap-2">
+            <span class="material-symbols-outlined text-sm">block</span> Inhabilitar
+            </button>
+        </template>
+        <template v-else>
+            <button @click="solicitarActivacion" class="bg-umsa-gold text-white px-8 py-3 rounded-2xl text-[10px] font-black shadow-lg hover:brightness-110 transition-all uppercase tracking-widest flex items-center gap-2">
+                <span class="material-symbols-outlined text-sm">lock_open</span> Solicitar Reactivación
+            </button>
+        </template>
       </div>
     </div>
 
@@ -768,21 +869,21 @@ const eliminarPonente = async (id: number) => {
   </div>
 
   <!-- MODAL DE CONFIGURACIÓN AVANZADA (EDICIÓN) -->
-  <div v-if="isEditing" class="fixed inset-0 bg-primary-dark/95 z-[300] flex items-center justify-center backdrop-blur-xl p-4 md:p-10 animate-in fade-in zoom-in duration-300">
-      <div class="bg-white dark:bg-gray-900 rounded-[3rem] w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col border border-white/10">
+  <div v-if="isEditing" class="fixed inset-0 bg-primary-dark/95 z-[300] flex items-center justify-center backdrop-blur-xl p-2 md:p-10 animate-in fade-in zoom-in duration-300">
+      <div class="bg-white dark:bg-gray-900 rounded-[2rem] md:rounded-[3rem] w-full max-w-5xl h-full md:h-auto max-h-[95vh] overflow-y-auto shadow-2xl flex flex-col border border-white/10">
           
           <div class="p-8 md:p-12 flex-1 space-y-12">
               <div class="flex justify-between items-start">
                   <div>
-                      <h2 class="text-4xl font-black text-primary-dark dark:text-white uppercase italic tracking-tighter">Configuración de Actividad</h2>
-                      <p class="text-slate-400 font-bold uppercase text-[10px] tracking-[0.3em] mt-2 italic">Edición de contenido, horarios y diseño visual</p>
+                      <h2 class="text-2xl md:text-4xl font-black text-primary-dark dark:text-white uppercase italic tracking-tighter">Configuración de Actividad</h2>
+                      <p class="text-slate-400 font-bold uppercase text-[8px] md:text-[10px] tracking-[0.2em] md:tracking-[0.3em] mt-2 italic">Edición de contenido, horarios y diseño visual</p>
                   </div>
                   <button @click="isEditing = false" class="p-4 bg-slate-100 dark:bg-gray-800 rounded-full text-slate-400 hover:text-red-500 transition-all">
                       <span class="material-symbols-outlined font-black">close</span>
                   </button>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12">
                   <!-- Columna 1: Información & Imagen -->
                   <div class="space-y-8">
                       <div class="space-y-4">
@@ -800,11 +901,58 @@ const eliminarPonente = async (id: number) => {
                           </div>
                       </div>
 
-                      <div class="grid grid-cols-1 gap-4">
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div>
                               <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Título de la Actividad</label>
                               <input v-model="editForm.nombre" type="text" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-2xl py-4 px-6 font-bold text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
                           </div>
+                          <div>
+                              <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Tipo de Actividad</label>
+                              <select v-model="editForm.tipo" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-2xl py-4 px-6 font-bold text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
+                                  <option value="Curso">Curso</option>
+                                  <option value="Taller">Taller</option>
+                                  <option value="Conferencia">Conferencia</option>
+                                  <option value="Workshop">Workshop</option>
+                                  <option value="Seminario">Seminario</option>
+                              </select>
+                          </div>
+                          <div>
+                              <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Modalidad de Enseñanza</label>
+                              <select v-model="editForm.modalidad" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-2xl py-4 px-6 font-bold text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
+                                  <option value="Presencial">Presencial</option>
+                                  <option value="Virtual">Virtual</option>
+                                  <option value="Híbrido">Híbrido</option>
+                                  <option value="Semipresencial">Semipresencial</option>
+                              </select>
+                          </div>
+                      </div>
+
+                      <div>
+                          <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Descripción Detallada</label>
+                          <textarea v-model="editForm.descripcion" rows="4" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-2xl py-4 px-6 font-bold text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all resize-none"></textarea>
+                      </div>
+
+                      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          <div>
+                              <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Fecha Inicio</label>
+                              <input v-model="editForm.fecha_inicio" type="date" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-2xl py-4 px-6 font-bold text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
+                          </div>
+                          <div>
+                              <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Fecha Fin</label>
+                              <input v-model="editForm.fecha_fin" type="date" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-2xl py-4 px-6 font-bold text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
+                          </div>
+                          <div>
+                              <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Carga Horaria (Hrs)</label>
+                              <input v-model="editForm.horas" type="number" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-2xl py-4 px-6 font-bold text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
+                          </div>
+                      </div>
+
+                      <div>
+                          <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Configuración de Requisitos (JSON)</label>
+                          <textarea v-model="editForm.requisitos" 
+                                    @input="(e) => { try { editForm.requisitos = JSON.parse((e.target as HTMLTextAreaElement).value) } catch(e) {} }"
+                                    class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-2xl py-4 px-6 font-mono text-[10px] text-emerald-600 dark:text-emerald-400 focus:border-umsa-gold outline-none transition-all resize-none" 
+                                    rows="3">{{ JSON.stringify(editForm.requisitos, null, 2) }}</textarea>
                       </div>
                   </div>
 
@@ -812,15 +960,36 @@ const eliminarPonente = async (id: number) => {
                   <div class="space-y-8">
                       <div class="bg-slate-50 dark:bg-gray-800/30 p-8 rounded-[2rem] border border-slate-100 dark:border-gray-800">
                           <h4 class="text-xs font-black text-primary-dark dark:text-white uppercase tracking-widest mb-6 flex items-center gap-2">
+                             <span class="material-symbols-outlined text-sm text-umsa-gold">verified</span> Parámetros de Aprobación
+                          </h4>
+                          <div class="grid grid-cols-2 gap-4 mb-10">
+                              <div>
+                                  <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Nota Mínima</label>
+                                  <input v-model="editForm.min_nota" type="number" class="w-full bg-white dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-center text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
+                              </div>
+                              <div>
+                                  <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Asistencia Mínima (%)</label>
+                                  <input v-model="editForm.min_asistencia" type="number" class="w-full bg-white dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-center text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
+                              </div>
+                          </div>
+
+                          <h4 class="text-xs font-black text-primary-dark dark:text-white uppercase tracking-widest mb-6 flex items-center gap-2">
                              <span class="material-symbols-outlined text-sm text-umsa-gold">schedule</span> Cronograma (Horarios)
                           </h4>
                           
-                          <div class="flex gap-2 mb-6">
-                              <select v-model="nuevaSesion.dia" class="flex-1 bg-white dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-2 px-3 text-[10px] font-bold">
+                          <div class="flex flex-wrap gap-2 mb-6">
+                              <select v-model="nuevaSesion.dia" class="flex-1 min-w-[120px] bg-white dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-2 px-3 text-[10px] font-bold outline-none focus:border-umsa-gold">
                                   <option>Lunes</option><option>Martes</option><option>Miércoles</option><option>Jueves</option><option>Viernes</option><option>Sábado</option><option>Domingo</option>
                               </select>
-                              <input v-model="nuevaSesion.hora_inicio" type="time" class="w-24 bg-white dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-2 px-3 text-[10px] font-bold">
-                              <button @click="agregarSesion" class="bg-primary-dark text-white p-2 rounded-xl hover:bg-umsa-gold transition-colors"><span class="material-symbols-outlined">add</span></button>
+                              <div class="flex items-center gap-2">
+                                  <input v-model="nuevaSesion.hora_inicio" type="time" class="w-24 bg-white dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-2 px-3 text-[10px] font-bold outline-none focus:border-umsa-gold">
+                                  <span class="text-slate-400 font-bold text-xs">a</span>
+                                  <input v-model="nuevaSesion.hora_fin" type="time" class="w-24 bg-white dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-2 px-3 text-[10px] font-bold outline-none focus:border-umsa-gold">
+                              </div>
+                              <button @click="agregarSesion" class="bg-primary-dark text-white px-4 py-2 rounded-xl hover:bg-emerald-500 transition-all flex items-center gap-1">
+                                  <span class="material-symbols-outlined text-sm">add</span>
+                                  <span class="text-[9px] font-black uppercase">Agregar</span>
+                              </button>
                           </div>
 
                           <div class="space-y-2">
@@ -834,7 +1003,7 @@ const eliminarPonente = async (id: number) => {
                           </div>
                       </div>
 
-                      <div class="grid grid-cols-2 gap-6">
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
                         <div>
                             <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Nota Mínima</label>
                             <input v-model="editForm.min_nota" type="number" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-primary-dark dark:text-white">
@@ -848,9 +1017,9 @@ const eliminarPonente = async (id: number) => {
               </div>
           </div>
 
-          <div class="p-8 bg-slate-50 dark:bg-gray-800/50 border-t border-slate-100 dark:border-gray-800 flex justify-end gap-4">
-              <button @click="isEditing = false" class="px-8 py-4 text-slate-500 font-black uppercase text-[10px] tracking-widest hover:bg-slate-200 dark:hover:bg-gray-800 rounded-2xl transition-all">Descartar Cambios</button>
-              <button @click="guardarCambios" class="px-10 py-4 bg-emerald-500 text-primary-dark rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl hover:scale-105 active:scale-95 transition-all">Publicar Cambios</button>
+          <div class="p-6 md:p-8 bg-slate-50 dark:bg-gray-800/50 border-t border-slate-100 dark:border-gray-800 flex flex-col sm:flex-row justify-end gap-3 md:gap-4">
+              <button @click="isEditing = false" class="w-full sm:w-auto px-8 py-4 text-slate-500 font-black uppercase text-[10px] tracking-widest hover:bg-slate-200 dark:hover:bg-gray-800 rounded-2xl transition-all">Descartar</button>
+              <button @click="guardarCambios" class="w-full sm:w-auto px-10 py-4 bg-emerald-500 text-primary-dark rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl hover:scale-105 active:scale-95 transition-all">Publicar Cambios</button>
           </div>
       </div>
   </div>

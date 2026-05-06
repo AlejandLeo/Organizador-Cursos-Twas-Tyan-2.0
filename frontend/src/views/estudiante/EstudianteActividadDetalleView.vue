@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, nextTick, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import api from '@/services/api';
 import Swal from 'sweetalert2';
+import QrcodeVue from 'qrcode.vue';
+import { Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
 
 const route = useRoute();
 const router = useRouter();
@@ -53,6 +55,20 @@ const actividad = ref({
   requisitos: null as any
 });
 
+// Lógica QR Estudiante
+const qrMode = ref<'project' | 'scan'>('project');
+const idInscripcionModalidad = computed(() => {
+    if (myInscripcion.value && myInscripcion.value.modalidades && myInscripcion.value.modalidades.length > 0) {
+        return myInscripcion.value.modalidades[0].id;
+    }
+    return null;
+});
+const qrData = computed(() => {
+    return idInscripcionModalidad.value ? JSON.stringify({ id_inscripcion_modalidad: idInscripcionModalidad.value }) : '';
+});
+let html5QrcodeScanner: Html5QrcodeScanner | null = null;
+let isProcessingScan = false;
+
 const loadActividad = async () => {
   try {
     const res = await api.get('/actividades-academicas/' + actividadId);
@@ -92,27 +108,16 @@ const loadActividad = async () => {
       requisitos: act.requisitos
     };
 
-    // Si el backend no tiene requisitos definidos (ej: datos semilla), 
-    // forzamos los básicos para que el formulario siempre aparezca completo.
     if (!actividad.value.requisitos || !actividad.value.requisitos.base || Object.keys(actividad.value.requisitos.base).length === 0) {
       actividad.value.requisitos = {
-        base: {
-          nombres: true,
-          primer_apellido: true,
-          segundo_apellido: true,
-          email: true,
-          documento_identidad: true,
-          celular: true
-        },
+        base: { nombres: true, primer_apellido: true, segundo_apellido: true, email: true, documento_identidad: true, celular: true },
         custom: []
       };
     }
 
-    // Inicializar datos del formulario (Autocompletar)
     preinscripcionForm.value.razon = 'Me interesa participar debido a que deseo ampliar mis conocimientos en esta área y aplicar lo aprendido en mi desarrollo académico y profesional.';
-    preinscripcionForm.value.miembro_tyan = 1; // Default a miembro
+    preinscripcionForm.value.miembro_tyan = 1; 
 
-    // Inicializar datos del perfil editables
     if (actividad.value.requisitos?.base) {
         Object.keys(actividad.value.requisitos.base).forEach(key => {
             if (actividad.value.requisitos.base[key]) {
@@ -128,11 +133,10 @@ const loadActividad = async () => {
                 } else {
                     datosPerfilEdit.value[key] = persona?.[key] || '';
                 }
-                perfilOriginal.value[key] = !!datosPerfilEdit.value[key]; // Guardamos si originalmente tenía valor
+                perfilOriginal.value[key] = !!datosPerfilEdit.value[key];
             }
         });
     }
-    // Inicializar campos dinámicos
     if (actividad.value.requisitos?.custom) {
         actividad.value.requisitos.custom.forEach((c: any) => {
             respuestasDinamicas.value[c.label] = c.type === 'file' ? null : '';
@@ -174,6 +178,10 @@ onMounted(async () => {
   loading.value = false;
 });
 
+onUnmounted(() => {
+    stopScanner();
+});
+
 const handleFileReqChange = (e: any, label: string) => {
     const file = e.target.files[0];
     if (file) {
@@ -185,7 +193,6 @@ const submitPreinscripcion = async () => {
   preinscribiendo.value = true;
   errorMensaje.value = '';
   try {
-    // 1. Actualizar perfil si hay cambios en datos base (los que estaban vacíos)
     if (Object.keys(datosPerfilEdit.value).length > 0) {
         try {
             await api.patch('/usuarios/perfil/datos', datosPerfilEdit.value);
@@ -194,13 +201,11 @@ const submitPreinscripcion = async () => {
         }
     }
 
-    // 2. Preparar Payload (FormData para soportar archivos)
     const formData = new FormData();
     formData.append('id_actividad', actividadId.toString());
     formData.append('miembro_tyan', preinscripcionForm.value.miembro_tyan.toString());
     formData.append('razon', preinscripcionForm.value.razon);
     
-    // Procesar respuestas dinámicas (archivos vs otros)
     const datosDinamicosJson: Record<string, any> = {};
     for (const [label, value] of Object.entries(respuestasDinamicas.value)) {
         if (value instanceof File) {
@@ -212,7 +217,6 @@ const submitPreinscripcion = async () => {
     }
     formData.append('datos_adicionales', JSON.stringify(datosDinamicosJson));
 
-    // 3. Enviar inscripción
     await api.post('/me/inscripciones/preinscribir', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
     });
@@ -243,6 +247,88 @@ const getStatusColor = (status: string) => {
 };
 
 const activeTab = ref(route.query.tab ? String(route.query.tab) : 'resumen');
+
+const switchTab = (tab: string) => {
+    activeTab.value = tab;
+    if (tab === 'asistencia' && qrMode.value === 'scan') {
+        startScanner();
+    } else {
+        stopScanner();
+    }
+};
+
+const switchQrMode = (mode: 'project' | 'scan') => {
+    qrMode.value = mode;
+    if (mode === 'scan') {
+        startScanner();
+    } else {
+        stopScanner();
+    }
+};
+
+const startScanner = async () => {
+    await nextTick();
+    if (document.getElementById('reader-student')) {
+        html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader-student",
+            { fps: 10, qrbox: {width: 250, height: 250}, supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA] },
+            false
+        );
+        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+    }
+};
+
+const stopScanner = () => {
+    if (html5QrcodeScanner) {
+        try {
+            html5QrcodeScanner.clear();
+        } catch (error) {
+            console.error("Failed to clear scanner", error);
+        }
+        html5QrcodeScanner = null;
+    }
+};
+
+const onScanSuccess = async (decodedText: string) => {
+    if (isProcessingScan) return;
+    
+    try {
+        const data = JSON.parse(decodedText);
+        if (!data.id_sesion) throw new Error("QR inválido para registro de sesión.");
+
+        isProcessingScan = true;
+        
+        if (html5QrcodeScanner) html5QrcodeScanner.pause(true);
+
+        const res = await api.post('/me/asistencias/registro-qr', {
+            id_sesion: data.id_sesion
+        });
+
+        await Swal.fire({
+            icon: 'success',
+            title: 'Asistencia Registrada',
+            text: res.data.mensaje || 'Tu asistencia fue registrada exitosamente.',
+            timer: 2000,
+            showConfirmButton: false
+        });
+
+    } catch (e: any) {
+        await Swal.fire({
+            icon: 'error',
+            title: 'Error de Lectura',
+            text: e.response?.data?.message || e.message || 'QR inválido o ya registrado.',
+            timer: 3000,
+            showConfirmButton: false
+        });
+    } finally {
+        isProcessingScan = false;
+        if (html5QrcodeScanner) html5QrcodeScanner.resume();
+    }
+};
+
+const onScanFailure = (error: any) => {
+    //
+};
 
 const tabs = computed(() => {
   const isAprobado = myInscripcion.value && (myInscripcion.value.estado === 1 || myInscripcion.value.estado === 3);
@@ -292,18 +378,18 @@ const goBack = () => {
       </div>
 
       <!-- Título y Meta de Actividad -->
-      <div class="absolute bottom-0 left-0 right-0 p-8 md:p-12 z-20 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+      <div class="absolute bottom-0 left-0 right-0 p-6 md:p-12 z-20 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
         <div class="max-w-3xl">
-          <div class="flex items-center gap-3 mb-3">
-              <span class="text-xs font-black text-emerald-400 uppercase tracking-widest bg-emerald-900/30 border border-emerald-500/30 px-3 py-1 rounded-full">{{ actividad.tipo }}</span>
-              <span class="text-xs font-bold text-gray-300 uppercase tracking-widest break-words">{{ actividad.fecha }}</span>
+          <div class="flex items-center gap-2 md:gap-3 mb-3 flex-wrap">
+              <span class="text-[9px] md:text-xs font-black text-emerald-400 uppercase tracking-widest bg-emerald-900/30 border border-emerald-500/30 px-3 py-1 rounded-full">{{ actividad.tipo }}</span>
+              <span class="text-[9px] md:text-xs font-bold text-gray-300 uppercase tracking-widest break-words">{{ actividad.fecha }}</span>
           </div>
-          <h1 class="text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-tighter leading-none mb-4 drop-shadow-lg">{{ actividad.nombre }}</h1>
-          <p class="text-sm md:text-base font-medium text-gray-300 line-clamp-2 md:line-clamp-3 leading-relaxed drop-shadow-md max-w-2xl">{{ actividad.descripcion }}</p>
+          <h1 class="text-3xl md:text-5xl lg:text-6xl font-black text-white tracking-tighter leading-none mb-4 drop-shadow-lg">{{ actividad.nombre }}</h1>
+          <p class="text-xs md:text-base font-medium text-gray-300 line-clamp-2 md:line-clamp-3 leading-relaxed drop-shadow-md max-w-2xl">{{ actividad.descripcion }}</p>
         </div>
 
         <!-- Acciones o Metric -->
-        <div class="flex flex-col gap-4 shrink-0 mt-4 md:mt-0 items-end">
+        <div class="flex flex-col gap-4 shrink-0 mt-4 lg:mt-0 items-center lg:items-end">
           <template v-if="myInscripcion">
             <div :class="myInscripcion.estado === 1 ? 'bg-emerald-500' : (myInscripcion.estado === 2 ? 'bg-red-500' : (myInscripcion.estado === 3 ? 'bg-blue-500' : 'bg-amber-500'))"
                   class="backdrop-blur-xl border border-white/20 dark:border-gray-800 rounded-2xl p-6 flex flex-col items-center justify-center min-w-[180px] shadow-2xl transition-all">
@@ -329,7 +415,7 @@ const goBack = () => {
 
     <!-- Tabs de Navegación -->
     <div class="flex overflow-x-auto gap-2 border-b border-slate-200 dark:border-gray-800 pb-1 snap-x scrollbar-hide">
-      <button v-for="tab in tabs" :key="tab.id" @click="activeTab = tab.id"
+      <button v-for="tab in tabs" :key="tab.id" @click="switchTab(tab.id)"
         class="flex items-center gap-2 px-6 py-4 text-xs font-black uppercase tracking-widest rounded-t-2xl transition-all whitespace-nowrap snap-start border-b-2"
         :class="activeTab === tab.id 
           ? 'text-primary-dark dark:text-emerald-400 border-primary-dark dark:border-emerald-400 bg-slate-50 dark:bg-gray-900/50' 
@@ -352,7 +438,7 @@ const goBack = () => {
                    <p class="text-slate-600 dark:text-gray-400 leading-relaxed">{{ actividad.descripcion }}</p>
                 </div>
                 
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 mt-6 border-t border-slate-100 dark:border-gray-800">
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 pt-6 mt-6 border-t border-slate-100 dark:border-gray-800">
                    <div class="space-y-1">
                        <span class="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest block">Docente</span>
                        <span class="text-sm font-black text-slate-700 dark:text-gray-300 block truncate">{{ actividad.docente }}</span>
@@ -428,19 +514,46 @@ const goBack = () => {
 
        <!-- Tab: Asistencia -->
       <div v-if="activeTab === 'asistencia'" class="animate-in slide-in-from-bottom-4 duration-500 fade-in">
-          <div class="flex justify-between items-center mb-6">
-              <h3 class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">Registro de Asistencia</h3>
-              
-              <!-- Registro de hoy QR -->
-              <button class="bg-primary-dark dark:bg-emerald-600 text-white px-5 py-3 rounded-xl shadow-lg border border-transparent hover:scale-105 transition-transform flex items-center gap-2 group cursor-pointer">
-                  <span class="material-symbols-outlined text-white transition-transform">qr_code_scanner</span>
-                  <span class="font-black text-sm uppercase tracking-wider text-white">Registro de Hoy</span>
-              </button>
+          <div class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-[1.5rem] md:rounded-[2.5rem] p-6 md:p-12 shadow-xl mb-8">
+              <div class="flex flex-col xl:flex-row gap-8 xl:gap-12 items-start">
+                  <div class="flex-1 w-full xl:max-w-lg">
+                      <h3 class="text-2xl md:text-3xl font-black text-slate-800 dark:text-white uppercase italic mb-4">Registro de Asistencia</h3>
+                      <p class="text-slate-500 text-sm leading-relaxed mb-6">Elige cómo deseas registrar tu asistencia a la sesión actual.</p>
+                      
+                      <div class="flex flex-col sm:flex-row gap-4">
+                          <button @click="switchQrMode('project')" :class="qrMode === 'project' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'bg-slate-100 text-slate-500'" class="flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">
+                              Mostrar Mi QR
+                          </button>
+                          <button @click="switchQrMode('scan')" :class="qrMode === 'scan' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'bg-slate-100 text-slate-500'" class="flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">
+                              Escanear Clase
+                          </button>
+                      </div>
+                  </div>
+
+                  <div class="flex-1 flex justify-center items-center w-full min-h-[300px] mt-8 xl:mt-0">
+                      <!-- Proyectar Mi QR -->
+                      <div v-if="qrMode === 'project'" class="bg-white p-4 md:p-6 rounded-[2rem] md:rounded-[2.5rem] border-[6px] md:border-[10px] border-slate-100 shadow-2xl flex flex-col items-center justify-center w-full max-w-sm">
+                          <div v-if="!idInscripcionModalidad" class="text-center p-8 text-slate-400">
+                              Cargando ID...
+                          </div>
+                          <template v-else>
+                              <QrcodeVue :value="qrData" :size="200" :level="'H'" class="md:hidden" />
+                              <QrcodeVue :value="qrData" :size="250" :level="'H'" class="hidden md:block" />
+                          </template>
+                          <p class="text-xs font-bold text-slate-400 mt-4 text-center">El docente debe escanear este código</p>
+                      </div>
+
+                      <!-- Escanear QR del Ponente -->
+                      <div v-if="qrMode === 'scan'" class="w-full max-w-md bg-black rounded-[2rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl">
+                          <div id="reader-student" class="w-full min-h-[300px] border-none bg-black"></div>
+                      </div>
+                  </div>
+              </div>
           </div>
           
           <div v-if="!actividad.asistencia || actividad.asistencia.length === 0" class="text-sm font-bold text-slate-500 bg-slate-50 dark:bg-gray-800 p-8 rounded-2xl border border-slate-200 dark:border-gray-700 text-center flex flex-col items-center">
              <span class="material-symbols-outlined text-4xl mb-3 opacity-50 block">event_busy</span>
-             Aún no hay registros de asistencia en esta actividad.
+             Aún no hay registros de asistencia guardados históricamente.
           </div>
           <div v-else class="space-y-4 max-w-3xl">
               <div v-for="(registro, index) in actividad.asistencia" :key="index" class="flex items-center justify-between border border-slate-200 dark:border-gray-800 rounded-2xl p-5 dark:bg-gray-950 relative overflow-hidden group hover:border-slate-300 dark:hover:border-gray-700 transition-colors">

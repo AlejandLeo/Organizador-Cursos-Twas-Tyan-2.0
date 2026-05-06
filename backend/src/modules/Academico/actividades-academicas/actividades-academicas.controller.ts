@@ -34,6 +34,15 @@ export class ActividadesAcademicasController {
     return this.service.findAll();
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Super Usuario')
+  @ApiBearerAuth()
+  @Get('solicitudes/pendientes')
+  @ApiOperation({ summary: 'Listar solicitudes de reactivación pendientes (Super Admin)' })
+  getSolicitudesPendientes() {
+    return this.service.getSolicitudesPendientes();
+  }
+
   /** GET /actividades-academicas/:id */
   @Get(':id')
   @ApiOperation({ summary: 'Detalle de una actividad' })
@@ -98,5 +107,23 @@ export class ActividadesAcademicasController {
   @ApiOperation({ summary: 'Eliminar actividad académica (Coordinador)' })
   eliminar(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     return this.service.eliminar(id, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Coordinador', 'Super Usuario')
+  @ApiBearerAuth()
+  @Post(':id/solicitar-activacion')
+  @ApiOperation({ summary: 'Solicitar reactivación de una actividad al Super Usuario' })
+  solicitarActivacion(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.service.solicitarActivacion(id, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Super Usuario')
+  @ApiBearerAuth()
+  @Patch(':id/activar')
+  @ApiOperation({ summary: 'Aprobar reactivación de una actividad (Super Admin)' })
+  aprobarReactivacion(@Param('id', ParseIntPipe) id: number) {
+    return this.service.aprobarReactivacion(id);
   }
 }

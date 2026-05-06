@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, nextTick, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import api from '@/services/api';
+import Swal from 'sweetalert2';
+import QrcodeVue from 'qrcode.vue';
+import { Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
 
 const route = useRoute();
 const router = useRouter();
@@ -11,10 +14,20 @@ const authStore = useAuthStore();
 const activeTab = ref('resumen');
 const loading = ref(true);
 const actividadId = route.params.id;
-const qrCodeUrl = ref(`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=attendance-${actividadId}`);
 
 const curso = ref<any>(null);
 const estudiantes = ref<any[]>([]);
+
+// Sesiones y QR
+const sesiones = ref<any[]>([]);
+const activeSessionId = ref<number | null>(null);
+const qrMode = ref<'project' | 'scan'>('project');
+const qrData = computed(() => {
+    return activeSessionId.value ? JSON.stringify({ id_sesion: activeSessionId.value }) : '';
+});
+
+// Scanner instance
+let html5QrcodeScanner: Html5QrcodeScanner | null = null;
 
 // Verificar si el ponente tiene permisos de edición en esta actividad
 const tienePermisos = computed(() => {
@@ -27,26 +40,48 @@ const fetchDetalleActividad = async () => {
     loading.value = true;
     try {
         const res = await api.get(`/actividades-academicas/${actividadId}`);
+        const data = res.data;
+        
         curso.value = {
-            id: res.data.id,
-            evento: res.data.evento?.nombre || 'Evento Académico',
-            version: res.data.version || 'Gestión 2026',
-            fechas: `${res.data.fecha_inicio ? new Date(res.data.fecha_inicio).toLocaleDateString() : 'Pendiente'} - ${res.data.fecha_fin ? new Date(res.data.fecha_fin).toLocaleDateString() : 'Pendiente'}`,
-            estudiantesInscritos: res.data.inscripciones?.length || 0,
-            estado: res.data.estado === 1 ? 'Activo' : 'Cerrado',
-            modalidad: res.data.modalidad || 'Presencial',
-            descripcion: res.data.descripcion || 'Sin descripción disponible.',
-            imparticiones: res.data.imparticiones || []
+            id: data.id,
+            evento: data.evento?.nombre || 'Evento Académico',
+            version: data.version || 'Gestión 2026',
+            fechas: `${data.fecha_inicio ? new Date(data.fecha_inicio).toLocaleDateString() : 'Pendiente'} - ${data.fecha_fin ? new Date(data.fecha_fin).toLocaleDateString() : 'Pendiente'}`,
+            estudiantesInscritos: data.inscripciones?.length || 0,
+            estado: data.estado === 1 ? 'Activo' : 'Cerrado',
+            modalidad: data.modalidad || 'Presencial',
+            descripcion: data.descripcion || 'Sin descripción disponible.',
+            imparticiones: data.imparticiones || []
         };
         
         // Estudiantes
-        estudiantes.value = (res.data.inscripciones || []).map((ins: any) => ({
+        estudiantes.value = (data.inscripciones || []).map((ins: any) => ({
             id: ins.id,
             nombre: `${ins.usuario.persona.nombres} ${ins.usuario.persona.primer_apellido}`,
             correo: ins.usuario.email,
-            asistencia: '---', // Esto vendría de otra tabla
+            asistencia: '---', 
             estado: ins.nota_principal >= 65 ? 'Excelente' : 'Regular'
         }));
+
+        // Extraer Sesiones
+        const allSesiones: any[] = [];
+        if (data.modalidades) {
+            data.modalidades.forEach((mod: any) => {
+                if (mod.sesiones) {
+                    mod.sesiones.forEach((s: any) => {
+                        allSesiones.push({
+                            ...s,
+                            modalidad_nombre: mod.nombre || 'General'
+                        });
+                    });
+                }
+            });
+        }
+        sesiones.value = allSesiones;
+        if (allSesiones.length > 0) {
+            activeSessionId.value = allSesiones[0].id;
+        }
+
     } catch (error) {
         console.error('Error al cargar detalle:', error);
     } finally {
@@ -56,12 +91,104 @@ const fetchDetalleActividad = async () => {
 
 onMounted(fetchDetalleActividad);
 
+onUnmounted(() => {
+    stopScanner();
+});
+
 const navigateToCalificaciones = () => {
     router.push({ 
         name: 'ponente-actividad-calificaciones',
         params: { actividadId: actividadId }
     });
 };
+
+const switchTab = (tab: string) => {
+    activeTab.value = tab;
+    if (tab === 'qr' && qrMode.value === 'scan') {
+        startScanner();
+    } else {
+        stopScanner();
+    }
+};
+
+const switchQrMode = (mode: 'project' | 'scan') => {
+    qrMode.value = mode;
+    if (mode === 'scan') {
+        startScanner();
+    } else {
+        stopScanner();
+    }
+};
+
+const startScanner = async () => {
+    await nextTick();
+    if (document.getElementById('reader')) {
+        html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader",
+            { fps: 10, qrbox: {width: 250, height: 250}, supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA] },
+            false
+        );
+        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+    }
+};
+
+const stopScanner = () => {
+    if (html5QrcodeScanner) {
+        try {
+            html5QrcodeScanner.clear();
+        } catch (error) {
+            console.error("Failed to clear scanner", error);
+        }
+        html5QrcodeScanner = null;
+    }
+};
+
+let isProcessingScan = false;
+
+const onScanSuccess = async (decodedText: string) => {
+    if (isProcessingScan) return;
+    
+    try {
+        const data = JSON.parse(decodedText);
+        if (!data.id_inscripcion_modalidad) throw new Error("QR inválido para asistencia de estudiante.");
+        if (!activeSessionId.value) throw new Error("Debe seleccionar una sesión activa.");
+
+        isProcessingScan = true;
+        
+        // Pausar scanner
+        if (html5QrcodeScanner) html5QrcodeScanner.pause(true);
+
+        const res = await api.post('/ponente/asistencias/registro-qr', {
+            id_inscripcion_modalidad: data.id_inscripcion_modalidad,
+            id_sesion: activeSessionId.value
+        });
+
+        await Swal.fire({
+            icon: 'success',
+            title: 'Asistencia Registrada',
+            text: res.data.mensaje || 'Estudiante registrado correctamente.',
+            timer: 2000,
+            showConfirmButton: false
+        });
+
+    } catch (e: any) {
+        await Swal.fire({
+            icon: 'error',
+            title: 'Error de Lectura',
+            text: e.response?.data?.message || e.message || 'QR inválido o ya registrado.',
+            timer: 3000,
+            showConfirmButton: false
+        });
+    } finally {
+        isProcessingScan = false;
+        if (html5QrcodeScanner) html5QrcodeScanner.resume();
+    }
+};
+
+const onScanFailure = (error: any) => {
+    // ignorar errores constantes de frame vacío
+};
+
 </script>
 
 <template>
@@ -78,61 +205,61 @@ const navigateToCalificaciones = () => {
     </button>
 
     <!-- Header Principal -->
-    <div class="bg-gradient-to-br from-umsa-blue via-[#005a96] to-[#004270] rounded-[2.5rem] p-8 md:p-12 text-white relative overflow-hidden shadow-2xl shadow-umsa-blue/20 flex flex-col md:flex-row justify-between items-center gap-8 border border-white/10">
+    <div class="bg-gradient-to-br from-umsa-blue via-[#005a96] to-[#004270] rounded-[1.5rem] md:rounded-[2.5rem] p-6 md:p-12 text-white relative overflow-hidden shadow-2xl shadow-umsa-blue/20 flex flex-col lg:flex-row justify-between items-center gap-6 md:gap-8 border border-white/10">
       <div class="absolute top-0 right-0 w-96 h-96 bg-umsa-gold/20 rounded-full blur-3xl -mr-32 -mt-32 mix-blend-screen pointer-events-none"></div>
       
-      <div class="relative z-10 w-full md:w-2/3">
-        <div class="flex items-center gap-3 mb-6 flex-wrap">
-          <span class="px-4 py-1.5 bg-umsa-gold text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg shadow-umsa-gold/30">
+      <div class="relative z-10 w-full lg:w-2/3 text-center lg:text-left">
+        <div class="flex items-center justify-center lg:justify-start gap-2 md:gap-3 mb-6 flex-wrap">
+          <span class="px-3 md:px-4 py-1 md:py-1.5 bg-umsa-gold text-white text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg shadow-umsa-gold/30">
             {{ curso.version }}
           </span>
-          <span class="px-4 py-1.5 bg-white/10 backdrop-blur-md border border-white/20 text-white text-[10px] font-black uppercase tracking-widest rounded-full">
+          <span class="px-3 md:px-4 py-1 md:py-1.5 bg-white/10 backdrop-blur-md border border-white/20 text-white text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded-full">
             <span class="mr-1 inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> {{ curso.estado }}
           </span>
         </div>
         
-        <h1 class="text-3xl md:text-5xl font-black leading-tight uppercase italic mb-4 tracking-tight">
+        <h1 class="text-2xl md:text-4xl lg:text-5xl font-black leading-tight uppercase italic mb-4 tracking-tight">
           {{ curso.evento }}
         </h1>
-        <p class="text-blue-50 text-sm md:text-base leading-relaxed max-w-3xl border-l-4 border-umsa-gold pl-4 font-medium opacity-90">
+        <p class="text-blue-50 text-xs md:text-sm lg:text-base leading-relaxed max-w-3xl border-l-4 border-umsa-gold pl-4 font-medium opacity-90 mx-auto lg:mx-0">
           {{ curso.descripcion }}
         </p>
       </div>
 
       <!-- Acciones Rápidas: SOLAMENTE SI TIENE PERMISOS -->
-      <div v-if="tienePermisos" class="relative z-10 flex flex-col gap-3 w-full md:w-auto min-w-[220px]">
-        <button @click="activeTab = 'qr'" class="group bg-white text-umsa-blue hover:bg-slate-50 font-black text-xs uppercase tracking-widest px-6 py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1">
-            <span class="material-symbols-outlined text-[20px] group-hover:scale-110 transition-transform">qr_code_scanner</span>
+      <div v-if="tienePermisos" class="relative z-10 flex flex-col sm:flex-row lg:flex-col gap-3 w-full lg:w-auto lg:min-w-[220px]">
+        <button @click="switchTab('qr')" class="group bg-white text-umsa-blue hover:bg-slate-50 font-black text-[10px] md:text-xs uppercase tracking-widest px-6 py-3.5 rounded-xl md:rounded-2xl flex items-center justify-center gap-3 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1 flex-1 lg:w-full">
+            <span class="material-symbols-outlined text-[18px] md:text-[20px] group-hover:scale-110 transition-transform">qr_code_scanner</span>
             Generar QR
         </button>
-        <button @click="navigateToCalificaciones()" class="group bg-umsa-gold hover:bg-yellow-600 text-white font-black text-xs uppercase tracking-widest px-6 py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-xl hover:shadow-2xl shadow-umsa-gold/20 hover:-translate-y-1">
-            <span class="material-symbols-outlined text-[20px] group-hover:scale-110 transition-transform">grading</span>
-            Gestionar Notas
+        <button @click="navigateToCalificaciones()" class="group bg-umsa-gold hover:bg-yellow-600 text-white font-black text-[10px] md:text-xs uppercase tracking-widest px-6 py-3.5 rounded-xl md:rounded-2xl flex items-center justify-center gap-3 transition-all shadow-xl hover:shadow-2xl shadow-umsa-gold/20 hover:-translate-y-1 flex-1 lg:w-full">
+            <span class="material-symbols-outlined text-[18px] md:text-[20px] group-hover:scale-110 transition-transform">grading</span>
+            Notas
         </button>
       </div>
       
       <!-- Si no tiene permisos, mostrar badge de catálogo -->
-      <div v-else class="relative z-10 bg-white/5 backdrop-blur-xl p-6 rounded-3xl border border-white/10 text-center flex flex-col items-center gap-2">
-            <span class="material-symbols-outlined text-4xl text-umsa-gold/50">visibility</span>
+      <div v-else class="relative z-10 bg-white/5 backdrop-blur-xl p-6 rounded-3xl border border-white/10 text-center flex flex-col items-center gap-2 w-full lg:w-auto">
+            <span class="material-symbols-outlined text-3xl md:text-4xl text-umsa-gold/50">visibility</span>
             <p class="text-[10px] font-black uppercase tracking-widest text-white/60">Vista de Catálogo</p>
             <p class="text-[8px] font-bold text-white/40 uppercase">No asignado como ponente</p>
       </div>
     </div>
 
     <!-- Pestañas Modernas -->
-    <div class="flex gap-2 overflow-x-auto no-scrollbar p-1 bg-slate-100 dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800">
-      <button v-for="tab in ['resumen', 'estudiantes']" :key="tab" @click="activeTab = tab" :class="[activeTab === tab ? 'bg-white dark:bg-gray-800 text-umsa-blue dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700']" class="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all flex items-center gap-2 flex-shrink-0">
+    <div class="flex gap-2 overflow-x-auto no-scrollbar p-1.5 bg-slate-100 dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 scroll-smooth">
+      <button v-for="tab in ['resumen', 'estudiantes']" :key="tab" @click="switchTab(tab)" :class="[activeTab === tab ? 'bg-white dark:bg-gray-800 text-umsa-blue dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700']" class="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all flex items-center gap-2 flex-shrink-0">
         <span class="material-symbols-outlined text-[18px]" :class="{'text-umsa-gold': activeTab === tab}">{{ tab === 'resumen' ? 'dashboard' : 'groups' }}</span>
         {{ tab === 'resumen' ? 'Panel Central' : `Nómina (${curso.estudiantesInscritos})` }}
       </button>
       
       <!-- Pestañas Extras solo si tiene permisos -->
       <template v-if="tienePermisos">
-          <button @click="activeTab = 'qr'" :class="[activeTab === 'qr' ? 'bg-white dark:bg-gray-800 text-umsa-blue dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700']" class="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all flex items-center gap-2 flex-shrink-0 relative">
+          <button @click="switchTab('qr')" :class="[activeTab === 'qr' ? 'bg-white dark:bg-gray-800 text-umsa-blue dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700']" class="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all flex items-center gap-2 flex-shrink-0 relative">
             <span class="material-symbols-outlined text-[18px]" :class="{'text-umsa-gold': activeTab === 'qr'}">qr_code_2</span>
             Asistencia
           </button>
-          <button @click="activeTab = 'certificados'" :class="[activeTab === 'certificados' ? 'bg-white dark:bg-gray-800 text-umsa-blue dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700']" class="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all flex items-center gap-2 flex-shrink-0">
+          <button @click="switchTab('certificados')" :class="[activeTab === 'certificados' ? 'bg-white dark:bg-gray-800 text-umsa-blue dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700']" class="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all flex items-center gap-2 flex-shrink-0">
             <span class="material-symbols-outlined text-[18px]" :class="{'text-umsa-gold': activeTab === 'certificados'}">workspace_premium</span>
             Mis Certificados
           </button>
@@ -156,7 +283,7 @@ const navigateToCalificaciones = () => {
            <h4 class="text-4xl font-black text-slate-800 dark:text-white leading-none">{{ curso.estudiantesInscritos }}</h4>
        </div>
 
-       <div v-if="tienePermisos" class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-[2.5rem] p-8 shadow-lg flex flex-col justify-between text-white group cursor-pointer" @click="activeTab='qr'">
+       <div v-if="tienePermisos" class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-[2.5rem] p-8 shadow-lg flex flex-col justify-between text-white group cursor-pointer" @click="switchTab('qr')">
             <p class="text-[10px] font-black uppercase tracking-widest text-umsa-gold mb-1">Módulo Docente</p>
             <h4 class="text-lg font-black leading-tight italic">Registrar Asistencia Hoy</h4>
             <div class="mt-4 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400">
@@ -170,43 +297,80 @@ const navigateToCalificaciones = () => {
     </div>
 
     <!-- Tabla de Estudiantes (Disponible para todos) -->
-    <div v-if="activeTab === 'estudiantes'" class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-[2.5rem] shadow-sm overflow-hidden p-2">
-        <table class="w-full text-left">
-            <thead class="bg-slate-50/50 dark:bg-black/20">
-                <tr>
-                    <th class="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Estudiante</th>
-                    <th class="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Correo Institucional</th>
-                    <th class="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Estatus Académico</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr v-for="est in estudiantes" :key="est.id" class="border-b border-slate-50 dark:border-gray-800/50 hover:bg-slate-50 dark:hover:bg-gray-800/30 transition-all">
-                    <td class="px-8 py-5">
-                       <div class="text-sm font-black text-slate-700 dark:text-white uppercase italic tracking-tighter">{{ est.nombre }}</div>
-                    </td>
-                    <td class="px-8 py-5 text-xs text-slate-500 font-bold">{{ est.correo }}</td>
-                    <td class="px-8 py-5 text-right">
-                        <span class="px-3 py-1 bg-blue-50 dark:bg-blue-900/10 text-umsa-blue text-[9px] font-black uppercase rounded-lg border border-blue-100 dark:border-blue-800/50">
-                            Pre-Inscrito
-                        </span>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+    <div v-if="activeTab === 'estudiantes'" class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm overflow-hidden p-2">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left min-w-[600px]">
+                <thead class="bg-slate-50/50 dark:bg-black/20">
+                    <tr>
+                        <th class="px-4 md:px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Estudiante</th>
+                        <th class="px-4 md:px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Correo Institucional</th>
+                        <th class="px-4 md:px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Estatus Académico</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="est in estudiantes" :key="est.id" class="border-b border-slate-50 dark:border-gray-800/50 hover:bg-slate-50 dark:hover:bg-gray-800/30 transition-all">
+                        <td class="px-4 md:px-8 py-5">
+                           <div class="text-sm font-black text-slate-700 dark:text-white uppercase italic tracking-tighter">{{ est.nombre }}</div>
+                        </td>
+                        <td class="px-4 md:px-8 py-5 text-xs text-slate-500 font-bold">{{ est.correo }}</td>
+                        <td class="px-4 md:px-8 py-5 text-right">
+                            <span class="px-3 py-1 bg-blue-50 dark:bg-blue-900/10 text-umsa-blue text-[9px] font-black uppercase rounded-lg border border-blue-100 dark:border-blue-800/50 whitespace-nowrap">
+                                Pre-Inscrito
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <!-- SECCIONES SEGURAS -->
-    <div v-if="activeTab === 'qr' && tienePermisos" class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-[2.5rem] p-12 shadow-xl flex flex-col md:flex-row items-center gap-12">
-        <div class="flex-1 max-w-lg">
-            <h3 class="text-3xl font-black text-slate-800 dark:text-white uppercase italic mb-4">Código de Asistencia</h3>
-            <p class="text-slate-500 text-sm leading-relaxed mb-8">Este código es único para ti. Proyectalo para que tus alumnos registren su entrada.</p>
-            <div class="flex gap-4">
-                <button class="bg-umsa-blue text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-umsa-blue/20">Pantalla Completa</button>
-                <button class="text-rose-500 font-black text-[10px] uppercase">Detener Sesión</button>
+    <div v-if="activeTab === 'qr' && tienePermisos" class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-[1.5rem] md:rounded-[2.5rem] p-6 md:p-12 shadow-xl">
+        <div class="flex flex-col xl:flex-row gap-8 xl:gap-12 items-start">
+            <div class="flex-1 w-full xl:max-w-lg">
+                <h3 class="text-2xl md:text-3xl font-black text-slate-800 dark:text-white uppercase italic mb-4">Registro de Asistencia</h3>
+                <p class="text-slate-500 text-sm leading-relaxed mb-6">Selecciona la sesión activa y el método de registro de asistencia.</p>
+                
+                <div class="mb-8 bg-slate-50 dark:bg-gray-800 p-4 rounded-xl border border-slate-200 dark:border-gray-700">
+                    <label class="text-[10px] font-black text-slate-400 uppercase mb-2 block">Sesión Académica Activa</label>
+                    <select v-if="sesiones.length > 0" v-model="activeSessionId" class="w-full bg-white dark:bg-gray-900 border border-slate-300 dark:border-gray-600 rounded-lg p-2 text-sm font-bold text-slate-700 dark:text-white focus:ring-2 focus:ring-umsa-blue/20 outline-none transition-all">
+                        <option v-for="s in sesiones" :key="s.id" :value="s.id">
+                            {{ s.modalidad_nombre }} - {{ s.fecha ? new Date(s.fecha).toLocaleDateString() : 'Sin Fecha' }}
+                        </option>
+                    </select>
+                    <div v-else class="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                        <p class="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-tight">No hay sesiones configuradas para esta actividad.</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <button @click="switchQrMode('project')" :class="qrMode === 'project' ? 'bg-umsa-blue text-white shadow-xl shadow-umsa-blue/20' : 'bg-slate-100 text-slate-500'" class="flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">
+                        Proyectar QR
+                    </button>
+                    <button @click="switchQrMode('scan')" :class="qrMode === 'scan' ? 'bg-umsa-blue text-white shadow-xl shadow-umsa-blue/20' : 'bg-slate-100 text-slate-500'" class="flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">
+                        Escanear Alumnos
+                    </button>
+                </div>
             </div>
-        </div>
-        <div class="bg-white p-6 rounded-[2.5rem] border-[10px] border-slate-100 shadow-2xl">
-            <img :src="qrCodeUrl" class="w-64 h-64 object-contain">
+
+            <!-- Panel Derecho (Proyectar o Escanear) -->
+            <div class="flex-1 flex justify-center items-center w-full min-h-[320px] mt-8 xl:mt-0">
+                <div v-if="qrMode === 'project'" class="bg-white p-6 md:p-10 rounded-[2.5rem] border-[8px] md:border-[12px] border-slate-100 shadow-2xl flex flex-col items-center justify-center w-full max-w-sm transition-all animate-in zoom-in-95 duration-500">
+                    <div v-if="!activeSessionId" class="text-center p-12 text-slate-400 flex flex-col items-center gap-4">
+                        <span class="material-symbols-outlined text-5xl opacity-20">ads_click</span>
+                        <p class="text-xs font-black uppercase tracking-widest leading-relaxed">Selecciona una sesión académica<br>para generar el código QR</p>
+                    </div>
+                    <template v-else>
+                        <QrcodeVue :value="qrData" :size="200" :level="'H'" class="md:hidden" />
+                        <QrcodeVue :value="qrData" :size="250" :level="'H'" class="hidden md:block" />
+                        <p class="text-xs font-bold text-slate-400 mt-6 text-center">Los alumnos deben escanear este código con la cámara de su celular desde el portal</p>
+                    </template>
+                </div>
+
+                <div v-if="qrMode === 'scan'" class="w-full max-w-md bg-black rounded-[2rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl">
+                    <div id="reader" class="w-full min-h-[300px] border-none bg-black"></div>
+                </div>
+            </div>
         </div>
     </div>
 

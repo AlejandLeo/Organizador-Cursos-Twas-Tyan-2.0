@@ -4,6 +4,8 @@ import api from '@/services/api';
 import Swal from 'sweetalert2';
 import type { Persona } from '@/types/admin';
 
+const activeTab = ref('cuentas');
+const solicitudesActividades = ref<any[]>([]);
 const cuentasPendientes = ref<any[]>([]);
 const loading = ref(true);
 
@@ -25,11 +27,56 @@ const fetchCuentasPendientes = async () => {
     }
 };
 
-onMounted(fetchCuentasPendientes);
+const fetchSolicitudesActividades = async () => {
+    try {
+        loading.value = true;
+        const response = await api.get('/actividades-academicas/solicitudes/pendientes');
+        solicitudesActividades.value = response.data || [];
+    } catch (error) {
+        console.error('Error fetching solicitudes actividades', error);
+        Swal.fire('Error', 'No se pudieron recuperar las solicitudes de reactivación', 'error');
+    } finally {
+        loading.value = false;
+    }
+};
+
+const refreshData = () => {
+    if (activeTab.value === 'cuentas') fetchCuentasPendientes();
+    else fetchSolicitudesActividades();
+};
+
+onMounted(refreshData);
+
+// ============================================
+// LOGICA DE ACTIVIDADES
+// ============================================
+
+const aprobarActividad = async (id: number, nombre: string) => {
+    try {
+        const { isConfirmed } = await Swal.fire({
+            title: '¿Reactivar Actividad?',
+            text: `¿Desea habilitar nuevamente "${nombre}"?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, Reactivar',
+            cancelButtonText: 'Cancelar'
+        });
+
+        if (!isConfirmed) return;
+
+        await api.patch(`/actividades-academicas/${id}/activar`);
+        Swal.fire({ icon: 'success', title: 'Actividad Reactivada', text: 'La actividad ya es visible para el público.', timer: 1500, showConfirmButton: false });
+        await fetchSolicitudesActividades();
+    } catch (error) {
+        console.error(error);
+        Swal.fire('Error', 'No se pudo reactivar la actividad', 'error');
+    }
+};
 
 // ============================================
 // LOGICA DE CUENTAS PENDIENTES
 // ============================================
+// ... rest of logic stays similar but integrated ...
 
 const aprobarCuenta = async (id: number) => {
     try {
@@ -55,20 +102,27 @@ const aprobarCuenta = async (id: number) => {
 
 const rechazarCuenta = async (id: number) => {
     try {
-        const { isConfirmed } = await Swal.fire({
+        const { value: motivo, isConfirmed } = await Swal.fire({
             title: '¿Rechazar Cuenta?',
-            text: 'La solicitud será rechazada y la cuenta quedará inactiva.',
+            text: 'Indique el motivo del rechazo para informar al usuario:',
+            input: 'textarea',
+            inputPlaceholder: 'Ej: El documento de aval es ilegible...',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
             confirmButtonText: 'Rechazar',
-            cancelButtonText: 'Cancelar'
+            cancelButtonText: 'Cancelar',
+            inputValidator: (value) => {
+                if (!value) {
+                    return '¡Debes escribir un motivo para el rechazo!';
+                }
+            }
         });
 
         if (!isConfirmed) return;
 
-        await api.patch(`/usuarios/${id}/solicitud/rechazar`);
-        Swal.fire({ icon: 'success', title: 'Cuenta Rechazada', text: 'La solicitud de cuenta ha sido rechazada.', timer: 1500, showConfirmButton: false });
+        await api.patch(`/usuarios/${id}/solicitud/rechazar`, { motivo });
+        Swal.fire({ icon: 'success', title: 'Cuenta Rechazada', text: 'La solicitud ha sido rechazada y se notificó al usuario.', timer: 1500, showConfirmButton: false });
         await fetchCuentasPendientes();
     } catch (error) {
         console.error(error);
@@ -125,8 +179,26 @@ const tieneReverso = (firmaDig?: string) => {
       </div>
     </div>
 
-    <!-- Tabla Cuentas Pendientes -->
-    <div class="bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden relative z-0">
+    <!-- SELECTOR DE PESTAÑAS -->
+    <div class="flex items-center gap-4 bg-white dark:bg-slate-900 p-2 rounded-[2rem] border border-slate-100 dark:border-slate-800 w-fit mx-auto shadow-sm">
+        <button @click="activeTab = 'cuentas'; refreshData()" 
+          :class="[activeTab === 'cuentas' ? 'bg-sky-600 text-white shadow-lg shadow-sky-500/30' : 'text-slate-400 hover:text-sky-500']"
+          class="flex items-center gap-3 px-8 py-4 rounded-full font-black text-[10px] uppercase tracking-widest transition-all duration-300">
+          <span class="material-symbols-outlined text-sm">person_add</span>
+          Cuentas Pendientes
+          <span v-if="cuentasPendientes.length > 0" class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+        </button>
+        <button @click="activeTab = 'actividades'; refreshData()" 
+          :class="[activeTab === 'actividades' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'text-slate-400 hover:text-amber-500']"
+          class="flex items-center gap-3 px-8 py-4 rounded-full font-black text-[10px] uppercase tracking-widest transition-all duration-300">
+          <span class="material-symbols-outlined text-sm">folder_managed</span>
+          Reactivación de Actividades
+          <span v-if="solicitudesActividades.length > 0" class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+        </button>
+    </div>
+
+    <!-- PESTAÑA: CUENTAS -->
+    <div v-if="activeTab === 'cuentas'" class="bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden relative z-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div class="p-6 bg-slate-50 dark:bg-gray-800 border-b border-slate-200 dark:border-gray-700 flex justify-between items-center">
             <div>
                 <h3 class="text-[12px] font-black text-primary-dark dark:text-white uppercase tracking-widest">
@@ -136,7 +208,7 @@ const tieneReverso = (firmaDig?: string) => {
                     {{ cuentasPendientes.length }} Cuentas nuevas por revisar
                 </p>
             </div>
-            <button @click="fetchCuentasPendientes" class="p-2 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-slate-400 hover:text-sky-500 transition-colors">
+            <button @click="refreshData" class="p-2 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-slate-400 hover:text-sky-500 transition-colors">
                 <span class="material-symbols-outlined text-[18px]">refresh</span>
             </button>
       </div>
@@ -197,6 +269,77 @@ const tieneReverso = (firmaDig?: string) => {
                         </button>
                         <button @click="rechazarCuenta(item.id)" class="p-2 border border-red-200 dark:border-red-900/50 text-red-500 rounded-lg hover:bg-red-50 hover:text-white transition-all group" title="Rechazar Registro">
                             <span class="material-symbols-outlined text-[18px]">person_off</span>
+                        </button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PESTAÑA: ACTIVIDADES -->
+    <div v-if="activeTab === 'actividades'" class="bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden relative z-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div class="p-6 bg-slate-50 dark:bg-gray-800 border-b border-slate-200 dark:border-gray-700 flex justify-between items-center">
+            <div>
+                <h3 class="text-[12px] font-black text-amber-600 uppercase tracking-widest">
+                    Peticiones de Reactivación de Módulos
+                </h3>
+                <p class="text-[10px] text-slate-500 mt-1 font-bold">
+                    {{ solicitudesActividades.length }} actividades esperando habilitación
+                </p>
+            </div>
+            <button @click="refreshData" class="p-2 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-slate-400 hover:text-amber-500 transition-colors">
+                <span class="material-symbols-outlined text-[18px]">refresh</span>
+            </button>
+      </div>
+
+      <div class="w-full overflow-x-auto">
+        <table class="w-full text-left">
+            <thead class="bg-slate-50 dark:bg-gray-800/50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-200 dark:border-gray-800">
+                <tr>
+                    <th class="px-6 py-4">Actividad Académica</th>
+                    <th class="px-6 py-4">Evento Relacionado</th>
+                    <th class="px-6 py-4">Estado Actual</th>
+                    <th class="px-6 py-4 text-center">Acciones</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 dark:divide-gray-800">
+                <tr v-if="loading" class="bg-white dark:bg-gray-900">
+                    <td colspan="4" class="py-12 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">
+                        <span class="material-symbols-outlined animate-spin align-middle mr-2">refresh</span> Cargando...
+                    </td>
+                </tr>
+                <tr v-if="!loading && solicitudesActividades.length === 0" class="bg-white dark:bg-gray-900">
+                    <td colspan="4" class="py-12 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">
+                        No hay solicitudes de reactivación pendientes
+                    </td>
+                </tr>
+                <tr v-for="act in solicitudesActividades" :key="act.id" class="hover:bg-slate-50 dark:hover:bg-gray-800/80 transition-colors">
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 rounded-xl overflow-hidden shadow-sm border border-slate-200">
+                                <img :src="act.imagen || 'https://via.placeholder.com/150'" class="w-full h-full object-cover">
+                            </div>
+                            <div>
+                                <p class="text-[12px] font-black text-slate-800 dark:text-white uppercase">{{ act.nombre }}</p>
+                                <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{{ act.tipo }}</p>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <p class="text-xs font-black text-slate-600 dark:text-slate-300 uppercase">{{ act.evento?.nombre || 'General' }}</p>
+                        <p class="text-[9px] text-slate-400 font-bold uppercase">Gestión: {{ act.evento?.gestion }}</p>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-500 rounded-full text-[9px] font-black uppercase tracking-widest border border-red-100">
+                            <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                            Inhabilitada
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <button @click="aprobarActividad(act.id, act.nombre)" 
+                          class="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-all font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-1">
+                          Habilitar Ahora
                         </button>
                     </td>
                 </tr>

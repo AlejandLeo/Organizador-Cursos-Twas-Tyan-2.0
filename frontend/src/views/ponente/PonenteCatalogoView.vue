@@ -1,66 +1,61 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import api from '@/services/api';
 
-const eventosPublicados = ref([
-  {
-    id: 1,
-    nombreCorto: 'TWAS',
-    nombreLargo: 'The World Academy of Sciences',
-    version: 'Versión 2026',
-    descripcion: 'Eventos del The World Academy of Sciences incluyendo diversas ramas de especialización.',
-    imagen: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80',
-    estado: 'Evento Activo',
-    colorEstado: 'bg-emerald-500 text-white border-emerald-400/30',
-    inscripcionesAbiertas: true,
-    mostrarActividades: true,
-    actividades: [
-      {
-        id: 1,
-        title: 'Programa de Especialidad en Biofertilizantes',
-        status: 'En curso',
-        type: 'Especialidad',
-        date: '15 Mar - 20 Jul 2026',
-        students: 45,
-        modules: 4,
-        image: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80'
-      },
-      {
-        id: 2,
-        title: 'Taller de Redacción APA 7ma Edición',
-        status: 'Próximamente',
-        type: 'Taller',
-        date: '10 Abr - 15 Abr 2026',
-        students: 120,
-        modules: 1,
-        image: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80'
-      }
-    ]
-  },
-  {
-    id: 2,
-    nombreCorto: 'Innovación Tecnológica',
-    nombreLargo: 'Congreso Internacional de Innovación y Tecnología',
-    version: 'Versión 2026',
-    descripcion: 'El congreso anual sobre los últimos avances en tecnología global e investigación.',
-    imagen: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1600&q=80',
-    estado: 'Próximamente',
-    colorEstado: 'bg-umsa-gold text-white border-yellow-400/30',
-    inscripcionesAbiertas: false,
-    mostrarActividades: true,
-    actividades: [
-      {
-        id: 3,
-        title: 'Diplomado en Riego Tecnificado',
-        status: 'Finalizado',
-        type: 'Diplomado',
-        date: '01 Ene - 28 Feb 2026',
-        students: 75,
-        modules: 6,
-        image: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=800&q=80'
-      }
-    ]
+const router = useRouter();
+const loading = ref(true);
+const eventosPublicados = ref<any[]>([]);
+
+const loadCatalog = async () => {
+  loading.value = true;
+  try {
+    const res = await api.get('/eventos');
+    const allEvents = res.data || [];
+    
+    // Filtrar solo eventos activos (1) o próximos (si aplica, usualmente 1 es activo)
+    const activeEvents = allEvents.filter((ev: any) => ev.estado === 1);
+    
+    eventosPublicados.value = activeEvents.map((evento: any) => {
+      return {
+        id: evento.id,
+        nombreCorto: evento.sigla || evento.nombre?.substring(0, 15) || 'Evento',
+        nombreLargo: evento.nombre || 'Nombre del Evento',
+        version: evento.version || 'Gestión ' + evento.gestion,
+        descripcion: evento.descripcion || 'Sin descripción disponible.',
+        imagen: evento.imagen_fondo || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80',
+        estado: 'Evento Activo',
+        colorEstado: 'bg-emerald-500 text-white border-emerald-400/30',
+        inscripcionesAbiertas: true,
+        mostrarActividades: true,
+        actividades: (evento.actividades || []).map((act: any) => {
+          // Determinar estado de la actividad (1 = Activo)
+          let statusLabel = 'Próximamente';
+          if (act.estado === 1) statusLabel = 'En curso';
+          if (act.estado === 0) statusLabel = 'Finalizado';
+
+          return {
+            id: act.id,
+            title: act.nombre || 'Actividad Académica',
+            status: statusLabel,
+            type: act.tipo || 'General',
+            date: act.fecha_inicio ? `${new Date(act.fecha_inicio).toLocaleDateString()}` : 'Por definir',
+            students: act.inscripciones?.length || 0,
+            modules: act.modalidades?.length || 1,
+            image: act.imagen || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80'
+          };
+        })
+      };
+    });
+  } catch (error) {
+    console.error('Error cargando catálogo:', error);
+  } finally {
+    loading.value = false;
   }
-]);
+};
+
+onMounted(loadCatalog);
+
 
 const toggleActividades = (evento: any) => {
   evento.mostrarActividades = !evento.mostrarActividades;
@@ -102,20 +97,20 @@ const getStatusColor = (status: string) => {
         <img :src="evento.imagen" :alt="evento.nombreCorto" class="w-full h-full object-cover object-center group-hover/card:scale-105 transition-transform duration-[1.5s] ease-out">
         <div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent"></div>
         
-        <div class="absolute bottom-0 left-0 right-0 p-8 pt-24 z-20 flex flex-col">
+        <div class="absolute bottom-0 left-0 right-0 p-6 md:p-8 pt-24 z-20 flex flex-col">
           <span class="mb-3" :class="[evento.colorEstado, 'text-[8px] font-black uppercase px-3 py-1 rounded-full tracking-widest w-fit shadow-lg backdrop-blur-md border']">
             {{ evento.estado }}
           </span>
-          <div class="flex items-end justify-between">
-            <div>
-              <p class="text-xs font-bold text-umsa-gold dark:text-blue-400 uppercase tracking-widest mb-2">{{ evento.version }}</p>
-              <h1 class="text-4xl md:text-5xl font-black text-white tracking-tighter leading-none mb-4">{{ evento.nombreCorto }}</h1>
-              <p class="text-sm font-medium text-gray-300 max-w-2xl line-clamp-2 leading-relaxed">{{ evento.descripcion }}</p>
+          <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+            <div class="flex-1">
+              <p class="text-[10px] md:text-xs font-bold text-umsa-gold dark:text-blue-400 uppercase tracking-widest mb-2">{{ evento.version }}</p>
+              <h1 class="text-3xl md:text-5xl font-black text-white tracking-tighter leading-none mb-3 md:mb-4">{{ evento.nombreCorto }}</h1>
+              <p class="text-xs md:text-sm font-medium text-gray-300 max-w-2xl line-clamp-2 leading-relaxed">{{ evento.descripcion }}</p>
             </div>
 
             <!-- Accordion Toggle Button -->
-            <button @click="toggleActividades(evento)" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 px-6 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 group/btn cursor-pointer z-30 relative">
-              <span class="text-xs font-bold uppercase tracking-widest">{{ evento.mostrarActividades ? 'Ocultar' : 'Ver' }} Actividades</span>
+            <button @click="toggleActividades(evento)" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 px-5 md:px-6 py-2.5 md:py-3 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 group/btn cursor-pointer z-30 relative w-full lg:w-auto">
+              <span class="text-[10px] md:text-xs font-bold uppercase tracking-widest">{{ evento.mostrarActividades ? 'Ocultar' : 'Ver' }} Actividades</span>
               <span class="material-symbols-outlined text-[16px] transition-transform duration-300" :class="evento.mostrarActividades ? 'rotate-180' : ''">expand_more</span>
             </button>
           </div>
@@ -127,12 +122,12 @@ const getStatusColor = (status: string) => {
         
         <div v-for="(acts, categoria) in getActividadesAgrupadas(evento.actividades)" :key="categoria" class="mb-10 w-full overflow-hidden">
           <!-- Row Header -->
-          <div class="flex items-end justify-between px-8 mb-4">
+          <div class="flex flex-col sm:flex-row sm:items-end justify-between px-6 md:px-8 mb-4 gap-4">
             <div>
-              <h3 class="text-xl md:text-2xl font-black text-primary-dark dark:text-white uppercase tracking-tighter">{{ categoria }}</h3>
-              <p class="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest mt-1">Explorar {{ acts.length }} disponibles en esta categoría</p>
+              <h3 class="text-lg md:text-2xl font-black text-primary-dark dark:text-white uppercase tracking-tighter">{{ categoria }}</h3>
+              <p class="text-[9px] md:text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest mt-1">Explorar {{ acts.length }} disponibles en esta categoría</p>
             </div>
-            <button class="text-[10px] font-black uppercase tracking-widest bg-white dark:bg-gray-800 hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 border border-slate-200 dark:border-gray-700 px-4 py-2 rounded-xl transition-all flex items-center gap-2 relative z-20 cursor-pointer shadow-sm hover:shadow-md">
+            <button class="text-[9px] md:text-[10px] font-black uppercase tracking-widest bg-white dark:bg-gray-800 hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 border border-slate-200 dark:border-gray-700 px-4 py-2 rounded-xl transition-all flex items-center justify-center gap-2 relative z-20 cursor-pointer shadow-sm hover:shadow-md w-full sm:w-auto">
               <span class="material-symbols-outlined text-[14px]">visibility</span> Ver todos
             </button>
           </div>
@@ -183,10 +178,10 @@ const getStatusColor = (status: string) => {
                 </div>
 
                 <div class="flex justify-between items-center pt-4 border-t border-slate-100 dark:border-gray-800">
-                    <div class="flex items-center text-umsa-blue font-black group/btn">
+                    <button @click="router.push(`/ponente/curso/${act.id}`)" class="flex items-center text-umsa-blue font-black group/btn cursor-pointer">
                         <span class="text-[11px] uppercase tracking-widest">Ver Detalles</span>
                         <span class="material-symbols-outlined text-[18px] ml-2 group-hover/btn:translate-x-1 transition-transform">visibility</span>
-                    </div>
+                    </button>
                 </div>
               </div>
             </div>
