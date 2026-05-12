@@ -40,8 +40,21 @@ export class SoporteService {
         await this.mailService.sendMail(
           email, 
           'Recibimos tu solicitud de acceso - TYAN',
+<<<<<<< HEAD
           'soporte-password',
           { mensaje }
+=======
+          `
+            <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+              <h2 style="color: #003a70;">Hola,</h2>
+              <p>Hemos recibido tu solicitud para restablecer tu contraseña en el sistema <b>TYAN</b>.</p>
+              <p>Un administrador revisará tu identidad y te enviará una clave temporal en breve.</p>
+              <p><b>Detalle de tu mensaje:</b><br><i style="color: #666;">"${mensaje}"</i></p>
+              <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+              <p style="font-size: 12px; color: #666;">Este es un aviso automático de recepción.</p>
+            </div>
+          `
+>>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
         );
       } catch (error) {
         console.error('Error enviando correo automático:', error);

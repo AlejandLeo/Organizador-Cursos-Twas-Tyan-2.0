@@ -322,7 +322,6 @@ const abrirMapa = (url: string) => {
                 </p>
               </div>
 
-
             </div>
           </div>
         </div>

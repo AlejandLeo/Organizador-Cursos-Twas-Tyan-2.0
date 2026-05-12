@@ -64,10 +64,14 @@ const fetchData = async () => {
             min_asistencia: mod?.min_asistencia ?? 80,
             fecha_inicio: actividad.value.fecha_inicio || '',
             fecha_fin: actividad.value.fecha_fin || '',
+<<<<<<< HEAD
             horas: actividad.value.horas || 0,
             id_evento: actividad.value.evento?.id || null,
             sesiones: Array.isArray(mod?.sesiones) ? JSON.parse(JSON.stringify(mod.sesiones)) : [],
             requisitos: actividad.value.requisitos || { fields: [] }
+=======
+            sesiones: Array.isArray(mod?.sesiones) ? JSON.parse(JSON.stringify(mod.sesiones)) : []
+>>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
         };
 
         // Carga de inscripciones (crítica - muestra solicitudes y alumnos)
@@ -381,8 +385,12 @@ const eliminarPonente = async (id: number) => {
     </button>
 
     <div v-if="actividad" class="rounded-[3rem] p-10 flex flex-col md:flex-row items-center justify-between shadow-2xl relative overflow-hidden border-r-8 border-umsa-gold min-h-[200px]"
+<<<<<<< HEAD
          :style="actividad.imagen ? { backgroundImage: `url(${getImageUrl('cursos', actividad.imagen)})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { backgroundColor: '#1e293b' }"
          :class="Number(actividad.estado) === -1 ? 'grayscale' : ''">
+=======
+         :style="actividad.imagen ? { backgroundImage: `url(${actividad.imagen})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { backgroundColor: '#1e293b' }">
+>>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
       <!-- Overlay degradado para adaptar a la paleta institucional -->
       <div class="absolute inset-0 bg-gradient-to-r" :class="Number(actividad.estado) === -1 ? 'from-gray-900/95 via-gray-800/80 to-transparent' : 'from-umsa-blue/95 via-primary-dark/80 to-transparent'"></div>
       

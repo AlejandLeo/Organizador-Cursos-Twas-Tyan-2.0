@@ -45,7 +45,11 @@ export class EventosService {
     const cleanFilename = decodeURIComponent(filenameOrUrl);
     
     const baseUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
+<<<<<<< HEAD
     return `${baseUrl}/uploads/${folder}/${encodeURIComponent(cleanFilename)}`;
+=======
+    return `${baseUrl}/uploads/${folder}/${encodeURIComponent(filenameOrUrl)}`;
+>>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
   }
 
   async findAll() {
@@ -55,7 +59,7 @@ export class EventosService {
     });
     return eventos.map(evento => ({
       ...evento,
-      logo: this.formatImageUrl(evento.logo, 'eventos'),
+      logo: this.formatImageUrl(evento.logo, 'logo'),
       imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
       actividades: (evento.actividades || [])
         .map(act => ({
@@ -71,7 +75,7 @@ export class EventosService {
     if (evento) {
       return {
         ...evento,
-        logo: this.formatImageUrl(evento.logo, 'eventos'),
+        logo: this.formatImageUrl(evento.logo, 'logo'),
         imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos')
       };
     }
@@ -186,7 +190,7 @@ export class EventosService {
 
     const data = eventos.map((evento) => ({
       ...evento,
-      logo: this.formatImageUrl(evento.logo, 'eventos'),
+      logo: this.formatImageUrl(evento.logo, 'logo'),
       imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
       actividades: (evento.actividades || []).map(act => ({
         ...act,
@@ -216,7 +220,7 @@ export class EventosService {
     const guardado = await this.eventoRepository.save(evento);
     return {
       ...guardado,
-      logo: this.formatImageUrl(guardado.logo, 'eventos'),
+      logo: this.formatImageUrl(guardado.logo, 'logo'),
       imagen_fondo: this.formatImageUrl(guardado.imagen_fondo, 'fondos'),
     };
   }
@@ -262,7 +266,7 @@ export class EventosService {
     const actualizado = await this.eventoRepository.findOneBy({ id });
     return {
       ...actualizado,
-      logo: this.formatImageUrl(actualizado!.logo, 'eventos'),
+      logo: this.formatImageUrl(actualizado!.logo, 'logo'),
       imagen_fondo: this.formatImageUrl(actualizado!.imagen_fondo, 'fondos'),
     };
   }

@@ -211,6 +211,16 @@ const router = createRouter({
           name: 'ponente-historial-notas',
           component: () => import('../views/ponente/PonenteHistorialNotasView.vue'),
         },
+        {
+          path: 'actividad/:id/proyectar-qr',
+          name: 'ponente-proyectar-qr',
+          component: () => import('../views/ponente/PonenteProyectarQrView.vue'),
+        },
+        {
+          path: 'actividad/:id/escanear-alumnos',
+          name: 'ponente-escanear-alumnos',
+          component: () => import('../views/ponente/PonenteEscanearEstudiantesView.vue'),
+        },
       ]
     },
     {
@@ -251,6 +261,16 @@ const router = createRouter({
           path: 'perfil',
           name: 'estudiante-perfil',
           component: () => import('../views/estudiante/EstudiantePerfilView.vue'),
+        },
+        {
+          path: 'mi-qr',
+          name: 'estudiante-mi-qr',
+          component: () => import('../views/estudiante/EstudianteMiQrView.vue'),
+        },
+        {
+          path: 'marcar-asistencia',
+          name: 'estudiante-marcar-asistencia',
+          component: () => import('../views/estudiante/EstudianteMarcarAsistenciaView.vue'),
         }
       ]
     },

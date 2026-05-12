@@ -31,7 +31,11 @@ export interface Persona {
   firma_dig?: string;
   perfil_completado?: boolean;
   ponente_configurado?: boolean;
+<<<<<<< HEAD
   id_usuario: number;
+=======
+  id_usuario: string;
+>>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
 }
 
 export interface Rol {

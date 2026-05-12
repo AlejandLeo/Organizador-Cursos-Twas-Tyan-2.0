@@ -165,7 +165,9 @@ const resetFormEvento = () => {
         contacto_donde: '',
         contacto_telefono: '',
         contacto_email: '',
-        auspicios: []
+        auspicios: [],
+        prioridad: '3',
+        visibilidad_al_finalizar: 'visible'
     };
 };
 
@@ -404,7 +406,7 @@ const handleSaveEvento = async () => {
         // Cronograma
         const cleanedCronograma = formEvento.value.cronograma_lista.map(d => ({
             ...d,
-            events: d.events.filter((e:any) => e.title?.trim())
+            events: d.events?.filter((e:any) => e?.title?.trim()) || []
         })).filter(d => d.events.length > 0);
         formData.append('cronograma', JSON.stringify(cleanedCronograma));
 
@@ -484,7 +486,9 @@ const editarEvento = (evento: any) => {
         contacto_donde: evento.direccion || '',
         contacto_telefono: evento.telefono || '',
         contacto_email: evento.email || '',
-        auspicios: []
+        auspicios: [],
+        prioridad: evento.prioridad || '3',
+        visibilidad_al_finalizar: evento.visibilidad_al_finalizar || 'visible'
     };
 
     if (evento.organizadores) {

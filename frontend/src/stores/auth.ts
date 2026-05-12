@@ -34,7 +34,7 @@ export const useAuthStore = defineStore('auth', () => {
   /** True si el usuario es Super Usuario */
   const esSuperUsuario = computed(
     () => userRoles.value.includes('Super Usuario') ||
-          (user.value as any)?.usuariosRoles?.some((ur: any) => ur.rol?.id === 1)
+      (user.value as any)?.usuariosRoles?.some((ur: any) => ur.rol?.id === 1)
   );
 
   /** Cambia el contexto de rol activo y lo persiste */
@@ -50,7 +50,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (esSuperUsuario.value) return '/admin';
     const roles = userRoles.value;
     const persona = user.value?.persona as any;
-    
+
     // Si ya hay un rol activo seleccionado, lo respetamos
     if (rolActivo.value && roles.includes(rolActivo.value)) {
       if (rolActivo.value === 'Ponente') return '/ponente';
@@ -66,12 +66,12 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Por defecto, si es estudiante va a /estudiante
     if (roles.includes('Estudiante')) return '/estudiante';
-    
+
     // Si solo es ponente (no configurado aún) o coordinador
     if (roles.includes('Coordinador')) return '/coordinador';
     if (roles.includes('Logística')) return '/logistica';
     if (roles.includes('Ponente')) return '/ponente';
-    
+
     return '/estudiante';
   }
 
@@ -93,15 +93,15 @@ export const useAuthStore = defineStore('auth', () => {
   async function login(email: string, password: string) {
     try {
       const response = await api.post('/auth/login', { email, password });
-      
+
       if (response.data.token) {
         localStorage.setItem('token', response.data.token);
         token.value = response.data.token;
-        
+
         // Asignar el token inmediatamente a la instancia de api para las siguientes llamadas
         api.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
       }
-      
+
       // Perfil actualizado desde /auth/me para evitar usuarios cacheados
       const meResponse = await api.get('/auth/me');
       user.value = meResponse.data;
@@ -117,7 +117,7 @@ export const useAuthStore = defineStore('auth', () => {
         localStorage.removeItem('rolActivo');
         rolActivo.value = '';
       }
-      
+
     } catch (error) {
       console.error('Login failed', error);
       throw error;
@@ -129,8 +129,8 @@ export const useAuthStore = defineStore('auth', () => {
       if (token.value) {
         const response = await api.get('/auth/me');
         if (response.data) {
-           user.value = response.data;
-           checkNotificacionPendiente();
+          user.value = response.data;
+          checkNotificacionPendiente();
         }
       }
     } catch (e: any) {

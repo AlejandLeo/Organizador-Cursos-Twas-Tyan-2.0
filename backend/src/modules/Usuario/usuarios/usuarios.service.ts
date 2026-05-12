@@ -537,6 +537,7 @@ export class UsuariosService {
 
       let contextoRol = '';
       
+<<<<<<< HEAD
       // Lógica de Validación Priorizada:
       // Si el DTO indica un portal (ej: 'Ponente'), intentamos validar esa clave PRIMERO.
       
@@ -573,6 +574,31 @@ export class UsuariosService {
         const passPonenteValido = await bcrypt.compare(loginDto.password, usuario.password_ponente);
         if (passPonenteValido) {
           contextoRol = 'Ponente';
+=======
+      // 1. Intentar validar con la contraseña principal (Estudiante / Admin)
+      // Nota: password siempre debe existir en la BD.
+      const passEstudianteValido = usuario.password 
+        ? await bcrypt.compare(loginDto.password, usuario.password)
+        : false;
+      
+      if (passEstudianteValido) {
+        contextoRol = 'Estudiante';
+        const esAdmin = usuario.usuariosRoles?.some((ur: any) => 
+          ur.rol?.id === 1 || ur.rol?.nombre_rol === 'Super Usuario'
+        );
+        if (esAdmin) contextoRol = 'Admin';
+      } else {
+        // 2. Intentar validar con la contraseña de ponente (si existe y está configurado)
+        if (usuario.password_ponente && usuario.password_ponente.length > 10) {
+          try {
+            const passPonenteValido = await bcrypt.compare(loginDto.password, usuario.password_ponente);
+            if (passPonenteValido) {
+              contextoRol = 'Ponente';
+            }
+          } catch (e) {
+            console.error('[AUTH ERROR] Error comparando password_ponente:', e.message);
+          }
+>>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
         }
       }
 
@@ -644,6 +670,10 @@ export class UsuariosService {
     tipo: 'principal' | 'ponente' = 'principal',
   ): Promise<{ mensaje: string }> {
     const hash = await bcrypt.hash(nuevaPassword, 10);
+<<<<<<< HEAD
+=======
+
+>>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
     if (tipo === 'ponente') {
       await this.usuarioRepository.update(id, { password_ponente: hash });
     } else {
@@ -665,6 +695,13 @@ export class UsuariosService {
     return await this.usuarioRepository.findOne({
       where: { email },
       relations: ['persona']
+<<<<<<< HEAD
+=======
+    });
+    await this.usuarioRepository.update(id, { 
+      password: hash,
+      requiere_cambio_password: false 
+>>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
     });
   }
 
@@ -1060,6 +1097,7 @@ export class UsuariosService {
 
       await queryRunner.commitTransaction();
 
+<<<<<<< HEAD
       // Notificar a administración (opcional/no-bloqueante)
       try {
         const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
@@ -1068,6 +1106,8 @@ export class UsuariosService {
         console.error('Error enviando notificación de solicitud a admin:', e);
       }
 
+=======
+>>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
       return {
         mensaje:
           'Su solicitud fue recepcionada correctamente. La confirmación de su cuenta se realizará una vez finalice el proceso de inscripciones y sea validada por administración.',
@@ -1237,6 +1277,7 @@ export class UsuariosService {
     console.log(`[AUDITORÍA] Portal Ponente ACTIVADO CON CLAVE ESPECÍFICA - Usuario ID: ${id_usuario}`);
     return { mensaje: 'Portal de ponente activado exitosamente.' };
   }
+<<<<<<< HEAD
 
   async getAttendanceToken(usuarioId: number): Promise<string> {
     return this.qrService.generarTokenAsistencia(usuarioId);
@@ -1257,5 +1298,7 @@ export class UsuariosService {
     
     return this.usuarioRepository.delete(id);
   }
+=======
+>>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
 }
 

@@ -69,9 +69,13 @@ export class UsuariosController {
   @Post('activar-ponente')
   @ApiOperation({ summary: 'Activar portal de ponente' })
   async activarPonente(@Request() req: any, @Body() body: { ci: string, password?: string }) {
+<<<<<<< HEAD
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const userId = Number(req.user.id);
     return this.usuariosService.activarPortalPonente(userId, body.ci, body.password || '');
+=======
+    return this.usuariosService.activarPortalPonente(req.user.id_usuario, body.ci, body.password || '');
+>>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
   }
 
   @UseGuards(JwtAuthGuard)
@@ -141,6 +145,7 @@ export class UsuariosController {
         });
       }
     }
+<<<<<<< HEAD
 
     // 4. Notificación de Designación como Logística
     const esLogistica = usuario.usuariosRoles?.some((ur: any) => ur.rol?.nombre_rol === 'Logística');
@@ -154,6 +159,8 @@ export class UsuariosController {
         prioridad: 'alta'
       });
     }
+=======
+>>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
 
     return alertas;
   }
