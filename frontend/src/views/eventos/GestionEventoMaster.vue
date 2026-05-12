@@ -12,7 +12,6 @@ import Swal from 'sweetalert2';
 const router = useRouter();
 const route = useRoute();
 const eventoStore = useEventoStore();
-const historialStore = useAdminHistorialStore();
 const authStore = useAuthStore();
 
 const openDetalleCurso = (courseId: any, extraQuery = {}) => {
@@ -34,8 +33,11 @@ const isAdmin = () => {
   const roles = (authStore.user as any)?.usuariosRoles || [];
   return roles.some((ur: any) => ur.rol?.nombre_rol === 'Super Usuario' || ur.rol?.id === 1);
 };
-const registrarAccion = (...args: Parameters<typeof historialStore.registrar>) => {
-  if (isAdmin()) historialStore.registrar(...args);
+const registrarAccion = (...args: Parameters<ReturnType<typeof useAdminHistorialStore>['registrar']>) => {
+  if (isAdmin()) {
+    const historialStore = useAdminHistorialStore();
+    historialStore.registrar(...args);
+  }
 };
 
 // --- LÓGICA DE GESTIÓN DE EVENTOS (FUSIÓN MAESTRA) ---
@@ -104,6 +106,8 @@ const formEvento = ref({
   cronograma_lista: [] as any[],
   version: '',
   nombre_2: '',
+  prioridad: '3',
+  visibilidad_al_finalizar: 'visible',
   // Paso 6: Contacto, Organización y Auspicios
   contacto_donde: '',
   contacto_telefono: '',
@@ -116,6 +120,23 @@ const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     return `${date.getDate() + 1} de ${months[date.getMonth()]}`;
+};
+
+const confirmarCancelar = () => {
+    Swal.fire({
+        title: '¿Estás seguro?',
+        text: "¿Quieres cancelar los cambios? Se perderán los datos no guardados.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#0070b4',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Sí, cancelar',
+        cancelButtonText: 'No, seguir editando'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            isCreatingEvento.value = false;
+        }
+    });
 };
 
 const ponentesFiltrados = computed(() => {
@@ -284,7 +305,6 @@ const fetchEventos = async () => {
             mostrarInhabilitadas: false, // Nueva variable para controlar el despliegue
             actividades: (ev.actividades || []).map((act: any) => {
                 const s_raw = Number(act.estado);
-                if (s_raw === -1) console.log(`   -> Actividad inhabilitada detectada: ${act.nombre}`);
                 return {
                 id: act.id,
                 title: act.nombre,
@@ -371,6 +391,8 @@ const handleSaveEvento = async () => {
         formData.append('color_badge_institucion', formEvento.value.color_badge_institucion);
         formData.append('color_badge_fecha', formEvento.value.color_badge_fecha);
         formData.append('nombre_2', formEvento.value.nombre_2 || '');
+        formData.append('prioridad', formEvento.value.prioridad || '3');
+        formData.append('visibilidad_al_finalizar', formEvento.value.visibilidad_al_finalizar || 'visible');
 
         // Contacto y Auspicios
         formData.append('telefono', formEvento.value.contacto_telefono || '');
@@ -880,11 +902,11 @@ const changeStep = (delta: number) => {
           <span class="absolute inset-y-0 left-5 flex items-center text-slate-400">
             <span class="material-symbols-outlined text-xl group-focus-within:text-umsa-blue transition-colors">search</span>
           </span>
-          <input v-model="filtroBusqueda" class="w-full pl-14 pr-6 py-4 bg-white dark:bg-gray-900 border-2 border-slate-200 dark:border-gray-800 rounded-full shadow-sm text-sm focus:ring-4 focus:ring-umsa-blue/10 focus:border-umsa-blue outline-none transition-all font-bold text-primary-dark dark:text-gray-200 placeholder-slate-400" placeholder="Busca Puntos de Agenda o Eventos..." type="text">
+          <input v-model="filtroBusqueda" class="w-full pl-14 pr-6 py-4 bg-white dark:bg-gray-900 border-2 border-slate-200 dark:border-gray-800 rounded-full shadow-sm text-sm focus:ring-4 focus:ring-umsa-blue/10 focus:border-umsa-blue outline-none transition-all font-bold text-primary-dark dark:text-gray-200 placeholder-slate-400" placeholder="Busca Cursos o Eventos..." type="text">
         </div>
       </div>
       
-      <div class="flex items-center justify-between border-b border-slate-200 dark:border-gray-800 mb-8 pb-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 dark:border-gray-800 mb-8 pb-6 gap-4">
         <div v-if="route.name === 'coordinador-estudiantes-global'">
           <h2 class="text-3xl font-black text-primary-dark dark:text-white uppercase italic">Directorio Estudiantil</h2>
           <p class="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Selecciona una actividad para gestionar sus alumnos</p>
@@ -894,16 +916,12 @@ const changeStep = (delta: number) => {
           <p class="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Selecciona una actividad para gestionar sus docentes</p>
         </div>
         <div v-else class="flex items-center gap-4">
-          <h2 class="text-3xl font-black text-primary-dark dark:text-white uppercase italic">Gestión de Eventos</h2>
+          <h2 class="text-2xl sm:text-3xl font-black text-primary-dark dark:text-white uppercase italic">Gestión de Eventos</h2>
         </div>
         
-        <div class="flex items-center gap-3">
-          <button @click="fetchEventos" 
-            class="bg-slate-100 dark:bg-gray-800 hover:bg-slate-200 text-slate-600 dark:text-gray-400 font-black px-6 py-4 rounded-2xl text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 border border-slate-200 dark:border-gray-700 shadow-sm">
-            <span class="material-symbols-outlined text-xl">sync</span> REFRESCAR DATOS
-          </button>
+        <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
           <button @click="isCreatingEvento = true; isEditingEvento = false; resetFormEvento()" 
-            class="bg-blue-600 hover:bg-blue-700 text-white font-black px-8 py-4 rounded-2xl text-[12px] uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:shadow-blue-500/40 hover:-translate-y-1 active:translate-y-0 transition-all flex items-center gap-3">
+            class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-black px-8 py-4 rounded-2xl text-[12px] uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:shadow-blue-500/40 hover:-translate-y-1 active:translate-y-0 transition-all flex items-center gap-3 justify-center">
             <span class="material-symbols-outlined text-[24px]">add_business</span> NUEVO EVENTO
           </button>
         </div>
@@ -921,36 +939,40 @@ const changeStep = (delta: number) => {
             <span class="mb-3" :class="[evento.colorEstado, 'text-[8px] font-black uppercase px-3 py-1 rounded-full tracking-widest w-fit shadow-lg backdrop-blur-md border']">
               {{ evento.estado }}
             </span>
-            <div class="flex items-end justify-between">
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
               <div>
                 <p class="text-xs font-bold text-umsa-gold dark:text-blue-400 uppercase tracking-widest mb-2">{{ evento.version }}</p>
-                <h1 class="text-4xl md:text-5xl font-black text-white tracking-tighter leading-none mb-4">{{ evento.nombreCorto }}</h1>
+                <h1 class="text-3xl md:text-5xl font-black text-white tracking-tighter leading-none mb-4">{{ evento.nombreCorto }}</h1>
                 <p class="text-sm font-medium text-gray-300 max-w-2xl line-clamp-2 leading-relaxed">{{ evento.descripcion }}</p>
               </div>
 
-              <div class="flex items-center gap-3 z-30 relative">
-                <button @click="editarEvento(evento)" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 px-4 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 group/btn cursor-pointer" title="Configurar Eventos">
+              <div class="flex flex-wrap items-center justify-start md:justify-end gap-2 z-30 relative">
+                <button @click="editarEvento(evento)" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 px-3 py-2.5 rounded-xl transition-all shadow-lg flex items-center justify-center cursor-pointer" title="Configurar Eventos">
                    <span class="material-symbols-outlined text-[18px]">settings</span>
                 </button>
-                <button @click="inhabilitarEvento(evento.id, evento.nombreCorto)" class="bg-red-500/20 hover:bg-red-500/40 backdrop-blur-md text-white border border-red-500/30 px-4 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 group/btn cursor-pointer" title="Inhabilitar Evento">
+                <button @click="inhabilitarEvento(evento.id, evento.nombreCorto)" class="bg-red-500/20 hover:bg-red-500/40 backdrop-blur-md text-white border border-red-500/30 px-3 py-2.5 rounded-xl transition-all shadow-lg flex items-center justify-center cursor-pointer" title="Inhabilitar Evento">
                    <span class="material-symbols-outlined text-[18px]">block</span>
                 </button>
 
-                <div class="h-8 w-px bg-white/20 mx-1"></div>
+                <div class="h-6 w-px bg-white/20 mx-1 hidden sm:block"></div>
 
-                <button @click="resetNuevaActividad(evento.id); isCreating = true" class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 font-black text-[10px] uppercase tracking-widest cursor-pointer">
-                   <span class="material-symbols-outlined text-[18px]">add_circle</span> Nueva Actividad
+                <button @click="resetNuevaActividad(evento.id); isCreating = true" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-xl transition-all shadow-lg flex items-center gap-2 font-black text-[10px] uppercase tracking-widest cursor-pointer">
+                   <span class="material-symbols-outlined text-[18px]">add_circle</span>
+                   <span class="hidden sm:inline">Nueva Actividad</span>
                 </button>
 
                 <button v-if="getActividadesInactivas(evento.actividades).length > 0" 
                   @click.stop="evento.mostrarInhabilitadas = !evento.mostrarInhabilitadas"
-                  class="bg-red-500/10 hover:bg-red-500/20 text-red-500 px-4 py-3 rounded-xl border border-red-500/30 flex items-center gap-2 animate-pulse cursor-pointer transition-all hover:scale-105 active:scale-95 shadow-lg shadow-red-500/10">
+                  class="bg-red-500/10 hover:bg-red-500/20 text-red-500 px-4 py-2.5 rounded-xl border border-red-500/30 flex items-center gap-2 animate-pulse cursor-pointer transition-all hover:scale-105 active:scale-95 shadow-lg shadow-red-500/10">
                    <span class="material-symbols-outlined text-[18px]">folder_managed</span>
-                   <span class="text-[10px] font-black uppercase tracking-widest">{{ getActividadesInactivas(evento.actividades).length }} INHABILITADAS</span>
+                   <span class="text-[10px] font-black uppercase tracking-widest">{{ getActividadesInactivas(evento.actividades).length }} <span class="hidden sm:inline">INHABILITADAS</span></span>
                 </button>
 
-                <button @click="toggleActividades(evento)" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 px-6 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 group/btn cursor-pointer">
-                  <span class="text-xs font-bold uppercase tracking-widest">{{ evento.mostrarActividades ? 'Ocultar' : 'Ver' }} Puntos de Agenda</span>
+                <button @click="toggleActividades(evento)" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 px-4 py-2.5 rounded-xl transition-all shadow-lg flex items-center gap-2 cursor-pointer">
+                  <span class="text-xs font-bold uppercase tracking-widest">
+                    <span class="hidden sm:inline">{{ evento.mostrarActividades ? 'Ocultar' : 'Ver' }} Cursos</span>
+                    <span class="sm:hidden">{{ evento.mostrarActividades ? 'Ocultar' : 'Ver' }} Cursos</span>
+                  </span>
                   <span class="material-symbols-outlined text-[16px] transition-transform duration-300" :class="evento.mostrarActividades ? 'rotate-180' : ''">expand_more</span>
                 </button>
               </div>
@@ -961,7 +983,54 @@ const changeStep = (delta: number) => {
         <div v-show="evento.mostrarActividades" class="py-8 bg-slate-50 dark:bg-gray-950/50 w-full animate-in slide-in-from-top-4 duration-500 fade-in border-t border-slate-100 dark:border-gray-900">
           
           <div class="px-8 pb-6 flex justify-start lg:justify-between items-center mb-8">
-            <h3 class="hidden lg:block text-lg font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest italic">Puntos de Agenda del Evento</h3>
+            <h3 class="hidden lg:block text-lg font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest italic">Cursos del Evento</h3>
+          </div>
+
+          <!-- SECCIÓN: ACTIVIDADES INHABILITADAS (ZONA DE CONTROL) -->
+          <div v-if="getActividadesInactivas(evento.actividades).length > 0 && evento.mostrarInhabilitadas" class="mt-4 mx-8 mb-12 py-10 px-8 bg-red-50/50 dark:bg-red-950/10 rounded-[2.5rem] border-4 border-dashed border-red-200 dark:border-red-900/30 shadow-inner relative animate-in slide-in-from-top-4 duration-500 overflow-hidden">
+            
+            <div class="flex items-center justify-between mb-8 relative z-10">
+              <div class="flex items-center gap-6">
+                <div class="w-16 h-16 bg-red-500 text-white rounded-[1.5rem] flex items-center justify-center shadow-xl shadow-red-500/20">
+                  <span class="material-symbols-outlined text-3xl">folder_off</span>
+                </div>
+                <div>
+                  <h4 class="text-2xl font-black text-red-600 dark:text-red-400 uppercase tracking-tighter italic">Sección de Actividades Inhabilitadas</h4>
+                  <p class="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-1 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm">info</span> Estos módulos están ocultos para el público general
+                  </p>
+                </div>
+              </div>
+              <button @click="evento.mostrarInhabilitadas = false" class="p-2 text-red-400 hover:text-red-600 transition-colors">
+                <span class="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
+              <div v-for="act in getActividadesInactivas(evento.actividades)" :key="act.id" 
+                class="bg-white dark:bg-gray-900 p-6 rounded-[2rem] border-2 border-red-50 dark:border-red-900/20 hover:border-red-300 transition-all flex flex-col justify-between h-[160px] shadow-sm hover:shadow-xl hover:shadow-red-500/5 group/disabled-item">
+                
+                <div class="flex items-start justify-between gap-4">
+                   <div class="truncate">
+                      <h5 class="text-sm font-black text-slate-700 dark:text-gray-200 uppercase truncate mb-1 group-hover/disabled-item:text-red-600 transition-colors">{{ act.title }}</h5>
+                      <div class="flex items-center gap-2">
+                         <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">{{ act.type }}</span>
+                         <span class="w-1 h-1 bg-slate-200 rounded-full"></span>
+                         <span class="text-[9px] font-bold text-red-500/60 uppercase">Archivada</span>
+                      </div>
+                   </div>
+                   <span class="material-symbols-outlined text-red-200 dark:text-red-900/40">block</span>
+                </div>
+
+                <div class="mt-4">
+                   <button @click.stop="solicitarActivacion(act.id, act.title)" 
+                     class="w-full flex items-center justify-center gap-3 px-6 py-3 bg-white dark:bg-gray-800 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all font-black text-[10px] uppercase tracking-widest border-2 border-red-100 dark:border-red-900/30 hover:border-red-500 shadow-sm hover:shadow-red-500/20">
+                     <span class="material-symbols-outlined text-sm">mail</span>
+                     Solicitar Habilitación
+                   </button>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div v-for="(acts, categoria) in getActividadesAgrupadas(evento.actividades)" :key="categoria" class="mb-10 w-full overflow-hidden">
@@ -1017,52 +1086,7 @@ const changeStep = (delta: number) => {
             </div>
           </div>
           
-          <!-- SECCIÓN: ACTIVIDADES INHABILITADAS (ZONA DE CONTROL) -->
-          <div v-if="getActividadesInactivas(evento.actividades).length > 0 && evento.mostrarInhabilitadas" class="mt-4 mx-8 mb-12 py-10 px-8 bg-red-50/50 dark:bg-red-950/10 rounded-[2.5rem] border-4 border-dashed border-red-200 dark:border-red-900/30 shadow-inner relative animate-in slide-in-from-top-4 duration-500 overflow-hidden">
-            
-            <div class="flex items-center justify-between mb-8 relative z-10">
-              <div class="flex items-center gap-6">
-                <div class="w-16 h-16 bg-red-500 text-white rounded-[1.5rem] flex items-center justify-center shadow-xl shadow-red-500/20">
-                  <span class="material-symbols-outlined text-3xl">folder_off</span>
-                </div>
-                <div>
-                  <h4 class="text-2xl font-black text-red-600 dark:text-red-400 uppercase tracking-tighter italic">Sección de Actividades Inhabilitadas</h4>
-                  <p class="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-1 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-sm">info</span> Estos módulos están ocultos para el público general
-                  </p>
-                </div>
-              </div>
-              <button @click="evento.mostrarInhabilitadas = false" class="p-2 text-red-400 hover:text-red-600 transition-colors">
-                <span class="material-symbols-outlined">close</span>
-              </button>
-            </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
-              <div v-for="act in getActividadesInactivas(evento.actividades)" :key="act.id" 
-                class="bg-white dark:bg-gray-900 p-6 rounded-[2rem] border-2 border-red-50 dark:border-red-900/20 hover:border-red-300 transition-all flex flex-col justify-between h-[160px] shadow-sm hover:shadow-xl hover:shadow-red-500/5 group/disabled-item">
-                
-                <div class="flex items-start justify-between gap-4">
-                   <div class="truncate">
-                      <h5 class="text-sm font-black text-slate-700 dark:text-gray-200 uppercase truncate mb-1 group-hover/disabled-item:text-red-600 transition-colors">{{ act.title }}</h5>
-                      <div class="flex items-center gap-2">
-                         <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">{{ act.type }}</span>
-                         <span class="w-1 h-1 bg-slate-200 rounded-full"></span>
-                         <span class="text-[9px] font-bold text-red-500/60 uppercase">Archivada</span>
-                      </div>
-                   </div>
-                   <span class="material-symbols-outlined text-red-200 dark:text-red-900/40">block</span>
-                </div>
-
-                <div class="mt-4">
-                   <button @click.stop="solicitarActivacion(act.id, act.title)" 
-                     class="w-full flex items-center justify-center gap-3 px-6 py-3 bg-white dark:bg-gray-800 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all font-black text-[10px] uppercase tracking-widest border-2 border-red-100 dark:border-red-900/30 hover:border-red-500 shadow-sm hover:shadow-red-500/20">
-                     <span class="material-symbols-outlined text-sm">mail</span>
-                     Solicitar Habilitación
-                   </button>
-                </div>
-              </div>
-            </div>
-          </div>
 
           <div v-if="getActividadesActivas(evento.actividades).length === 0 && getActividadesInactivas(evento.actividades).length === 0" class="px-8 py-20 text-center">
             <div class="max-w-md mx-auto opacity-30">
@@ -1520,10 +1544,16 @@ const changeStep = (delta: number) => {
                     <span class="material-symbols-outlined text-3xl">{{ isEditingEvento ? 'edit_calendar' : 'add_circle' }}</span>
                     {{ isEditingEvento ? 'Editar Gestión de Evento' : 'Crear Nueva Gestión de Evento' }}
                 </h3>
-                <button @click="isCreatingEvento = false" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-xl border border-white/20 transition-all flex items-center gap-2">
-                    <span class="material-symbols-outlined text-sm">close</span>
-                    <span class="text-[9px] font-black uppercase tracking-widest">cancelar</span>
-                </button>
+                <div class="flex items-center gap-3">
+                    <button @click.prevent="handleSaveEvento" class="bg-umsa-gold hover:bg-yellow-600 text-white px-4 py-2 rounded-xl border border-yellow-500 transition-all flex items-center gap-2 shadow-lg">
+                        <span class="material-symbols-outlined text-sm">check_circle</span>
+                        <span class="text-[9px] font-black uppercase tracking-widest">Finalizar Cambios</span>
+                    </button>
+                    <button @click="confirmarCancelar" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-xl border border-white/20 transition-all flex items-center gap-2">
+                        <span class="material-symbols-outlined text-sm">close</span>
+                        <span class="text-[9px] font-black uppercase tracking-widest">cancelar</span>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -1575,7 +1605,9 @@ const changeStep = (delta: number) => {
                                     <div class="flex gap-2">
                                         <input v-model="formEvento.nombre" type="text" placeholder="NOMBRE DEL EVENTO" class="flex-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-black uppercase" />
                                         <div class="flex flex-col items-center justify-center bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-2">
-                                            <input v-model="formEvento.color_texto_header" type="color" class="w-6 h-6 border-none bg-transparent cursor-pointer" />
+                                            <div class="w-8 h-8 rounded-full overflow-hidden border border-slate-200 dark:border-gray-700">
+                                                <input v-model="formEvento.color_texto_header" type="color" class="w-full h-full scale-150 cursor-pointer" />
+                                            </div>
                                             <span class="text-[7px] font-bold text-slate-400 uppercase mt-1">COLOR</span>
                                         </div>
                                     </div>
@@ -1585,7 +1617,9 @@ const changeStep = (delta: number) => {
                                     <div class="flex gap-2">
                                         <input v-model="formEvento.sigla" type="text" placeholder="SIGLA" class="flex-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-black uppercase" />
                                         <div class="flex flex-col items-center justify-center bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-2">
-                                            <input v-model="formEvento.color_sigla" type="color" class="w-6 h-6 border-none bg-transparent cursor-pointer" />
+                                            <div class="w-8 h-8 rounded-full overflow-hidden border border-slate-200 dark:border-gray-700">
+                                                <input v-model="formEvento.color_sigla" type="color" class="w-full h-full scale-150 cursor-pointer" />
+                                            </div>
                                             <span class="text-[7px] font-bold text-slate-400 uppercase mt-1">COLOR</span>
                                         </div>
                                     </div>
@@ -1605,7 +1639,9 @@ const changeStep = (delta: number) => {
                                     <div class="flex gap-2">
                                         <input v-model="formEvento.nombre" type="text" class="flex-1 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-black uppercase" />
                                         <div class="flex flex-col items-center justify-center bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-2">
-                                            <input v-model="formEvento.color_principal" type="color" class="w-6 h-6 border-none bg-transparent cursor-pointer" />
+                                            <div class="w-8 h-8 rounded-full overflow-hidden border border-slate-200 dark:border-gray-700">
+                                                <input v-model="formEvento.color_principal" type="color" class="w-full h-full scale-150 cursor-pointer" />
+                                            </div>
                                             <span class="text-[7px] font-bold text-slate-400 uppercase mt-1">COLOR</span>
                                         </div>
                                     </div>
@@ -1615,10 +1651,39 @@ const changeStep = (delta: number) => {
                                     <div class="flex gap-2">
                                         <input v-model="formEvento.nombre_2" type="text" placeholder="PARTE 2" class="flex-1 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-black uppercase" />
                                         <div class="flex flex-col items-center justify-center bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-2">
-                                            <input v-model="formEvento.color_titulo_2" type="color" class="w-6 h-6 border-none bg-transparent cursor-pointer" />
+                                            <div class="w-8 h-8 rounded-full overflow-hidden border border-slate-200 dark:border-gray-700">
+                                                <input v-model="formEvento.color_titulo_2" type="color" class="w-full h-full scale-150 cursor-pointer" />
+                                            </div>
                                             <span class="text-[7px] font-bold text-slate-400 uppercase mt-1">COLOR</span>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SECCIÓN D: PRIORIDAD Y VISIBILIDAD -->
+                        <div class="p-6 bg-white dark:bg-gray-900 rounded-3xl border border-slate-100 dark:border-gray-800 space-y-6">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-amber-500 text-sm">priority_high</span>
+                                <h5 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Prioridad y Visibilidad</h5>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Orden de Prioridad</label>
+                                    <select v-model="formEvento.prioridad" class="w-full bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold">
+                                        <option value="1">1º (Primer Evento / Destacado)</option>
+                                        <option value="2">2º (Segundo Evento)</option>
+                                        <option value="3">3º (Tercero)</option>
+                                        <option value="4">4º (Cuarto)</option>
+                                        <option value="5">5º (Quinto)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Al Finalizar el Evento</label>
+                                    <select v-model="formEvento.visibilidad_al_finalizar" class="w-full bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold">
+                                        <option value="visible">Mantener Visible (con etiqueta 'Finalizado')</option>
+                                        <option value="oculto">Ocultar Evento</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
@@ -1634,14 +1699,18 @@ const changeStep = (delta: number) => {
                                     <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Gestión / Edición</label>
                                     <div class="flex gap-2">
                                         <input v-model="formEvento.gestion" type="text" class="flex-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold" />
-                                        <input v-model="formEvento.color_badge_gestion" type="color" class="w-10 h-10 border-none bg-transparent cursor-pointer mt-1" />
+                                        <div class="w-8 h-8 rounded-full overflow-hidden border border-slate-200 dark:border-gray-700 mt-1">
+                                            <input v-model="formEvento.color_badge_gestion" type="color" class="w-full h-full scale-150 cursor-pointer" />
+                                        </div>
                                     </div>
                                 </div>
                                 <div>
                                     <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Fecha de Inicio</label>
                                     <div class="flex gap-2">
                                         <input v-model="formEvento.fecha_inicio" type="date" class="flex-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold" />
-                                        <input v-model="formEvento.color_badge_fecha" type="color" class="w-10 h-10 border-none bg-transparent cursor-pointer mt-1" />
+                                        <div class="w-8 h-8 rounded-full overflow-hidden border border-slate-200 dark:border-gray-700 mt-1">
+                                            <input v-model="formEvento.color_badge_fecha" type="color" class="w-full h-full scale-150 cursor-pointer" />
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="md:col-span-2">
@@ -1649,7 +1718,9 @@ const changeStep = (delta: number) => {
                                     <div class="flex gap-3">
                                         <input v-model="formEvento.institucion_badge" type="text" class="flex-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-xs font-black uppercase" />
                                         <div class="flex flex-col items-center justify-center bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-3">
-                                            <input v-model="formEvento.color_badge_institucion" type="color" class="w-6 h-6 border-none bg-transparent cursor-pointer" />
+                                            <div class="w-8 h-8 rounded-full overflow-hidden border border-slate-200 dark:border-gray-700">
+                                                <input v-model="formEvento.color_badge_institucion" type="color" class="w-full h-full scale-150 cursor-pointer" />
+                                            </div>
                                             <span class="text-[7px] font-bold text-slate-400 uppercase mt-1">FONDO</span>
                                         </div>
                                     </div>
@@ -1667,15 +1738,7 @@ const changeStep = (delta: number) => {
 
                         <!-- SECCIÓN D: MULTIMEDIA -->
                         <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
-                            <div class="md:col-span-4 p-4 bg-white dark:bg-gray-900 rounded-3xl border border-slate-100 dark:border-gray-800 flex flex-col gap-2">
-                                <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block">Logo Oficial</label>
-                                <div class="flex-1 relative bg-slate-50 dark:bg-gray-800 border border-dashed border-slate-200 dark:border-gray-700 rounded-2xl flex flex-col items-center justify-center overflow-hidden min-h-[100px]">
-                                    <img v-if="resolvedLogo" :src="resolvedLogo" class="w-full h-full object-contain p-2" />
-                                    <span v-else class="material-symbols-outlined text-slate-300">add_photo_alternate</span>
-                                    <input type="file" @change="onLogoChange" class="absolute inset-0 opacity-0 cursor-pointer" />
-                                </div>
-                            </div>
-                            <div class="md:col-span-8 p-4 bg-white dark:bg-gray-900 rounded-3xl border border-slate-100 dark:border-gray-800 flex flex-col gap-2">
+                            <div class="md:col-span-12 p-4 bg-white dark:bg-gray-900 rounded-3xl border border-slate-100 dark:border-gray-800 flex flex-col gap-2">
                                 <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block">Fondo Hero (Banner)</label>
                                 <div class="flex-1 relative bg-slate-50 dark:bg-gray-800 border border-dashed border-slate-200 dark:border-gray-700 rounded-2xl flex items-center justify-center overflow-hidden min-h-[100px]">
                                     <img v-if="resolvedBanner" :src="resolvedBanner" class="w-full h-full object-cover opacity-50" />
@@ -1785,13 +1848,13 @@ const changeStep = (delta: number) => {
                                 <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
                             </div>
                             <div class="bg-slate-50 dark:bg-gray-950 border-2 border-slate-100 dark:border-gray-800 rounded-2xl p-4 max-h-[300px] overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3 thin-scrollbar">
-                                <label v-for="pn in ponentesFiltrados" :key="pn.id" class="flex items-center gap-3 p-4 bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-xl cursor-pointer hover:border-emerald-500 transition-all group">
-                                    <input type="checkbox" :value="pn.id" v-model="formEvento.ponentes_seleccionados" class="w-5 h-5 rounded border-2 border-slate-200 text-emerald-500" />
+                                <div v-for="pn in ponentesFiltrados" :key="pn.id" class="flex items-center gap-3 p-4 bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-xl group">
+                                    <span class="material-symbols-outlined text-emerald-500 text-lg">person</span>
                                     <div class="flex flex-col min-w-0">
                                         <span class="text-[10px] font-black text-primary-dark dark:text-gray-200 truncate">{{ pn.displayName }}</span>
                                         <span class="text-[8px] font-bold uppercase tracking-widest text-emerald-500">{{ pn.roleLabel }}</span>
                                     </div>
-                                </label>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1903,7 +1966,7 @@ const changeStep = (delta: number) => {
                         <div
                             ref="heroRef"
                             :class="[
-                                currentStep === 1 ? 'lg:h-[520px]' : 'lg:h-[200px]',
+                                currentStep === 1 ? 'h-[520px]' : 'h-[200px]',
                                 currentStep === 1 ? 'ring-4 ring-umsa-blue/40 shadow-2xl shadow-umsa-blue/20' : 'ring-0'
                             ]"
                             class="transition-all duration-700 ease-in-out bg-slate-100 dark:bg-gray-950 rounded-[3rem] shadow-2xl border border-slate-200 dark:border-gray-800 overflow-hidden relative group"

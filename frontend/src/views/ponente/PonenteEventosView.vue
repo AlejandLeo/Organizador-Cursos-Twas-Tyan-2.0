@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import api from '@/services/api';
+import api, { getImageUrl } from '@/services/api';
 
 const router = useRouter();
 
@@ -14,22 +14,23 @@ const fetchData = async () => {
     const res = await api.get('/imparticiones/mis-actividades');
     const imparticiones = res.data || [];
     
-    // Mapear directamente a actividades
-    const actividades = imparticiones.map((imp: any) => {
-      const act = imp.actividadAcademica;
-      const ev = imp.evento || {};
-      return {
-        id: act.id,
-        title: act.nombre || 'Actividad',
-        eventoNombre: ev.nombreCorto || ev.nombre || 'Evento Principal',
-        status: act.estado === 1 ? 'En Progreso' : (act.estado === 0 ? 'Finalizado' : 'Próximamente'),
-        date: act.fecha_inicio ? `${new Date(act.fecha_inicio).toLocaleDateString()} - ${new Date(act.fecha_fin).toLocaleDateString()}` : 'Fechas por definir',
-        students: act.inscripciones?.length || 0,
-        type: act.tipo || 'Actividad',
-        image: act.imagen || ev.imagen || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80',
-        gestion: ev.fecha_inicio ? new Date(ev.fecha_inicio).getFullYear().toString() : '2026'
-      };
-    });
+    const actividades = imparticiones
+      .filter((imp: any) => imp?.actividadAcademica && Number(imp.actividadAcademica?.estado) !== -1)
+      .map((imp: any) => {
+        const act = imp.actividadAcademica || {};
+        const ev = imp.evento || {};
+        return {
+          id: act.id,
+          title: act.nombre || 'Actividad',
+          eventoNombre: ev.nombreCorto || ev.nombre || 'Evento Principal',
+          status: act.estado === 1 ? 'En Progreso' : (act.estado === 0 ? 'Finalizado' : 'Próximamente'),
+          date: act.fecha_inicio ? `${new Date(act.fecha_inicio).toLocaleDateString()} - ${new Date(act.fecha_fin).toLocaleDateString()}` : 'Fechas por definir',
+          students: act.inscripciones?.length || 0,
+          type: act.tipo || 'Actividad',
+          image: getImageUrl('cursos', act.imagen, 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80'),
+          gestion: ev.fecha_inicio ? new Date(ev.fecha_inicio).getFullYear().toString() : '2026'
+        };
+      });
 
     actividadesAsignadas.value = actividades;
 
@@ -72,10 +73,10 @@ const openActividadDetalle = (actividadId: any) => {
       </div>
     </div>
     
-    <div class="flex items-center justify-between border-b border-slate-200 dark:border-gray-800 mb-8 pb-6">
+    <div class="flex items-center justify-between border-b border-slate-200 dark:border-gray-800 mb-8 pb-6 px-4 md:px-0">
       <div>
-        <h2 class="text-3xl font-black text-primary-dark dark:text-white uppercase italic">Mis Cursos Asignados</h2>
-        <p class="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Programas en los que estás asignado como docente/ponente</p>
+        <h2 class="text-2xl md:text-3xl font-black text-primary-dark dark:text-white uppercase italic">Mis Cursos Asignados</h2>
+        <p class="text-[9px] md:text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Programas en los que estás asignado como docente/ponente</p>
       </div>
     </div>
 
@@ -96,7 +97,7 @@ const openActividadDetalle = (actividadId: any) => {
             <p class="text-[10px] font-bold text-umsa-gold uppercase tracking-[0.2em] mb-1 drop-shadow-md">
               {{ actividad.eventoNombre }}
             </p>
-            <h3 class="text-2xl font-black text-white leading-tight uppercase italic group-hover:text-umsa-gold transition-colors drop-shadow-lg line-clamp-2">
+            <h3 class="text-xl md:text-2xl font-black text-white leading-tight uppercase italic group-hover:text-umsa-gold transition-colors drop-shadow-lg line-clamp-2">
               {{ actividad.title }}
             </h3>
           </div>

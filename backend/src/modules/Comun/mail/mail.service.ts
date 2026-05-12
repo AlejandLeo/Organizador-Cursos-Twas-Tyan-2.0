@@ -155,4 +155,20 @@ export class MailService {
       },
     );
   }
+
+  /**
+   * Notifica a un usuario que se le ha asignado un nuevo rol (ej: Logística).
+   */
+  async sendRoleDesignationEmail(to: string, name: string, roleName: string) {
+    return this.sendMail(
+      to,
+      'Nueva Designación de Cargo',
+      'role-designation',
+      { 
+        name, 
+        role: roleName,
+        loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
+      },
+    );
+  }
 }

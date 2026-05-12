@@ -6,6 +6,7 @@ import { Usuario } from './entities/usuario.entity';
 import { Persona } from '../../Usuario/personas/entities/persona.entity';
 
 import { MailModule } from '../../Comun/mail/mail.module';
+import { QrModule } from '../../Seguridad/qr/qr.module';
 
 /**
  * El módulo importa TAMBIÉN la entidad Persona porque el servicio
@@ -18,6 +19,7 @@ import { MailModule } from '../../Comun/mail/mail.module';
   imports: [
     TypeOrmModule.forFeature([Usuario, Persona]),
     MailModule,
+    QrModule,
   ],
   controllers: [UsuariosController],
   providers: [UsuariosService],

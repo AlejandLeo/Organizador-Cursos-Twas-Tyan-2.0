@@ -12,6 +12,7 @@ const authStore = useAuthStore()
 const uiStore = useUIStore()
 const isDark = ref(false)
 const isProfileOpen = ref(false)
+const profilePhotoUrl = ref('');
 const profileDropdownRef = ref<HTMLElement | null>(null)
 
 // Notificaciones
@@ -133,7 +134,7 @@ const closeAll = (e: MouseEvent) => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   const savedTheme = localStorage.getItem('theme')
   if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
     isDark.value = true
@@ -141,6 +142,28 @@ onMounted(() => {
   }
   document.addEventListener('click', closeAll)
   fetchNotifications()
+  
+  // Cargar foto de perfil - Manejo silencioso
+  try {
+    const photoRes = await api.get('/usuarios/perfil/foto', { 
+      responseType: 'blob'
+    });
+    
+    if (photoRes.status === 200) {
+      // Si el backend envió 'NONE', es que no hay foto
+      const text = await photoRes.data.text();
+      if (text === 'NONE') {
+        profilePhotoUrl.value = '';
+      } else {
+        if (profilePhotoUrl.value) URL.revokeObjectURL(profilePhotoUrl.value);
+        profilePhotoUrl.value = URL.createObjectURL(photoRes.data);
+      }
+    } else {
+      profilePhotoUrl.value = '';
+    }
+  } catch (e) {
+    profilePhotoUrl.value = '';
+  }
 })
 
 onUnmounted(() => {
@@ -222,8 +245,9 @@ onUnmounted(() => {
       <!-- Menú Perfil SSA Style -->
       <div class="relative" ref="profileDropdownRef" @click.stop>
         <button @click="isProfileOpen = !isProfileOpen" class="flex items-center gap-2 md:gap-3 bg-slate-50 dark:bg-gray-900 border border-slate-200 dark:border-gray-700 hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors rounded-xl pr-2 md:pr-3 py-1 pl-1 shadow-sm">
-          <div class="h-8 w-8 rounded-full overflow-hidden bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 p-0.5 flex items-center justify-center shrink-0">
-            <span class="material-symbols-outlined text-2xl text-slate-400">account_circle</span>
+          <div class="h-8 w-8 rounded-full overflow-hidden bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 p-0 flex items-center justify-center shrink-0">
+            <img v-if="profilePhotoUrl" :src="profilePhotoUrl" alt="Foto" class="w-full h-full object-cover" />
+            <span v-else class="material-symbols-outlined text-2xl text-slate-400">account_circle</span>
           </div>
           <div class="hidden lg:flex flex-col items-start pr-1">
             <span class="text-xs font-black text-primary-dark dark:text-white leading-tight">

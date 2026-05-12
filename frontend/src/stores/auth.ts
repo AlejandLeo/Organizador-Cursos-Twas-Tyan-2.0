@@ -28,6 +28,9 @@ export const useAuthStore = defineStore('auth', () => {
   /** True si el usuario tiene el rol de Estudiante */
   const esEstudiante = computed(() => userRoles.value.includes('Estudiante'));
 
+  /** True si el usuario tiene el rol de Logística */
+  const esLogistica = computed(() => userRoles.value.includes('Logística'));
+
   /** True si el usuario es Super Usuario */
   const esSuperUsuario = computed(
     () => userRoles.value.includes('Super Usuario') ||
@@ -53,6 +56,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (rolActivo.value === 'Ponente') return '/ponente';
       if (rolActivo.value === 'Estudiante') return '/estudiante';
       if (rolActivo.value === 'Coordinador') return '/coordinador';
+      if (rolActivo.value === 'Logística') return '/logistica';
     }
 
     // PRIORIDAD: Si es Ponente y ya está configurado, va a /ponente
@@ -65,6 +69,7 @@ export const useAuthStore = defineStore('auth', () => {
     
     // Si solo es ponente (no configurado aún) o coordinador
     if (roles.includes('Coordinador')) return '/coordinador';
+    if (roles.includes('Logística')) return '/logistica';
     if (roles.includes('Ponente')) return '/ponente';
     
     return '/estudiante';
@@ -152,6 +157,7 @@ export const useAuthStore = defineStore('auth', () => {
     tieneMultiplesRoles,
     esPonente,
     esEstudiante,
+    esLogistica,
     esSuperUsuario,
     cambiarRolActivo,
     marcarPonenteNotificado,

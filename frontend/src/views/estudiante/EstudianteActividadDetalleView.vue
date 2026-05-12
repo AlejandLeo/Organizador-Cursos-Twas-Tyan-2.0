@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, nextTick, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
-import api from '@/services/api';
+import api, { getImageUrl } from '@/services/api';
 import Swal from 'sweetalert2';
 import QrcodeVue from 'qrcode.vue';
 import { Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
@@ -56,7 +56,8 @@ const actividad = ref({
 });
 
 // Lógica QR Estudiante
-const qrMode = ref<'project' | 'scan'>('project');
+const qrMode = ref<'project' | 'scan' | 'pin'>('project');
+const pinInput = ref('');
 const idInscripcionModalidad = computed(() => {
     if (myInscripcion.value && myInscripcion.value.modalidades && myInscripcion.value.modalidades.length > 0) {
         return myInscripcion.value.modalidades[0].id;
@@ -73,6 +74,18 @@ const loadActividad = async () => {
   try {
     const res = await api.get('/actividades-academicas/' + actividadId);
     const act = res.data;
+
+    // Bloquear si la actividad está inhabilitada
+    if (Number(act.estado) === -1) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Actividad Inhabilitada',
+        text: 'Esta actividad ha sido inhabilitada temporalmente y no puede ser visualizada.',
+        confirmButtonColor: '#003B71'
+      });
+      router.push({ name: 'estudiante-dashboard' });
+      return;
+    }
     actividad.value = {
       id: act.id,
       nombre: act.nombre,
@@ -88,7 +101,8 @@ const loadActividad = async () => {
       horas: act.horas || 40,
       docente: act.imparticiones && act.imparticiones.length > 0 ? `${act.imparticiones[0].usuario.persona.nombres} ${act.imparticiones[0].usuario.persona.primer_apellido}` : 'Sin Docente',
       descripcion: act.descripcion || 'Sin descripción detallada.',
-      imagen: act.imagen || 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=1200&q=80',
+      imagen: getImageUrl('cursos', act.imagen) || 
+              (act.evento ? (act.evento.imagen_fondo || act.evento.logo) : 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=1200&q=80'),
       materiales: act.materiales?.length ? act.materiales : [
         { id: 1, titulo: 'Guía del Estudiante', tipo: 'PDF', tamaño: '2 MB', fecha: 'Hace 2 días' },
         { id: 2, titulo: 'Presentación del Curso', tipo: 'PDF', tamaño: '4.5 MB', fecha: 'Hace 3 días' }
@@ -257,12 +271,47 @@ const switchTab = (tab: string) => {
     }
 };
 
-const switchQrMode = (mode: 'project' | 'scan') => {
+const switchQrMode = (mode: 'project' | 'scan' | 'pin') => {
     qrMode.value = mode;
     if (mode === 'scan') {
         startScanner();
     } else {
         stopScanner();
+    }
+};
+
+const submitPin = async () => {
+    if (!pinInput.value.trim()) {
+        Swal.fire('Atención', 'El PIN no puede estar vacío.', 'warning');
+        return;
+    }
+    
+    try {
+        const resActivas = await api.get('/sesiones-academicas/activas');
+        const sesiones = resActivas.data;
+        const sesionHoy = sesiones.find((s: any) => s.cursoModalidad?.actividadAcademica?.id === actividadId);
+        
+        if (!sesionHoy) {
+            Swal.fire('Error', 'No hay ninguna sesión activa hoy con PIN para esta actividad.', 'error');
+            return;
+        }
+        
+        await api.post('/inscripciones/registrar-asistencia-pin', {
+            email: authStore.user?.email,
+            id_sesion: sesionHoy.id,
+            pin: pinInput.value.trim()
+        });
+        
+        Swal.fire('Éxito', 'Asistencia registrada correctamente con PIN.', 'success');
+        pinInput.value = '';
+        qrMode.value = 'project';
+        
+        await loadActividad();
+        await checkInscripcionStatus();
+        
+    } catch (e: any) {
+        console.error(e);
+        Swal.fire('Error', e.response?.data?.message || 'No se pudo registrar la asistencia con PIN.', 'error');
     }
 };
 
@@ -514,63 +563,153 @@ const goBack = () => {
 
        <!-- Tab: Asistencia -->
       <div v-if="activeTab === 'asistencia'" class="animate-in slide-in-from-bottom-4 duration-500 fade-in">
-          <div class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-[1.5rem] md:rounded-[2.5rem] p-6 md:p-12 shadow-xl mb-8">
-              <div class="flex flex-col xl:flex-row gap-8 xl:gap-12 items-start">
-                  <div class="flex-1 w-full xl:max-w-lg">
-                      <h3 class="text-2xl md:text-3xl font-black text-slate-800 dark:text-white uppercase italic mb-4">Registro de Asistencia</h3>
-                      <p class="text-slate-500 text-sm leading-relaxed mb-6">Elige cómo deseas registrar tu asistencia a la sesión actual.</p>
+          <!-- Card Principal de Asistencia -->
+          <div class="bg-gradient-to-br from-white to-slate-50 dark:from-gray-900 dark:to-gray-950 border border-slate-200/60 dark:border-gray-800 rounded-[2rem] p-6 md:p-10 shadow-xl shadow-slate-200/10 dark:shadow-black/30 mb-8 relative overflow-hidden">
+              <!-- Decoración de fondo -->
+              <div class="absolute -top-24 -right-24 w-48 h-48 bg-emerald-500/10 dark:bg-emerald-500/5 rounded-full blur-3xl"></div>
+              <div class="absolute -bottom-24 -left-24 w-48 h-48 bg-blue-500/10 dark:bg-blue-500/5 rounded-full blur-3xl"></div>
+
+              <div class="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start relative z-10">
+                  <!-- Columna Izquierda: Opciones -->
+                  <div class="flex-1 w-full lg:max-w-md">
+                      <div class="flex items-center gap-3 mb-2">
+                          <span class="material-symbols-outlined text-emerald-500 text-3xl">fact_check</span>
+                          <h3 class="text-2xl md:text-3xl font-black text-slate-800 dark:text-white uppercase italic tracking-tight">Registro de Asistencia</h3>
+                      </div>
+                      <p class="text-slate-500 dark:text-gray-400 text-sm leading-relaxed mb-8">Selecciona el método que prefieras para registrar tu presencia en la sesión de hoy.</p>
                       
-                      <div class="flex flex-col sm:flex-row gap-4">
-                          <button @click="switchQrMode('project')" :class="qrMode === 'project' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'bg-slate-100 text-slate-500'" class="flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">
-                              Mostrar Mi QR
+                      <!-- Botones de Modo -->
+                      <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-3">
+                          <!-- Botón Mostrar QR -->
+                          <button @click="switchQrMode('project')" 
+                              :class="qrMode === 'project' 
+                                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-600/20 scale-[1.02]' 
+                                  : 'bg-white dark:bg-gray-800 text-slate-600 dark:text-gray-300 border border-slate-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700'" 
+                              class="flex items-center gap-3 p-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 group">
+                              <div class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                                  :class="qrMode === 'project' ? 'bg-white/20' : 'bg-slate-100 dark:bg-gray-700 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/30'">
+                                  <span class="material-symbols-outlined text-[18px]" :class="qrMode === 'project' ? 'text-white' : 'text-slate-500 dark:text-gray-400 group-hover:text-emerald-600'">qr_code_2</span>
+                              </div>
+                              <span class="flex-1 text-left">Mostrar Mi QR</span>
+                              <span class="material-symbols-outlined text-[16px] opacity-0 group-hover:opacity-100 transition-opacity" :class="qrMode === 'project' ? 'text-white/70' : 'text-emerald-500'">arrow_forward</span>
                           </button>
-                          <button @click="switchQrMode('scan')" :class="qrMode === 'scan' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'bg-slate-100 text-slate-500'" class="flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">
-                              Escanear Clase
+
+                          <!-- Botón Escanear Clase -->
+                          <button @click="switchQrMode('scan')" 
+                              :class="qrMode === 'scan' 
+                                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-600/20 scale-[1.02]' 
+                                  : 'bg-white dark:bg-gray-800 text-slate-600 dark:text-gray-300 border border-slate-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700'" 
+                              class="flex items-center gap-3 p-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 group">
+                              <div class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                                  :class="qrMode === 'scan' ? 'bg-white/20' : 'bg-slate-100 dark:bg-gray-700 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/30'">
+                                  <span class="material-symbols-outlined text-[18px]" :class="qrMode === 'scan' ? 'text-white' : 'text-slate-500 dark:text-gray-400 group-hover:text-emerald-600'">qr_code_scanner</span>
+                              </div>
+                              <span class="flex-1 text-left">Escanear Clase</span>
+                              <span class="material-symbols-outlined text-[16px] opacity-0 group-hover:opacity-100 transition-opacity" :class="qrMode === 'scan' ? 'text-white/70' : 'text-emerald-500'">arrow_forward</span>
+                          </button>
+
+                          <!-- Botón Ingresar PIN -->
+                          <button @click="switchQrMode('pin')" 
+                              :class="qrMode === 'pin' 
+                                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-600/20 scale-[1.02]' 
+                                  : 'bg-white dark:bg-gray-800 text-slate-600 dark:text-gray-300 border border-slate-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700'" 
+                              class="flex items-center gap-3 p-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 group">
+                              <div class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                                  :class="qrMode === 'pin' ? 'bg-white/20' : 'bg-slate-100 dark:bg-gray-700 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/30'">
+                                  <span class="material-symbols-outlined text-[18px]" :class="qrMode === 'pin' ? 'text-white' : 'text-slate-500 dark:text-gray-400 group-hover:text-emerald-600'">pin</span>
+                              </div>
+                              <span class="flex-1 text-left">Ingresar PIN</span>
+                              <span class="material-symbols-outlined text-[16px] opacity-0 group-hover:opacity-100 transition-opacity" :class="qrMode === 'pin' ? 'text-white/70' : 'text-emerald-500'">arrow_forward</span>
                           </button>
                       </div>
                   </div>
 
-                  <div class="flex-1 flex justify-center items-center w-full min-h-[300px] mt-8 xl:mt-0">
+                  <!-- Columna Derecha: Contenido Dinámico -->
+                  <div class="flex-1 flex justify-center items-center w-full min-h-[340px] mt-6 lg:mt-0 bg-slate-50/50 dark:bg-gray-800/30 rounded-2xl p-6 border border-slate-100 dark:border-gray-800">
+                      
                       <!-- Proyectar Mi QR -->
-                      <div v-if="qrMode === 'project'" class="bg-white p-4 md:p-6 rounded-[2rem] md:rounded-[2.5rem] border-[6px] md:border-[10px] border-slate-100 shadow-2xl flex flex-col items-center justify-center w-full max-w-sm">
+                      <div v-if="qrMode === 'project'" class="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-xl flex flex-col items-center justify-center w-full max-w-sm border border-slate-100 dark:border-gray-800 animate-in fade-in zoom-in-95 duration-300">
                           <div v-if="!idInscripcionModalidad" class="text-center p-8 text-slate-400">
-                              Cargando ID...
+                              <span class="material-symbols-outlined text-4xl animate-spin mb-2">autorenew</span>
+                              <p class="text-xs font-bold uppercase tracking-widest">Generando código...</p>
                           </div>
                           <template v-else>
-                              <QrcodeVue :value="qrData" :size="200" :level="'H'" class="md:hidden" />
-                              <QrcodeVue :value="qrData" :size="250" :level="'H'" class="hidden md:block" />
+                              <div class="p-4 bg-white rounded-xl mb-4">
+                                  <QrcodeVue :value="qrData" :size="200" :level="'H'" class="md:hidden" />
+                                  <QrcodeVue :value="qrData" :size="220" :level="'H'" class="hidden md:block" />
+                              </div>
                           </template>
-                          <p class="text-xs font-bold text-slate-400 mt-4 text-center">El docente debe escanear este código</p>
+                          <div class="flex items-center gap-2 text-slate-500 dark:text-gray-400">
+                              <span class="material-symbols-outlined text-[16px]">info</span>
+                              <p class="text-xs font-bold uppercase tracking-widest">Muestra este código al docente</p>
+                          </div>
                       </div>
 
                       <!-- Escanear QR del Ponente -->
-                      <div v-if="qrMode === 'scan'" class="w-full max-w-md bg-black rounded-[2rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl">
+                      <div v-if="qrMode === 'scan'" class="w-full max-w-md bg-black rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-300">
                           <div id="reader-student" class="w-full min-h-[300px] border-none bg-black"></div>
+                          <div class="p-4 bg-gray-900 text-center">
+                              <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Apunta a la pantalla del docente</p>
+                          </div>
+                      </div>
+
+                      <!-- Ingresar PIN -->
+                      <div v-if="qrMode === 'pin'" class="w-full max-w-md bg-white dark:bg-gray-900 p-8 rounded-2xl border border-slate-200 dark:border-gray-800 shadow-xl flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-300">
+                          <div class="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 rounded-full flex items-center justify-center mb-4">
+                              <span class="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-3xl">lock</span>
+                          </div>
+                          <h4 class="text-sm font-black text-slate-700 dark:text-gray-200 mb-2 uppercase tracking-widest">PIN de Acceso</h4>
+                          <p class="text-xs text-slate-500 dark:text-gray-400 text-center mb-6">Ingresa el código de 6 dígitos que proyecta el docente.</p>
+                          
+                          <input v-model="pinInput" type="text" placeholder="······" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-4 text-center text-3xl font-black focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none mb-4 tracking-[0.5em]" maxlength="6" />
+                          
+                          <button @click="submitPin" class="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-colors shadow-lg shadow-emerald-600/10 flex items-center justify-center gap-2">
+                              <span class="material-symbols-outlined text-[18px]">verified</span>
+                              Registrar Asistencia
+                          </button>
                       </div>
                   </div>
               </div>
           </div>
           
-          <div v-if="!actividad.asistencia || actividad.asistencia.length === 0" class="text-sm font-bold text-slate-500 bg-slate-50 dark:bg-gray-800 p-8 rounded-2xl border border-slate-200 dark:border-gray-700 text-center flex flex-col items-center">
-             <span class="material-symbols-outlined text-4xl mb-3 opacity-50 block">event_busy</span>
-             Aún no hay registros de asistencia guardados históricamente.
-          </div>
-          <div v-else class="space-y-4 max-w-3xl">
-              <div v-for="(registro, index) in actividad.asistencia" :key="index" class="flex items-center justify-between border border-slate-200 dark:border-gray-800 rounded-2xl p-5 dark:bg-gray-950 relative overflow-hidden group hover:border-slate-300 dark:hover:border-gray-700 transition-colors">
-                  <div class="absolute left-0 top-0 bottom-0 w-1 transition-all" :class="registro.estado === 'presente' ? 'bg-emerald-500 group-hover:w-2' : 'bg-rose-500 group-hover:w-2'"></div>
-                  <div class="flex items-center gap-4 pl-2">
-                      <div class="bg-slate-100 dark:bg-gray-900 h-12 w-12 rounded-xl flex items-center justify-center">
-                          <span class="material-symbols-outlined" :class="registro.estado === 'presente' ? 'text-emerald-500' : 'text-rose-500'">
-                              {{ registro.estado === 'presente' ? 'check_circle' : 'cancel' }}
-                          </span>
+          <!-- Historial de Asistencias -->
+          <div class="max-w-4xl mx-auto">
+              <div class="flex items-center justify-between mb-6">
+                  <h3 class="text-lg font-black text-slate-800 dark:text-white uppercase tracking-tight">Historial de Sesiones</h3>
+                  <span class="text-xs font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest">{{ actividad.asistencia?.length || 0 }} Registros</span>
+              </div>
+
+              <div v-if="!actividad.asistencia || actividad.asistencia.length === 0" class="text-sm font-bold text-slate-500 bg-slate-50 dark:bg-gray-800/50 p-10 rounded-2xl border-2 border-dashed border-slate-200 dark:border-gray-700 text-center flex flex-col items-center justify-center">
+                 <span class="material-symbols-outlined text-5xl mb-4 text-slate-400 dark:text-gray-600">event_busy</span>
+                 <p class="text-slate-600 dark:text-gray-300 text-base mb-1">Aún no hay registros de asistencia.</p>
+                 <p class="text-xs text-slate-400 dark:text-gray-500">Tus asistencias marcadas aparecerán aquí.</p>
+              </div>
+              
+              <div v-else class="space-y-3">
+                  <div v-for="(registro, index) in actividad.asistencia" :key="index" class="flex items-center justify-between bg-white dark:bg-gray-900 border border-slate-200/60 dark:border-gray-800 rounded-xl p-4 dark:bg-gray-950 relative overflow-hidden group hover:border-emerald-300 dark:hover:border-emerald-700 transition-all duration-300 shadow-sm hover:shadow-lg hover:shadow-slate-100 dark:hover:shadow-black/20">
+                      <!-- Barra de estado -->
+                      <div class="absolute left-0 top-0 bottom-0 w-1.5 transition-all duration-300" 
+                          :class="registro.estado === 'presente' ? 'bg-emerald-500 group-hover:w-2' : 'bg-rose-500 group-hover:w-2'"></div>
+                      
+                      <div class="flex items-center gap-4 pl-2">
+                          <div class="h-10 w-10 rounded-lg flex items-center justify-center transition-colors"
+                              :class="registro.estado === 'presente' ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-rose-50 dark:bg-rose-900/20'">
+                              <span class="material-symbols-outlined text-[20px]" :class="registro.estado === 'presente' ? 'text-emerald-500' : 'text-rose-500'">
+                                  {{ registro.estado === 'presente' ? 'check_circle' : 'cancel' }}
+                              </span>
+                          </div>
+                          <div>
+                              <h4 class="font-bold text-slate-800 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{{ registro.fecha }}</h4>
+                              <div class="text-[10px] text-slate-400 dark:text-gray-500 font-bold uppercase tracking-widest mt-0.5">Sesión {{ Number(index) + 1 }}</div>
+                          </div>
                       </div>
-                      <div>
-                          <h4 class="font-bold text-slate-800 dark:text-white">{{ registro.fecha }}</h4>
-                          <div class="text-xs text-slate-500 dark:text-gray-400 font-medium uppercase tracking-widest mt-1">Sesión {{ Number(index) + 1 }}</div>
+                      
+                      <div class="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all" 
+                          :class="registro.estado === 'presente' 
+                              ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' 
+                              : 'bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400'">
+                        {{ registro.estado === 'presente' ? 'Presente' : 'Ausente' }}
                       </div>
-                  </div>
-                  <div class="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-sm transition-transform group-hover:scale-105" :class="registro.estado === 'presente' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400'">
-                    {{ registro.estado === 'presente' ? 'Registrado' : 'No Registrado' }}
                   </div>
               </div>
           </div>
@@ -638,8 +777,8 @@ const goBack = () => {
             <div v-if="actividad.requisitos?.base" class="p-5 bg-slate-50 dark:bg-gray-800/50 rounded-2xl border border-slate-100 dark:border-gray-800 space-y-4">
                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2 mb-4">Verificación de Datos de Perfil</p>
                 <div class="grid grid-cols-1 gap-4">
-                    <template v-for="(required, key) in actividad.requisitos.base" :key="key">
-                        <div v-if="required" class="flex flex-col">
+                    <template v-for="key in ['nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad', 'email', 'celular', 'genero', 'afiliacion']" :key="key">
+                        <div v-if="actividad.requisitos.base[key]" class="flex flex-col">
                             <label class="text-[9px] font-black text-slate-400 uppercase mb-1">
                                 {{ key === 'documento_identidad' && datosPerfilEdit[key]?.includes(':') ? (datosPerfilEdit[key].split(':')[0] || 'Documento') : key.toString().replace(/_/g, ' ') }}
                             </label>
@@ -656,10 +795,22 @@ const goBack = () => {
                                    readonly
                                    class="w-full px-4 py-2 text-xs font-bold bg-slate-100 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl outline-none text-slate-500 dark:text-gray-400 cursor-not-allowed transition-all">
                             
+                            <!-- Si es Género, mostrar select -->
+                            <select v-else-if="key === 'genero'"
+                                    v-model="datosPerfilEdit[key]"
+                                    required
+                                    class="w-full px-4 py-2 text-xs font-bold bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl outline-none focus:border-blue-500 text-slate-800 dark:text-white transition-all">
+                                <option value="">Seleccione Género</option>
+                                <option :value="0">Masculino</option>
+                                <option :value="1">Femenino</option>
+                                <option :value="2">Otro / No especifica</option>
+                            </select>
+
                             <!-- Para campos vacíos que deben poder llenarse -->
                             <input v-else
                                    v-model="datosPerfilEdit[key]" 
-                                   :placeholder="'Ingresa tu ' + key"
+                                   required
+                                   :placeholder="'Ingresa tu ' + key.toString().replace(/_/g, ' ')"
                                    class="w-full px-4 py-2 text-xs font-bold bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl outline-none focus:border-blue-500 text-slate-800 dark:text-white transition-all">
                         </div>
                     </template>

@@ -84,12 +84,24 @@ const handleLogout = () => {
         <span class="material-symbols-outlined text-[20px] transition-colors" :class="[ $route.name === 'estudiante-certificados' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">workspace_premium</span>
       </button>
 
-      <!-- Botones de Calificaciones y Certificados Obsoletos debido al layout de Netflix -->
+      <!-- Acceso a Logística para Estudiantes designados -->
+      <div v-if="authStore.esLogistica">
+        <p class="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-3 mt-6 pl-2 border-b border-slate-100 dark:border-gray-800 pb-2">Operaciones</p>
+
+        <button @click="navigate('logistica-asistencia')"
+          :class="[ $route.name === 'logistica-asistencia' ? 'nav-active bg-emerald-600 text-white shadow-md shadow-emerald-600/20' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500' ]"
+          class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group mt-2">
+          <span class="text-xs uppercase tracking-widest font-bold">Registrar Asistencia</span>
+          <span class="material-symbols-outlined text-[20px] transition-colors" :class="[ $route.name === 'logistica-asistencia' ? 'text-white' : 'text-slate-400 group-hover:text-emerald-600' ]">qr_code_scanner</span>
+        </button>
+      </div>
     </nav>
 
-    <button @click="handleLogout" class="mt-8 flex items-center justify-center space-x-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl font-bold py-3 transition-colors uppercase text-xs tracking-widest mb-2 border border-red-100 dark:border-red-900/30">
-      <span class="material-symbols-outlined text-[20px]">logout</span>
-      <span>Cerrar Sesión</span>
-    </button>
+    <div class="mt-auto space-y-2">
+      <button @click="handleLogout" class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all font-bold text-slate-500 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 border border-transparent mb-2">
+        <span class="text-[10px] uppercase tracking-widest">Cerrar Sesión</span>
+        <span class="material-symbols-outlined text-[18px]">logout</span>
+      </button>
+    </div>
   </aside>
 </template>

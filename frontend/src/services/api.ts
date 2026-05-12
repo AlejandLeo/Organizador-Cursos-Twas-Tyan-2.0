@@ -21,4 +21,27 @@ api.interceptors.request.use(
   }
 );
 
+/**
+ * Construye la URL completa para una imagen almacenada en el servidor.
+ * @param carpeta Nombre de la subcarpeta en /uploads (ej: 'eventos', 'cursos', 'perfiles')
+ * @param nombreArchivo Nombre del archivo guardado en la BD
+ * @param fallback URL opcional si no hay imagen
+ */
+export const getImageUrl = (carpeta: string, nombreArchivo: string, fallback = '') => {
+  if (!nombreArchivo) return fallback;
+  if (nombreArchivo.startsWith('http')) return nombreArchivo;
+  
+  const baseUrl = api.defaults.baseURL || 'http://localhost:3000';
+  // Decodificamos varias veces por si viene con doble codificación desde el backend (ej: %2520 -> %20 -> " ")
+  let cleanName = nombreArchivo;
+  try {
+    cleanName = decodeURIComponent(decodeURIComponent(nombreArchivo));
+  } catch (e) {
+    try {
+      cleanName = decodeURIComponent(nombreArchivo);
+    } catch (e2) {}
+  }
+  return `${baseUrl}/uploads/${carpeta}/${cleanName}`;
+};
+
 export default api;

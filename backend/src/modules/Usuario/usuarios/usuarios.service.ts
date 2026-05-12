@@ -29,6 +29,7 @@ import { RoleId } from './constants/user-roles.constants';
 import * as fs from 'fs';
 import { join } from 'path';
 import { MailService } from '../../Comun/mail/mail.service';
+import { QrService } from '../../Seguridad/qr/qr.service';
 
 @Injectable()
 export class UsuariosService {
@@ -39,6 +40,7 @@ export class UsuariosService {
     private readonly personaRepository: Repository<Persona>,
     private readonly dataSource: DataSource,
     private readonly mailService: MailService,
+    private readonly qrService: QrService,
   ) {}
 
   // ══════════════════════════════════════════════════════════
@@ -535,35 +537,42 @@ export class UsuariosService {
 
       let contextoRol = '';
       
-      // 1. Intentar validar con la contraseña principal (Estudiante / Admin)
-      // Nota: password siempre debe existir en la BD.
-      const passEstudianteValido = usuario.password 
-        ? await bcrypt.compare(loginDto.password, usuario.password)
-        : false;
+      // Lógica de Validación Priorizada:
+      // Si el DTO indica un portal (ej: 'Ponente'), intentamos validar esa clave PRIMERO.
       
-      if (passEstudianteValido) {
-        contextoRol = 'Estudiante';
+      if (loginDto.portal === 'Ponente' && usuario.password_ponente && usuario.password_ponente.length > 10) {
+        const passPonenteValido = await bcrypt.compare(loginDto.password, usuario.password_ponente);
+        if (passPonenteValido) {
+          contextoRol = 'Ponente';
+        }
+      }
 
-        const esCoordinador = usuario.usuariosRoles?.some((ur: any) => 
-          ur.rol?.id === 2 || ur.rol?.nombre_rol === 'Coordinador'
-        );
-        if (esCoordinador) contextoRol = 'Coordinador';
+      // Si no se validó arriba (porque no era ponente o la clave no coincidió), probamos la principal
+      if (!contextoRol) {
+        const passPrincipalValida = usuario.password 
+          ? await bcrypt.compare(loginDto.password, usuario.password)
+          : false;
+        
+        if (passPrincipalValida) {
+          contextoRol = 'Estudiante';
 
-        const esAdmin = usuario.usuariosRoles?.some((ur: any) => 
-          ur.rol?.id === 1 || ur.rol?.nombre_rol === 'Super Usuario'
-        );
-        if (esAdmin) contextoRol = 'Admin';
-      } else {
-        // 2. Intentar validar con la contraseña de ponente (si existe y está configurado)
-        if (usuario.password_ponente && usuario.password_ponente.length > 10) {
-          try {
-            const passPonenteValido = await bcrypt.compare(loginDto.password, usuario.password_ponente);
-            if (passPonenteValido) {
-              contextoRol = 'Ponente';
-            }
-          } catch (e) {
-            console.error('[AUTH ERROR] Error comparando password_ponente:', e.message);
-          }
+          const esCoordinador = usuario.usuariosRoles?.some((ur: any) => 
+            ur.rol?.id === 2 || ur.rol?.nombre_rol === 'Coordinador'
+          );
+          if (esCoordinador) contextoRol = 'Coordinador';
+
+          const esAdmin = usuario.usuariosRoles?.some((ur: any) => 
+            ur.rol?.id === 1 || ur.rol?.nombre_rol === 'Super Usuario'
+          );
+          if (esAdmin) contextoRol = 'Admin';
+        }
+      }
+
+      // Fallback final: si aún no tenemos rol y no probamos la de ponente antes, probarla ahora
+      if (!contextoRol && loginDto.portal !== 'Ponente' && usuario.password_ponente && usuario.password_ponente.length > 10) {
+        const passPonenteValido = await bcrypt.compare(loginDto.password, usuario.password_ponente);
+        if (passPonenteValido) {
+          contextoRol = 'Ponente';
         }
       }
 
@@ -744,6 +753,14 @@ export class UsuariosService {
 
       await queryRunner.commitTransaction();
 
+      // Notificar al usuario por correo (especialmente útil para logística/ponentes creados por admin)
+      try {
+        const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
+        await this.mailService.sendAccountApprovalEmail(dto.email, nombreCompleto, dto.password);
+      } catch (e) {
+        console.error('Error enviando correo de bienvenida:', e);
+      }
+
       // Devolvemos el perfil cargado (usando el método existente)
       return this.getPerfil(usuarioGuardado.id);
     } catch (error) {
@@ -787,6 +804,16 @@ export class UsuariosService {
         estado: 1,
       });
       await this.dataSource.getRepository(UsuarioRol).save(nuevaRelacion);
+      
+      // Notificar al usuario por correo
+      try {
+        const nombreCompleto = usuario.persona 
+          ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}` 
+          : 'Usuario';
+        await this.mailService.sendRoleDesignationEmail(usuario.email, nombreCompleto, rol.nombre_rol);
+      } catch (e) {
+        console.error('Error enviando notificación de rol:', e);
+      }
     }
 
     return this.getPerfil(usuarioId);
@@ -1209,6 +1236,26 @@ export class UsuariosService {
 
     console.log(`[AUDITORÍA] Portal Ponente ACTIVADO CON CLAVE ESPECÍFICA - Usuario ID: ${id_usuario}`);
     return { mensaje: 'Portal de ponente activado exitosamente.' };
+  }
+
+  async getAttendanceToken(usuarioId: number): Promise<string> {
+    return this.qrService.generarTokenAsistencia(usuarioId);
+  }
+
+  /**
+   * Elimina físicamente un usuario y su persona asociada.
+   * ÚTIL PARA LIMPIEZA DE DATOS DE PRUEBA.
+   */
+  async eliminarFisico(id: number) {
+    const usuario = await this.findOne(id);
+    
+    // Al usar onDelete: CASCADE en las relaciones, se borrarían automáticamente,
+    // pero para estar seguros borramos persona si existe.
+    if (usuario.persona) {
+      await this.dataSource.getRepository(Persona).delete(usuario.persona.id);
+    }
+    
+    return this.usuarioRepository.delete(id);
   }
 }
 

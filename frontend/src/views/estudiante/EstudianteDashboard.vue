@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
-import api from '@/services/api';
+import api, { getImageUrl } from '@/services/api';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -38,7 +38,7 @@ const fetchInscripciones = async () => {
     userStats.value.finalizados = inscripcionesReales.filter((i: any) => i.estado === 3).length;
     userStats.value.certificados = userStats.value.finalizados; // Un certificado por finalizado (ejemplo simple)
 
-    eventoData.value.actividadesInscritas = inscripcionesReales.map((ins: any) => {
+    eventoData.value.actividadesInscritas = inscripcionesReales.filter((ins: any) => Number(ins.actividadAcademica?.estado) !== -1).map((ins: any) => {
       const act = ins.actividadAcademica;
       let statusText = 'Inscrito';
       if (ins.estado === 3) statusText = 'Finalizado';
@@ -53,7 +53,7 @@ const fetchInscripciones = async () => {
         type: act.tipo || 'General',
         date: act.fecha_inicio ? new Date(act.fecha_inicio).toLocaleDateString() : 'Por definir',
         progress: ins.estado === 1 ? 50 : (ins.estado === 3 ? 100 : 0), // Lógica rápida visual
-        image: act.imagen || 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=800&q=80'
+        image: getImageUrl('cursos', act.imagen, 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=800&q=80')
       };
     });
   } catch (error) {

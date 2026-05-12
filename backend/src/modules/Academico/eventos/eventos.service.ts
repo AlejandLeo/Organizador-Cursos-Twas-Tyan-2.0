@@ -41,17 +41,21 @@ export class EventosService {
     if (!filenameOrUrl) return null;
     if (filenameOrUrl.startsWith('http')) return filenameOrUrl;
     
+    // Evitar doble codificación: decodificar primero por si ya viene codificado
+    const cleanFilename = decodeURIComponent(filenameOrUrl);
+    
     const baseUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
-    return `${baseUrl}/uploads/${folder}/${encodeURIComponent(filenameOrUrl)}`;
+    return `${baseUrl}/uploads/${folder}/${encodeURIComponent(cleanFilename)}`;
   }
 
   async findAll() {
     const eventos = await this.eventoRepository.find({
-      relations: ['actividades', 'actividades.modalidades', 'actividades.inscripciones']
+      relations: ['actividades', 'actividades.modalidades', 'actividades.inscripciones'],
+      order: { prioridad: 'ASC', fecha_creacion: 'DESC' }
     });
     return eventos.map(evento => ({
       ...evento,
-      logo: this.formatImageUrl(evento.logo, 'logo'),
+      logo: this.formatImageUrl(evento.logo, 'eventos'),
       imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
       actividades: (evento.actividades || [])
         .map(act => ({
@@ -67,7 +71,7 @@ export class EventosService {
     if (evento) {
       return {
         ...evento,
-        logo: this.formatImageUrl(evento.logo, 'logo'),
+        logo: this.formatImageUrl(evento.logo, 'eventos'),
         imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos')
       };
     }
@@ -175,14 +179,14 @@ export class EventosService {
         'actividades.modalidades', 
         'actividades.inscripciones'
       ],
-      order: { fecha_creacion: 'DESC' },
+      order: { prioridad: 'ASC', fecha_creacion: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     });
 
     const data = eventos.map((evento) => ({
       ...evento,
-      logo: this.formatImageUrl(evento.logo, 'logo'),
+      logo: this.formatImageUrl(evento.logo, 'eventos'),
       imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
       actividades: (evento.actividades || []).map(act => ({
         ...act,
@@ -204,6 +208,7 @@ export class EventosService {
     imagenFondo?: Express.Multer.File,
   ) {
     const data: Partial<Evento> = { ...dto } as any;
+    if (dto.prioridad) data.prioridad = parseInt(dto.prioridad, 10);
     if (imagenPortada) data.logo = imagenPortada.filename;
     if (imagenFondo) data.imagen_fondo = imagenFondo.filename;
 
@@ -211,7 +216,7 @@ export class EventosService {
     const guardado = await this.eventoRepository.save(evento);
     return {
       ...guardado,
-      logo: this.formatImageUrl(guardado.logo, 'logo'),
+      logo: this.formatImageUrl(guardado.logo, 'eventos'),
       imagen_fondo: this.formatImageUrl(guardado.imagen_fondo, 'fondos'),
     };
   }
@@ -235,10 +240,11 @@ export class EventosService {
     if (!evento) throw new NotFoundException(`Evento ${id} no encontrado.`);
 
     const data: Partial<Evento> = { ...dto } as any;
+    if (dto.prioridad) data.prioridad = parseInt(dto.prioridad as any, 10);
 
     if (imagenPortada) {
       if (evento.logo && !evento.logo.startsWith('http')) {
-        const oldPath = `uploads/imagenes/${evento.logo}`;
+        const oldPath = `uploads/eventos/${evento.logo}`;
         if (existsSync(oldPath)) unlinkSync(oldPath);
       }
       data.logo = imagenPortada.filename;
@@ -246,7 +252,7 @@ export class EventosService {
 
     if (imagenFondo) {
       if (evento.imagen_fondo && !evento.imagen_fondo.startsWith('http')) {
-        const oldPath = `uploads/imagenes/${evento.imagen_fondo}`;
+        const oldPath = `uploads/fondos/${evento.imagen_fondo}`;
         if (existsSync(oldPath)) unlinkSync(oldPath);
       }
       data.imagen_fondo = imagenFondo.filename;
@@ -256,7 +262,7 @@ export class EventosService {
     const actualizado = await this.eventoRepository.findOneBy({ id });
     return {
       ...actualizado,
-      logo: this.formatImageUrl(actualizado!.logo, 'logo'),
+      logo: this.formatImageUrl(actualizado!.logo, 'eventos'),
       imagen_fondo: this.formatImageUrl(actualizado!.imagen_fondo, 'fondos'),
     };
   }

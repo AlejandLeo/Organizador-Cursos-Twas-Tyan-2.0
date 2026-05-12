@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import api from '@/services/api';
+import api, { getImageUrl } from '@/services/api';
 
 const route = useRoute();
 const router = useRouter();
@@ -31,26 +31,30 @@ const fetchData = async () => {
     const imparticionesEvento = imparticiones.filter((imp: any) => imp.evento?.id === eventoId);
     
     if (imparticionesEvento.length > 0) {
-      const ev = imparticionesEvento[0].evento;
+      const ev = imparticionesEvento[0].evento || {};
       eventoData.value = {
-        id: ev.id,
-        nombreCorto: 'Programa', // o extraer de ev.tipo
-        nombreLargo: ev.nombre,
-        version: new Date(ev.fecha_inicio).getFullYear().toString(),
+        id: ev.id || 0,
+        nombreCorto: 'Programa', 
+        nombreLargo: ev.nombre || 'Sin nombre',
+        version: ev.fecha_inicio ? new Date(ev.fecha_inicio).getFullYear().toString() : '2026',
         descripcion: ev.descripcion || 'Gestiona las actividades a tu cargo.',
         estado: ev.estado === 1 ? 'En Progreso' : (ev.estado === 2 ? 'Finalizado' : 'Próximamente'),
         colorEstado: 'bg-primary-dark text-white border-blue-900',
-        imagen: ev.imagen || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=1600&q=80',
+        imagen: getImageUrl('eventos', ev.logo || ev.imagen_fondo, 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=1600&q=80'),
         mostrarActividades: true,
-        actividadesAsignadas: imparticionesEvento.map((imp: any) => ({
-          id: imp.actividadAcademica?.id,
-          title: imp.actividadAcademica?.nombre,
-          status: 'En curso', // Podríamos derivarlo de las fechas de la actividad
-          type: imp.actividadAcademica?.tipo || 'Actividad',
-          date: `${new Date(imp.actividadAcademica?.fecha_inicio).toLocaleDateString()} - ${new Date(imp.actividadAcademica?.fecha_fin).toLocaleDateString()}`,
-          students: imp.actividadAcademica?.inscripciones?.length || 0,
-          image: imp.actividadAcademica?.imagen || 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=800&q=80'
-        }))
+        actividadesAsignadas: imparticionesEvento
+          .filter((imp: any) => imp?.actividadAcademica && Number(imp.actividadAcademica?.estado) !== -1)
+          .map((imp: any) => ({
+            id: imp.actividadAcademica?.id,
+            title: imp.actividadAcademica?.nombre || 'Sin nombre',
+            status: 'En curso',
+            type: imp.actividadAcademica?.tipo || 'Actividad',
+            date: imp.actividadAcademica?.fecha_inicio 
+              ? `${new Date(imp.actividadAcademica.fecha_inicio).toLocaleDateString()} - ${new Date(imp.actividadAcademica.fecha_fin).toLocaleDateString()}` 
+              : 'Fechas por definir',
+            students: imp.actividadAcademica?.inscripciones?.length || 0,
+            image: getImageUrl('cursos', imp.actividadAcademica?.imagen, 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=800&q=80')
+          }))
       };
     }
   } catch (error) {
@@ -96,18 +100,18 @@ const getStatusColor = (status: string) => {
 
     <div class="w-full bg-white dark:bg-gray-900 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 dark:border-gray-800 flex flex-col group/card mb-8">
         
-        <div class="relative w-full h-[320px] overflow-hidden">
+        <div class="relative w-full h-[240px] md:h-[320px] overflow-hidden">
           <img :src="eventoData.imagen" alt="Banner" class="w-full h-full object-cover object-center group-hover/card:scale-105 transition-transform duration-[1.5s] ease-out">
           <div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent"></div>
-          <div class="absolute bottom-0 left-0 right-0 p-8 pt-24 z-20 flex flex-col">
+          <div class="absolute bottom-0 left-0 right-0 p-6 md:p-8 pt-24 z-20 flex flex-col">
             <span class="mb-3" :class="[eventoData.colorEstado, 'text-[8px] font-black uppercase px-3 py-1 rounded-full tracking-widest w-fit shadow-lg backdrop-blur-md border']">
               {{ eventoData.estado }}
             </span>
             <div class="flex items-end justify-between">
               <div>
-                <p class="text-xs font-bold text-umsa-gold dark:text-blue-400 uppercase tracking-widest mb-2">{{ eventoData.version }}</p>
-                <h1 class="text-4xl md:text-5xl font-black text-white tracking-tighter leading-none mb-4 uppercase italic">{{ eventoData.nombreLargo }}</h1>
-                <p class="text-sm font-medium text-gray-300 max-w-2xl line-clamp-2 leading-relaxed italic opacity-80">{{ eventoData.descripcion }}</p>
+                <p class="text-[10px] md:text-xs font-bold text-umsa-gold dark:text-blue-400 uppercase tracking-widest mb-1 md:mb-2">{{ eventoData.version }}</p>
+                <h1 class="text-2xl md:text-5xl font-black text-white tracking-tighter leading-none mb-2 md:mb-4 uppercase italic">{{ eventoData.nombreLargo }}</h1>
+                <p class="text-[11px] md:text-sm font-medium text-gray-300 max-w-2xl line-clamp-2 leading-relaxed italic opacity-80">{{ eventoData.descripcion }}</p>
               </div>
             </div>
           </div>

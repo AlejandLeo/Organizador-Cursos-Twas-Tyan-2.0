@@ -145,7 +145,7 @@ const abrirMapa = (url: string) => {
             <!-- ROW 1: SELECTOR DE EVENTO Y BADGE OFICIAL (Lineales Izquierda) -->
             <div class="flex flex-col md:flex-row items-center justify-start gap-4 mb-8 w-full md:w-auto relative z-50 animate-in fade-in slide-in-from-bottom-2 duration-500">
                <!-- Elegante Selector de Eventos -->
-               <div class="relative w-full sm:w-auto min-w-[300px]">
+               <div class="relative w-full sm:w-auto sm:min-w-[300px]">
                    <button @click="isDropdownOpen = !isDropdownOpen" class="w-full flex items-center justify-between gap-4 px-5 py-3.5 bg-black/40 backdrop-blur-xl border border-white/10 hover:border-emerald-400/50 rounded-2xl text-white shadow-2xl transition-all group">
                        <div class="flex items-center gap-3">
                            <div :style="{ backgroundColor: eventoSeleccionado?.color_principal || '#10b981' }" class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-lg">
@@ -184,7 +184,7 @@ const abrirMapa = (url: string) => {
             </div>
             
             <!-- ROW 2: TÍTULO PRINCIPAL -->
-            <h1 :key="`title-${eventoSeleccionado?.id}`" class="text-5xl md:text-6xl lg:text-[5rem] xl:text-[6.5rem] font-black text-white leading-[0.95] uppercase tracking-tighter mb-4 drop-shadow-2xl animate-in fade-in slide-in-from-bottom-5 duration-700 max-w-[95%] xl:max-w-[85%]">
+            <h1 :key="`title-${eventoSeleccionado?.id}`" class="text-3xl sm:text-4xl md:text-6xl lg:text-[5rem] xl:text-[6.5rem] font-black text-white leading-[0.95] uppercase tracking-tighter mb-4 drop-shadow-2xl animate-in fade-in slide-in-from-bottom-5 duration-700 max-w-[95%] xl:max-w-[85%]">
               {{ eventoSeleccionado?.title }}
             </h1>
             
@@ -230,32 +230,83 @@ const abrirMapa = (url: string) => {
       <div class="w-full px-6 md:px-16 lg:px-24 max-w-[2500px] mx-auto">
         <div class="flex flex-col md:flex-row items-center md:items-start gap-12">
           
-          <div class="md:w-1/3 flex-shrink-0 space-y-6">
-             <div class="bg-blue-50/50 dark:bg-blue-950/20 p-8 rounded-[2rem] border border-blue-100 dark:border-blue-900/40 relative overflow-hidden group">
-                <div class="absolute -right-4 -top-4 text-umsa-blue/10 rotate-12 group-hover:scale-110 transition-transform duration-700">
-                    <span class="material-symbols-outlined text-[100px]">public</span>
-                </div>
-                <h4 class="text-xs font-black text-umsa-blue mb-4 uppercase tracking-widest flex items-center gap-2">
-                    <span class="w-2 h-2 bg-umsa-gold rounded-full"></span> Acerca de TWAS
-                </h4>
-                <p class="text-sm font-medium text-slate-600 dark:text-slate-400 leading-relaxed italic">
-                    The World Academy of Sciences (TWAS) trabaja para promover el avance científico en los países en desarrollo, fomentando la excelencia a través de la cooperación sur-sur.
-                </p>
-                <div class="mt-6 flex items-center gap-4">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/a/af/Escudo_de_la_Universidad_Mayor_de_San_Andr%C3%A9s.png" class="h-12 grayscale opacity-50 contrast-125 dark:invert" alt="Logo UMSA">
-                    <div class="h-8 w-px bg-slate-200 dark:bg-slate-700"></div>
-                    <span class="text-[10px] uppercase font-black tracking-tighter text-slate-400">Co-Organizador Oficial</span>
-                </div>
-             </div>
+          <div class="md:w-1/3 flex-shrink-0">
+              <!-- ENLACES EXTERNOS -->
+              <div v-if="eventoSeleccionado?.link_web || eventoSeleccionado?.link_facebook" class="space-y-4">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Más información oficial</p>
 
-             <div class="bg-emerald-50/50 dark:bg-emerald-950/20 p-8 rounded-[2rem] border border-emerald-100 dark:border-emerald-900/40 relative overflow-hidden group">
-                <h4 class="text-xs font-black text-emerald-600 mb-4 uppercase tracking-widest flex items-center gap-2">
-                    <span class="w-2 h-2 bg-emerald-500 rounded-full"></span> Red TYAN
-                </h4>
-                <p class="text-sm font-medium text-slate-600 dark:text-slate-400 leading-relaxed">
-                    The TWAS Young Affiliates Network (TYAN) conecta a jóvenes científicos de excelencia, facilitando el intercambio de conocimientos y fortaleciendo la investigación científica global.
-                </p>
-             </div>
+                <!-- Rich Card for Website -->
+                <a
+                  v-if="eventoSeleccionado?.link_web"
+                  :href="eventoSeleccionado.link_web"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="w-full block bg-gradient-to-br from-white to-slate-50 dark:from-gray-900 dark:to-gray-800 border border-slate-100 dark:border-gray-700 rounded-2xl p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 mb-4 group relative overflow-hidden"
+                >
+                  <!-- Decorative Gradient Beam -->
+                  <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-400 to-teal-500"></div>
+                  
+                  <div class="flex items-start gap-4">
+                    <!-- Icon Container -->
+                    <div class="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+                      <span class="material-symbols-outlined text-2xl">language</span>
+                    </div>
+                    
+                    <div class="flex-1 min-w-0">
+                      <span class="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Portal Oficial</span>
+                      <p class="text-sm font-black text-primary-dark dark:text-white mt-0.5 group-hover:text-emerald-600 transition-colors">Sitio Web del Evento</p>
+                      <p class="text-xs font-medium text-slate-500 dark:text-gray-400 mt-1 leading-relaxed">Visita el portal oficial para enterarte de todos los detalles y descargar recursos.</p>
+                      
+                      <!-- Badges/Tags -->
+                      <div class="flex flex-wrap gap-2 mt-3">
+                        <span class="text-[9px] font-bold bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-gray-400 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span class="material-symbols-outlined text-[10px]">bolt</span> Acceso Rápido
+                        </span>
+                        <span class="text-[9px] font-bold bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span class="material-symbols-outlined text-[10px]">verified</span> Oficial
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </a>
+
+                <!-- Rich Card for Facebook -->
+                <a
+                  v-if="eventoSeleccionado?.link_facebook"
+                  :href="eventoSeleccionado.link_facebook"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="w-full block bg-gradient-to-br from-white to-slate-50 dark:from-gray-900 dark:to-gray-800 border border-slate-100 dark:border-gray-700 rounded-2xl p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden"
+                >
+                  <!-- Decorative Gradient Beam -->
+                  <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#1877F2] to-blue-400"></div>
+                  
+                  <div class="flex items-start gap-4">
+                    <!-- Icon Container -->
+                    <div class="w-12 h-12 bg-blue-50 dark:bg-blue-900/30 rounded-xl flex items-center justify-center text-[#1877F2] group-hover:scale-110 transition-transform">
+                      <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                      </svg>
+                    </div>
+                    
+                    <div class="flex-1 min-w-0">
+                      <span class="text-[9px] font-black text-[#1877F2] uppercase tracking-widest">Redes Sociales</span>
+                      <p class="text-sm font-black text-primary-dark dark:text-white mt-0.5 group-hover:text-[#1877F2] transition-colors">Seguir en Facebook</p>
+                      <p class="text-xs font-medium text-slate-500 dark:text-gray-400 mt-1 leading-relaxed">Mantente al tanto de las transmisiones en vivo y actualizaciones del evento.</p>
+                      
+                      <!-- Badges/Tags -->
+                      <div class="flex flex-wrap gap-2 mt-3">
+                        <span class="text-[9px] font-bold bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-gray-400 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span class="material-symbols-outlined text-[10px]">videocam</span> En Vivo
+                        </span>
+                        <span class="text-[9px] font-bold bg-blue-50 dark:bg-blue-900/30 text-[#1877F2] dark:text-blue-400 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span class="material-symbols-outlined text-[10px]">share</span> Comunidad
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </a>
+              </div>
           </div>
 
           <div class="md:w-2/3 text-left">
@@ -271,40 +322,7 @@ const abrirMapa = (url: string) => {
                 </p>
               </div>
 
-              <!-- ENLACES EXTERNOS: Solo aparecen si el coordinador los configuró -->
-              <div v-if="eventoSeleccionado?.link_web || eventoSeleccionado?.link_facebook" class="flex flex-wrap items-center gap-4 pt-6 mt-4 border-t border-slate-100 dark:border-gray-800">
-                <p class="w-full text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Más información oficial</p>
 
-                <!-- Sitio Web Oficial -->
-                <a
-                  v-if="eventoSeleccionado?.link_web"
-                  :href="eventoSeleccionado.link_web"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  :style="{ borderColor: eventoSeleccionado?.color_principal || '#0070b4', color: eventoSeleccionado?.color_principal || '#0070b4' }"
-                  class="inline-flex items-center gap-3 px-6 py-3.5 rounded-xl border-2 bg-white dark:bg-gray-900 hover:bg-opacity-10 font-black text-xs uppercase tracking-widest shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group"
-                >
-                  <span class="material-symbols-outlined text-[20px]">language</span>
-                  Sitio Web Oficial
-                  <span class="material-symbols-outlined text-[14px] opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all">arrow_outward</span>
-                </a>
-
-                <!-- Facebook -->
-                <a
-                  v-if="eventoSeleccionado?.link_facebook"
-                  :href="eventoSeleccionado.link_facebook"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="inline-flex items-center gap-3 px-6 py-3.5 rounded-xl border-2 border-[#1877F2] text-[#1877F2] bg-white dark:bg-gray-900 font-black text-xs uppercase tracking-widest shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all duration-300 group"
-                >
-                  <!-- Ícono de Facebook SVG -->
-                  <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                  </svg>
-                  Seguir en Facebook
-                  <span class="material-symbols-outlined text-[14px] opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all">arrow_outward</span>
-                </a>
-              </div>
             </div>
           </div>
         </div>

@@ -127,6 +127,12 @@ export class Evento {
   @Column({ length: 255, nullable: true })
   nombre_2: string;
 
+  @Column({ type: 'integer', default: 3 })
+  prioridad: number;
+
+  @Column({ length: 50, default: 'visible' })
+  visibilidad_al_finalizar: string;
+
   // ── Relaciones ────────────────────────────────────────────────────────────
 
   /** Un evento tiene múltiples actividades (cursos, talleres, conferencias). */

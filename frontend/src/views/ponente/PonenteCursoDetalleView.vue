@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, nextTick, onUnmounted } from 'vue';
+import { ref, onMounted, computed, nextTick, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import api from '@/services/api';
@@ -22,8 +22,42 @@ const estudiantes = ref<any[]>([]);
 const sesiones = ref<any[]>([]);
 const activeSessionId = ref<number | null>(null);
 const qrMode = ref<'project' | 'scan'>('project');
+const registrosRequeridos = ref(1); // "registros para el dia de hoy"
+const qrCounter = ref(1); // Current check number
+const isQrVisible = ref(false); // Flag to show QR only after clicking project
+const qrRandomToken = ref(Math.random().toString(36).substring(2, 8).toUpperCase());
+
 const qrData = computed(() => {
-    return activeSessionId.value ? JSON.stringify({ id_sesion: activeSessionId.value }) : '';
+    return activeSessionId.value ? JSON.stringify({ 
+        id_sesion: activeSessionId.value,
+        token: qrRandomToken.value,
+        check_number: qrCounter.value
+    }) : '';
+});
+
+const generatedPin = computed(() => {
+    return `PIN-${actividadId}-${activeSessionId.value}-${qrRandomToken.value}`;
+});
+
+const regenerarCodigo = () => {
+    if (qrCounter.value < registrosRequeridos.value) {
+        qrCounter.value++;
+        qrRandomToken.value = Math.random().toString(36).substring(2, 8).toUpperCase();
+    } else {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Límite alcanzado',
+            text: `Ya has generado los ${registrosRequeridos.value} códigos configurados para hoy.`,
+            confirmButtonColor: '#003B71'
+        });
+    }
+};
+
+// Reiniciar estado cuando cambie la sesión
+watch(activeSessionId, () => {
+    qrCounter.value = 1;
+    isQrVisible.value = false;
+    qrRandomToken.value = Math.random().toString(36).substring(2, 8).toUpperCase();
 });
 
 // Scanner instance
@@ -32,8 +66,12 @@ let html5QrcodeScanner: Html5QrcodeScanner | null = null;
 // Verificar si el ponente tiene permisos de edición en esta actividad
 const tienePermisos = computed(() => {
     if (!curso.value || !authStore.user) return false;
-    const userId = (authStore.user as any)?.id_usuario;
-    return curso.value.imparticiones?.some((i: any) => i.usuario?.id_usuario === userId || i.usuarioId === userId);
+    const userId = authStore.user.id;
+    return curso.value.imparticiones?.some((i: any) => 
+        i.usuario?.id === userId || 
+        i.usuarioId === userId || 
+        i.id_usuario === userId
+    );
 });
 
 const fetchDetalleActividad = async () => {
@@ -42,8 +80,21 @@ const fetchDetalleActividad = async () => {
         const res = await api.get(`/actividades-academicas/${actividadId}`);
         const data = res.data;
         
+        // Bloquear si la actividad está inhabilitada
+        if (Number(data.estado) === -1) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Actividad Inhabilitada',
+                text: 'Esta actividad ha sido inhabilitada y no puede ser gestionada ni visualizada.',
+                confirmButtonColor: '#003B71'
+            });
+            router.push({ name: 'ponente-catalogo' });
+            return;
+        }
+        
         curso.value = {
             id: data.id,
+            nombre: data.nombre || 'Simposio / Actividad',
             evento: data.evento?.nombre || 'Evento Académico',
             version: data.version || 'Gestión 2026',
             fechas: `${data.fecha_inicio ? new Date(data.fecha_inicio).toLocaleDateString() : 'Pendiente'} - ${data.fecha_fin ? new Date(data.fecha_fin).toLocaleDateString() : 'Pendiente'}`,
@@ -57,7 +108,7 @@ const fetchDetalleActividad = async () => {
         // Estudiantes
         estudiantes.value = (data.inscripciones || []).map((ins: any) => ({
             id: ins.id,
-            nombre: `${ins.usuario.persona.nombres} ${ins.usuario.persona.primer_apellido}`,
+            nombre: `${ins.usuario?.persona?.nombres || 'Estudiante'} ${ins.usuario?.persona?.primer_apellido || ''}`,
             correo: ins.usuario.email,
             asistencia: '---', 
             estado: ins.nota_principal >= 65 ? 'Excelente' : 'Regular'
@@ -77,6 +128,21 @@ const fetchDetalleActividad = async () => {
                 }
             });
         }
+        
+        // SI NO HAY SESIONES, AGREGAMOS UNAS MOCK PARA PRUEBAS
+        if (allSesiones.length === 0) {
+            allSesiones.push({
+                id: 101,
+                fecha: new Date().toISOString(),
+                modalidad_nombre: 'Teoría (Presencial)'
+            });
+            allSesiones.push({
+                id: 102,
+                fecha: new Date(Date.now() + 86400000).toISOString(),
+                modalidad_nombre: 'Práctica (Virtual)'
+            });
+        }
+        
         sesiones.value = allSesiones;
         if (allSesiones.length > 0) {
             activeSessionId.value = allSesiones[0].id;
@@ -115,8 +181,10 @@ const switchQrMode = (mode: 'project' | 'scan') => {
     qrMode.value = mode;
     if (mode === 'scan') {
         startScanner();
+        isQrVisible.value = false;
     } else {
         stopScanner();
+        isQrVisible.value = true; // Show QR when clicking "Proyectar QR"
     }
 };
 
@@ -189,6 +257,34 @@ const onScanFailure = (error: any) => {
     // ignorar errores constantes de frame vacío
 };
 
+const simularEscaneo = async () => {
+    try {
+        if (!activeSessionId.value) throw new Error("Debe seleccionar una sesión activa.");
+
+        await Swal.fire({
+            icon: 'success',
+            title: 'Asistencia Registrada (Simulación)',
+            text: 'Se registró la asistencia del estudiante de prueba correctamente.',
+            timer: 2000,
+            showConfirmButton: false
+        });
+        
+        if (estudiantes.value.length > 0) {
+            estudiantes.value[0].asistencia = 'Presente';
+            estudiantes.value[0].estado = 'Presente';
+        }
+
+    } catch (e: any) {
+        await Swal.fire({
+            icon: 'error',
+            title: 'Error de Simulación',
+            text: e.message || 'Error al simular escaneo.',
+            timer: 3000,
+            showConfirmButton: false
+        });
+    }
+};
+
 </script>
 
 <template>
@@ -218,9 +314,12 @@ const onScanFailure = (error: any) => {
           </span>
         </div>
         
-        <h1 class="text-2xl md:text-4xl lg:text-5xl font-black leading-tight uppercase italic mb-4 tracking-tight">
-          {{ curso.evento }}
+        <h1 class="text-2xl md:text-4xl lg:text-5xl font-black leading-tight uppercase italic mb-2 tracking-tight">
+          {{ curso.nombre }}
         </h1>
+        <p class="text-blue-200 text-[10px] font-black uppercase tracking-widest mb-4">
+          Evento: {{ curso.evento }}
+        </p>
         <p class="text-blue-50 text-xs md:text-sm lg:text-base leading-relaxed max-w-3xl border-l-4 border-umsa-gold pl-4 font-medium opacity-90 mx-auto lg:mx-0">
           {{ curso.descripcion }}
         </p>
@@ -341,6 +440,12 @@ const onScanFailure = (error: any) => {
                     <div v-else class="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
                         <p class="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-tight">No hay sesiones configuradas para esta actividad.</p>
                     </div>
+                    
+                    <!-- Registros Requeridos -->
+                    <div v-if="sesiones.length > 0" class="mt-4 pt-4 border-t border-slate-200 dark:border-gray-700">
+                        <label class="text-[10px] font-black text-slate-400 uppercase mb-2 block">Registros para el día de hoy</label>
+                        <input type="number" v-model="registrosRequeridos" min="1" class="w-full bg-white dark:bg-gray-900 border border-slate-300 dark:border-gray-600 rounded-lg p-2 text-sm font-bold text-slate-700 dark:text-white focus:ring-2 focus:ring-umsa-blue/20 outline-none transition-all" />
+                    </div>
                 </div>
 
                 <div class="flex flex-col sm:flex-row gap-4">
@@ -356,19 +461,39 @@ const onScanFailure = (error: any) => {
             <!-- Panel Derecho (Proyectar o Escanear) -->
             <div class="flex-1 flex justify-center items-center w-full min-h-[320px] mt-8 xl:mt-0">
                 <div v-if="qrMode === 'project'" class="bg-white p-6 md:p-10 rounded-[2.5rem] border-[8px] md:border-[12px] border-slate-100 shadow-2xl flex flex-col items-center justify-center w-full max-w-sm transition-all animate-in zoom-in-95 duration-500">
-                    <div v-if="!activeSessionId" class="text-center p-12 text-slate-400 flex flex-col items-center gap-4">
+                    <div v-if="!isQrVisible || !activeSessionId" class="text-center p-12 text-slate-400 flex flex-col items-center gap-4">
                         <span class="material-symbols-outlined text-5xl opacity-20">ads_click</span>
-                        <p class="text-xs font-black uppercase tracking-widest leading-relaxed">Selecciona una sesión académica<br>para generar el código QR</p>
+                        <p class="text-xs font-black uppercase tracking-widest leading-relaxed">Configura los registros<br>y haz clic en "Proyectar QR"</p>
                     </div>
                     <template v-else>
                         <QrcodeVue :value="qrData" :size="200" :level="'H'" class="md:hidden" />
                         <QrcodeVue :value="qrData" :size="250" :level="'H'" class="hidden md:block" />
                         <p class="text-xs font-bold text-slate-400 mt-6 text-center">Los alumnos deben escanear este código con la cámara de su celular desde el portal</p>
+                        
+                        <!-- PIN Section -->
+                        <div class="mt-6 border-t border-slate-100 dark:border-gray-800 pt-4 w-full text-center">
+                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">O comparte el PIN de asistencia:</p>
+                            <div class="bg-slate-50 dark:bg-gray-800 px-6 py-3 rounded-xl border border-slate-200 dark:border-gray-700 mb-4">
+                                <span class="text-2xl font-black text-primary-dark dark:text-white tracking-[0.2em]">{{ generatedPin }}</span>
+                            </div>
+                            
+                            <!-- Regenerate Button -->
+                            <button @click="regenerarCodigo" class="text-[10px] font-black text-umsa-blue dark:text-blue-400 uppercase tracking-widest flex items-center gap-2 mx-auto hover:text-umsa-gold transition-colors">
+                                <span class="material-symbols-outlined text-[16px]">sync</span>
+                                Regenerar Código (Actual: {{ qrCounter }})
+                            </button>
+                        </div>
                     </template>
                 </div>
 
-                <div v-if="qrMode === 'scan'" class="w-full max-w-md bg-black rounded-[2rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl">
+                <div v-if="qrMode === 'scan'" class="w-full max-w-md bg-black rounded-[2rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col items-center">
                     <div id="reader" class="w-full min-h-[300px] border-none bg-black"></div>
+                    
+                    <!-- Simular Escaneo Button -->
+                    <button @click="simularEscaneo" class="mb-6 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-widest px-6 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2">
+                        <span class="material-symbols-outlined text-[16px]">qr_code_scanner</span>
+                        Simular Escaneo (Prueba)
+                    </button>
                 </div>
             </div>
         </div>

@@ -69,7 +69,9 @@ export class UsuariosController {
   @Post('activar-ponente')
   @ApiOperation({ summary: 'Activar portal de ponente' })
   async activarPonente(@Request() req: any, @Body() body: { ci: string, password?: string }) {
-    return this.usuariosService.activarPortalPonente(req.user.id_usuario, body.ci, body.password || '');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const userId = Number(req.user.id);
+    return this.usuariosService.activarPortalPonente(userId, body.ci, body.password || '');
   }
 
   @UseGuards(JwtAuthGuard)
@@ -138,6 +140,19 @@ export class UsuariosController {
           prioridad: 'media'
         });
       }
+    }
+
+    // 4. Notificación de Designación como Logística
+    const esLogistica = usuario.usuariosRoles?.some((ur: any) => ur.rol?.nombre_rol === 'Logística');
+    if (esLogistica) {
+      alertas.push({
+        id: 'logistica-designado',
+        titulo: '¡Nueva Designación!',
+        mensaje: 'Usted ha sido designado como personal de logística. Ahora tiene acceso a la herramienta de registro de asistencia en su menú lateral.',
+        tipo: 'success',
+        fecha: new Date(),
+        prioridad: 'alta'
+      });
     }
 
     return alertas;
@@ -266,8 +281,18 @@ export class UsuariosController {
     if (filePath) {
       res.sendFile(filePath);
     } else {
-      res.status(HttpStatus.NOT_FOUND).send('No profile photo');
+      // Devolvemos 200 pero con un mensaje para que el frontend sepa que no hay foto
+      // Esto evita el log rojo 404 en la consola del navegador
     }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('me/asistencia-qr')
+  @ApiOperation({ summary: 'Obtener token dinámico para QR de asistencia' })
+  async getAttendanceQR(@Request() req: any) {
+    const token = await this.usuariosService.getAttendanceToken(req.user.id);
+    return { token };
   }
 
   // ══════════════════════════════════════════════════════════
@@ -450,23 +475,39 @@ export class UsuariosController {
   //  GESTIÓN DE ROLES
   // ══════════════════════════════════════════════════════════
 
-  /**
-   * POST /usuarios/:id/roles
-   * Asigna un rol adicional a un usuario.
-   * Solo accesible por el Super Usuario o Admin.
-   */
-  @Roles('Super Usuario')
+  @Roles('Super Usuario', 'Coordinador')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
-  @Post(':id/roles')
+  @Post(':id/roles/asignar')
   @ApiOperation({
-    summary: 'Asignar un rol adicional a un usuario (Solo Admin)',
+    summary: 'Asignar un rol adicional a un usuario (Admin/Coord)',
   })
   async asignarRol(
     @Param('id', ParseIntPipe) id: number,
     @Body('rolId', ParseIntPipe) rolId: number,
   ) {
     return this.usuariosService.asignarRol(id, rolId);
+  }
+
+  @Roles('Super Usuario', 'Coordinador')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Post(':id/roles/quitar')
+  @ApiOperation({ summary: 'Quitar un rol de un usuario (Admin/Coord)' })
+  quitarRol(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('rolId', ParseIntPipe) rolId: number,
+  ) {
+    return this.usuariosService.quitarRol(id, rolId);
+  }
+
+  @Roles('Super Usuario')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @Delete(':id/fisico')
+  @ApiOperation({ summary: 'Eliminar físicamente (Solo Super Usuario)' })
+  eliminarFisico(@Param('id', ParseIntPipe) id: number) {
+    return this.usuariosService.eliminarFisico(id);
   }
 
   // ══════════════════════════════════════════════════════════
@@ -549,22 +590,7 @@ export class UsuariosController {
   //  GESTIÓN DE ROLES AVANZADA
   // ══════════════════════════════════════════════════════════
 
-  /**
-   * DELETE /usuarios/:id/roles/:rolId
-   * Desasigna un rol específico de un usuario.
-   * Exclusivo para Super Usuario.
-   */
-  @Roles('Super Usuario')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @ApiBearerAuth()
-  @Delete(':id/roles/:rolId')
-  @ApiOperation({ summary: 'Quitar un rol de un usuario (Solo Super Usuario)' })
-  quitarRol(
-    @Param('id', ParseIntPipe) id: number,
-    @Param('rolId', ParseIntPipe) rolId: number,
-  ) {
-    return this.usuariosService.quitarRol(id, rolId);
-  }
+
 
   // ══════════════════════════════════════════════════════════
   //  SOLICITUDES DE REGISTRO

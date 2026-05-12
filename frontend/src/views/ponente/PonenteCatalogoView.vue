@@ -28,7 +28,7 @@ const loadCatalog = async () => {
         colorEstado: 'bg-emerald-500 text-white border-emerald-400/30',
         inscripcionesAbiertas: true,
         mostrarActividades: true,
-        actividades: (evento.actividades || []).map((act: any) => {
+        actividades: (evento.actividades || []).filter((act: any) => Number(act.estado) !== -1).map((act: any) => {
           // Determinar estado de la actividad (1 = Activo)
           let statusLabel = 'Próximamente';
           if (act.estado === 1) statusLabel = 'En curso';

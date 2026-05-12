@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import Swal from 'sweetalert2';
 import { useAuthStore } from '@/stores/auth';
 import api from '@/services/api';
+import QRAsistencia from '@/components/QRAsistencia.vue';
 
 const authStore = useAuthStore();
 const isEditing = ref(false);
@@ -199,6 +200,11 @@ const saveChanges = () => {
                </div>
             </div>
         </div>
+    </div>
+
+    <!-- QR de Asistencia -->
+    <div class="max-w-md mx-auto">
+      <QRAsistencia />
     </div>
   </div>
 </template>

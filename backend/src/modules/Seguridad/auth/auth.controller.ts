@@ -33,13 +33,14 @@ export class AuthController {
   @ApiOperation({ summary: 'Iniciar sesión y obtener JWT' })
   @HttpCode(HttpStatus.OK)
   async login(@Body() loginDto: LoginDto) {
-    // 1. Valida credenciales (lanza 401 si son incorrectas o cuenta inactiva)
-    const usuario = await this.usuariosService.login(loginDto);
+    // 1. Valida credenciales
+    const result = await this.usuariosService.login(loginDto);
     // 2. Genera y devuelve el access_token JWT
-    const token = await this.authService.generarToken(usuario);
+    const token = await this.authService.generarToken(result);
     return {
-      user: usuario,
+      user: result,
       token: token.access_token,
+      rolSugerido: result.rolSugerido // Lo exponemos directamente aquí
     };
   }
 

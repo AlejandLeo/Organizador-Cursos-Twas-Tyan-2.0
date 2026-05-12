@@ -12,6 +12,11 @@ const authStore = useAuthStore()
 const router = useRouter()
 
 const isDark = ref(false)
+
+const versionActual = computed(() => {
+  const current = eventoStore.versionesDisponibles.find(v => v.id === eventoStore.selectedEventoId);
+  return current ? current.edicion : 'Sin Versión';
+});
 const notifications = ref({
   total: 0,
   accounts: 0,
@@ -126,36 +131,44 @@ const onNombreChange = (event: Event) => {
         <p class="hidden md:block text-[6px] leading-tight text-primary-dark/60 dark:text-gray-400 uppercase font-bold tracking-tighter">The World Academy of Sciences</p>
       </div>
 
+      <!-- Selector Móvil (Visible solo en móvil al lado del logo) -->
+      <div class="lg:hidden flex-1 max-w-[180px] relative group/select ml-2">
+        <select :value="eventoStore.selectedEventoNombre" @change="onNombreChange"
+          style="text-align: left !important; text-align-last: left !important;"
+          :class="[(eventoStore.activeEvento?.estado === 1 || eventoStore.activeEvento?.estado === 2) ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-500 dark:border-emerald-600 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-gray-800 border-slate-300 dark:border-gray-700 text-slate-500 dark:text-gray-400']"
+          class="w-full border text-[10px] font-black rounded-lg py-1.5 pl-2 pr-6 appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all truncate">
+          <option v-for="(nombre, idx) in eventoStore.nombresEventos" :key="idx" :value="nombre">{{ nombre }}</option>
+        </select>
+        <span class="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">unfold_more</span>
+      </div>
+
       <!-- Selectores (Sólo Escritorio - Vista Premium) -->
       <div class="hidden lg:flex items-center gap-4">
         <div class="relative group/select">
-          <label class="absolute -top-2 left-3 bg-white dark:bg-gray-900 px-1 text-[8px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-[0.2em] z-10 transition-colors group-focus-within/select:text-umsa-blue">Evento Académico</label>
+          <label class="absolute -top-2 left-3 bg-white dark:bg-gray-900 px-1 text-[8px] font-black text-slate-400 group-focus-within/select:text-emerald-500 uppercase tracking-[0.2em] z-10 transition-colors">Evento Académico</label>
           <div class="relative">
             <select :value="eventoStore.selectedEventoNombre" @change="onNombreChange"
               style="text-align: left !important; text-align-last: left !important;"
-              class="bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700 text-primary-dark dark:text-gray-200 text-xs font-black rounded-xl py-2.5 pl-12 pr-10 appearance-none focus:ring-4 focus:ring-umsa-blue/10 focus:border-umsa-blue w-80 truncate cursor-pointer transition-all shadow-sm group-hover/select:bg-white dark:group-hover/select:bg-gray-800">
+              :class="[(eventoStore.activeEvento?.estado === 1 || eventoStore.activeEvento?.estado === 2) ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-500 dark:border-emerald-600 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-gray-800 border-slate-300 dark:border-gray-700 text-slate-500 dark:text-gray-400']"
+              class="border text-xs font-black rounded-xl py-2.5 pl-12 pr-10 appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:shadow-lg focus:shadow-emerald-500/10 w-80 truncate cursor-pointer transition-all">
               <option v-for="(nombre, idx) in eventoStore.nombresEventos" :key="idx" :value="nombre">{{ nombre }}</option>
             </select>
-            <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl pointer-events-none group-focus-within/select:text-umsa-blue">event_seat</span>
+            <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-xl pointer-events-none transition-colors"
+              :class="[(eventoStore.activeEvento?.estado === 1 || eventoStore.activeEvento?.estado === 2) ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400']">event_seat</span>
             <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-lg pointer-events-none group-hover/select:translate-y-[-40%] transition-transform">unfold_more</span>
           </div>
         </div>
 
         <div class="relative group/select" v-if="eventoStore.selectedEventoNombre">
-          <label class="absolute -top-2 left-3 bg-white dark:bg-gray-900 px-1 text-[8px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-[0.2em] z-10 transition-colors group-focus-within/select:text-emerald-500">Versión (Gestión)</label>
+          <label class="absolute -top-2 left-3 bg-white dark:bg-gray-900 px-1 text-[8px] font-black uppercase tracking-[0.2em] z-10 transition-colors"
+            :class="[(eventoStore.activeEvento?.estado === 1 || eventoStore.activeEvento?.estado === 2) ? 'text-emerald-500' : 'text-slate-400']">Versión (Gestión)</label>
           <div class="relative">
-            <select v-model="eventoStore.selectedEventoId"
-              style="text-align: left !important; text-align-last: left !important;"
-              :class="[
-                'text-xs font-black rounded-xl py-2.5 pl-12 pr-10 appearance-none focus:ring-4 w-64 transition-all cursor-pointer shadow-sm',
-                eventoStore.selectedEstado === 'Activo' 
-                  ? 'bg-emerald-50/50 border-emerald-400/50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-500/50 focus:ring-emerald-500/10'
-                  : 'bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-primary-dark dark:text-gray-200'
-              ]">
-              <option v-for="ver in eventoStore.versionesDisponibles" :key="ver.id" :value="ver.id">{{ ver.edicion }}</option>
-            </select>
-            <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl pointer-events-none group-focus-within/select:text-emerald-500">history_toggle_off</span>
-            <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-lg pointer-events-none group-hover/select:translate-y-[-40%] transition-transform">unfold_more</span>
+            <div :class="[(eventoStore.activeEvento?.estado === 1 || eventoStore.activeEvento?.estado === 2) ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-500 dark:border-emerald-600 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-gray-800 border-slate-300 dark:border-gray-700 text-slate-500 dark:text-gray-400']"
+              class="border text-xs font-black rounded-xl py-2.5 pl-12 pr-10 w-64 transition-all flex items-center">
+              {{ versionActual }}
+            </div>
+            <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-xl pointer-events-none transition-colors"
+              :class="[(eventoStore.activeEvento?.estado === 1 || eventoStore.activeEvento?.estado === 2) ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400']">history_toggle_off</span>
           </div>
         </div>
       </div>
@@ -200,7 +213,7 @@ const onNombreChange = (event: Event) => {
 
             <!-- Solicitudes de Actividades -->
             <div v-for="act in notifications.activities" :key="act.id"
-              @click="router.push(`/coordinador/actividades/${act.id}?tab=solicitudes`); showNotifications = false"
+              @click="router.push(`/coordinador/gestion-eventos/${act.id}?tab=solicitudes`); showNotifications = false"
               class="p-5 hover:bg-slate-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer border-b border-slate-50 dark:border-gray-800 last:border-0 group">
               <div class="flex items-start gap-4">
                 <div class="w-10 h-10 rounded-2xl bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center text-sky-600 dark:text-sky-400 group-hover:scale-110 transition-transform">

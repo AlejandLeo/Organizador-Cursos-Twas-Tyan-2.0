@@ -34,6 +34,7 @@ import { UsuariosCertificadosModule } from './modules/Certificacion/usuarios-cer
 
 // --- Auth ---
 import { AuthModule } from './modules/Seguridad/auth/auth.module';
+import { QrModule } from './modules/Seguridad/qr/qr.module';
 
 // --- Archivos ---
 import { UploadsModule } from './modules/Comun/uploads/uploads.module';
@@ -91,6 +92,7 @@ import { CoordinadorModule } from './modules/Academico/coordinador/coordinador.m
 
     // --- Auth ---
     AuthModule,
+    QrModule,
 
     // --- Archivos ---
     UploadsModule,

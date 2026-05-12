@@ -1,7 +1,7 @@
 // Enums
 export enum EstadoUsuario {
-  ACTIVO = 'ACTIVO',
-  INACTIVO = 'INACTIVO',
+  ACTIVO = 1,
+  INACTIVO = 0,
 }
 
 // Entidades Base
@@ -9,7 +9,7 @@ export interface Usuario {
   id: number;
   email: string;
   password?: string;
-  estado: number | EstadoUsuario;
+  estado: number;
   persona?: Persona;
   roles?: Rol[];
   usuariosRoles?: any[];
@@ -17,21 +17,21 @@ export interface Usuario {
 }
 
 export interface Persona {
-  id_perfil: string;
+  id: number;
   nombres: string;
   primer_apellido: string;
   segundo_apellido?: string;
   documento_identidad: string;
-  genero?: string;
+  genero?: number;
   pais_origen?: string;
   pais_residencia?: string;
   fecha_nacimiento?: string;
   celular?: string;
-  fecha_registro: string;
+  fecha_creacion?: string;
   firma_dig?: string;
   perfil_completado?: boolean;
   ponente_configurado?: boolean;
-  id_usuario: string;
+  id_usuario: number;
 }
 
 export interface Rol {
@@ -41,127 +41,128 @@ export interface Rol {
 
 // Relaciones
 export interface UsuarioRol {
-  id_usuario_rol: string;
-  estado: string;
-  id_usuario: string;
-  id_rol: string;
+  id: number;
+  estado: number;
+  id_usuario: number;
+  id_rol: number;
 }
 
 export interface InfoCertificado {
-    id_info_certificado: string;
+    id: number;
     cabecera: string;
     tenor: string;
-    id_evento: string;
+    id_evento: number;
 }
 
 export interface Certificado {
-    id_certificado: string;
+    id: number;
     codigo_certificado: string;
     path_certificado: string;
     fecha_emision: string;
     tipo: string;
-    estado: string;
-    id_info_certificado: string;
-    id_actividad_academica: string;
-    id_usuario: string;
+    estado: number;
+    id_info_certificado: number;
+    id_actividad_academica: number;
+    id_usuario: number;
 }
 
 export interface Evento {
-    id_eventos: string;
+    id: number;
+    nombre_evento?: string;
+    sigla?: string;
     descripcion: string;
     gestion: string;
     ubicacion: string;
     direccion: string;
     fecha_inicio: string;
     fecha_fin: string;
-    estado: string;
+    estado: number;
     logo?: string;
 }
 
 export interface Afiliacion {
-    id_afiliacion: string;
-    afiliacion: string;
+    id: number;
+    institucion: string;
     tipo_afiliacion: string;
     area_tematica: string;
     disciplina_cientifica: string;
-    grado_academico: string;
-    id_usuario: string;
+    id_grado_academico?: number;
+    id_usuario: number;
 }
 
 export interface Inscripcion {
-    id_inscripcion: string;
+    id: number;
     fecha_registro: string;
     nota_principal: number;
     miembro_tyan: boolean;
     razon: string;
-    estado: string;
-    id_usuario: string;
-    id_actividad_academica: string;
+    estado: number;
+    id_usuario: number;
+    id_actividad_academica: number;
 }
 
 export interface InscripcionModalidad {
-    id_inscripcion_modalidad: string;
+    id: number;
     nota: number;
     num_asistencia: number;
     aprobado: boolean;
-    id_inscripcion: string;
-    id_curso_modalidad: string;
+    id_inscripcion: number;
+    id_curso_modalidad: number;
 }
 
 export interface CoordinacionEvento {
-    id_coordinacion: string;
-    id_usuario: string;
-    id_evento: string;
+    id: number;
+    id_usuario: number;
+    id_evento: number;
 }
 
 export interface Imparticion {
-    id_imparticion: string;
-    id_usuario: string;
-    id_actividad_academica: string;
-    id_eventos: string;
+    id: number;
+    id_usuario: number;
+    id_actividad_academica: number;
+    id_evento: number;
 }
 
 export interface ActividadAcademica {
-    id_actividad_academica: string;
-    nombre: string;
+    id: number;
+    titulo: string;
     descripcion: string;
     tipo: string;
     fecha_inicio: string;
     fecha_fin: string;
-    id_evento: string;
+    id_evento: number;
 }
 
 export interface SesionAcademica {
-    id_sesion_academica: string;
+    id: number;
     fecha: string;
     hora_inicio: string;
     hora_fin: string;
     modalidad: string;
     aula?: string;
     cod_verificacion?: string;
-    id_curso_modalidad: string;
+    id_actividad_academica: number;
 }
 
 export interface Asistencia {
-    id_asistencia: string;
+    id: number;
     fecha_hora_registro: string;
-    estado: string;
-    id_inscripcion_modalidad: string;
-    id_sesion_academica: string;
+    estado: number;
+    id_inscripcion: number;
+    id_sesion_academica: number;
 }
 
 export interface CursoModalidad {
-    id_curso_modalidad: string;
+    id: number;
     tipo: string;
     min_nota: number;
     min_asistencia: number;
-    id_actividad_academica: string;
+    id_actividad_academica: number;
 }
 
 export interface UsuarioCertificado {
-    id_usuario: string;
-    id_certificado: string;
+    id_usuario: number;
+    id_certificado: number;
     tipo_relacion: string;
     es_beneficiario: boolean;
 }
-

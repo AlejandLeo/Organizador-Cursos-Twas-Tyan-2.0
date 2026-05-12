@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import api from '@/services/api';
+import api, { getImageUrl } from '@/services/api';
 import Swal from 'sweetalert2';
+import { useAuthStore } from '@/stores/auth';
 
 const route = useRoute();
 const router = useRouter();
+const authStore = useAuthStore();
 
 const activeTab = ref('estudiantes');
 const isLoading = ref(false);
@@ -379,7 +381,7 @@ const eliminarPonente = async (id: number) => {
     </button>
 
     <div v-if="actividad" class="rounded-[3rem] p-10 flex flex-col md:flex-row items-center justify-between shadow-2xl relative overflow-hidden border-r-8 border-umsa-gold min-h-[200px]"
-         :style="actividad.imagen ? { backgroundImage: `url(${actividad.imagen})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { backgroundColor: '#1e293b' }"
+         :style="actividad.imagen ? { backgroundImage: `url(${getImageUrl('cursos', actividad.imagen)})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { backgroundColor: '#1e293b' }"
          :class="Number(actividad.estado) === -1 ? 'grayscale' : ''">
       <!-- Overlay degradado para adaptar a la paleta institucional -->
       <div class="absolute inset-0 bg-gradient-to-r" :class="Number(actividad.estado) === -1 ? 'from-gray-900/95 via-gray-800/80 to-transparent' : 'from-umsa-blue/95 via-primary-dark/80 to-transparent'"></div>
@@ -545,42 +547,119 @@ const eliminarPonente = async (id: number) => {
 
     <!-- Tab 3: Asistencia -->
     <div v-if="activeTab === 'asistencia'" class="tab-content block space-y-6 animate-in fade-in">
-        <div class="flex flex-col md:flex-row md:justify-between md:items-end mb-4 gap-4">
-            <div>
-                <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic">Control de Asistencia</h3>
-                <p class="text-[10px] font-bold text-slate-400 uppercase mt-1 tracking-widest">Selecciona la sesión activa:</p>
+        <!-- VISTA PARA COORDINADOR: HISTORIAL DE ASISTENCIA -->
+        <div v-if="authStore.rolActivo === 'Coordinador'" class="space-y-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic">Historial de Asistencias</h3>
+                <span class="bg-blue-100 dark:bg-blue-900/30 text-umsa-blue px-3 py-1 text-[10px] font-black uppercase rounded-lg">Vista de Coordinador</span>
             </div>
-            <select class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 text-primary-dark dark:text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm outline-none focus:ring-2 focus:ring-umsa-gold">
-                <option>Sesión 1: Martes 14/Nov (Teoría)</option>
-            </select>
+            
+            <div class="bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-50 dark:bg-gray-800/50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-200 dark:border-gray-800">
+                        <tr>
+                            <th class="px-8 py-5">Fecha / Sesión</th>
+                            <th class="px-8 py-5">Modo de Registro</th>
+                            <th class="px-8 py-5 text-center">Asistentes</th>
+                            <th class="px-8 py-5 text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-gray-800">
+                        <tr class="hover:bg-slate-50 dark:hover:bg-gray-800/80 transition-colors">
+                            <td class="px-8 py-6">
+                                <p class="font-black text-primary-dark dark:text-white text-sm uppercase">Sesión 1: Martes 14/Nov</p>
+                                <p class="text-[10px] text-slate-400 font-medium">Teoría • 08:00 AM</p>
+                            </td>
+                            <td class="px-8 py-6">
+                                <span class="bg-blue-100 dark:bg-blue-900/30 text-umsa-blue px-3 py-1 rounded-lg font-black text-[9px] uppercase">Por PIN</span>
+                            </td>
+                            <td class="px-8 py-6 text-center">
+                                <span class="text-green-600 dark:text-green-400 font-black text-sm">32 / 45</span>
+                            </td>
+                            <td class="px-8 py-6 text-center">
+                                <button @click="openModal('modal-lista-asistencia')" class="bg-primary-dark text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all flex items-center gap-1 mx-auto">
+                                    <span class="material-symbols-outlined text-sm">visibility</span> Ver Lista
+                                </button>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 dark:hover:bg-gray-800/80 transition-colors">
+                            <td class="px-8 py-6">
+                                <p class="font-black text-primary-dark dark:text-white text-sm uppercase">Sesión 2: Jueves 16/Nov</p>
+                                <p class="text-[10px] text-slate-400 font-medium">Práctica • 02:00 PM</p>
+                            </td>
+                            <td class="px-8 py-6">
+                                <span class="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 px-3 py-1 rounded-lg font-black text-[9px] uppercase">QR Proyectado</span>
+                            </td>
+                            <td class="px-8 py-6 text-center">
+                                <span class="text-green-600 dark:text-green-400 font-black text-sm">40 / 45</span>
+                            </td>
+                            <td class="px-8 py-6 text-center">
+                                <button @click="openModal('modal-lista-asistencia')" class="bg-primary-dark text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all flex items-center gap-1 mx-auto">
+                                    <span class="material-symbols-outlined text-sm">visibility</span> Ver Lista
+                                </button>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 dark:hover:bg-gray-800/80 transition-colors">
+                            <td class="px-8 py-6">
+                                <p class="font-black text-primary-dark dark:text-white text-sm uppercase">Sesión 3: Sábado 18/Nov</p>
+                                <p class="text-[10px] text-slate-400 font-medium">Evaluación • 10:00 AM</p>
+                            </td>
+                            <td class="px-8 py-6">
+                                <span class="bg-purple-100 dark:bg-purple-900/30 text-purple-600 px-3 py-1 rounded-lg font-black text-[9px] uppercase">QR Estudiante</span>
+                            </td>
+                            <td class="px-8 py-6 text-center">
+                                <span class="text-green-600 dark:text-green-400 font-black text-sm">45 / 45</span>
+                            </td>
+                            <td class="px-8 py-6 text-center">
+                                <button @click="openModal('modal-lista-asistencia')" class="bg-primary-dark text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all flex items-center gap-1 mx-auto">
+                                    <span class="material-symbols-outlined text-sm">visibility</span> Ver Lista
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
-        <div class="grid grid-cols-12 gap-8">
-            <div class="col-span-12 lg:col-span-5 bg-white dark:bg-gray-900 p-8 rounded-[3rem] shadow-sm border border-slate-100 dark:border-gray-800 text-center relative overflow-hidden">
-                <h3 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Proyectar Código QR</h3>
-                <div class="relative bg-slate-50 dark:bg-gray-800 p-6 rounded-3xl border-2 border-dashed border-umsa-gold mb-6 flex justify-center">
-                    <span class="material-symbols-outlined text-[150px] text-primary-dark dark:text-white">qr_code_2</span>
-                    <div class="absolute top-0 left-0 w-full h-[3px] bg-emerald-500 shadow-[0_0_15px_#BC9C31] animate-[scan_2s_infinite_linear]"></div>
+
+        <!-- VISTA PARA PONENTE: CONTROL DE ASISTENCIA (Lo que ya existía) -->
+        <div v-else class="space-y-6">
+            <div class="flex flex-col md:flex-row md:justify-between md:items-end mb-4 gap-4">
+                <div>
+                    <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic">Control de Asistencia</h3>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase mt-1 tracking-widest">Selecciona la sesión activa:</p>
                 </div>
-                <p class="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-2">O ingresa el PIN:</p>
-                <div class="bg-slate-100 dark:bg-gray-800 px-8 py-3 rounded-2xl border border-slate-200 dark:border-gray-700 mb-6">
-                    <span class="text-4xl font-black text-primary-dark dark:text-white tracking-[0.3em]">482-91A</span>
-                </div>
+                <select class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 text-primary-dark dark:text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm outline-none focus:ring-2 focus:ring-umsa-gold">
+                    <option>Sesión 1: Martes 14/Nov (Teoría)</option>
+                </select>
             </div>
-            <div class="col-span-12 lg:col-span-7 bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden flex flex-col">
-                <div class="p-6 bg-slate-50 dark:bg-gray-800/50 border-b border-slate-100 dark:border-gray-800 flex justify-between items-center">
-                    <div>
-                        <h3 class="text-xs font-black text-primary-dark dark:text-white uppercase tracking-widest">Asistencia en Vivo</h3>
-                        <p class="text-[10px] text-green-600 dark:text-green-400 font-bold uppercase mt-1 flex items-center gap-1"><span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> 32 / 45 Presentes</p>
+            <div class="grid grid-cols-12 gap-8">
+                <div class="col-span-12 lg:col-span-5 bg-white dark:bg-gray-900 p-8 rounded-[3rem] shadow-sm border border-slate-100 dark:border-gray-800 text-center relative overflow-hidden">
+                    <h3 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Proyectar Código QR</h3>
+                    <div class="relative bg-slate-50 dark:bg-gray-800 p-6 rounded-3xl border-2 border-dashed border-umsa-gold mb-6 flex justify-center">
+                        <span class="material-symbols-outlined text-[150px] text-primary-dark dark:text-white">qr_code_2</span>
+                        <div class="absolute top-0 left-0 w-full h-[3px] bg-emerald-500 shadow-[0_0_15px_#BC9C31] animate-[scan_2s_infinite_linear]"></div>
                     </div>
-                    <button class="bg-red-50 dark:bg-red-900/30 text-red-500 px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors">Cerrar Registro</button>
+                    <p class="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-2">O ingresa el PIN:</p>
+                    <div class="bg-slate-100 dark:bg-gray-800 px-8 py-3 rounded-2xl border border-slate-200 dark:border-gray-700 mb-6">
+                        <span class="text-4xl font-black text-primary-dark dark:text-white tracking-[0.3em]">482-91A</span>
+                    </div>
                 </div>
-                <div class="p-6 flex-1 overflow-y-auto max-h-[400px] space-y-3">
-                    <div class="flex items-center justify-between p-4 bg-green-50/50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/30 rounded-2xl">
-                        <div class="flex items-center gap-4">
-                            <div class="w-10 h-10 bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center"><span class="material-symbols-outlined text-sm font-bold">check</span></div>
-                            <div><p class="font-black text-primary-dark dark:text-white text-sm uppercase">Pérez Nogales Brenda</p></div>
+                <div class="col-span-12 lg:col-span-7 bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden flex flex-col">
+                    <div class="p-6 bg-slate-50 dark:bg-gray-800/50 border-b border-slate-100 dark:border-gray-800 flex justify-between items-center">
+                        <div>
+                            <h3 class="text-xs font-black text-primary-dark dark:text-white uppercase tracking-widest">Asistencia en Vivo</h3>
+                            <p class="text-[10px] text-green-600 dark:text-green-400 font-bold uppercase mt-1 flex items-center gap-1"><span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> 32 / 45 Presentes</p>
                         </div>
-                        <span class="bg-green-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase">Presente</span>
+                        <button class="bg-red-50 dark:bg-red-900/30 text-red-500 px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors">Cerrar Registro</button>
+                    </div>
+                    <div class="p-6 flex-1 overflow-y-auto max-h-[400px] space-y-3">
+                        <div class="flex items-center justify-between p-4 bg-green-50/50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/30 rounded-2xl">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center"><span class="material-symbols-outlined text-sm font-bold">check</span></div>
+                                <div><p class="font-black text-primary-dark dark:text-white text-sm uppercase">Pérez Nogales Brenda</p></div>
+                            </div>
+                            <span class="bg-green-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase">Presente</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -716,6 +795,57 @@ const eliminarPonente = async (id: number) => {
         </div>
     </div>
 
+  </div>
+
+  <!-- Modal Lista de Asistencia (Vista Coordinador) -->
+  <div id="modal-lista-asistencia" class="fixed inset-0 bg-primary-dark/80 z-[200] hidden items-center justify-center backdrop-blur-sm">
+      <div class="bg-white dark:bg-gray-900 rounded-[2rem] w-full max-w-2xl p-10 shadow-2xl">
+          <div class="flex justify-between items-center mb-8 border-b border-slate-100 dark:border-gray-800 pb-4">
+              <div>
+                  <h3 class="text-2xl font-black text-primary-dark dark:text-white italic uppercase">Lista de Asistencia</h3>
+                  <p class="text-[10px] text-slate-400 font-bold uppercase mt-1">Sesión 1: Martes 14/Nov</p>
+              </div>
+              <button @click="closeModal('modal-lista-asistencia')" class="text-slate-400 hover:text-red-500 transition-colors"><span class="material-symbols-outlined">close</span></button>
+          </div>
+          <div class="space-y-4 max-h-[400px] overflow-y-auto">
+              <!-- Item Estudiante -->
+              <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-700 rounded-2xl">
+                  <div class="flex items-center gap-4">
+                      <div class="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center"><span class="material-symbols-outlined text-sm font-bold">check</span></div>
+                      <div>
+                          <p class="font-black text-primary-dark dark:text-white text-sm uppercase">PÉREZ NOGALES BRENDA</p>
+                          <p class="text-[10px] text-slate-400 font-medium">CI: 1234567</p>
+                      </div>
+                  </div>
+                  <span class="bg-green-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase">Presente</span>
+              </div>
+              
+              <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-700 rounded-2xl">
+                  <div class="flex items-center gap-4">
+                      <div class="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center"><span class="material-symbols-outlined text-sm font-bold">check</span></div>
+                      <div>
+                          <p class="font-black text-primary-dark dark:text-white text-sm uppercase">GÓMEZ LÓPEZ CARLOS</p>
+                          <p class="text-[10px] text-slate-400 font-medium">CI: 7654321</p>
+                      </div>
+                  </div>
+                  <span class="bg-green-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase">Presente</span>
+              </div>
+              
+              <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-700 rounded-2xl">
+                  <div class="flex items-center gap-4">
+                      <div class="w-10 h-10 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center"><span class="material-symbols-outlined text-sm font-bold">close</span></div>
+                      <div>
+                          <p class="font-black text-primary-dark dark:text-white text-sm uppercase">MAMANI QUISPE JHOEL</p>
+                          <p class="text-[10px] text-slate-400 font-medium">CI: 9876543</p>
+                      </div>
+                  </div>
+                  <span class="bg-red-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase">Ausente</span>
+              </div>
+          </div>
+          <div class="mt-8 flex justify-end pt-4 border-t border-slate-100 dark:border-gray-800">
+              <button @click="closeModal('modal-lista-asistencia')" class="px-8 py-3 bg-primary-dark text-white rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-500 shadow-lg transition-all">Cerrar</button>
+          </div>
+      </div>
   </div>
 
   <!-- Modal Estudiante -->
