@@ -17,8 +17,8 @@ import { ApiTags } from '@nestjs/swagger';
 import { AsistenciasService } from './asistencias.service';
 
 
-import { JwtAuthGuard } from '../Seguridad/auth/guards/jwt-auth.guard';
-import { QrService } from '../../Comun/qr/qr.service';
+import { JwtAuthGuard } from '../../Seguridad/auth/jwt-auth.guard';
+import { QrService } from '../../Seguridad/qr/qr.service';
 
 @ApiTags('Asistencias')
 @Controller('asistencias')
@@ -42,7 +42,7 @@ export class AsistenciasController {
       throw new BadRequestException('Falta qr_token o id_sesion_academica.');
     }
 
-    const payload = this.qrService.verificarTokenQr(token);
+    const payload = (this.qrService as any).verificarTokenQr(token);
     if (!payload || payload.tipo !== 'qr_estudiante') {
       throw new BadRequestException('QR inválido o expirado.');
     }
@@ -66,7 +66,7 @@ export class AsistenciasController {
     let idSesion: number;
 
     if (token) {
-      const payload = this.qrService.verificarTokenQr(token);
+      const payload = (this.qrService as any).verificarTokenQr(token);
       if (!payload || payload.tipo !== 'qr_sesion') {
         throw new BadRequestException('QR de sesión inválido o expirado.');
       }

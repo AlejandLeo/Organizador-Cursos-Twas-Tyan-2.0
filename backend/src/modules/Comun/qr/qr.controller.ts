@@ -7,7 +7,7 @@ import {
   Request,
 } from '@nestjs/common';
 import { QrService } from './qr.service';
-import { JwtAuthGuard } from '../../Seguridad/auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../../Seguridad/auth/jwt-auth.guard';
 
 @Controller('qr')
 @UseGuards(JwtAuthGuard)

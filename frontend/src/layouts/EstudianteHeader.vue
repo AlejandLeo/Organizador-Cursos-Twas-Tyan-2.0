@@ -15,9 +15,51 @@ const uiStore = useUIStore();
 const profilePhotoUrl = ref('');
 const profileRef = ref<HTMLElement | null>(null);
 const notificationsRef = ref<HTMLElement | null>(null);
+const studentNotifications = ref([] as any[]);
+const showStudentNotifications = ref(false);
 
-const studentNotifications = ref([] as any[])
-const showStudentNotifications = ref(false)
+const autoCloseTimer = ref<any>(null);
+
+const eliminarAlerta = (id: string | number) => {
+  studentNotifications.value = studentNotifications.value.filter(n => n.id !== id);
+  const dismissed = JSON.parse(localStorage.getItem('dismissedNotifications') || '[]');
+  if (!dismissed.includes(id)) {
+    dismissed.push(id);
+    localStorage.setItem('dismissedNotifications', JSON.stringify(dismissed));
+  }
+}
+
+const startAutoClose = () => {
+  if (autoCloseTimer.value) clearTimeout(autoCloseTimer.value);
+  autoCloseTimer.value = setTimeout(() => {
+    showStudentNotifications.value = false;
+    isProfileOpen.value = false;
+  }, 10000);
+}
+
+const resetAutoClose = () => {
+  if (showStudentNotifications.value || isProfileOpen.value) {
+    startAutoClose();
+  }
+}
+
+const toggleNotifications = () => {
+  showStudentNotifications.value = !showStudentNotifications.value;
+  if (showStudentNotifications.value) {
+    startAutoClose();
+  } else {
+    if (autoCloseTimer.value) clearTimeout(autoCloseTimer.value);
+  }
+}
+
+const toggleProfile = () => {
+  isProfileOpen.value = !isProfileOpen.value;
+  if (isProfileOpen.value) {
+    startAutoClose();
+  } else {
+    if (autoCloseTimer.value) clearTimeout(autoCloseTimer.value);
+  }
+}
 
 const toggleDark = () => {
   isDark.value = !isDark.value;
@@ -297,7 +339,8 @@ const checkNuevasDesignaciones = () => {
 const fetchStudentNotifications = async () => {
   try {
     const res = await api.get('/usuarios/alertas/estudiante');
-    studentNotifications.value = res.data;
+    const dismissed = JSON.parse(localStorage.getItem('dismissedNotifications') || '[]');
+    studentNotifications.value = res.data.filter((n: any) => !dismissed.includes(n.id));
   } catch (error) {
     console.error('Error fetching student notifications', error);
   }
@@ -362,9 +405,9 @@ onUnmounted(() => {
         <span class="material-symbols-outlined text-[24px]">menu</span>
       </button>
 
-      <div class="hidden sm:flex flex-col flex-shrink-0 cursor-pointer border-r border-slate-200 dark:border-gray-800 pr-6">
-        <h2 class="text-primary-dark dark:text-white font-black italic text-2xl tracking-tighter leading-none">twas</h2>
-        <p class="text-[6px] leading-tight text-primary-dark/60 dark:text-gray-400 uppercase font-bold tracking-tighter">The World Academy of Sciences</p>
+      <div class="hidden sm:flex flex-col flex-shrink-0 cursor-pointer border-r border-slate-200 dark:border-gray-800 pr-4 md:pr-6 justify-center">
+        <h2 class="text-black dark:text-white font-clarendon font-black text-[10px] md:text-xs tracking-tighter leading-none">Sistema de Gestión de Eventos</h2>
+        <p class="text-[8px] text-slate-500 dark:text-gray-400 font-clarendon mt-0.5">Plataforma Académica</p>
       </div>
 
       <h1 class="text-xs md:text-sm font-black text-umsa-blue dark:text-blue-500 tracking-widest uppercase italic hidden md:block">
@@ -398,17 +441,18 @@ onUnmounted(() => {
 
       <div class="relative" ref="notificationsRef">
         <button
-          @click="showStudentNotifications = !showStudentNotifications"
+          @click="toggleNotifications"
           class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 dark:bg-gray-800 text-slate-500 dark:text-gray-400 hover:text-umsa-blue hover:bg-slate-100 dark:hover:text-blue-500 dark:hover:bg-gray-700 transition-all shadow-sm border border-slate-200 dark:border-gray-700 relative"
           aria-label="Notificaciones"
         >
           <span class="material-symbols-outlined text-[22px]" :class="studentNotifications.some(n => n.prioridad === 'alta') ? 'animate-pulse text-primary-dark dark:text-white' : ''">notifications</span>
-          <span v-if="studentNotifications.length > 0" class="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-gray-950" :class="studentNotifications.some(n => n.prioridad === 'alta') ? 'animate-ping' : ''"></span>
-          <span v-if="studentNotifications.length > 0" class="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-gray-950"></span>
+          <span v-if="studentNotifications.length > 0" class="absolute -top-1 -right-1 min-w-[16px] h-4 bg-red-500 rounded-full border border-white dark:border-gray-950 flex items-center justify-center text-[9px] font-bold text-white px-1">
+            {{ studentNotifications.length }}
+          </span>
         </button>
 
         <!-- Dropdown Estudiante -->
-        <div v-if="showStudentNotifications" @click.stop
+        <div v-if="showStudentNotifications" @click.stop @mousemove="resetAutoClose"
           class="absolute right-0 mt-4 w-72 md:w-80 bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-gray-800 z-[200] overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
           <div class="p-5 border-b border-slate-100 dark:border-gray-800 flex justify-between items-center bg-slate-50/50 dark:bg-gray-800/50">
             <h3 class="text-[10px] font-black text-primary-dark dark:text-white uppercase tracking-widest">Alertas del Sistema</h3>
@@ -417,7 +461,7 @@ onUnmounted(() => {
           
           <div class="max-h-[60vh] overflow-y-auto overscroll-contain">
             <div v-for="notif in studentNotifications" :key="notif.id"
-              @click="$router.push('/estudiante/perfil'); showStudentNotifications = false"
+              @click="eliminarAlerta(notif.id); $router.push('/estudiante/perfil'); showStudentNotifications = false"
               class="p-4 hover:bg-slate-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer border-b border-slate-50 dark:border-gray-800 last:border-0 group">
               <div class="flex items-start gap-3">
                 <div :class="[
@@ -449,7 +493,7 @@ onUnmounted(() => {
       
       <!-- Profile Button matched exactly to Ponente -->
       <div class="relative" ref="profileRef">
-        <button @click="isProfileOpen = !isProfileOpen" class="flex items-center gap-2 md:gap-3 bg-slate-50 dark:bg-gray-900 border border-slate-200 dark:border-gray-700 hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors rounded-xl pr-2 md:pr-3 py-1 pl-1 shadow-sm">
+        <button @click="toggleProfile" class="flex items-center gap-2 md:gap-3 bg-slate-50 dark:bg-gray-900 border border-slate-200 dark:border-gray-700 hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors rounded-xl pr-2 md:pr-3 py-1 pl-1 shadow-sm">
           <div class="h-8 w-8 rounded-full overflow-hidden bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 p-0 flex flex-shrink-0 items-center justify-center">
             <img v-if="profilePhotoUrl" :src="profilePhotoUrl" alt="Foto" class="w-full h-full object-cover" />
             <span v-else class="material-symbols-outlined text-2xl text-slate-400">account_circle</span>
@@ -462,7 +506,7 @@ onUnmounted(() => {
         </button>
 
         <!-- Dropdown -->
-        <div v-if="isProfileOpen" class="absolute right-0 top-full mt-2 w-[220px] bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+        <div v-if="isProfileOpen" @mousemove="resetAutoClose" class="absolute right-0 top-full mt-2 w-[220px] bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
           
           <div class="p-4 border-b border-slate-100 dark:border-gray-800 bg-slate-50 dark:bg-gray-800/50 block md:hidden">
              <span class="block text-xs font-black text-primary-dark dark:text-white">{{ authStore.user?.persona?.nombres || 'Usuario' }} {{ authStore.user?.persona?.primer_apellido || '' }}</span>
@@ -500,3 +544,11 @@ onUnmounted(() => {
     </div>
   </header>
 </template>
+
+<style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@900&display=swap');
+
+.font-clarendon {
+  font-family: 'Roboto Slab', serif;
+}
+</style>

@@ -25,6 +25,35 @@ const notifications = ref({
 const showNotifications = ref(false)
 const studentNotifications = ref([] as any[])
 const showStudentNotifications = ref(false)
+const isProfileOpen = ref(false)
+const autoCloseTimer = ref<any>(null);
+
+const startAutoClose = () => {
+  if (autoCloseTimer.value) clearTimeout(autoCloseTimer.value);
+  autoCloseTimer.value = setTimeout(() => {
+    showNotifications.value = false;
+    showStudentNotifications.value = false;
+    isProfileOpen.value = false;
+  }, 10000);
+}
+
+const resetAutoClose = () => {
+  if (showNotifications.value || showStudentNotifications.value || isProfileOpen.value) {
+    startAutoClose();
+  }
+}
+
+const toggleNotifications = () => {
+  showNotifications.value = !showNotifications.value;
+  showStudentNotifications.value = false;
+  if (showNotifications.value) {
+    startAutoClose();
+  } else {
+    if (autoCloseTimer.value) clearTimeout(autoCloseTimer.value);
+  }
+}
+
+
 const coordinatorNotificationsRef = ref<HTMLElement | null>(null);
 const studentNotificationsRef = ref<HTMLElement | null>(null);
 
@@ -53,13 +82,23 @@ const fetchNotifications = async () => {
   }
 }
 
+const eliminarAlerta = (id: string | number) => {
+  studentNotifications.value = studentNotifications.value.filter(n => n.id !== id);
+  const dismissed = JSON.parse(localStorage.getItem('dismissedNotifications') || '[]');
+  if (!dismissed.includes(id)) {
+    dismissed.push(id);
+    localStorage.setItem('dismissedNotifications', JSON.stringify(dismissed));
+  }
+}
+
 const fetchStudentNotifications = async () => {
   if (!isStudent.value) return;
   console.log('--- ATTEMPTING TO FETCH STUDENT NOTIFICATIONS');
   try {
     const res = await api.get('/usuarios/alertas/estudiante');
     console.log('--- STUDENT NOTIFICATIONS RECEIVED:', res.data);
-    studentNotifications.value = res.data;
+    const dismissed = JSON.parse(localStorage.getItem('dismissedNotifications') || '[]');
+    studentNotifications.value = res.data.filter((n: any) => !dismissed.includes(n.id));
   } catch (error) {
     console.error('Error fetching student notifications', error);
   }
@@ -114,6 +153,10 @@ const onNombreChange = (event: Event) => {
   const target = event.target as HTMLSelectElement;
   eventoStore.setEventoPorNombre(target.value);
 }
+
+const goToProfile = () => {
+  router.push('/coordinador/perfil');
+}
 </script>
 
 <template>
@@ -126,9 +169,9 @@ const onNombreChange = (event: Event) => {
       </button>
 
       <!-- Logo -->
-      <div class="flex flex-col flex-shrink-0 cursor-pointer border-r border-slate-200 dark:border-gray-800 pr-4 md:pr-6">
-        <h2 class="text-primary-dark dark:text-white font-black italic text-xl md:text-2xl tracking-tighter leading-none">twas</h2>
-        <p class="hidden md:block text-[6px] leading-tight text-primary-dark/60 dark:text-gray-400 uppercase font-bold tracking-tighter">The World Academy of Sciences</p>
+      <div class="flex flex-col flex-shrink-0 cursor-pointer border-r border-slate-200 dark:border-gray-800 pr-4 md:pr-6 justify-center">
+        <h2 class="text-black dark:text-white font-clarendon font-black text-[10px] md:text-xs tracking-tighter leading-none">Sistema de Gestión de Eventos</h2>
+        <p class="text-[8px] text-slate-500 dark:text-gray-400 font-clarendon mt-0.5">Plataforma Académica</p>
       </div>
 
       <!-- Selector Móvil (Visible solo en móvil al lado del logo) -->
@@ -179,7 +222,7 @@ const onNombreChange = (event: Event) => {
       
       <!-- Campanita de Notificaciones (Solo Coordinador/Admin) -->
       <div v-if="isCoordinadorOrAdmin" class="relative" ref="coordinatorNotificationsRef">
-        <button @click="showNotifications = !showNotifications; showStudentNotifications = false" 
+        <button @click="toggleNotifications" 
           class="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-slate-100 dark:bg-gray-800 text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-gray-700 hover:bg-slate-200 dark:hover:bg-gray-700 transition-all relative">
           <span class="material-symbols-outlined text-[18px] md:text-[20px] transition-transform" :class="notifications.total > 0 ? 'animate-bounce' : ''">notifications</span>
           <span v-if="notifications.total > 0" class="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 shadow-sm">
@@ -188,7 +231,7 @@ const onNombreChange = (event: Event) => {
         </button>
 
         <!-- Dropdown de Notificaciones -->
-        <div v-if="showNotifications" 
+        <div v-if="showNotifications" @mousemove="resetAutoClose"
           class="absolute right-0 mt-4 w-80 bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl border border-slate-100 dark:border-gray-800 z-[200] overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
           <div class="p-6 border-b border-slate-100 dark:border-gray-800 flex justify-between items-center bg-slate-50/50 dark:bg-gray-800/50">
             <h3 class="text-xs font-black text-primary-dark dark:text-white uppercase tracking-widest">Gestión Académica</h3>
@@ -237,15 +280,16 @@ const onNombreChange = (event: Event) => {
 
       <!-- Campanita de Notificaciones (Estudiante / Usuario Regular) -->
       <div v-if="isStudent" class="relative" ref="studentNotificationsRef">
-        <button @click="showStudentNotifications = !showStudentNotifications; showNotifications = false" 
+        <button @click="showStudentNotifications = !showStudentNotifications; showNotifications = false; if(showStudentNotifications) startAutoClose()" 
           class="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-slate-100 dark:bg-gray-800 text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-gray-700 hover:bg-slate-200 dark:hover:bg-gray-700 transition-all relative">
           <span class="material-symbols-outlined text-[18px] md:text-[20px]" :class="studentNotifications.some(n => n.prioridad === 'alta') ? 'animate-pulse text-primary-dark dark:text-white' : ''">notifications</span>
-          <span v-if="studentNotifications.length > 0" class="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-gray-900 shadow-sm" :class="studentNotifications.some(n => n.prioridad === 'alta') ? 'animate-ping' : ''"></span>
-          <span v-if="studentNotifications.length > 0" class="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-gray-900 shadow-sm"></span>
+          <span v-if="studentNotifications.length > 0" class="absolute -top-1 -right-1 min-w-[16px] h-4 bg-red-500 rounded-full border border-white dark:border-gray-950 flex items-center justify-center text-[9px] font-bold text-white px-1">
+            {{ studentNotifications.length }}
+          </span>
         </button>
 
         <!-- Dropdown Estudiante -->
-        <div v-if="showStudentNotifications" 
+        <div v-if="showStudentNotifications" @mousemove="resetAutoClose"
           class="absolute right-0 mt-4 w-80 bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl border border-slate-100 dark:border-gray-800 z-[200] overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
           <div class="p-6 border-b border-slate-100 dark:border-gray-800 flex justify-between items-center bg-slate-50/50 dark:bg-gray-800/50">
             <h3 class="text-xs font-black text-primary-dark dark:text-white uppercase tracking-widest">Notificaciones</h3>
@@ -254,7 +298,7 @@ const onNombreChange = (event: Event) => {
           
           <div class="max-h-96 overflow-y-auto">
             <div v-for="notif in studentNotifications" :key="notif.id"
-              @click="router.push('/estudiante/perfil'); showStudentNotifications = false"
+              @click="router.push('/estudiante/perfil'); eliminarAlerta(notif.id); showStudentNotifications = false"
               class="p-5 hover:bg-slate-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer border-b border-slate-50 dark:border-gray-800 last:border-0 group">
               <div class="flex items-start gap-4">
                 <div :class="[
@@ -285,14 +329,20 @@ const onNombreChange = (event: Event) => {
       <button @click="toggleDark" class="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-slate-100 dark:bg-gray-800 text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-gray-700">
         <span class="material-symbols-outlined text-[18px] md:text-[20px]">{{ isDark ? 'light_mode' : 'dark_mode' }}</span>
       </button>
-      <div class="w-9 h-9 md:w-10 md:h-10 bg-slate-100 dark:bg-gray-800 border-2 border-white dark:border-gray-700 rounded-full flex items-center justify-center shadow-sm ring-2 ring-slate-200 dark:ring-gray-600 overflow-hidden">  
-        <img src="https://upload.wikimedia.org/wikipedia/commons/a/af/Escudo_de_la_Universidad_Mayor_de_San_Andr%C3%A9s.png" alt="UMSA" class="h-full w-full object-cover">
+      <div @click="goToProfile" class="w-9 h-9 md:w-10 md:h-10 bg-slate-100 dark:bg-gray-800 border-2 border-white dark:border-gray-700 rounded-full flex items-center justify-center shadow-sm ring-2 ring-slate-200 dark:ring-gray-600 overflow-hidden cursor-pointer hover:ring-emerald-500 transition-all">  
+        <span class="material-symbols-outlined text-xl text-slate-500">account_circle</span>
       </div>
     </div>
   </header>
 </template>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@900&display=swap');
+
+.font-clarendon {
+  font-family: 'Roboto Slab', serif;
+}
+
 .animate-in {
   animation: fadeIn 0.3s ease-out;
 }

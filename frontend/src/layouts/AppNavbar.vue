@@ -177,12 +177,12 @@ onMounted(async () => {
           <div class="hidden sm:flex items-center gap-2 border-l pl-4 border-slate-200 dark:border-slate-800 ml-1">
              <a href="https://www.fcpn.edu.bo/" target="_blank" 
                 class="w-10 h-10 flex items-center justify-center hover:scale-110 transition-all cursor-pointer">
-               <img src="/logo/logoOficial.png" 
-                    class="w-full h-full object-contain dark:opacity-90" alt="Logo Oficial" />
+               <img :src="eventoStore.activeEvento?.logo ? `http://localhost:3000/uploads/logo/${eventoStore.activeEvento.logo}` : 'http://localhost:3000/uploads/logo/EscudoFCPN.png'" 
+                    class="w-full h-full object-contain dark:opacity-90" :alt="eventoStore.activeEvento?.logo ? 'Logo Evento' : 'FCPN'" />
              </a>
              <a href="https://www.umsa.bo/" target="_blank" 
                 class="w-10 h-10 rounded-full border border-slate-100 dark:border-slate-700 p-1 flex items-center justify-center bg-white dark:bg-slate-900 shadow-sm hover:scale-110 transition-all cursor-pointer">
-               <img src="http://localhost:3000/uploads/logo/Logo%20UMSA.png" 
+               <img src="http://localhost:3000/uploads/logo/LOGO%20UMSA%20OFICIAL.png" 
                     class="w-full h-full object-contain dark:opacity-90" alt="UMSA" />
              </a>
           </div>
