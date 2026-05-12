@@ -4,6 +4,7 @@ import { Evento } from '../../../modules/Academico/eventos/entities/evento.entit
 import { ActividadAcademica } from '../../../modules/Academico/actividades-academicas/entities/actividad-academica.entity';
 import { Usuario } from '../../../modules/Usuario/usuarios/entities/usuario.entity';
 import { Imparticion } from '../../../modules/Academico/imparticiones/entities/imparticion.entity';
+import { CoordinacionEvento } from '../../../modules/Academico/coordinaciones/entities/coordinacion.entity';
 
 export default class EventosSeeder implements Seeder {
   public async run(dataSource: DataSource): Promise<void> {
@@ -176,6 +177,13 @@ export default class EventosSeeder implements Seeder {
 
     const ponente = await userRepository.findOneBy({ email: 'ponente@gmail.com' });
 
+    const coordinacionRepository = dataSource.getRepository(CoordinacionEvento);
+
+    const coordinadores = await userRepository.find({
+      where: { email: 'coordinador@gmail.com' }
+    });
+    const coordinador = coordinadores[0];
+
     for (const data of eventosData) {
       const { actividades, ...eventoInfo } = data;
 
@@ -203,6 +211,20 @@ export default class EventosSeeder implements Seeder {
         }
       } else {
         console.log(`El evento "${evento.nombre}" ya existe.`);
+      }
+
+      if (coordinador && evento) {
+        const coordExiste = await coordinacionRepository.findOneBy({
+          usuario: { id: coordinador.id },
+          evento: { id: evento.id }
+        });
+        if (!coordExiste) {
+          await coordinacionRepository.save(coordinacionRepository.create({
+            usuario: coordinador,
+            evento: evento
+          }));
+          console.log(`    - Coordinador asignado a ${evento.nombre}`);
+        }
       }
     }
 
