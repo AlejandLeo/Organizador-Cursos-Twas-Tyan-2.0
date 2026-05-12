@@ -103,13 +103,9 @@ const handleUpdateProfile = async (finalizar = false) => {
 };
 
 const photoRef = ref<HTMLInputElement | null>(null);
+const isDragging = ref(false);
 
-const handlePhotoUpload = async (e: Event) => {
-  if (isCompleted.value && !!profilePhotoUrl.value) return;
-  const target = e.target as HTMLInputElement;
-  if (!target.files || !target.files.length) return;
-  const file = target.files[0];
-  
+const uploadFile = async (file: File) => {
   const fd = new FormData();
   fd.append('file', file as Blob);
   
@@ -125,6 +121,27 @@ const handlePhotoUpload = async (e: Event) => {
      error.value = errorRes.response?.data?.message || 'Error al subir foto.';
   } finally {
      loading.value = false;
+  }
+};
+
+const handlePhotoUpload = async (e: Event) => {
+  if (isCompleted.value && !!profilePhotoUrl.value) return;
+  const target = e.target as HTMLInputElement;
+  if (!target.files || !target.files.length) return;
+  await uploadFile(target.files[0]);
+};
+
+const handleDrop = async (e: DragEvent) => {
+  e.preventDefault();
+  isDragging.value = false;
+  if (isCompleted.value && !!profilePhotoUrl.value) return;
+  if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+    const file = e.dataTransfer.files[0];
+    if (file.type.startsWith('image/')) {
+      await uploadFile(file);
+    } else {
+      error.value = 'El archivo debe ser una imagen.';
+    }
   }
 };
 
@@ -161,7 +178,12 @@ onMounted(() => {
       <!-- Panel lateral de Archivos -->
       <div class="space-y-6 md:col-span-1">
         <!-- Foto de Perfil -->
-        <div class="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-slate-200 dark:border-gray-800 shadow-sm flex flex-col items-center text-center">
+        <div 
+          @dragover.prevent="isDragging = true"
+          @dragleave.prevent="isDragging = false"
+          @drop.prevent="handleDrop"
+          :class="[isDragging ? 'border-umsa-blue bg-blue-50 dark:bg-blue-900/10' : 'border-slate-200 dark:border-gray-800 bg-white dark:bg-gray-900']"
+          class="p-6 rounded-2xl border-2 border-dashed shadow-sm flex flex-col items-center text-center transition-colors duration-300">
           <div class="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-100 dark:border-gray-800 mb-4 bg-slate-50 dark:bg-gray-800">
             <img v-if="profilePhotoUrl" :src="profilePhotoUrl" alt="Foto" class="w-full h-full object-cover" @error="profilePhotoUrl = ''" />
             <span v-else class="material-symbols-outlined text-6xl text-slate-300 dark:text-gray-600 h-full flex items-center justify-center">account_circle</span>

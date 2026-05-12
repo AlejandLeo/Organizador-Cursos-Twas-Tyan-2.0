@@ -25,14 +25,16 @@ const onNombreChange = (e: any) => {
     'w-72 bg-white dark:bg-gray-950 text-slate-600 dark:text-gray-300 flex flex-col px-4 py-8 fixed left-0 bottom-0 top-[75px] z-[45] border-r border-slate-200 dark:border-gray-800 overflow-y-auto transition-all duration-300 ease-in-out'
   ]">
 
-    <div class="mb-6 p-5 bg-slate-50 dark:bg-gray-900 rounded-2xl border border-slate-100 dark:border-gray-800 shadow-sm">
-      <p class="text-[10px] uppercase tracking-widest text-umsa-blue dark:text-blue-400 font-bold mb-1">Bienvenido</p>
-      <h3 class="text-sm font-black text-primary-dark dark:text-white leading-tight">
+    <div class="mb-6 p-5 bg-slate-50 dark:bg-gray-900 rounded-2xl border border-slate-100 dark:border-gray-800 shadow-sm relative overflow-hidden group">
+      <div class="absolute left-0 top-0 bottom-0 w-1 bg-umsa-blue dark:bg-blue-600 opacity-70 group-hover:opacity-100 transition-opacity"></div>
+      <p class="text-[10px] uppercase tracking-widest text-umsa-blue dark:text-blue-400 font-bold mb-1">Coordinador(a)</p>
+      <h3 class="text-sm font-bold font-serif italic text-primary-dark dark:text-white leading-tight">
         {{ authStore.user?.persona?.nombres || 'Super' }} {{ authStore.user?.persona?.primer_apellido || 'Admin' }}
       </h3>
       <p class="text-xs text-slate-500 dark:text-gray-400 mt-1">
         {{ authStore.user?.persona?.segundo_apellido || 'Sistema' }}
       </p>
+
     </div>
 
 
