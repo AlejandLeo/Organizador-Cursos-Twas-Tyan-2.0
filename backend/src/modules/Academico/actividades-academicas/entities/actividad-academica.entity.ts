@@ -51,6 +51,10 @@ export class ActividadAcademica {
   @Column({ type: 'integer', nullable: true })
   horas: number;
 
+  /** 1 = Activo | 0 = Finalizado | -1 = Inhabilitado */
+  @Column({ type: 'integer', default: 1 })
+  estado: number;
+
   /** 
    * Requisitos configurados para la pre-inscripción (Base + Dinámicos).
    * Almacenado como JSON.

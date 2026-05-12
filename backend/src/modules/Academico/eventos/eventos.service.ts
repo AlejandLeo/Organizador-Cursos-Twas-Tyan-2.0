@@ -12,7 +12,7 @@ export class EventosService {
     @InjectRepository(Evento)
     private readonly eventoRepository: Repository<Evento>,
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
 
   /**
    * Valida si el usuario logueado tiene permisos sobre el evento.
@@ -40,23 +40,29 @@ export class EventosService {
   private formatImageUrl(filenameOrUrl: string, folder: string = 'imagenes'): string | null {
     if (!filenameOrUrl) return null;
     if (filenameOrUrl.startsWith('http')) return filenameOrUrl;
-    
+
+    // Evitar doble codificación: decodificar primero por si ya viene codificado
+    const cleanFilename = decodeURIComponent(filenameOrUrl);
+
     const baseUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
-    return `${baseUrl}/uploads/${folder}/${encodeURIComponent(filenameOrUrl)}`;
+    return `${baseUrl}/uploads/${folder}/${encodeURIComponent(cleanFilename)}`;
   }
 
   async findAll() {
     const eventos = await this.eventoRepository.find({
-      relations: ['actividades', 'actividades.modalidades', 'actividades.inscripciones']
+      relations: ['actividades', 'actividades.modalidades', 'actividades.inscripciones'],
+      order: { prioridad: 'ASC', fecha_creacion: 'DESC' }
     });
     return eventos.map(evento => ({
       ...evento,
       logo: this.formatImageUrl(evento.logo, 'logo'),
       imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
-      actividades: (evento.actividades || []).map(act => ({
-        ...act,
-        imagen: this.formatImageUrl(act.imagen, 'cursos')
-      }))
+      actividades: (evento.actividades || [])
+        .map(act => ({
+          ...act,
+          estado: Number(act.estado),
+          imagen: this.formatImageUrl(act.imagen, 'cursos')
+        }))
     }));
   }
 
@@ -76,8 +82,8 @@ export class EventosService {
     const evento = await this.eventoRepository.findOne({
       where: { id },
       relations: [
-        'actividades', 
-        'actividades.modalidades', 
+        'actividades',
+        'actividades.modalidades',
         'actividades.modalidades.sesiones'
       ]
     });
@@ -106,7 +112,7 @@ export class EventosService {
         const u = imp.usuario;
         const persona = u.persona || {};
         const ga = u.afiliaciones?.[0]?.gradoAcademico || {};
-        
+
         expositoresMap.set(u.id, {
           id: u.id,
           email: u.email,
@@ -169,11 +175,11 @@ export class EventosService {
     const [eventos, total] = await this.eventoRepository.findAndCount({
       where,
       relations: [
-        'actividades', 
-        'actividades.modalidades', 
+        'actividades',
+        'actividades.modalidades',
         'actividades.inscripciones'
       ],
-      order: { fecha_creacion: 'DESC' },
+      order: { prioridad: 'ASC', fecha_creacion: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -184,6 +190,7 @@ export class EventosService {
       imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
       actividades: (evento.actividades || []).map(act => ({
         ...act,
+        estado: Number(act.estado),
         imagen: this.formatImageUrl(act.imagen, 'cursos')
       }))
     }));
@@ -201,6 +208,7 @@ export class EventosService {
     imagenFondo?: Express.Multer.File,
   ) {
     const data: Partial<Evento> = { ...dto } as any;
+    if (dto.prioridad) data.prioridad = parseInt(dto.prioridad, 10);
     if (imagenPortada) data.logo = imagenPortada.filename;
     if (imagenFondo) data.imagen_fondo = imagenFondo.filename;
 
@@ -232,10 +240,11 @@ export class EventosService {
     if (!evento) throw new NotFoundException(`Evento ${id} no encontrado.`);
 
     const data: Partial<Evento> = { ...dto } as any;
+    if (dto.prioridad) data.prioridad = parseInt(dto.prioridad as any, 10);
 
     if (imagenPortada) {
       if (evento.logo && !evento.logo.startsWith('http')) {
-        const oldPath = `uploads/imagenes/${evento.logo}`;
+        const oldPath = `uploads/eventos/${evento.logo}`;
         if (existsSync(oldPath)) unlinkSync(oldPath);
       }
       data.logo = imagenPortada.filename;
@@ -243,7 +252,7 @@ export class EventosService {
 
     if (imagenFondo) {
       if (evento.imagen_fondo && !evento.imagen_fondo.startsWith('http')) {
-        const oldPath = `uploads/imagenes/${evento.imagen_fondo}`;
+        const oldPath = `uploads/fondos/${evento.imagen_fondo}`;
         if (existsSync(oldPath)) unlinkSync(oldPath);
       }
       data.imagen_fondo = imagenFondo.filename;

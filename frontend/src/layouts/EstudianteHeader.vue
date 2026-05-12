@@ -63,11 +63,12 @@ const cambiarAPonente = async () => {
           // Validamos la contraseña específicamente para el portal ponente
           const response = await api.post('/auth/login', { 
             email: authStore.user?.email, 
-            password: password 
+            password: password,
+            portal: 'Ponente'
           });
           
           // Si el login fue exitoso pero no es la clave de ponente, rechazar
-          if (response.data.portalSuggested !== 'Ponente') {
+          if (response.data.rolSugerido !== 'Ponente') {
             Swal.showValidationMessage('Esta es su clave de estudiante. Use su clave de ponente.');
             return false;
           }
@@ -322,10 +323,24 @@ onMounted(async () => {
   checkNuevasDesignaciones();
   setInterval(fetchStudentNotifications, 60000);
 
+  // Cargar foto de perfil - Manejo silencioso
   try {
-    const photoRes = await api.get('/usuarios/perfil/foto', { responseType: 'blob' });
-    if (profilePhotoUrl.value) URL.revokeObjectURL(profilePhotoUrl.value);
-    profilePhotoUrl.value = URL.createObjectURL(photoRes.data);
+    const photoRes = await api.get('/usuarios/perfil/foto', { 
+      responseType: 'blob'
+    });
+    
+    if (photoRes.status === 200) {
+      // Si el backend envió 'NONE', es que no hay foto
+      const text = await photoRes.data.text();
+      if (text === 'NONE') {
+        profilePhotoUrl.value = '';
+      } else {
+        if (profilePhotoUrl.value) URL.revokeObjectURL(profilePhotoUrl.value);
+        profilePhotoUrl.value = URL.createObjectURL(photoRes.data);
+      }
+    } else {
+      profilePhotoUrl.value = '';
+    }
   } catch (e) {
     profilePhotoUrl.value = '';
   }

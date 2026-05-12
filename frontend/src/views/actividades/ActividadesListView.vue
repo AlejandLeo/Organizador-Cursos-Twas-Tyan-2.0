@@ -132,8 +132,8 @@ const registrarPonenteQuick = async () => {
 const fetchPonentesYGrados = async () => {
     try {
         const [resP, resC, resG] = await Promise.all([
-            api.get('/usuarios?rol=Ponente&limit=100'),
-            api.get('/usuarios?rol=Coordinador&limit=100'),
+            api.get('/usuarios?rol=Ponente&limit=200'),
+            api.get('/usuarios?rol=Coordinador&limit=200'),
             api.get('/grados-academicos')
         ]);
         const mapUser = (u: any, role: string) => {
@@ -215,8 +215,10 @@ const onFondoChange = (e: any) => {
 const fetchEventos = async () => {
     try {
         isLoading.value = true;
-        const res = await api.get('/eventos');
-        eventosPublicados.value = (res.data || []).map((ev: any) => ({
+        // Usar el endpoint de administración correcto para ver datos reales
+        const res = await api.get('/admin/eventos/lista?limit=100');
+        const eventosData = res.data?.data || res.data || [];
+        eventosPublicados.value = eventosData.map((ev: any) => ({
             ...ev,
             nombreCorto: ev.nombre,
             version: ev.gestion,
@@ -228,13 +230,14 @@ const fetchEventos = async () => {
                 id: act.id,
                 title: act.nombre,
                 version: act.version,
-                status: 'Activo',
+                status: Number(act.estado) === 1 ? 'Activo' : (Number(act.estado) === -1 ? 'Inactivo' : 'Pendiente'),
                 type: act.tipo || 'Curso',
                 date: act.fecha_inicio ? new Date(act.fecha_inicio).toLocaleDateString() : 'Pendiente',
                 students: act.inscripciones?.length || 0,
                 modules: 1,
                 image: act.imagen || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80',
                 id_evento: ev.id,
+                status_raw: act.estado,
                 min_nota: act.min_nota,
                 min_asistencia: act.min_asistencia,
                 modalidad: act.modalidad,
@@ -433,8 +436,11 @@ const nuevaActividad = ref({
             { label: 'Matrícula / Título / Aval (Documento de Respaldo)', type: 'file', mandatory: true }
         ] as any[]
     },
-    lockTipo: false
+    lockTipo: false as boolean
 });
+
+// Lista local de IDs inhabilitados (usaremos Strings para máxima compatibilidad)
+const inhabilitadosLocal = ref<string[]>([]);
 
 const resetNuevaActividad = (eventoId: number) => {
     isEditingActividad.value = false;
@@ -462,7 +468,7 @@ const resetNuevaActividad = (eventoId: number) => {
                 { label: 'Matrícula / Título / Aval (Documento de Respaldo)', type: 'file', mandatory: true }
             ] as any[]
         },
-        lockTipo: false
+        lockTipo: false as boolean
     };
     imagenArchivo.value = null;
     imagenPreview.value = null;
@@ -488,7 +494,7 @@ const editarActividad = async (act: any) => {
             fecha_inicio: act.fecha_inicio_raw || '',
             fecha_fin: act.fecha_fin_raw || '',
             sesiones: [],
-            lockTipo: false,
+            lockTipo: false as boolean,
             requisitos: act.requisitos || { base: {}, custom: [] }
         };
         
@@ -512,20 +518,31 @@ const editarActividad = async (act: any) => {
 const inhabilitarActividad = async (id: number, nombre: string) => {
     const { value: motivo } = await Swal.fire({
         title: '¿INHABILITAR ACTIVIDAD?',
-        text: `Indique la razón para inhabilitar "${nombre}":`,
+        html: `<div class="text-left"><p class="mb-4">Indique la razón para inhabilitar <b>"${nombre}"</b>:</p>
+               <div class="bg-red-50 text-red-600 p-3 rounded-lg border border-red-200 text-sm font-bold flex items-start gap-2">
+                 <span class="material-symbols-outlined text-lg">warning</span>
+                 <span>ATENCIÓN: Una vez inhabilitada, la actividad desaparecerá para estudiantes y ponentes. <b>SOLO EL SUPER USUARIO</b> podrá volver a habilitarla.</span>
+               </div></div>`,
         input: 'textarea',
-        inputPlaceholder: 'Escriba el motivo aquí...',
+        inputPlaceholder: 'Escriba el motivo detallado aquí...',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',
-        confirmButtonText: 'INHABILITAR',
+        confirmButtonText: 'SÍ, INHABILITAR',
         cancelButtonText: 'CANCELAR',
-        inputValidator: (value) => {
+        inputValidator: (value: any) => {
           if (!value) return '¡Es obligatorio indicar un motivo!'
         }
     });
 
     if (motivo) {
         try {
+            // BLOQUEO OPTIMISTA: Feedback visual instantáneo (forzar String)
+            const idStr = String(id);
+            if (!inhabilitadosLocal.value.includes(idStr)) {
+                inhabilitadosLocal.value.push(idStr);
+            }
+            console.log("Actividades Inhabilitadas Localmente:", inhabilitadosLocal.value);
+            
             await api.patch(`/actividades-academicas/${id}`, { 
                 estado: -1, // Estado inhabilitado
                 descripcion: `[INHABILITACION_MOTIVO]:${motivo}\n[FECHA]:${new Date().toLocaleString()}\n` 
@@ -624,20 +641,27 @@ const publicarActividad = async () => {
         }
 
         // PAYLOAD LIMPIO: Ajustado estrictamente al DTO del backend
-        const payload = {
-            nombre: nuevaActividad.value.nombre,
-            tipo: tipoFinal || 'Actividad',
-            descripcion: nuevaActividad.value.descripcion,
-            id_evento: Number(nuevaActividad.value.id_evento),
-            fecha_inicio: nuevaActividad.value.fecha_inicio || null,
-            fecha_fin: nuevaActividad.value.fecha_fin || null,
-            requisitos: nuevaActividad.value.requisitos
-        };
+        const formData = new FormData();
+        formData.append('nombre', nuevaActividad.value.nombre);
+        formData.append('tipo', tipoFinal || 'Actividad');
+        formData.append('descripcion', nuevaActividad.value.descripcion);
+        formData.append('id_evento', String(nuevaActividad.value.id_evento));
+        if (nuevaActividad.value.fecha_inicio) formData.append('fecha_inicio', nuevaActividad.value.fecha_inicio);
+        if (nuevaActividad.value.fecha_fin) formData.append('fecha_fin', nuevaActividad.value.fecha_fin);
+        formData.append('requisitos', JSON.stringify(nuevaActividad.value.requisitos));
+        
+        if (imagenArchivo.value) {
+            formData.append('imagen', imagenArchivo.value);
+        }
 
         if (isEditingActividad.value && editActividadId.value) {
-            await api.put(`/actividades-academicas/${editActividadId.value}`, payload);
+            await api.put(`/actividades-academicas/${editActividadId.value}`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
         } else {
-            await api.post('/actividades-academicas', payload);
+            await api.post('/actividades-academicas', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
         }
 
         // --- ALERTA EXITOSA (PREMIUM) ---
@@ -721,10 +745,31 @@ const toggleActividades = (evento: any) => {
   evento.mostrarActividades = !evento.mostrarActividades;
 };
 
+// Filtrar solo actividades activas para el catálogo
+const getActividadesActivas = (actividades: any[]) => {
+    return (actividades || []).filter(a => {
+        const est = Number(a.status_raw ?? a.estado);
+        const idStr = String(a.id);
+        const isInactive = a.status === 'Inactivo' || est === -1 || inhabilitadosLocal.value.includes(idStr);
+        return est === 1 && !isInactive;
+    });
+};
+
+// Filtrar solo actividades inhabilitadas
+const getActividadesInactivas = (actividades: any[]) => {
+    return (actividades || []).filter(a => {
+        const est = Number(a.status_raw ?? a.estado);
+        const idStr = String(a.id);
+        const result = est === -1 || a.status === 'Inactivo' || inhabilitadosLocal.value.includes(idStr);
+        return result;
+    });
+};
+
 // Agrupar actividades por Tipo para la vista estilo Netflix (Case Insensitive)
 const getActividadesAgrupadas = (actividades: any[]) => {
+  const activas = getActividadesActivas(actividades);
   const grupos: Record<string, any[]> = {};
-  actividades.forEach((act: any) => {
+  activas.forEach((act: any) => {
     // Normalizar a mayúsculas para la clave del grupo
     const normalizedType = (act.type || 'Actividad').trim().toUpperCase();
     if (!grupos[normalizedType]) {
@@ -732,16 +777,34 @@ const getActividadesAgrupadas = (actividades: any[]) => {
     }
     grupos[normalizedType]!.push(act);
   });
+  
+  // Ordenar: Alfabético por título
+  Object.keys(grupos).forEach(key => {
+    grupos[key]!.sort((a, b) => a.title.localeCompare(b.title));
+  });
+  
   return grupos;
 };
 
 const getStatusColor = (status: string) => {
   if (status === 'En curso') return 'text-green-600 bg-green-50 dark:bg-green-900/40 border border-green-200 dark:border-green-800';
   if (status === 'Inscripciones') return 'text-umsa-blue bg-blue-50 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800';
+  if (status === 'Inactivo') return 'text-red-600 bg-red-50 dark:bg-red-900/40 border border-red-200 dark:border-red-800';
   return 'text-slate-500 bg-slate-100 dark:bg-gray-800 dark:text-gray-400 border border-slate-200 dark:border-gray-700';
 };
 
-const openDetalleCurso = (courseId: any) => {
+const openDetalleCurso = (courseId: any, status?: string, rawEstado?: any) => {
+  const est = Number(rawEstado);
+  if (status === 'Inactivo' || est === -1) {
+    Swal.fire({
+      icon: 'error',
+      title: 'ACTIVIDAD BLOQUEADA',
+      text: 'Esta actividad ha sido inhabilitada. Debe solicitar su reactivación al Super Usuario para poder ingresar al panel.',
+      confirmButtonColor: '#ef4444',
+      confirmButtonText: 'ENTENDIDO'
+    });
+    return;
+  }
   // Detectar contexto: ¿estamos en /admin o /coordinador?
   const isAdminContext = route.path.startsWith('/admin');
   const prefix = isAdminContext ? '/admin' : '/coordinador';
@@ -751,7 +814,7 @@ const openDetalleCurso = (courseId: any) => {
   } else if (route.name === 'coordinador-ponentes-global' || route.name === 'admin-ponentes') {
     router.push({ path: `${prefix}/actividades/${courseId}`, query: { tab: 'ponentes' } });
   } else {
-    router.push({ path: `${prefix}/actividades/${courseId}` });
+    router.push({ path: `${prefix}/gestion-eventos/${courseId}` });
   }
 };
 
@@ -761,9 +824,65 @@ const changeStep = (delta: number) => {
     currentStep.value = nextStep;
   }
 };
+
+const solicitarActivacion = async (id: number, nombre: string) => {
+    const result = await Swal.fire({
+        title: '¿SOLICITAR ACTIVACIÓN?',
+        text: `Se enviará un mensaje al Super Usuario para solicitar la reactivación de "${nombre}".`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#003B71',
+        confirmButtonText: 'SÍ, ENVIAR SOLICITUD',
+        cancelButtonText: 'CANCELAR'
+    });
+
+    if (result.isConfirmed) {
+        try {
+            Swal.fire({ title: 'Enviando solicitud...', didOpen: () => Swal.showLoading() });
+            await api.post(`/actividades-academicas/${id}/solicitar-activacion`);
+            Swal.fire('Solicitud Enviada', 'El Super Usuario ha sido notificado.', 'success');
+        } catch (e) {
+            Swal.fire('Error', 'No se pudo enviar la solicitud.', 'error');
+        }
+    }
+};
+
+const habilitarActividad = async (id: number, nombre: string) => {
+    const result = await Swal.fire({
+        title: '¿HABILITAR ACTIVIDAD?',
+        text: `¿Está seguro de reactivar "${nombre}"? Volverá a ser visible en el catálogo público.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#10b981',
+        confirmButtonText: 'SÍ, HABILITAR',
+        cancelButtonText: 'CANCELAR'
+    });
+
+    if (result.isConfirmed) {
+        try {
+            await api.patch(`/actividades-academicas/${id}`, { estado: 1 });
+            registrarAccion('actividad', 'crear', `Actividad reactivada: "${nombre}"`, { entidadId: id.toString(), entidadNombre: nombre });
+            fetchEventos();
+            Swal.fire('Activada', 'La actividad está nuevamente en línea.', 'success');
+        } catch (e) {
+            Swal.fire('Error', 'No se pudo habilitar.', 'error');
+        }
+    }
+};
 </script>
 
 <template>
+    <!-- PANEL DE DIAGNÓSTICO TEMPORAL -->
+    <div class="fixed top-20 right-4 z-[9999] bg-black/80 backdrop-blur-md text-white p-4 rounded-2xl border border-white/20 text-[10px] font-mono shadow-2xl pointer-events-none">
+       <div class="flex items-center gap-2 mb-2 text-umsa-gold font-bold uppercase tracking-widest border-b border-white/10 pb-2">
+          <span class="material-symbols-outlined text-sm">bug_report</span> DIAGNÓSTICO
+       </div>
+       <div class="space-y-1">
+          <p>EVENTOS CARGADOS: {{ eventosPublicados.length }}</p>
+          <p>LOCAL INHABILITADOS: {{ inhabilitadosLocal.length }}</p>
+          <p>LISTA LOCAL: {{ inhabilitadosLocal.join(', ') || 'VACÍA' }}</p>
+       </div>
+    </div>
   <div class="animate-in fade-in duration-500 max-w-7xl mx-auto space-y-8">
     
     <!-- VISTA: LISTADO -->
@@ -834,6 +953,11 @@ const changeStep = (delta: number) => {
                    <span class="material-symbols-outlined text-[18px]">add_circle</span> Nueva Actividad
                 </button>
 
+                <button v-if="getActividadesInactivas(evento.actividades).length > 0" class="bg-red-500/20 text-red-500 px-4 py-3 rounded-xl border border-red-500/30 flex items-center gap-2 animate-pulse">
+                   <span class="material-symbols-outlined text-[18px]">folder_off</span>
+                   <span class="text-[10px] font-black uppercase tracking-widest">{{ getActividadesInactivas(evento.actividades).length }} Archivadas</span>
+                </button>
+
                 <button @click="toggleActividades(evento)" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 px-6 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 group/btn cursor-pointer">
                   <span class="text-xs font-bold uppercase tracking-widest">{{ evento.mostrarActividades ? 'Ocultar' : 'Ver' }} Actividades</span>
                   <span class="material-symbols-outlined text-[16px] transition-transform duration-300" :class="evento.mostrarActividades ? 'rotate-180' : ''">expand_more</span>
@@ -851,7 +975,7 @@ const changeStep = (delta: number) => {
             <h3 class="hidden lg:block text-lg font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest italic">Actividades Académicas del Evento</h3>
           </div>
 
-          <div v-for="(acts, categoria) in getActividadesAgrupadas(evento.actividades)" :key="categoria" class="mb-10 w-full overflow-hidden">
+          <div v-for="(acts, categoria) in getActividadesAgrupadas(evento.actividades)" :key="categoria + '-' + acts.length" class="mb-10 w-full overflow-hidden">
             <!-- Row Header -->
             <div class="flex items-end justify-between px-8 mb-4">
               <div>
@@ -866,20 +990,43 @@ const changeStep = (delta: number) => {
             <!-- Horizontal Scroll Row -->
             <div class="flex overflow-x-auto gap-6 px-8 pb-8 pt-2 snap-x snap-mandatory flex-nowrap" style="scrollbar-width: none; -ms-overflow-style: none;">
               <!-- Tarjeta -->
-              <div v-for="act in acts" :key="act.id" @click="openDetalleCurso(act.id)" class="flex-none w-[280px] md:w-[320px] bg-white dark:bg-gray-900 rounded-[1.5rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none border border-slate-200/60 dark:border-gray-800 hover:border-primary-light/50 dark:hover:border-gray-600 transition-all hover:-translate-y-1 hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] cursor-pointer group flex flex-col snap-start relative">
+              <div v-for="act in acts" :key="act.id" 
+                @click="openDetalleCurso(act.id, act.status, act.status_raw || act.estado)" 
+                :class="{'opacity-40 grayscale pointer-events-none scale-95': inhabilitadosLocal.includes(act.id)}"
+                class="flex-none w-[280px] md:w-[320px] bg-white dark:bg-gray-900 rounded-[1.5rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none border border-slate-200/60 dark:border-gray-800 hover:border-primary-light/50 dark:hover:border-gray-600 transition-all hover:-translate-y-1 hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] cursor-pointer group flex flex-col snap-start relative">
                 
                 <div class="relative h-48 w-full overflow-hidden shrink-0">
                   <div class="absolute inset-0 bg-primary-dark/10 group-hover:bg-transparent transition-colors z-10"></div>
+                  
+                  <!-- INDICADOR DE ESTADO (DEPURACIÓN) -->
+                  <div class="absolute top-2 right-2 z-50 flex flex-col gap-1 items-end pointer-events-none">
+                      <span class="bg-black/60 text-white text-[7px] px-1 rounded font-black shadow-sm">ID: {{ act.id }}</span>
+                      <span :class="(act.status_raw === -1 || act.estado === -1 || inhabilitadosLocal.includes(act.id)) ? 'bg-red-500' : 'bg-green-500'" class="text-white text-[7px] px-1 rounded font-black shadow-sm">EST: {{ act.status_raw || act.estado }}</span>
+                  </div>
+                  
+                  <!-- OVERLAY DE BLOQUEO (PREMIUM) -->
+                  <div v-if="act.status === 'Inactivo'" class="absolute inset-0 z-40 bg-gray-900/40 backdrop-blur-[2px] flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500">
+                    <span class="material-symbols-outlined text-white text-5xl mb-2 drop-shadow-lg">lock</span>
+                    <p class="text-white text-[10px] font-black uppercase tracking-[0.2em] drop-shadow-md">Contenido Bloqueado</p>
+                  </div>
+
                   <img :src="act.imagen || act.image" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" :alt="act.title">   
                   
                   <!-- ACCIONES RAPIDAS (FLOTANTES) -->
-                  <div class="absolute top-3 left-3 z-30 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0 duration-300">
-                    <button @click.stop="editarActividad(act)" class="p-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-lg shadow-lg text-umsa-blue hover:scale-110 transition-all border border-blue-50/20" title="Editar Actividad">
-                        <span class="material-symbols-outlined text-[18px]">edit</span>
-                    </button>
-                    <button @click.stop="inhabilitarActividad(act.id, act.title)" class="p-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-lg shadow-lg text-red-500 hover:scale-110 transition-all border border-red-50/20" title="Inhabilitar Actividad">
-                        <span class="material-symbols-outlined text-[18px]">block</span>
-                    </button>
+                  <div class="absolute top-3 left-3 z-50 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0 duration-300">
+                    <template v-if="act.status !== 'Inactivo'">
+                      <button @click.stop="editarActividad(act)" class="p-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-lg shadow-lg text-umsa-blue hover:scale-110 transition-all border border-blue-50/20" title="Editar Actividad">
+                          <span class="material-symbols-outlined text-[18px]">edit</span>
+                      </button>
+                      <button @click.stop="inhabilitarActividad(act.id, act.title)" class="p-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-lg shadow-lg text-red-500 hover:scale-110 transition-all border border-red-50/20" title="Inhabilitar Actividad">
+                          <span class="material-symbols-outlined text-[18px]">block</span>
+                      </button>
+                    </template>
+                    <template v-else>
+                      <button @click.stop="solicitarActivacion(act.id, act.title)" class="p-2 bg-umsa-gold text-white backdrop-blur-md rounded-lg shadow-lg hover:scale-110 transition-all border border-yellow-400/20" title="Solicitar Activación">
+                          <span class="material-symbols-outlined text-[18px]">lock_open</span>
+                      </button>
+                    </template>
                   </div>
 
                   <span class="absolute top-3 right-3 z-20 text-[8px] font-black uppercase px-2 py-1 rounded-md tracking-widest shadow-sm bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm" :class="getStatusColor(act.status)">
@@ -912,8 +1059,55 @@ const changeStep = (delta: number) => {
               </div>
             </div>
           </div>
+
+          <!-- SECCIÓN: ACTIVIDADES INHABILITADAS (ZONA DE CONTROL) -->
+          <div v-if="getActividadesInactivas(evento.actividades).length > 0" class="mt-8 mx-8 mb-8 py-8 px-6 bg-gradient-to-br from-red-50/50 to-orange-50/30 dark:from-red-950/20 dark:to-gray-900/50 rounded-2xl border-2 border-dashed border-red-200 dark:border-red-900/40">
+            <div class="flex items-center justify-between mb-6">
+              <div class="flex items-center gap-4">
+                <div class="p-3 bg-red-500 text-white rounded-2xl shadow-lg shadow-red-500/20">
+                  <span class="material-symbols-outlined text-2xl">folder_off</span>
+                </div>
+                <div>
+                  <h4 class="text-lg font-black text-red-600 dark:text-red-400 uppercase tracking-tight">Actividades Archivadas / Inhabilitadas</h4>
+                  <p class="text-[10px] font-bold text-slate-500 dark:text-gray-500 uppercase tracking-[0.15em] mt-0.5">No visibles para estudiantes ni ponentes · Solo el Super Usuario puede reactivarlas</p>
+                </div>
+              </div>
+              <span class="bg-red-500/10 text-red-500 text-[9px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest border border-red-200 dark:border-red-800">
+                {{ getActividadesInactivas(evento.actividades).length }} inhabilitada{{ getActividadesInactivas(evento.actividades).length > 1 ? 's' : '' }}
+              </span>
+            </div>
+
+            <!-- Lista de actividades inhabilitadas -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div v-for="act in getActividadesInactivas(evento.actividades)" :key="act.id" 
+                class="flex items-center justify-between bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm p-4 rounded-2xl border border-red-100 dark:border-red-900/30 shadow-sm hover:shadow-md transition-all group/disabled">
+                
+                <div class="flex items-center gap-4 min-w-0">
+                   <div class="w-14 h-14 bg-red-50 dark:bg-red-900/20 rounded-xl flex items-center justify-center shrink-0 border border-red-100 dark:border-red-800">
+                      <span class="material-symbols-outlined text-red-400 text-2xl">visibility_off</span>
+                   </div>
+                   <div class="truncate">
+                      <h5 class="text-[12px] font-black text-slate-700 dark:text-gray-200 uppercase truncate">{{ act.title }}</h5>
+                      <div class="flex items-center gap-2 mt-1">
+                        <span class="text-[8px] font-black text-red-500 uppercase tracking-widest bg-red-50 dark:bg-red-900/30 px-2 py-0.5 rounded border border-red-100 dark:border-red-800">Inhabilitada</span>
+                        <span class="text-[8px] text-slate-400 font-bold">{{ act.type }}</span>
+                      </div>
+                   </div>
+                </div>
+
+                <div class="flex items-center gap-2 shrink-0">
+                   <button @click.stop="solicitarActivacion(act.id, act.title)" 
+                     class="flex items-center gap-2 px-4 py-2.5 bg-amber-500/10 hover:bg-amber-500 text-amber-600 hover:text-white rounded-xl transition-all border border-amber-300/30 hover:border-amber-500 font-black text-[9px] uppercase tracking-wider hover:shadow-lg hover:shadow-amber-500/20 hover:-translate-y-0.5"
+                     title="Solicitar al Super Usuario que reactive esta actividad">
+                     <span class="material-symbols-outlined text-[16px]">mail</span>
+                     Solicitar Habilitación
+                   </button>
+                </div>
+              </div>
+            </div>
+          </div>
           
-          <div v-if="Object.keys(getActividadesAgrupadas(evento.actividades)).length === 0" class="px-8 py-10 text-center">
+          <div v-if="getActividadesActivas(evento.actividades).length === 0 && getActividadesInactivas(evento.actividades).length === 0" class="px-8 py-10 text-center">
             <p class="text-sm font-bold text-gray-500 uppercase tracking-widest">No hay actividades publicadas para esta categoría.</p>
           </div>
         </div>
@@ -996,7 +1190,7 @@ const changeStep = (delta: number) => {
                       </div>
                   </div>
               </div>
-              <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-10">
                   <div class="space-y-6">
                       <div>
                           <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Nombre Oficial de la Actividad</label>
@@ -1030,7 +1224,7 @@ const changeStep = (delta: number) => {
                       <div>
                           <label class="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest block mb-2">Imagen de Portada (Opcional)</label>
                           <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-300 dark:border-gray-700 border-dashed rounded-xl hover:border-umsa-blue dark:hover:border-blue-500 transition-colors bg-slate-50 dark:bg-gray-800/40 group overflow-hidden relative">
-                              <div v-if="imagenPreview" class="absolute inset-0">
+                              <div v-if="imagenPreview" class="absolute inset-0 z-10 overflow-hidden rounded-xl">
                                   <img :src="imagenPreview" class="w-full h-full object-cover">
                                   <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
                                       <p class="text-white text-[10px] font-black uppercase">Cambiar Imagen</p>
@@ -1336,7 +1530,7 @@ const changeStep = (delta: number) => {
 
                   <!-- Columna Preview Imagen -->
                   <div class="relative rounded-[2rem] overflow-hidden border-2 border-slate-100 dark:border-gray-800 bg-slate-50 dark:bg-gray-800 aspect-square lg:aspect-auto">
-                      <div v-if="imagenPreview" class="absolute inset-0">
+                      <div v-if="imagenPreview" class="absolute inset-0 z-10">
                           <img :src="imagenPreview" class="w-full h-full object-cover">
                       </div>
                       <div v-else class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center opacity-50 grayscale">
@@ -1465,8 +1659,8 @@ const changeStep = (delta: number) => {
                                     <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Logo del Evento</label>
                                     <p class="text-[8px] font-bold text-slate-400 uppercase mt-0.5">PNG/SVG Transparente • 512x512px</p>
                                 </div>
-                                <div class="relative h-32 bg-slate-50 dark:bg-gray-800 border-2 border-dashed border-slate-200 dark:border-gray-700 rounded-2xl flex flex-col items-center justify-center p-4">
-                                    <img v-if="resolvedLogo" :src="resolvedLogo" class="w-full h-full object-contain">
+                                <div class="relative h-32 bg-slate-50 dark:bg-gray-800 border-2 border-dashed border-slate-200 dark:border-gray-700 rounded-2xl flex flex-col items-center justify-center p-4 overflow-hidden">
+                                    <img v-if="resolvedLogo" :src="resolvedLogo" class="w-full h-full object-contain z-10">
                                     <template v-else>
                                         <span class="material-symbols-outlined text-slate-300 text-3xl">image</span>
                                         <span class="text-[8px] text-slate-400 font-bold uppercase">Subir Logo Oficial</span>
@@ -1479,8 +1673,8 @@ const changeStep = (delta: number) => {
                                     <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Banner Principal (Hero)</label>
                                     <p class="text-[8px] font-bold text-slate-400 uppercase mt-0.5">JPG/PNG • Full HD (1920x1080px)</p>
                                 </div>
-                                <div class="relative h-32 bg-slate-50 dark:bg-gray-800 border-2 border-dashed border-slate-200 dark:border-gray-700 rounded-2xl flex flex-col items-center justify-center p-4">
-                                    <img v-if="resolvedBanner" :src="resolvedBanner" class="w-full h-full object-cover">
+                                <div class="relative h-32 bg-slate-50 dark:bg-gray-800 border-2 border-dashed border-slate-200 dark:border-gray-700 rounded-2xl flex flex-col items-center justify-center p-4 overflow-hidden">
+                                    <img v-if="resolvedBanner" :src="resolvedBanner" class="w-full h-full object-cover z-10">
                                     <template v-else>
                                         <span class="material-symbols-outlined text-slate-300 text-3xl">wallpaper</span>
                                         <span class="text-[8px] text-slate-400 font-bold uppercase">Subir Fondo Hero</span>
@@ -1677,8 +1871,8 @@ const changeStep = (delta: number) => {
                             </div>
 
                             <!-- CONTENIDO HERO (Paso 1, 4, 5) -->
-                            <div v-if="[1, 4, 5].includes(currentStep)" class="h-full w-full relative">
-                                <img v-if="resolvedBanner" :src="resolvedBanner" class="w-full h-full object-cover opacity-60 animate-in fade-in duration-700">
+                            <div v-if="[1, 4, 5].includes(currentStep)" class="h-full w-full relative overflow-hidden">
+                                <img v-if="resolvedBanner" :src="resolvedBanner" class="w-full h-full object-cover opacity-60 animate-in fade-in duration-700 z-10">
                                 <div v-else class="w-full h-full bg-slate-800 flex items-center justify-center">
                                     <span class="material-symbols-outlined text-4xl text-white/5">wallpaper</span>
                                 </div>

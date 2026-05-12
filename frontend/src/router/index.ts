@@ -274,61 +274,74 @@ const router = createRouter({
         }
       ]
     },
-    // ... otras rutas
+    {
+      path: '/logistica',
+      component: () => import('../layouts/LogisticaLayout.vue'),
+      children: [
+        {
+          path: '',
+          name: 'logistica-dashboard',
+          component: () => import('../views/logistica/LogisticaDashboard.vue'),
+        },
+        {
+          path: 'asistencia',
+          name: 'logistica-asistencia',
+          component: () => import('../views/logistica/LogisticaAsistenciaView.vue'),
+        },
+        {
+          path: 'eventos',
+          name: 'logistica-eventos',
+          component: () => import('../views/logistica/LogisticaEventosView.vue'),
+        },
+        {
+          path: 'usuarios',
+          name: 'logistica-usuarios',
+          component: () => import('../views/logistica/LogisticaUsuariosView.vue'),
+        }
+      ]
+    },
   ],
 })
 
-router.beforeEach(async (to, from, next) => {
-
-  // Rutas que requieren estar autenticado
-  const requireAuthPaths = ['/coordinador', '/ponente', '/estudiante'];
-
+router.beforeEach(async (to) => {
+  const requireAuthPaths = ['/coordinador', '/ponente', '/estudiante', '/admin', '/logistica'];
   const pathRequiresAuth = requireAuthPaths.some(path => to.path.startsWith(path));
-
-  // Initialize store safely inside router hooks to prevent circular dependencies at load time
-
   const authStore = useAuthStore();
 
   if (pathRequiresAuth) {
     const token = localStorage.getItem('token');
-    if (!token) {
-      return next({ name: 'login' });
-    }
+    if (!token) return { name: 'login' };
 
-    // Cargar usuario si aún no está en memoria
     if (!authStore.user) {
       await authStore.fetchUser();
-      if (!authStore.isAuthenticated) {
-        return next({ name: 'login' });
-      }
+      if (!authStore.isAuthenticated) return { name: 'login' };
     }
 
-    // ── Guard de roles ──────────────────────────────────────────────────
     const userRoles: string[] = (authStore.user as any)?.usuariosRoles?.map((ur: any) => ur.rol?.nombre_rol) || [];
     const rolIds: number[] = (authStore.user as any)?.usuariosRoles?.map((ur: any) => ur.rol?.id) || [];
 
     const isSuperAdmin = userRoles.includes('Super Usuario') || rolIds.includes(1);
     const isCoordinador = userRoles.includes('Coordinador');
     const isPonente = userRoles.includes('Ponente');
+    const isLogistica = userRoles.includes('Logística');
 
-    // /admin → solo Super Admin
     if (to.path.startsWith('/admin') && !isSuperAdmin) {
-      return next(isCoordinador ? '/coordinador' : isPonente ? '/ponente' : '/estudiante');
+      return isCoordinador ? '/coordinador' : isLogistica ? '/logistica' : isPonente ? '/ponente' : '/estudiante';
     }
 
-    // /coordinador → solo Coordinador (o Super Admin que tiene acceso total)
     if (to.path.startsWith('/coordinador') && !isCoordinador && !isSuperAdmin) {
-      return next(isPonente ? '/ponente' : '/estudiante');
+      return isLogistica ? '/logistica' : isPonente ? '/ponente' : '/estudiante';
     }
 
-    // /ponente → solo Ponente (o superior)
+    if (to.path.startsWith('/logistica') && !isLogistica && !isSuperAdmin) {
+      return isPonente ? '/ponente' : '/estudiante';
+    }
+
     if (to.path.startsWith('/ponente') && !isPonente && !isSuperAdmin) {
-      return next('/estudiante');
+      return '/estudiante';
     }
   }
-
-
-  next();
+  return true;
 });
 
 export default router

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Nueva Designación</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; margin: 0; padding: 40px; }
+        .container { background-color: #ffffff; padding: 40px; border-radius: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; }
+        .header { color: #0d9488; font-size: 24px; font-weight: 800; margin-bottom: 20px; text-transform: uppercase; letter-spacing: -0.025em; }
+        .content { color: #334155; line-height: 1.6; font-size: 16px; }
+        .role-badge { display: inline-block; background-color: #f0fdfa; color: #0d9488; padding: 8px 16px; border-radius: 9999px; font-weight: 800; font-size: 14px; text-transform: uppercase; margin: 20px 0; border: 1px solid #ccfbf1; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #f1f5f9; color: #94a3b8; font-size: 12px; }
+        .btn { display: inline-block; background-color: #0d9488; color: #ffffff !important; padding: 14px 28px; border-radius: 12px; text-decoration: none; font-weight: 700; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">Nueva Designación de Cargo</div>
+        <div class="content">
+            <p>Estimado(a) <strong>{{name}}</strong>,</p>
+            <p>Le informamos que ha sido designado(a) oficialmente con un nuevo rol dentro de la plataforma:</p>
+            
+            <div class="role-badge">{{role}}</div>
+            
+            <p>A partir de este momento, usted cuenta con acceso a las herramientas de <strong>{{role}}</strong>, las cuales incluyen el escaneo de QRs para el registro de asistencias y la gestión logística de actividades.</p>
+            
+            <p>Para acceder a su nuevo portal, simplemente inicie sesión y utilice la opción <strong>"Cambiar Rol"</strong> en su menú lateral o perfil.</p>
+            
+            <div style="text-align: center;">
+                <a href="{{loginUrl}}" class="btn">Acceder al Sistema</a>
+            </div>
+        </div>
+        <div class="footer">
+            Este es un mensaje automático generado por el sistema de gestión. Por favor no responda a este correo.
+        </div>
+    </div>
+</body>
+</html>

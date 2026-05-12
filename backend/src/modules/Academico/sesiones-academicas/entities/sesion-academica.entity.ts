@@ -27,6 +27,10 @@ export class SesionAcademica {
   @PrimaryGeneratedColumn({ name: 'id' })
   id: number;
 
+  /** Día de la semana (ej: "Lunes", "Martes") para horarios recurrentes */
+  @Column({ length: 20, nullable: true })
+  dia: string;
+
   @Column({ type: 'date', nullable: true })
   fecha: Date;
 

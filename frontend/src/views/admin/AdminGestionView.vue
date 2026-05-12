@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useAdminHistorialStore } from '@/stores/adminHistorial';
-import api from '@/services/api';
+import api, { getImageUrl } from '@/services/api';
 import Swal from 'sweetalert2';
 
 const historialStore = useAdminHistorialStore();
 
 // ─── Estado Global ─────────────────────────────────────────
-const tabActivo = ref<'eventos' | 'actividades'>('eventos');
+const tabActivo = ref<'eventos' | 'actividades' | 'solicitudes'>('eventos');
 const isLoading = ref(false);
 const filtroTexto = ref('');
 const filtroEstado = ref('');
@@ -37,11 +37,11 @@ const estadoEventoConfig: Record<number, { label: string; color: string; bg: str
 const fetchEventos = async () => {
   try {
     isLoading.value = true;
-    const res = await api.get('/eventos/admin/lista');
-    eventos.value = res.data?.data || res.data || [];
-  } catch {
     const res = await api.get('/eventos');
     eventos.value = res.data?.data || res.data || [];
+  } catch (e) {
+    console.error('Error fetching eventos:', e);
+    eventos.value = [];
   } finally { isLoading.value = false; }
 };
 
@@ -70,7 +70,7 @@ const abrirCrearEvento = () => {
 const abrirEditarEvento = (ev: any) => {
   isEditingEvento.value = true;
   editEventoId.value = ev.id;
-  previewImg.value = ev.imagen_fondo || null;
+  previewImg.value = getImageUrl('eventos', ev.imagen_fondo) || null;
   imagenFile.value = null;
   formEvento.value = {
     nombre: ev.nombre || ev.nombreCorto || '',
@@ -228,7 +228,48 @@ const confirmarEliminarActividad = async (act: any) => {
   } catch { Swal.fire('Error', 'No se pudo eliminar', 'error'); }
 };
 
-onMounted(() => { fetchEventos(); fetchActividades(); });
+// ─── Solicitudes de Activación ────────────────────────────
+const solicitudes = ref<any[]>([]);
+
+const fetchSolicitudes = async () => {
+  try {
+    isLoading.value = true;
+    const res = await api.get('/actividades-academicas/solicitudes/pendientes');
+    solicitudes.value = res.data || [];
+  } catch (e) {
+    console.error('Error fetching solicitudes:', e);
+    solicitudes.value = [];
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+const aprobarSolicitud = async (sol: any) => {
+  const { isConfirmed } = await Swal.fire({
+    title: '¿Aprobar Reactivación?',
+    text: `¿Estás seguro de reactivar la actividad "${sol.nombre}"?`,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: '#10b981',
+    confirmButtonText: 'Sí, reactivar'
+  });
+
+  if (!isConfirmed) return;
+
+  try {
+    await api.patch(`/actividades-academicas/${sol.id}/activar`);
+    Swal.fire('Activada', 'La actividad ha sido reactivada correctamente.', 'success');
+    fetchSolicitudes();
+  } catch (e: any) {
+    Swal.fire('Error', e.response?.data?.message || 'No se pudo activar la actividad.', 'error');
+  }
+};
+
+onMounted(() => { 
+  fetchEventos(); 
+  fetchActividades(); 
+  fetchSolicitudes();
+});
 </script>
 
 <template>
@@ -257,6 +298,13 @@ onMounted(() => { fetchEventos(); fetchActividades(); });
             <span class="material-symbols-outlined text-[16px]">school</span>
             Actividades
           </button>
+          <button @click="tabActivo = 'solicitudes'; filtroTexto = ''; filtroEstado = ''"
+                  :class="tabActivo === 'solicitudes' ? 'bg-white dark:bg-emerald-600 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'"
+                  class="flex items-center gap-2 px-5 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all">
+            <span class="material-symbols-outlined text-[16px]">notification_important</span>
+            Solicitudes
+            <span v-if="solicitudes.length > 0" class="flex h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>
+          </button>
         </div>
 
         <!-- Botón de acción -->
@@ -265,10 +313,15 @@ onMounted(() => { fetchEventos(); fetchActividades(); });
           <span class="material-symbols-outlined text-[16px] group-hover:rotate-90 transition-transform">add</span>
           Nuevo Evento
         </button>
-        <button v-else @click="abrirCrearActividad()"
+        <button v-else-if="tabActivo === 'actividades'" @click="abrirCrearActividad()"
                 class="flex items-center gap-2 px-5 py-3 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase shadow-lg shadow-amber-500/20 hover:bg-amber-600 transition-all group">
           <span class="material-symbols-outlined text-[16px] group-hover:rotate-90 transition-transform">add</span>
           Nueva Actividad
+        </button>
+        <button v-else @click="fetchSolicitudes()"
+                class="flex items-center gap-2 px-5 py-3 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-all group">
+          <span class="material-symbols-outlined text-[16px]">refresh</span>
+          Recargar
         </button>
       </div>
     </div>
@@ -322,7 +375,7 @@ onMounted(() => { fetchEventos(); fetchActividades(); });
                 <td class="px-6 py-4">
                   <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl overflow-hidden bg-red-100 dark:bg-red-900/20 shrink-0 border border-red-200 dark:border-red-900/30">
-                      <img v-if="ev.imagen_fondo" :src="ev.imagen_fondo" class="w-full h-full object-cover" />
+                      <img v-if="ev.imagen_fondo" :src="getImageUrl('eventos', ev.imagen_fondo)" class="w-full h-full object-cover" />
                       <div v-else class="w-full h-full flex items-center justify-center">
                         <span class="material-symbols-outlined text-red-600 text-[18px]">corporate_fare</span>
                       </div>
@@ -371,7 +424,7 @@ onMounted(() => { fetchEventos(); fetchActividades(); });
     </div>
 
     <!-- TAB: ACTIVIDADES -->
-    <div v-else>
+    <div v-else-if="tabActivo === 'actividades'">
       <div v-if="isLoading" class="py-20 flex justify-center">
         <div class="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
@@ -434,6 +487,62 @@ onMounted(() => { fetchEventos(); fetchActividades(); });
                       <span class="material-symbols-outlined text-[18px]">delete</span>
                     </button>
                   </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: SOLICITUDES -->
+    <div v-else-if="tabActivo === 'solicitudes'">
+      <div v-if="isLoading" class="py-20 flex justify-center">
+        <div class="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+      <div v-else-if="solicitudes.length === 0" class="py-20 flex flex-col items-center text-slate-400">
+        <span class="material-symbols-outlined text-6xl mb-2 opacity-20">notification_important</span>
+        <p class="text-xs font-black uppercase tracking-widest">No hay solicitudes pendientes</p>
+      </div>
+      <div v-else class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-slate-50 dark:bg-white/5">
+              <tr class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <th class="px-6 py-4 text-left">Actividad</th>
+                <th class="px-6 py-4 text-left">Evento</th>
+                <th class="px-6 py-4 text-left">Motivo / Descripción</th>
+                <th class="px-6 py-4 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 dark:divide-white/5">
+              <tr v-for="sol in solicitudes" :key="sol.id"
+                  class="hover:bg-slate-50 dark:hover:bg-white/3 transition-colors group">
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center border border-emerald-200 dark:border-emerald-900/30 shrink-0">
+                      <span class="material-symbols-outlined text-emerald-600 text-[18px]">school</span>
+                    </div>
+                    <div>
+                      <p class="text-sm font-black text-slate-800 dark:text-white">{{ sol.nombre }}</p>
+                      <p class="text-[9px] text-emerald-600 font-bold uppercase tracking-widest">{{ sol.tipo }}</p>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-6 py-4">
+                  <span class="text-xs font-bold text-slate-500">{{ sol.evento?.nombre || '—' }}</span>
+                </td>
+                <td class="px-6 py-4">
+                  <p class="text-xs text-slate-600 dark:text-gray-400 max-w-md line-clamp-2">
+                    {{ sol.descripcion?.replace('[SOLICITUD_ACTIVACION]', '').trim() || 'Sin motivo especificado' }}
+                  </p>
+                </td>
+                <td class="px-6 py-4 text-right">
+                  <button @click="aprobarSolicitud(sol)"
+                          class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase hover:bg-emerald-700 transition-all shadow-md shadow-emerald-600/20 flex items-center gap-2 ml-auto">
+                    <span class="material-symbols-outlined text-[14px]">check_circle</span>
+                    Aprobar Activación
+                  </button>
                 </td>
               </tr>
             </tbody>

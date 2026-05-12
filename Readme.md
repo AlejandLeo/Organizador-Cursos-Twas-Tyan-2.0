@@ -63,6 +63,29 @@ El proyecto utiliza una arquitectura moderna de desacoplamiento entre cliente y 
 
 ---
 
+## Dependencias Principales
+
+Para que tu compañero o cualquier desarrollador pueda instalar todo sin problemas, aquí se listan las dependencias clave que se instalarán con `npm install`:
+
+### Backend
+*   **Core**: `@nestjs/common`, `@nestjs/core`, `@nestjs/jwt`, `@nestjs/passport`
+*   **Base de Datos**: `typeorm`, `pg` (PostgreSQL), `typeorm-extension` (para seeds)
+*   **Seguridad**: `bcrypt`, `passport-jwt`
+*   **Utilidades**: `nodemailer`, `@nestjs-modules/mailer`, `handlebars` (plantillas de correo), `uuid`
+*   **Reportes**: `jspdf`, `jspdf-autotable`, `xlsx`
+*   **QR**: `html5-qrcode`, `qrcode.vue`
+
+### Frontend
+*   **Core**: `vue` (v3), `vue-router`, `pinia` (estado), `axios` (peticiones HTTP)
+*   **UI/UX**: `sweetalert2` (alertas), `vue-i18n` (idiomas)
+*   **QR**: `html5-qrcode` (lector), `qrcode.vue` (generador)
+*   **Reportes**: `jspdf`, `jspdf-autotable`, `xlsx`
+
+> [!NOTE]
+> No es necesario instalar estas dependencias una por una. Ejecutar `npm install` en las carpetas `backend` y `frontend` instalará todo automáticamente.
+
+---
+
 ## Flujo de Trabajo (GitFlow)
 
 * `main`: Codigo en produccion, siempre estable.

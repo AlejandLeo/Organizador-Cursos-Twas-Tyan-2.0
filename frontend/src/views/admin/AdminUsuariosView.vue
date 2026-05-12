@@ -16,10 +16,11 @@ const isAsignandoPonente = ref(false);
 const usuarioSeleccionado = ref<any>(null);
 
 // IDs de roles (deben coincidir con la BD)
-const ROLE_IDS = { COORDINADOR: 2, ESTUDIANTE: 4, PONENTE: 5 };
+const ROLE_IDS = { COORDINADOR: 2, LOGISTICA: 3, ESTUDIANTE: 4, PONENTE: 5 };
 
 const rolesDisponibles = [
   { id: ROLE_IDS.COORDINADOR, nombre: 'Coordinador' },
+  { id: ROLE_IDS.LOGISTICA,    nombre: 'Logística' },
   { id: ROLE_IDS.PONENTE,     nombre: 'Ponente' },
   { id: ROLE_IDS.ESTUDIANTE,  nombre: 'Estudiante' },
 ];
@@ -238,7 +239,9 @@ onMounted(fetchUsuarios);
               <td class="px-6 py-4">
                 <div class="flex gap-1 flex-wrap">
                   <span v-for="nombre in getRoles(user)" :key="nombre"
-                        :class="nombre === 'Ponente' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200 dark:border-blue-800' : 'bg-slate-100 dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10'"
+                        :class="nombre === 'Ponente' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200 dark:border-blue-800' : 
+                                nombre === 'Logística' ? 'bg-teal-100 text-teal-600 dark:bg-teal-900/20 dark:text-teal-400 border-teal-200 dark:border-teal-800' :
+                                'bg-slate-100 dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10'"
                         class="px-2 py-0.5 rounded border text-[9px] font-black uppercase">
                     {{ nombre }}
                   </span>

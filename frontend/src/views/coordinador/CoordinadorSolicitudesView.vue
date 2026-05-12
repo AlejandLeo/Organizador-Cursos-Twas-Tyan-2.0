@@ -3,9 +3,17 @@ import { ref, onMounted } from 'vue';
 import api from '@/services/api';
 import Swal from 'sweetalert2';
 import type { Persona } from '@/types/admin';
+import { useAuthStore } from '@/stores/auth';
 
+const authStore = useAuthStore();
+
+const activeTab = ref('cuentas');
+const personalLogistica = ref<any[]>([]);
 const cuentasPendientes = ref<any[]>([]);
+const allUsers = ref<any[]>([]);
 const loading = ref(true);
+const searchTerm = ref('');
+
 
 const parseFullName = (persona?: Persona) => {
   if (!persona) return 'Usuario Sin Datos';
@@ -25,11 +33,119 @@ const fetchCuentasPendientes = async () => {
     }
 };
 
-onMounted(fetchCuentasPendientes);
+const fetchPersonalLogistica = async () => {
+    try {
+        loading.value = true;
+        // El seeder usa 'Logistica' (sin tilde)
+        const response = await api.get('/usuarios', { params: { rol: 'Logistica' } });
+        // findConFiltros devuelve { data, total, ... }
+        personalLogistica.value = response.data.data || [];
+    } catch (error) {
+        console.error('Error fetching personal logistica', error);
+    } finally {
+        loading.value = false;
+    }
+};
+
+const fetchAllUsers = async () => {
+    if (searchTerm.value.length < 3) return;
+    try {
+        const response = await api.get('/usuarios', { params: { q: searchTerm.value } });
+        // findConFiltros devuelve { data, total, ... }, tomamos data
+        allUsers.value = response.data.data || [];
+    } catch (error) {
+        console.error('Error searching users', error);
+    }
+};
+
+const refreshData = () => {
+    if (activeTab.value === 'cuentas') fetchCuentasPendientes();
+    else fetchPersonalLogistica();
+};
+
+onMounted(refreshData);
+
+
+
+const asignarLogistica = async (userId: number) => {
+    try {
+        const { isConfirmed } = await Swal.fire({
+            title: '¿Designar como Logística?',
+            text: 'Este usuario podrá escanear QRs y registrar asistencias.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, Designar',
+            cancelButtonText: 'Cancelar'
+        });
+
+        if (!isConfirmed) return;
+
+        // Endpoint para asignar rol
+        await api.post(`/usuarios/${userId}/roles/asignar`, { rolId: 3 });
+        Swal.fire('Éxito', 'Usuario designado como personal de logística', 'success');
+        searchTerm.value = '';
+        allUsers.value = [];
+        fetchPersonalLogistica();
+    } catch (error: any) {
+        console.error(error);
+        const msg = error.response?.data?.message || 'No se pudo asignar el rol';
+        Swal.fire('Error', msg, 'error');
+    }
+};
+
+const quitarLogistica = async (userId: number) => {
+    try {
+        const { isConfirmed } = await Swal.fire({
+            title: '¿Quitar cargo de Logística?',
+            text: 'El usuario perderá el acceso al portal de logística.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, Quitar',
+            cancelButtonText: 'No, Mantener'
+        });
+
+        if (!isConfirmed) return;
+
+        await api.post(`/usuarios/${userId}/roles/quitar`, { rolId: 3 });
+        Swal.fire('Actualizado', 'Se ha retirado el rol de logística', 'success');
+        fetchPersonalLogistica();
+    } catch (error: any) {
+        console.error(error);
+        const msg = error.response?.data?.message || 'No se pudo retirar el rol';
+        Swal.fire('Error', msg, 'error');
+    }
+};
+
+const eliminarFisico = async (userId: number) => {
+    try {
+        const { isConfirmed } = await Swal.fire({
+            title: '¿ELIMINAR COMPLETAMENTE?',
+            text: 'Esta acción borrará al usuario y su perfil de la base de datos de forma permanente. Use esto solo para limpiar errores de creación.',
+            icon: 'error',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Sí, Borrar de Raíz',
+            cancelButtonText: 'Cancelar'
+        });
+
+        if (!isConfirmed) return;
+
+        await api.delete(`/usuarios/${userId}/fisico`);
+        Swal.fire('Eliminado', 'Usuario borrado de la base de datos.', 'success');
+        fetchPersonalLogistica();
+    } catch (error: any) {
+        console.error(error);
+        const msg = error.response?.data?.message || 'No se pudo eliminar físicamente';
+        Swal.fire('Error', msg, 'error');
+    }
+};
+
+// Eliminada lógica de reactivación de actividades por petición del usuario
 
 // ============================================
 // LOGICA DE CUENTAS PENDIENTES
 // ============================================
+// ... rest of logic stays similar but integrated ...
 
 const aprobarCuenta = async (id: number) => {
     try {
@@ -55,20 +171,27 @@ const aprobarCuenta = async (id: number) => {
 
 const rechazarCuenta = async (id: number) => {
     try {
-        const { isConfirmed } = await Swal.fire({
+        const { value: motivo, isConfirmed } = await Swal.fire({
             title: '¿Rechazar Cuenta?',
-            text: 'La solicitud será rechazada y la cuenta quedará inactiva.',
+            text: 'Indique el motivo del rechazo para informar al usuario:',
+            input: 'textarea',
+            inputPlaceholder: 'Ej: El documento de aval es ilegible...',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
             confirmButtonText: 'Rechazar',
-            cancelButtonText: 'Cancelar'
+            cancelButtonText: 'Cancelar',
+            inputValidator: (value) => {
+                if (!value) {
+                    return '¡Debes escribir un motivo para el rechazo!';
+                }
+            }
         });
 
         if (!isConfirmed) return;
 
-        await api.patch(`/usuarios/${id}/solicitud/rechazar`);
-        Swal.fire({ icon: 'success', title: 'Cuenta Rechazada', text: 'La solicitud de cuenta ha sido rechazada.', timer: 1500, showConfirmButton: false });
+        await api.patch(`/usuarios/${id}/solicitud/rechazar`, { motivo });
+        Swal.fire({ icon: 'success', title: 'Cuenta Rechazada', text: 'La solicitud ha sido rechazada y se notificó al usuario.', timer: 1500, showConfirmButton: false });
         await fetchCuentasPendientes();
     } catch (error) {
         console.error(error);
@@ -125,8 +248,25 @@ const tieneReverso = (firmaDig?: string) => {
       </div>
     </div>
 
-    <!-- Tabla Cuentas Pendientes -->
-    <div class="bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden relative z-0">
+    <!-- SELECTOR DE PESTAÑAS -->
+    <div class="flex items-center gap-4 bg-white dark:bg-slate-900 p-2 rounded-[2rem] border border-slate-100 dark:border-slate-800 w-fit mx-auto shadow-sm">
+        <button @click="activeTab = 'cuentas'; refreshData()" 
+          :class="[activeTab === 'cuentas' ? 'bg-sky-600 text-white shadow-lg shadow-sky-500/30' : 'text-slate-400 hover:text-sky-500']"
+          class="flex items-center gap-3 px-8 py-4 rounded-full font-black text-[10px] uppercase tracking-widest transition-all duration-300">
+          <span class="material-symbols-outlined text-sm">person_add</span>
+          Cuentas Pendientes
+          <span v-if="cuentasPendientes.length > 0" class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+        </button>
+        <button @click="activeTab = 'logistica'; refreshData()" 
+          :class="[activeTab === 'logistica' ? 'bg-teal-600 text-white shadow-lg shadow-teal-500/30' : 'text-slate-400 hover:text-teal-500']"
+          class="flex items-center gap-3 px-8 py-4 rounded-full font-black text-[10px] uppercase tracking-widest transition-all duration-300">
+          <span class="material-symbols-outlined text-sm">support_agent</span>
+          Designación de Logística
+        </button>
+    </div>
+
+    <!-- PESTAÑA: CUENTAS -->
+    <div v-if="activeTab === 'cuentas'" class="bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden relative z-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div class="p-6 bg-slate-50 dark:bg-gray-800 border-b border-slate-200 dark:border-gray-700 flex justify-between items-center">
             <div>
                 <h3 class="text-[12px] font-black text-primary-dark dark:text-white uppercase tracking-widest">
@@ -136,7 +276,7 @@ const tieneReverso = (firmaDig?: string) => {
                     {{ cuentasPendientes.length }} Cuentas nuevas por revisar
                 </p>
             </div>
-            <button @click="fetchCuentasPendientes" class="p-2 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-slate-400 hover:text-sky-500 transition-colors">
+            <button @click="refreshData" class="p-2 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-slate-400 hover:text-sky-500 transition-colors">
                 <span class="material-symbols-outlined text-[18px]">refresh</span>
             </button>
       </div>
@@ -203,6 +343,109 @@ const tieneReverso = (firmaDig?: string) => {
             </tbody>
         </table>
       </div>
+    </div>
+
+    <!-- PESTAÑA: LOGISTICA -->
+    <div v-if="activeTab === 'logistica'" class="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        
+        <!-- Buscador de Usuarios y Botón Crear -->
+        <div class="flex flex-col lg:flex-row gap-6">
+            <div class="flex-1 bg-white dark:bg-gray-900 rounded-[2.5rem] p-8 border border-slate-100 dark:border-gray-800 shadow-sm">
+                <h3 class="text-[12px] font-black text-teal-600 uppercase tracking-widest mb-6 flex items-center gap-2">
+                    <span class="material-symbols-outlined">person_search</span>
+                    Designar desde Usuarios Existentes
+                </h3>
+                
+                <div class="relative max-w-2xl">
+                    <input v-model="searchTerm" @input="fetchAllUsers" type="text" placeholder="Buscar por nombre, correo o documento (min. 3 caracteres)..." 
+                    class="w-full bg-slate-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-4 text-sm font-bold placeholder:text-slate-400 focus:ring-2 focus:ring-teal-500 transition-all outline-none">
+                    <div v-if="allUsers.length > 0 && searchTerm.length >= 3" class="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-slate-100 dark:border-gray-700 z-20 max-h-64 overflow-y-auto overflow-x-hidden">
+                        <div v-for="u in allUsers" :key="u.id" 
+                        class="p-4 hover:bg-slate-50 dark:hover:bg-gray-700/50 cursor-pointer flex items-center justify-between border-b border-slate-50 dark:border-gray-700 last:border-none">
+                            <div>
+                                <p class="text-xs font-black text-slate-800 dark:text-white uppercase">{{ parseFullName(u.persona) }}</p>
+                                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{{ u.email }} | {{ u.persona?.documento_identidad }}</p>
+                            </div>
+                            <button @click="asignarLogistica(u.id)" class="px-4 py-2 bg-teal-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-teal-700 transition-colors">
+                                Designar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Listado de Personal Actual -->
+        <div class="bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden relative z-0">
+            <div class="p-6 bg-slate-50 dark:bg-gray-800 border-b border-slate-200 dark:border-gray-700 flex justify-between items-center">
+                    <div>
+                        <h3 class="text-[12px] font-black text-teal-600 uppercase tracking-widest">
+                            Personal de Logística Activo
+                        </h3>
+                        <p class="text-[10px] text-slate-500 mt-1 font-bold">
+                            {{ personalLogistica.length }} usuarios autorizados para escaneo de QR
+                        </p>
+                    </div>
+                    <button @click="refreshData" class="p-2 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-slate-400 hover:text-teal-500 transition-colors">
+                        <span class="material-symbols-outlined text-[18px]">refresh</span>
+                    </button>
+            </div>
+
+            <div class="w-full overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-50 dark:bg-gray-800/50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-200 dark:border-gray-800">
+                        <tr>
+                            <th class="px-6 py-4">Usuario</th>
+                            <th class="px-6 py-4">Identificación</th>
+                            <th class="px-6 py-4">Correo</th>
+                            <th class="px-6 py-4 text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-gray-800">
+                        <tr v-if="loading" class="bg-white dark:bg-gray-900">
+                            <td colspan="4" class="py-12 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">
+                                <span class="material-symbols-outlined animate-spin align-middle mr-2">refresh</span> Cargando...
+                            </td>
+                        </tr>
+                        <tr v-if="!loading && personalLogistica.length === 0" class="bg-white dark:bg-gray-900">
+                            <td colspan="4" class="py-12 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">
+                                No se ha designado personal de logística aún
+                            </td>
+                        </tr>
+                        <tr v-for="p in personalLogistica" :key="p.id" class="hover:bg-slate-50 dark:hover:bg-gray-800/80 transition-colors">
+                            <td class="px-6 py-4">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-900/20 text-teal-600 flex items-center justify-center font-black">
+                                        {{ p.persona?.nombres?.[0] || 'L' }}
+                                    </div>
+                                    <div>
+                                        <p class="text-[12px] font-black text-slate-800 dark:text-white uppercase">{{ parseFullName(p.persona) }}</p>
+                                        <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Logística</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <p class="text-xs font-black text-slate-600 dark:text-slate-300 uppercase">{{ p.persona?.documento_identidad }}</p>
+                            </td>
+                            <td class="px-6 py-4">
+                                <p class="text-xs font-bold text-slate-500 dark:text-gray-400">{{ p.email }}</p>
+                            </td>
+                            <td class="px-6 py-4 text-center flex justify-center gap-2">
+                                <button @click="quitarLogistica(p.id)" 
+                                  class="p-2 border border-orange-200 dark:border-orange-900/50 text-orange-500 rounded-lg hover:bg-orange-500 hover:text-white transition-all group" title="Quitar Rol de Logística">
+                                  <span class="material-symbols-outlined text-[18px]">person_remove</span>
+                                </button>
+                                
+                                <button v-if="authStore.esAdmin" @click="eliminarFisico(p.id)" 
+                                  class="p-2 border border-red-200 dark:border-red-900/50 text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-all group" title="Eliminar Cuenta Permanentemente">
+                                  <span class="material-symbols-outlined text-[18px]">delete_forever</span>
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
   </div>
 </template>

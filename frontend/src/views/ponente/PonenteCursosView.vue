@@ -1,43 +1,76 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import api, { getImageUrl } from '@/services/api';
 
+const route = useRoute();
 const router = useRouter();
 
-const eventoData = ref({
-  id: 1,
-  nombreCorto: 'Programa Especializado',
-  nombreLargo: 'Programa de Especialidad en Biofertilizantes',
-  version: 'V Edición - 2026',
-  descripcion: 'Gestiona las actividades a tu carga. Mantén el registro de asistencia y emisión de certificados.',
-  estado: 'En Progreso',
+const eventoData = ref<any>({
+  id: 0,
+  nombreCorto: '',
+  nombreLargo: 'Cargando...',
+  version: '',
+  descripcion: '',
+  estado: '',
   colorEstado: 'bg-primary-dark text-white border-blue-900',
   imagen: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=1600&q=80',
   mostrarActividades: true,
-  actividadesAsignadas: [
-    {
-      id: 1,
-      title: 'Módulo 1: Fundamentos de Biofertilizantes',
-      status: 'En curso',
-      type: 'Módulo',
-      date: '10 May - 20 Jun 2026',
-      students: 45,
-      image: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=800&q=80'
-    },
-    {
-      id: 2,
-      title: 'Taller de Aplicación de Suelos',
-      status: 'Próximamente',
-      type: 'Taller',
-      date: '25 Jun - 30 Jun 2026',
-      students: 120,
-      image: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80'
+  actividadesAsignadas: []
+});
+const isLoading = ref(false);
+
+const fetchData = async () => {
+  try {
+    isLoading.value = true;
+    const eventoId = Number(route.params.evento_id);
+    const res = await api.get('/imparticiones/mis-actividades');
+    const imparticiones = res.data || [];
+    
+    // Filtrar solo las imparticiones de este evento
+    const imparticionesEvento = imparticiones.filter((imp: any) => imp.evento?.id === eventoId);
+    
+    if (imparticionesEvento.length > 0) {
+      const ev = imparticionesEvento[0].evento || {};
+      eventoData.value = {
+        id: ev.id || 0,
+        nombreCorto: 'Programa', 
+        nombreLargo: ev.nombre || 'Sin nombre',
+        version: ev.fecha_inicio ? new Date(ev.fecha_inicio).getFullYear().toString() : '2026',
+        descripcion: ev.descripcion || 'Gestiona las actividades a tu cargo.',
+        estado: ev.estado === 1 ? 'En Progreso' : (ev.estado === 2 ? 'Finalizado' : 'Próximamente'),
+        colorEstado: 'bg-primary-dark text-white border-blue-900',
+        imagen: getImageUrl('eventos', ev.logo || ev.imagen_fondo, 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=1600&q=80'),
+        mostrarActividades: true,
+        actividadesAsignadas: imparticionesEvento
+          .filter((imp: any) => imp?.actividadAcademica && Number(imp.actividadAcademica?.estado) !== -1)
+          .map((imp: any) => ({
+            id: imp.actividadAcademica?.id,
+            title: imp.actividadAcademica?.nombre || 'Sin nombre',
+            status: 'En curso',
+            type: imp.actividadAcademica?.tipo || 'Actividad',
+            date: imp.actividadAcademica?.fecha_inicio 
+              ? `${new Date(imp.actividadAcademica.fecha_inicio).toLocaleDateString()} - ${new Date(imp.actividadAcademica.fecha_fin).toLocaleDateString()}` 
+              : 'Fechas por definir',
+            students: imp.actividadAcademica?.inscripciones?.length || 0,
+            image: getImageUrl('cursos', imp.actividadAcademica?.imagen, 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=800&q=80')
+          }))
+      };
     }
-  ]
+  } catch (error) {
+    console.error('Error al cargar actividades del evento:', error);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+onMounted(() => {
+  fetchData();
 });
 
 const getActividadesAgrupadas = (actividades: any) => {
   const grupos: any = {};
+  if (!actividades) return grupos;
   actividades.forEach((act: any) => {
     if (!grupos[act.type]) {
       grupos[act.type] = [];
@@ -67,18 +100,18 @@ const getStatusColor = (status: string) => {
 
     <div class="w-full bg-white dark:bg-gray-900 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 dark:border-gray-800 flex flex-col group/card mb-8">
         
-        <div class="relative w-full h-[320px] overflow-hidden">
+        <div class="relative w-full h-[240px] md:h-[320px] overflow-hidden">
           <img :src="eventoData.imagen" alt="Banner" class="w-full h-full object-cover object-center group-hover/card:scale-105 transition-transform duration-[1.5s] ease-out">
           <div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent"></div>
-          <div class="absolute bottom-0 left-0 right-0 p-8 pt-24 z-20 flex flex-col">
+          <div class="absolute bottom-0 left-0 right-0 p-6 md:p-8 pt-24 z-20 flex flex-col">
             <span class="mb-3" :class="[eventoData.colorEstado, 'text-[8px] font-black uppercase px-3 py-1 rounded-full tracking-widest w-fit shadow-lg backdrop-blur-md border']">
               {{ eventoData.estado }}
             </span>
             <div class="flex items-end justify-between">
               <div>
-                <p class="text-xs font-bold text-umsa-gold dark:text-blue-400 uppercase tracking-widest mb-2">{{ eventoData.version }}</p>
-                <h1 class="text-4xl md:text-5xl font-black text-white tracking-tighter leading-none mb-4 uppercase italic">{{ eventoData.nombreLargo }}</h1>
-                <p class="text-sm font-medium text-gray-300 max-w-2xl line-clamp-2 leading-relaxed italic opacity-80">{{ eventoData.descripcion }}</p>
+                <p class="text-[10px] md:text-xs font-bold text-umsa-gold dark:text-blue-400 uppercase tracking-widest mb-1 md:mb-2">{{ eventoData.version }}</p>
+                <h1 class="text-2xl md:text-5xl font-black text-white tracking-tighter leading-none mb-2 md:mb-4 uppercase italic">{{ eventoData.nombreLargo }}</h1>
+                <p class="text-[11px] md:text-sm font-medium text-gray-300 max-w-2xl line-clamp-2 leading-relaxed italic opacity-80">{{ eventoData.descripcion }}</p>
               </div>
             </div>
           </div>

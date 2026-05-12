@@ -46,6 +46,8 @@ export class InscripcionesService {
         'actividadAcademica',
         'actividadAcademica.evento',
         'actividadAcademica.modalidades',
+        'modalidades',
+        'modalidades.cursoModalidad',
       ],
       order: { fecha_creacion: 'DESC' },
     });

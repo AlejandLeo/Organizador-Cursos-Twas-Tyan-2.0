@@ -26,8 +26,24 @@ const fetchEstudiantes = async () => {
     
     loading.value = true;
     try {
-        // NOTA: Este endpoint lo creará tu compañero
-        // GET /inscripciones/ponente/:actividadId
+        // Verificar estado de la actividad primero
+        const actRes = await api.get(`/actividades-academicas/${actividadId.value}`);
+        if (Number(actRes.data.estado) === -1) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Actividad Inhabilitada',
+                text: 'No se pueden gestionar calificaciones para una actividad inhabilitada.',
+                confirmButtonColor: '#003B71'
+            });
+            router.push({ name: 'ponente-catalogo' });
+            return;
+        }
+
+        // Cargar información de la actividad
+        actividadInfo.value.nombre = actRes.data.nombre;
+        actividadInfo.value.evento = actRes.data.evento?.nombre || 'Evento';
+
+        // Cargar estudiantes
         const response = await api.get(`/inscripciones/ponente/${actividadId.value}`);
         estudiantes.value = response.data.map((ins: any) => ({
             id: ins.id,

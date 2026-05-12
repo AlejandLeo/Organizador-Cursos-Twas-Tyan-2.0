@@ -4,9 +4,11 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import Swal from 'sweetalert2';
 import api from '@/services/api';
+import { useI18n } from 'vue-i18n';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const { t } = useI18n();
 
 const email = ref('');
 const password = ref('');
@@ -98,16 +100,16 @@ const abrirSoporte = () => {
       <div class="w-full md:w-1/2 p-8 md:p-14 lg:p-20 flex flex-col justify-center">
         <div class="text-center md:text-left mb-10">
           <div class="inline-block mb-6">
-            <h2 class="text-[#003a70] dark:text-blue-400 font-black italic text-5xl tracking-tighter leading-none">WELCOME</h2>
-            <p class="text-[10px] leading-tight text-[#003a70]/60 dark:text-blue-400/60 uppercase font-bold tracking-widest mt-1 text-center">SISTEMA DE GESTIÓN ACADÉMICA</p>
+            <h2 class="text-[#003a70] dark:text-blue-400 font-black italic text-5xl tracking-tighter leading-none">{{ t('login.welcome') }}</h2>
+            <p class="text-[10px] leading-tight text-[#003a70]/60 dark:text-blue-400/60 uppercase font-bold tracking-widest mt-1 text-center">{{ t('login.subtitle') }}</p>
           </div>
-          <h1 class="text-3xl font-black text-[#003a70] dark:text-white tracking-tight uppercase">Acceso Plataforma</h1>
-          <p class="text-slate-500 dark:text-slate-400 mt-2 text-sm font-medium">Ingresa tus credenciales para acceder a los servicios.</p>
+          <h1 class="text-3xl font-black text-[#003a70] dark:text-white tracking-tight uppercase">{{ t('login.access') }}</h1>
+          <p class="text-slate-500 dark:text-slate-400 mt-2 text-sm font-medium">{{ t('login.instructions') }}</p>
         </div>
 
         <form @submit.prevent="handleLogin" class="space-y-6">
           <div>
-            <label for="email" class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2 block">Correo Electrónico</label>
+            <label for="email" class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2 block">{{ t('login.email') }}</label>
             <div class="relative group">
               <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-[#003a70] transition-colors">
                 <span class="material-symbols-outlined text-[20px]">mail</span>
@@ -124,7 +126,7 @@ const abrirSoporte = () => {
           </div>
           
           <div>
-            <label for="password" class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2 block">Contraseña</label>
+            <label for="password" class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2 block">{{ t('login.password') }}</label>
             <div class="relative group">
               <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-[#003a70] transition-colors">
                 <span class="material-symbols-outlined text-[20px]">lock</span>
@@ -155,7 +157,7 @@ const abrirSoporte = () => {
 
           <div class="flex justify-end">
             <button type="button" @click="abrirSoporte" class="text-[10px] font-black text-slate-400 hover:text-[#003a70] uppercase tracking-widest transition-colors">
-              ¿Olvidaste tu contraseña? Recuperar aquí
+              {{ t('login.forgot_password') }}
             </button>
           </div>
 
@@ -166,14 +168,14 @@ const abrirSoporte = () => {
               class="w-full flex justify-center items-center gap-2 py-4 px-4 rounded-2xl text-sm font-black uppercase tracking-widest text-white bg-[#003a70] shadow-xl shadow-[#003a70]/20 hover:bg-[#002a50] hover:-translate-y-0.5 active:translate-y-[2px] active:shadow-none focus:outline-none transition-all duration-300 disabled:opacity-70 disabled:hover:translate-y-0"
             >
               <span v-if="loading" class="material-symbols-outlined animate-spin text-[20px]">autorenew</span>
-              {{ loading ? 'Verificando...' : 'Ingresar al Sistema' }}
+              {{ loading ? t('login.verifying') : t('login.submit') }}
             </button>
           </div>
           
           <p class="text-center text-xs font-semibold text-slate-500 mt-6">
-            ¿No tienes una cuenta? 
+            {{ t('login.no_account') }} 
             <router-link to="/register" class="font-black text-[#003a70] hover:underline dark:text-blue-400 uppercase transition-colors ml-1">
-              Regístrate aquí
+              {{ t('login.register_here') }}
             </router-link>
           </p>
         </form>

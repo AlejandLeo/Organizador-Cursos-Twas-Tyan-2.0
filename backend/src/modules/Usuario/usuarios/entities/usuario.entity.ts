@@ -45,6 +45,10 @@ export class Usuario {
   @Column({ type: 'boolean', default: false })
   requiere_cambio_password: boolean;
 
+  /** Contraseña específica para el portal de ponente, opcional. */
+  @Column({ length: 255, nullable: true })
+  password_ponente: string;
+
   // ── Relaciones ────────────────────────────────────────────────────────────
 
   /**

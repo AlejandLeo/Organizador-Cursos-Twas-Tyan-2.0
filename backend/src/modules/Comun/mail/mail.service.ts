@@ -39,8 +39,10 @@ export class MailService {
       this.logger.log(`Correo enviado exitosamente a ${to}. MessageId: ${info.messageId}`);
       return info;
     } catch (error) {
+      // Solo logueamos el error — NO lo relanzamos para que los flujos de negocio
+      // (aprobación, rechazo) no fallen por un problema de correo
       this.logger.error(`Error enviando correo a ${to}: ${error.message}`, error.stack);
-      throw error;
+      return null; // Retorna null en lugar de lanzar excepción
     }
   }
 
@@ -111,6 +113,20 @@ export class MailService {
       { name, actividad, reason },
     );
   }
+  
+  /**
+   * Notifica a administración sobre una nueva solicitud de cuenta pendiente.
+   */
+  async sendNewRegistrationRequestNotification(studentName: string, studentEmail: string) {
+    // Usamos el mismo MAIL_USER como destino si no hay un admin email específico
+    const adminEmail = process.env.MAIL_USER || 'coursemanagementsystemumsa@gmail.com';
+    return this.sendMail(
+      adminEmail,
+      'Nueva Solicitud de Registro Pendiente',
+      'admin-notification',
+      { studentName, studentEmail },
+    );
+  }
 
   /**
    * Ejemplo de método para un correo de bienvenida.
@@ -122,6 +138,37 @@ export class MailService {
       'welcome', // Debe existir en src/modules/Comun/mail/templates/welcome.hbs
       { name },
       `Hola ${name}, bienvenido a nuestra plataforma.`,
+    );
+  }
+
+  async sendActivationRequestNotification(actividadNombre: string, coordinadorNombre: string, coordinadorEmail: string) {
+    const adminEmail = process.env.MAIL_USER || 'coursemanagementsystemumsa@gmail.com';
+    return this.sendMail(
+      adminEmail,
+      'Solicitud de Reactivación de Actividad',
+      'activation-request',
+      { 
+        actividadNombre, 
+        coordinadorNombre, 
+        coordinadorEmail,
+        fecha: new Date().toLocaleString()
+      },
+    );
+  }
+
+  /**
+   * Notifica a un usuario que se le ha asignado un nuevo rol (ej: Logística).
+   */
+  async sendRoleDesignationEmail(to: string, name: string, roleName: string) {
+    return this.sendMail(
+      to,
+      'Nueva Designación de Cargo',
+      'role-designation',
+      { 
+        name, 
+        role: roleName,
+        loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
+      },
     );
   }
 }

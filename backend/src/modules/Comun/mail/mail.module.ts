@@ -1,6 +1,6 @@
 import { Module, Global } from '@nestjs/common';
 import { MailerModule } from '@nestjs-modules/mailer';
-import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
+import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.adapter';
 import { ConfigService } from '@nestjs/config';
 import { join } from 'path';
 import { MailService } from './mail.service';
@@ -13,17 +13,20 @@ import { MailService } from './mail.service';
         transport: {
           host: config.get('MAIL_HOST'),
           port: config.get('MAIL_PORT'),
-          secure: config.get('MAIL_PORT') === '465', // true for 465, false for other ports
+          secure: config.get('MAIL_PORT') === '465',
           auth: {
             user: config.get('MAIL_USER'),
-            pass: config.get('MAIL_PASSWORD'),
+            pass: config.get('MAIL_PASS'),
+          },
+          tls: {
+            rejectUnauthorized: false, // Permite certificados auto-firmados
           },
         },
         defaults: {
-          from: `"No Reply" <${config.get('MAIL_FROM')}>`,
+          from: config.get('MAIL_FROM'),
         },
         template: {
-          dir: join(__dirname, 'templates'),
+          dir: join(process.cwd(), 'src', 'modules', 'Comun', 'mail', 'templates'),
           adapter: new HandlebarsAdapter(),
           options: {
             strict: true,

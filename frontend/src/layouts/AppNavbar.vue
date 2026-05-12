@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { useRouter, useRoute } from 'vue-router';
 import { useEventoStore } from '@/stores/eventoStore';
 import { useAuthStore } from '@/stores/auth';
+import { getImageUrl } from '@/services/api';
 
 const { t, locale } = useI18n();
 const router = useRouter();
@@ -84,15 +85,10 @@ onMounted(async () => {
         <div class="flex items-center shrink-0 h-full">
           <RouterLink to="/" @click="scrollTo('#inicio')" class="flex items-center gap-2 group cursor-pointer">
             
-            <!-- LOGO DEL EVENTO ADAPTATIVO -->
-            <div class="relative flex items-center p-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-lg shadow-sm transition-all duration-300 group-hover:scale-105">
-              <img v-if="eventoStore.activeEvento"
-                   :key="eventoStore.activeEvento?.id"
-                   :src="eventoStore.activeEvento?.logo && !eventoStore.activeEvento.logo.includes('null') 
-                          ? (eventoStore.activeEvento.logo.startsWith('http') ? eventoStore.activeEvento.logo : `http://localhost:3000/uploads/logo/${eventoStore.activeEvento.logo}`)
-                          : 'http://localhost:3000/uploads/logo/logo%20fcpn.png'" 
-                   class="h-7 md:h-8 w-auto object-contain dark:opacity-90 transition-all duration-300" />
-              <div v-else class="h-7 md:h-8 w-8 bg-slate-100 dark:bg-slate-800 animate-pulse rounded"></div>
+            <!-- LOGO ESTÁTICO TRANSPARENTE -->
+            <div class="relative flex items-center transition-all duration-300 group-hover:scale-105">
+              <img src="/logo/logoOficial.png" 
+                   class="h-10 md:h-12 w-auto object-contain dark:opacity-90 transition-all duration-300" alt="Logo Oficial" />
             </div>
 
             <!-- TEXTO DEL EVENTO (MINIATURA PREMIUM) -->
@@ -136,7 +132,7 @@ onMounted(async () => {
         <div class="flex items-center gap-2 md:gap-3 shrink-0">
           
           <!-- BOTÓN IDIOMA (TEXTO COMPLETO Y MÁS GRANDE) -->
-          <button @click="toggleLang" class="flex items-center gap-2 px-4 py-2 bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl hover:bg-white dark:hover:bg-slate-700 text-xs font-black uppercase tracking-widest transition-all shadow-sm">
+          <button @click="toggleLang" class="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl hover:bg-white dark:hover:bg-slate-700 text-xs font-black uppercase tracking-widest transition-all shadow-sm">
             <span class="material-symbols-outlined text-base">language</span>
             <span>{{ t('navbar.language') }}</span>
           </button>
@@ -163,7 +159,7 @@ onMounted(async () => {
             </router-link>
 
             <router-link to="/login" 
-                         class="flex items-center justify-center gap-2 px-8 py-2.5 text-white rounded-full font-black text-[11px] md:text-xs tracking-widest uppercase transition-all duration-300 hover:shadow-xl hover:scale-105 active:scale-95 ml-1 shadow-md"
+                         class="hidden sm:flex items-center justify-center gap-2 px-8 py-2.5 text-white rounded-full font-black text-[11px] md:text-xs tracking-widest uppercase transition-all duration-300 hover:shadow-xl hover:scale-105 active:scale-95 ml-1 shadow-md"
                          :style="{ 
                            background: isDark 
                              ? `linear-gradient(135deg, ${eventoStore.activeEvento?.color_principal || '#004a99'} 0%, #001a35 100%)`
@@ -180,9 +176,9 @@ onMounted(async () => {
           <!-- LOGOS INSTITUCIONALES (TAMAÑO EQUILIBRADO) -->
           <div class="hidden sm:flex items-center gap-2 border-l pl-4 border-slate-200 dark:border-slate-800 ml-1">
              <a href="https://www.fcpn.edu.bo/" target="_blank" 
-                class="w-10 h-10 rounded-full border border-slate-100 dark:border-slate-700 p-1 flex items-center justify-center bg-white dark:bg-slate-900 shadow-sm hover:scale-110 transition-all cursor-pointer">
-               <img src="http://localhost:3000/uploads/logo/logo%20fcpn.png" 
-                    class="w-full h-full object-contain dark:opacity-90" alt="FCPN" />
+                class="w-10 h-10 flex items-center justify-center hover:scale-110 transition-all cursor-pointer">
+               <img src="/logo/logoOficial.png" 
+                    class="w-full h-full object-contain dark:opacity-90" alt="Logo Oficial" />
              </a>
              <a href="https://www.umsa.bo/" target="_blank" 
                 class="w-10 h-10 rounded-full border border-slate-100 dark:border-slate-700 p-1 flex items-center justify-center bg-white dark:bg-slate-900 shadow-sm hover:scale-110 transition-all cursor-pointer">
@@ -253,7 +249,7 @@ onMounted(async () => {
 
           <!-- Logos Institucionales en Móvil -->
           <div class="flex justify-center items-center gap-6 pt-4">
-             <img src="http://localhost:3000/uploads/logo/logo%20fcpn.png" class="h-10 w-auto opacity-70" alt="FCPN" />
+             <img src="/logo/logoOficial.png" class="h-10 w-auto opacity-70" alt="Logo Oficial" />
              <img src="http://localhost:3000/uploads/logo/Logo%20UMSA.png" class="h-10 w-auto opacity-70" alt="UMSA" />
           </div>
         </div>

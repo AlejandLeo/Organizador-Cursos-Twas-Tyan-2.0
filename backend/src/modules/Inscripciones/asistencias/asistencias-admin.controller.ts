@@ -35,10 +35,10 @@ export class AsistenciasAdminController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Registrar asistencia por QR escaneado (Coordinador)' })
   registrarPorQR(
-    @Body('id_inscripcion_modalidad', ParseIntPipe) id_inscripcion_modalidad: number,
+    @Body('token') token: string,
     @Body('id_sesion', ParseIntPipe) id_sesion: number,
   ) {
-    return this.service.registrarPorQR({ id_inscripcion_modalidad, id_sesion });
+    return this.service.registrarPorQR({ token, id_sesion });
   }
 
   @Get('sesion/:sesionId')

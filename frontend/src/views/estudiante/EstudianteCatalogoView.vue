@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import api from '@/services/api'; // Import api instance
+import api, { getImageUrl } from '@/services/api'; // Import api instance
 
 const router = useRouter();
 const eventosPublicados = ref<any[]>([]);
@@ -22,11 +22,15 @@ const fetchEventos = async () => {
       nombreLargo: evento.nombre,
       version: evento.gestion || 'Última versión',
       descripcion: evento.descripcion || 'Sin descripción',
-      imagen: evento.logo || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80',
+      imagen: (evento.imagen_fondo && evento.imagen_fondo.startsWith('http')) 
+        ? evento.imagen_fondo 
+        : ((evento.logo && evento.logo.startsWith('http')) 
+            ? evento.logo 
+            : getImageUrl('eventos', evento.imagen_fondo || evento.logo, 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80')),
       estado: evento.estado == 1 ? 'Activo' : 'Próximamente',
       colorEstado: evento.estado == 1 ? 'bg-emerald-500 text-white border-emerald-400/30' : 'bg-slate-500 text-white border-slate-400/30',
       mostrarActividades: true,
-      actividades: (evento.actividades || []).map((act: any) => {
+      actividades: (evento.actividades || []).filter((act: any) => Number(act.estado) !== -1).map((act: any) => {
         const found = misInsc.find((i: any) => i.actividadAcademica?.id === act.id);
         let myStatus = 'Disponible';
         if (found) {
@@ -43,7 +47,7 @@ const fetchEventos = async () => {
           type: act.tipo || 'General',
           date: `${act.fecha_inicio ? new Date(act.fecha_inicio).toLocaleDateString() : 'Por definir'}`,
           modules: 1,
-          image: act.imagen || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80'
+          image: getImageUrl('cursos', act.imagen, 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80')
         };
       })
     }));
@@ -101,7 +105,7 @@ const getStatusColor = (status: string) => {
     <div v-for="evento in eventosPublicados" :key="evento.id" class="w-full bg-white dark:bg-gray-900 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 dark:border-gray-800 mb-12 flex flex-col group/card">
       
       <!-- Header Evento Banner (Estilo Netflix) -->
-      <div class="relative w-full h-[320px] overflow-hidden">
+      <div class="relative w-full h-[240px] md:h-[320px] overflow-hidden">
         <img :src="evento.imagen" :alt="evento.nombreCorto" class="w-full h-full object-cover object-center group-hover/card:scale-105 transition-transform duration-[1.5s] ease-out">
         <div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent"></div>
         
@@ -110,12 +114,12 @@ const getStatusColor = (status: string) => {
           ● {{ evento.estado }}
         </span>
 
-        <div class="absolute bottom-0 left-0 right-0 p-8 pt-24 z-20 flex flex-col">
-          <div class="flex items-end justify-between">
+        <div class="absolute bottom-0 left-0 right-0 p-6 md:p-8 pt-24 z-20 flex flex-col">
+          <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
-              <p class="text-xs font-bold text-emerald-400 dark:text-emerald-400 uppercase tracking-widest mb-2">{{ evento.version }}</p>
-              <h1 class="text-4xl md:text-5xl font-black text-white tracking-tighter leading-none mb-4">{{ evento.nombreCorto }}</h1>
-              <p class="text-sm font-medium text-gray-300 max-w-2xl line-clamp-2 leading-relaxed">{{ evento.descripcion }}</p>
+              <p class="text-[10px] md:text-xs font-bold text-emerald-400 dark:text-emerald-400 uppercase tracking-widest mb-1 md:mb-2">{{ evento.version }}</p>
+              <h1 class="text-2xl md:text-5xl font-black text-white tracking-tighter leading-none mb-2 md:mb-4">{{ evento.nombreCorto }}</h1>
+              <p class="text-[11px] md:text-sm font-medium text-gray-300 max-w-2xl line-clamp-2 leading-relaxed">{{ evento.descripcion }}</p>
             </div>
 
             <button @click="toggleActividades(evento)" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 px-6 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 group/btn cursor-pointer z-30 relative">

@@ -1,33 +1,53 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import api, { getImageUrl } from '@/services/api';
 
 const router = useRouter();
 
-const eventosAsignados = ref([
-  {
-    id: 1,
-    title: 'Programa de Especialidad en Biofertilizantes',
-    status: 'En Progreso',
-    gestion: '2026',
-    date: '10/05/2026 - 15/09/2026',
-    progress: 45,
-    actividadesCount: 2,
-    color: 'bg-primary-dark',
-    image: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80'
-  },
-  {
-    id: 2,
-    title: 'Simposio Internacional de Inteligencia Artificial',
-    status: 'Próximamente',
-    gestion: '2026',
-    date: '01/08/2026 - 30/08/2026',
-    progress: 0,
-    actividadesCount: 1,
-    color: 'bg-umsa-gold',
-    image: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80'
+const actividadesAsignadas = ref<any[]>([]);
+const isLoading = ref(false);
+
+const fetchData = async () => {
+  try {
+    isLoading.value = true;
+    const res = await api.get('/imparticiones/mis-actividades');
+    const imparticiones = res.data || [];
+    
+    const actividades = imparticiones
+      .filter((imp: any) => imp?.actividadAcademica && Number(imp.actividadAcademica?.estado) !== -1)
+      .map((imp: any) => {
+        const act = imp.actividadAcademica || {};
+        const ev = imp.evento || {};
+        return {
+          id: act.id,
+          title: act.nombre || 'Actividad',
+          eventoNombre: ev.nombreCorto || ev.nombre || 'Evento Principal',
+          status: act.estado === 1 ? 'En Progreso' : (act.estado === 0 ? 'Finalizado' : 'Próximamente'),
+          date: act.fecha_inicio ? `${new Date(act.fecha_inicio).toLocaleDateString()} - ${new Date(act.fecha_fin).toLocaleDateString()}` : 'Fechas por definir',
+          students: act.inscripciones?.length || 0,
+          type: act.tipo || 'Actividad',
+          image: getImageUrl('cursos', act.imagen, 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80'),
+          gestion: ev.fecha_inicio ? new Date(ev.fecha_inicio).getFullYear().toString() : '2026'
+        };
+      });
+
+    actividadesAsignadas.value = actividades;
+
+    // Redirección directa si solo tiene una actividad (requerimiento de UX)
+    if (actividades.length === 1) {
+      router.replace({ name: 'ponente-curso-detalle', params: { id: actividades[0].id } });
+    }
+  } catch (error) {
+    console.error('Error al cargar actividades asignadas:', error);
+  } finally {
+    isLoading.value = false;
   }
-]);
+};
+
+onMounted(() => {
+  fetchData();
+});
 
 const getStatusColor = (status: any) => {
   if (status === 'En Progreso') return 'text-white bg-emerald-500 shadow-emerald-500/30';
@@ -35,8 +55,8 @@ const getStatusColor = (status: any) => {
   return 'text-white bg-umsa-gold shadow-yellow-500/30';
 };
 
-const openActividadesEvento = (eventoId: any) => {
-  router.push({ name: 'ponente-curso', params: { evento_id: eventoId } });
+const openActividadDetalle = (actividadId: any) => {
+  router.push({ name: 'ponente-curso-detalle', params: { id: actividadId } });
 };
 </script>
 
@@ -53,32 +73,32 @@ const openActividadesEvento = (eventoId: any) => {
       </div>
     </div>
     
-    <div class="flex items-center justify-between border-b border-slate-200 dark:border-gray-800 mb-8 pb-6">
+    <div class="flex items-center justify-between border-b border-slate-200 dark:border-gray-800 mb-8 pb-6 px-4 md:px-0">
       <div>
-        <h2 class="text-3xl font-black text-primary-dark dark:text-white uppercase italic">Mis Cursos Asignados</h2>
-        <p class="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Programas en los que estás asignado como docente/ponente</p>
+        <h2 class="text-2xl md:text-3xl font-black text-primary-dark dark:text-white uppercase italic">Mis Cursos Asignados</h2>
+        <p class="text-[9px] md:text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Programas en los que estás asignado como docente/ponente</p>
       </div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-      <div v-for="evento in eventosAsignados" :key="evento.id" @click="openActividadesEvento(evento.id)" 
+      <div v-for="actividad in actividadesAsignadas" :key="actividad.id" @click="openActividadDetalle(actividad.id)" 
         class="bg-white dark:bg-gray-900 rounded-[2.5rem] overflow-hidden shadow-lg border border-slate-100 dark:border-gray-800 hover:border-umsa-blue transition-all duration-500 hover:-translate-y-2 cursor-pointer group flex flex-col relative">
         
         <!-- Imagen Predominante -->
         <div class="relative h-60 w-full overflow-hidden shrink-0">
-          <img :src="evento.image" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 ease-out">   
+          <img :src="actividad.image" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 ease-out">   
           <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent"></div>
           
-          <span class="absolute top-4 right-4 z-20 text-[9px] font-black uppercase px-3 py-1.5 rounded-full tracking-widest shadow-xl backdrop-blur-md border border-white/10" :class="getStatusColor(evento.status)">
-            {{ evento.status }}
+          <span class="absolute top-4 right-4 z-20 text-[9px] font-black uppercase px-3 py-1.5 rounded-full tracking-widest shadow-xl backdrop-blur-md border border-white/10" :class="getStatusColor(actividad.status)">
+            {{ actividad.status }}
           </span>
 
           <div class="absolute bottom-4 left-6 right-6 z-20">
             <p class="text-[10px] font-bold text-umsa-gold uppercase tracking-[0.2em] mb-1 drop-shadow-md">
-              GESTIÓN {{ evento.gestion }}
+              {{ actividad.eventoNombre }}
             </p>
-            <h3 class="text-2xl font-black text-white leading-tight uppercase italic group-hover:text-umsa-gold transition-colors drop-shadow-lg line-clamp-2">
-              {{ evento.title }}
+            <h3 class="text-xl md:text-2xl font-black text-white leading-tight uppercase italic group-hover:text-umsa-gold transition-colors drop-shadow-lg line-clamp-2">
+              {{ actividad.title }}
             </h3>
           </div>
         </div>
@@ -88,17 +108,17 @@ const openActividadesEvento = (eventoId: any) => {
           <div class="flex items-center justify-between text-slate-500 dark:text-gray-400 mb-6">
             <div class="flex items-center gap-2">
               <span class="material-symbols-outlined text-sm text-umsa-blue">calendar_month</span>
-              <span class="text-[10px] font-bold uppercase tracking-wider">{{ evento.date }}</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider">{{ actividad.date }}</span>
             </div>
             <div class="flex items-center gap-2">
-              <span class="material-symbols-outlined text-sm text-umsa-blue">book</span>
-              <span class="text-[10px] font-bold uppercase tracking-wider">{{ evento.actividadesCount }} Actividades</span>
+              <span class="material-symbols-outlined text-sm text-umsa-blue">groups</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider">{{ actividad.students }} Estudiantes</span>
             </div>
           </div>
 
           <div class="mt-auto flex justify-between items-center pt-5 border-t border-slate-100 dark:border-gray-800">
               <div class="flex items-center text-umsa-blue font-black group/btn">
-                  <span class="text-[11px] uppercase tracking-widest">Ver Actividades</span>
+                  <span class="text-[11px] uppercase tracking-widest">Gestionar Actividad</span>
                   <span class="material-symbols-outlined text-[18px] ml-2 group-hover/btn:translate-x-1 transition-transform">arrow_forward</span>
               </div>
           </div>
