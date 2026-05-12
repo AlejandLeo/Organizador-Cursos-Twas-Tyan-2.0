@@ -10,6 +10,10 @@ export default class CleanUsersSeeder implements Seeder {
         const u = await userRepo.findOne({ where: { email } });
         if (u) {
             await dataSource.query('DELETE FROM usuarios_roles WHERE id_usuario = $1', [u.id]);
+            await dataSource.query('DELETE FROM inscripciones WHERE id_usuario = $1', [u.id]);
+            await dataSource.query('DELETE FROM imparticiones WHERE id_usuario = $1', [u.id]);
+            await dataSource.query('DELETE FROM coordinacion_eventos WHERE id_usuario = $1', [u.id]);
+            await dataSource.query('DELETE FROM personas WHERE id_usuario = $1', [u.id]);
             await userRepo.remove(u);
             console.log(`Usuario eliminado: ${email}`);
         }

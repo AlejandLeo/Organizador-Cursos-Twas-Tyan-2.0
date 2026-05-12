@@ -14,7 +14,7 @@ const options: typeorm.DataSourceOptions & extension.SeederOptions = {
   entities: ['src/**/*.entity.ts'],
   migrations: ['src/database/migrations/*.ts'],
   synchronize: false,
-  seeds: ['src/database/seeds/*.ts', 'src/database/seeds/production/*.ts', 'src/database/seeds/development/*.ts'],
+  seeds: ['src/database/seeds/production/*.ts', 'src/database/seeds/development/*.ts'],
   factories: ['src/database/factories/**/*.ts'],
 };
 
