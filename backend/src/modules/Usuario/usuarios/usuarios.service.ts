@@ -41,7 +41,7 @@ export class UsuariosService {
     private readonly dataSource: DataSource,
     private readonly mailService: MailService,
     private readonly qrService: QrService,
-  ) {}
+  ) { }
 
   // ══════════════════════════════════════════════════════════
   //  CRUD BÁSICO
@@ -69,10 +69,10 @@ export class UsuariosService {
 
     // 1. Filtrar campos específicos para la entidad Persona
     const camposPersonaValidos = [
-      'nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad', 
+      'nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad',
       'genero', 'pais_origen', 'pais_residencia', 'fecha_nacimiento', 'celular'
     ];
-    
+
     const datosPersona: any = {};
     camposPersonaValidos.forEach(key => {
       if (data[key] !== undefined) {
@@ -81,10 +81,10 @@ export class UsuariosService {
 
         // Manejo especial para género si viene como string
         if (key === 'genero' && typeof data[key] === 'string') {
-           const g = data[key];
-           if (g.startsWith('Mas')) datosPersona.genero = 0;
-           else if (g.startsWith('Fem')) datosPersona.genero = 1;
-           else datosPersona.genero = 2;
+          const g = data[key];
+          if (g.startsWith('Mas')) datosPersona.genero = 0;
+          else if (g.startsWith('Fem')) datosPersona.genero = 1;
+          else datosPersona.genero = 2;
         } else {
           datosPersona[key] = data[key];
         }
@@ -100,15 +100,15 @@ export class UsuariosService {
     const { id_grado_academico, tipo_afiliacion, area_tematica, disciplina_cientifica } = data;
 
     if (
-      institucion !== undefined || 
-      id_grado_academico !== undefined || 
-      tipo_afiliacion !== undefined || 
-      area_tematica !== undefined || 
+      institucion !== undefined ||
+      id_grado_academico !== undefined ||
+      tipo_afiliacion !== undefined ||
+      area_tematica !== undefined ||
       disciplina_cientifica !== undefined
     ) {
       const afiliacionRepo = this.dataSource.getRepository(Afiliacion);
-      let af = usuario.afiliaciones && usuario.afiliaciones.length > 0 
-        ? usuario.afiliaciones[0] 
+      let af = usuario.afiliaciones && usuario.afiliaciones.length > 0
+        ? usuario.afiliaciones[0]
         : null;
 
       if (af) {
@@ -117,7 +117,7 @@ export class UsuariosService {
           if (!(isCompleted && af.institucion)) af.institucion = institucion;
         }
         if (id_grado_academico !== undefined) {
-           if (!(isCompleted && af.id_grado_academico)) af.id_grado_academico = id_grado_academico;
+          if (!(isCompleted && af.id_grado_academico)) af.id_grado_academico = id_grado_academico;
         }
         if (tipo_afiliacion !== undefined) af.tipo_afiliacion = tipo_afiliacion;
         if (area_tematica !== undefined) af.area_tematica = area_tematica;
@@ -146,7 +146,7 @@ export class UsuariosService {
       if (!p.nombres || !p.primer_apellido || !p.documento_identidad || !p.celular || !af?.institucion) {
         throw new BadRequestException('Debe completar todos los campos obligatorios antes de finalizar.');
       }
-      
+
       await this.personaRepository.update(p.id, { perfil_completado: true });
     }
 
@@ -178,7 +178,7 @@ export class UsuariosService {
     // 3. Procesar Persona (Sanitización y Mapeo)
     if (usuario.persona) {
       const datosPersona: any = {};
-      
+
       // Mapeo seguro de campos existentes en Persona
       const camposSeguros = ['nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad', 'celular', 'pais_origen', 'pais_residencia'];
       camposSeguros.forEach(c => {
@@ -211,7 +211,7 @@ export class UsuariosService {
     if (institucion !== undefined || id_grado_academico !== undefined || especialidad !== undefined) {
       const afRepo = this.dataSource.getRepository(Afiliacion);
       let af = usuario.afiliaciones?.[0];
-      
+
       if (!af) {
         af = afRepo.create({ usuario: usuario });
       }
@@ -332,18 +332,18 @@ export class UsuariosService {
   async deshabilitarUsuario(id: number): Promise<{ mensaje: string }> {
     const usuario = await this.findOne(id);
     await this.usuarioRepository.update(id, { estado: 0 });
-    
+
     // Opcional: Notificar por correo
-    const nombreCompleto = usuario.persona 
-      ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}` 
+    const nombreCompleto = usuario.persona
+      ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
       : 'Usuario';
-    
+
     await this.mailService.sendAccountRejectionEmail(
       usuario.email,
       nombreCompleto,
       'Tu cuenta ha sido deshabilitada por administración.'
     );
-    
+
     return { mensaje: `Usuario ${id} deshabilitado correctamente.` };
   }
 
@@ -354,13 +354,13 @@ export class UsuariosService {
   async habilitarUsuario(id: number): Promise<{ mensaje: string }> {
     const usuario = await this.findOne(id);
     await this.usuarioRepository.update(id, { estado: 1 });
-    
-    const nombreCompleto = usuario.persona 
-      ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}` 
+
+    const nombreCompleto = usuario.persona
+      ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
       : 'Usuario';
-    
+
     await this.mailService.sendAccountReactivationEmail(usuario.email, nombreCompleto);
-    
+
     return { mensaje: `Usuario ${id} habilitado correctamente.` };
   }
 
@@ -536,11 +536,10 @@ export class UsuariosService {
       }
 
       let contextoRol = '';
-      
-<<<<<<< HEAD
+
       // Lógica de Validación Priorizada:
       // Si el DTO indica un portal (ej: 'Ponente'), intentamos validar esa clave PRIMERO.
-      
+
       if (loginDto.portal === 'Ponente' && usuario.password_ponente && usuario.password_ponente.length > 10) {
         const passPonenteValido = await bcrypt.compare(loginDto.password, usuario.password_ponente);
         if (passPonenteValido) {
@@ -550,19 +549,19 @@ export class UsuariosService {
 
       // Si no se validó arriba (porque no era ponente o la clave no coincidió), probamos la principal
       if (!contextoRol) {
-        const passPrincipalValida = usuario.password 
+        const passPrincipalValida = usuario.password
           ? await bcrypt.compare(loginDto.password, usuario.password)
           : false;
-        
+
         if (passPrincipalValida) {
           contextoRol = 'Estudiante';
 
-          const esCoordinador = usuario.usuariosRoles?.some((ur: any) => 
+          const esCoordinador = usuario.usuariosRoles?.some((ur: any) =>
             ur.rol?.id === 2 || ur.rol?.nombre_rol === 'Coordinador'
           );
           if (esCoordinador) contextoRol = 'Coordinador';
 
-          const esAdmin = usuario.usuariosRoles?.some((ur: any) => 
+          const esAdmin = usuario.usuariosRoles?.some((ur: any) =>
             ur.rol?.id === 1 || ur.rol?.nombre_rol === 'Super Usuario'
           );
           if (esAdmin) contextoRol = 'Admin';
@@ -574,31 +573,6 @@ export class UsuariosService {
         const passPonenteValido = await bcrypt.compare(loginDto.password, usuario.password_ponente);
         if (passPonenteValido) {
           contextoRol = 'Ponente';
-=======
-      // 1. Intentar validar con la contraseña principal (Estudiante / Admin)
-      // Nota: password siempre debe existir en la BD.
-      const passEstudianteValido = usuario.password 
-        ? await bcrypt.compare(loginDto.password, usuario.password)
-        : false;
-      
-      if (passEstudianteValido) {
-        contextoRol = 'Estudiante';
-        const esAdmin = usuario.usuariosRoles?.some((ur: any) => 
-          ur.rol?.id === 1 || ur.rol?.nombre_rol === 'Super Usuario'
-        );
-        if (esAdmin) contextoRol = 'Admin';
-      } else {
-        // 2. Intentar validar con la contraseña de ponente (si existe y está configurado)
-        if (usuario.password_ponente && usuario.password_ponente.length > 10) {
-          try {
-            const passPonenteValido = await bcrypt.compare(loginDto.password, usuario.password_ponente);
-            if (passPonenteValido) {
-              contextoRol = 'Ponente';
-            }
-          } catch (e) {
-            console.error('[AUTH ERROR] Error comparando password_ponente:', e.message);
-          }
->>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
         }
       }
 
@@ -608,9 +582,9 @@ export class UsuariosService {
 
       // Eliminamos passwords antes de devolver
       const { password, password_ponente, ...usuarioSinPassword } = usuario;
-      
+
       console.log(`[AUTH] Acceso exitoso: ${usuario.email} -> Portal: ${contextoRol}`);
-      
+
       return {
         ...usuarioSinPassword,
         rolSugerido: contextoRol
@@ -651,9 +625,9 @@ export class UsuariosService {
     }
 
     const nuevaHash = await bcrypt.hash(dto.password_nuevo, 10);
-    await this.usuarioRepository.update(id, { 
+    await this.usuarioRepository.update(id, {
       password: nuevaHash,
-      requiere_cambio_password: false 
+      requiere_cambio_password: false
     });
 
     return { mensaje: 'Contraseña actualizada correctamente.' };
@@ -670,10 +644,6 @@ export class UsuariosService {
     tipo: 'principal' | 'ponente' = 'principal',
   ): Promise<{ mensaje: string }> {
     const hash = await bcrypt.hash(nuevaPassword, 10);
-<<<<<<< HEAD
-=======
-
->>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
     if (tipo === 'ponente') {
       await this.usuarioRepository.update(id, { password_ponente: hash });
     } else {
@@ -685,7 +655,7 @@ export class UsuariosService {
   async habilitarEdicion(id: number) {
     const usuario = await this.findOne(id);
     if (!usuario.persona) throw new NotFoundException('El usuario no tiene un perfil vinculado');
-    
+
     // Desbloqueamos el perfil
     await this.personaRepository.update(usuario.persona.id, { perfil_completado: false });
     return { mensaje: 'Edición habilitada correctamente' };
@@ -695,13 +665,6 @@ export class UsuariosService {
     return await this.usuarioRepository.findOne({
       where: { email },
       relations: ['persona']
-<<<<<<< HEAD
-=======
-    });
-    await this.usuarioRepository.update(id, { 
-      password: hash,
-      requiere_cambio_password: false 
->>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
     });
   }
 
@@ -841,11 +804,11 @@ export class UsuariosService {
         estado: 1,
       });
       await this.dataSource.getRepository(UsuarioRol).save(nuevaRelacion);
-      
+
       // Notificar al usuario por correo
       try {
-        const nombreCompleto = usuario.persona 
-          ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}` 
+        const nombreCompleto = usuario.persona
+          ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
           : 'Usuario';
         await this.mailService.sendRoleDesignationEmail(usuario.email, nombreCompleto, rol.nombre_rol);
       } catch (e) {
@@ -1097,7 +1060,6 @@ export class UsuariosService {
 
       await queryRunner.commitTransaction();
 
-<<<<<<< HEAD
       // Notificar a administración (opcional/no-bloqueante)
       try {
         const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
@@ -1106,8 +1068,6 @@ export class UsuariosService {
         console.error('Error enviando notificación de solicitud a admin:', e);
       }
 
-=======
->>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
       return {
         mensaje:
           'Su solicitud fue recepcionada correctamente. La confirmación de su cuenta se realizará una vez finalice el proceso de inscripciones y sea validada por administración.',
@@ -1145,7 +1105,7 @@ export class UsuariosService {
    * @param id       ID del usuario pendiente
    * @param accion   'aprobar' | 'rechazar'
    */
-   async aprobarRechazarSolicitud(
+  async aprobarRechazarSolicitud(
     id: number,
     accion: 'aprobar' | 'rechazar',
     motivo?: string,
@@ -1169,23 +1129,23 @@ export class UsuariosService {
       // SI EL ESTADO ES 2: Es la primera vez (Admisión)
       if (usuario.estado === 2) {
         // Mantenemos la contraseña original que el usuario eligió al registrarse
-        await this.usuarioRepository.update(id, { 
-          estado: 1, 
-          requiere_cambio_password: false 
+        await this.usuarioRepository.update(id, {
+          estado: 1,
+          requiere_cambio_password: false
         });
-        
-        const nombreCompleto = usuario.persona 
-          ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}` 
+
+        const nombreCompleto = usuario.persona
+          ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
           : 'Usuario';
-          
+
         await this.mailService.sendAccountApprovalEmail(usuario.email, nombreCompleto, 'La elegida en su registro');
         return { mensaje: 'Solicitud aprobada. El usuario ya puede ingresar con su contraseña original.' };
-      } 
+      }
       // SI EL ESTADO ERA 0: Es una reactivación
       else {
         await this.usuarioRepository.update(id, { estado: 1 });
-        const nombreCompleto = usuario.persona 
-          ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}` 
+        const nombreCompleto = usuario.persona
+          ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
           : 'Usuario';
         await this.mailService.sendAccountReactivationEmail(usuario.email, nombreCompleto);
         return { mensaje: 'Cuenta reactivada y usuario notificado.' };
@@ -1193,11 +1153,11 @@ export class UsuariosService {
     } else {
       // Rechazar: estado = -1
       await this.usuarioRepository.update(id, { estado: -1 });
-      
-      const nombreCompleto = usuario.persona 
-        ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}` 
+
+      const nombreCompleto = usuario.persona
+        ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
         : 'Usuario';
-        
+
       await this.mailService.sendAccountRejectionEmail(
         usuario.email,
         nombreCompleto,
@@ -1228,7 +1188,7 @@ export class UsuariosService {
 
     // Función para dejar SOLO los números
     const limpiarANumeros = (s: string) => s.replace(/\D/g, '');
-    
+
     const inputNum = limpiarANumeros(ci);
     const dbNum = limpiarANumeros(ciAlmacenado);
 
@@ -1252,7 +1212,7 @@ export class UsuariosService {
    */
   async activarPortalPonente(id_usuario: number, ci: string, nuevaPassword: string) {
     console.log(`[AUDITORÍA] Intento de ACTIVACIÓN de portal Ponente - Usuario ID: ${id_usuario}`);
-    
+
     // 1. Validar identidad (CI)
     const esValido = await this.verificarPasswordRespaldo(id_usuario, ci);
     if (!esValido) {
@@ -1262,13 +1222,13 @@ export class UsuariosService {
     // 2. Actualizar contraseña de ponente y marcar como configurado
     const hash = await bcrypt.hash(nuevaPassword, 10);
     await this.usuarioRepository.update(id_usuario, { password_ponente: hash });
-    
+
     // 3. Marcar como configurado en la entidad Persona
-    const usuario = await this.usuarioRepository.findOne({ 
+    const usuario = await this.usuarioRepository.findOne({
       where: { id: id_usuario },
       relations: ['persona']
     });
-    
+
     if (usuario && usuario.persona) {
       usuario.persona.ponente_configurado = true;
       await this.dataSource.getRepository(Persona).save(usuario.persona);
@@ -1277,7 +1237,6 @@ export class UsuariosService {
     console.log(`[AUDITORÍA] Portal Ponente ACTIVADO CON CLAVE ESPECÍFICA - Usuario ID: ${id_usuario}`);
     return { mensaje: 'Portal de ponente activado exitosamente.' };
   }
-<<<<<<< HEAD
 
   async getAttendanceToken(usuarioId: number): Promise<string> {
     return this.qrService.generarTokenAsistencia(usuarioId);
@@ -1289,16 +1248,14 @@ export class UsuariosService {
    */
   async eliminarFisico(id: number) {
     const usuario = await this.findOne(id);
-    
+
     // Al usar onDelete: CASCADE en las relaciones, se borrarían automáticamente,
     // pero para estar seguros borramos persona si existe.
     if (usuario.persona) {
       await this.dataSource.getRepository(Persona).delete(usuario.persona.id);
     }
-    
+
     return this.usuarioRepository.delete(id);
   }
-=======
->>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
 }
 

@@ -41,7 +41,7 @@ import { Roles } from '../../Seguridad/auth/roles.decorator';
 @ApiTags('Usuarios')
 @Controller('usuarios')
 export class UsuariosController {
-  constructor(private readonly usuariosService: UsuariosService) {}
+  constructor(private readonly usuariosService: UsuariosService) { }
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -50,32 +50,28 @@ export class UsuariosController {
   async verificarRespaldo(@Request() req: any, @Body() dto: VerificarRespaldoDto) {
     const userId = Number(req.user.id);
     const userEmail = req.user.email;
-    
+
     console.log(`[AUDITORÍA] Intento de verificación de respaldo - Usuario ID: ${userId}, Email: ${userEmail}`);
-    
+
     const esValido = await this.usuariosService.verificarPasswordRespaldo(userId, dto.ci);
-    
+
     if (!esValido) {
       console.warn(`[AUDITORÍA] Intento FALLIDO de verificación de respaldo - Usuario ID: ${userId}`);
       throw new BadRequestException('La contraseña de respaldo es incorrecta.');
     }
-    
+
     console.log(`[AUDITORÍA] Verificación de respaldo EXITOSA - Usuario ID: ${userId}`);
     return { valid: true, message: 'Verificación exitosa.' };
   }
-  
+
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('activar-ponente')
   @ApiOperation({ summary: 'Activar portal de ponente' })
   async activarPonente(@Request() req: any, @Body() body: { ci: string, password?: string }) {
-<<<<<<< HEAD
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const userId = Number(req.user.id);
     return this.usuariosService.activarPortalPonente(userId, body.ci, body.password || '');
-=======
-    return this.usuariosService.activarPortalPonente(req.user.id_usuario, body.ci, body.password || '');
->>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
   }
 
   @UseGuards(JwtAuthGuard)
@@ -85,10 +81,10 @@ export class UsuariosController {
   async getAlertasEstudiante(@Request() req: any) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const userId = Number(req.user.id);
-    
+
     const usuario = await this.usuariosService.getPerfil(userId);
     const alertas: any[] = [];
-    
+
     if (!usuario) return [];
 
     // 1. Notificación de Perfil
@@ -120,7 +116,7 @@ export class UsuariosController {
         }
       });
     }
-    
+
     // 3. Notificación de Designación como Ponente (Persistente hasta configuración)
     const esPonente = usuario.usuariosRoles?.some((ur: any) => ur.rol?.nombre_rol === 'Ponente');
     if (esPonente) {
@@ -145,7 +141,6 @@ export class UsuariosController {
         });
       }
     }
-<<<<<<< HEAD
 
     // 4. Notificación de Designación como Logística
     const esLogistica = usuario.usuariosRoles?.some((ur: any) => ur.rol?.nombre_rol === 'Logística');
@@ -159,8 +154,6 @@ export class UsuariosController {
         prioridad: 'alta'
       });
     }
-=======
->>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
 
     return alertas;
   }
@@ -237,14 +230,14 @@ export class UsuariosController {
   uploadFoto(@Request() req: any, @UploadedFile() file: Express.Multer.File) {
     const idUsuario = req.user?.id;
     fs.appendFileSync('upload_debug.log', `[${new Date().toISOString()}] Inicio upload para usuario: ${idUsuario}\n`);
-    
+
     if (!file) {
       fs.appendFileSync('upload_debug.log', `[${new Date().toISOString()}] Error: No hay archivo en el request\n`);
       throw new Error('No se pudo subir la foto de perfil');
     }
-    
+
     fs.appendFileSync('upload_debug.log', `[${new Date().toISOString()}] Archivo recibido: ${file.originalname}, size: ${file.size}, path: ${file.path}\n`);
-    
+
     const currentExt = extname(file.originalname).toLowerCase();
 
     // Clean up other extensions
@@ -678,7 +671,7 @@ export class UsuariosController {
   @ApiBearerAuth()
   @Patch(':id/solicitud/:accion')
   @ApiOperation({ summary: 'Aprobar o rechazar solicitud (accion: aprobar|rechazar)' })
-   async aprobarRechazarSolicitud(
+  async aprobarRechazarSolicitud(
     @Param('id', ParseIntPipe) id: number,
     @Param('accion') accion: 'aprobar' | 'rechazar',
     @Body('motivo') motivo?: string,
@@ -700,7 +693,7 @@ export class UsuariosController {
     @Query('parte') parte?: string,
   ) {
     const usuario = await this.usuariosService.getPerfil(id);
-    
+
     if (!usuario || !usuario.persona || !usuario.persona.firma_dig) {
       throw new BadRequestException(
         'El usuario no tiene un documento de aval o no existe.',

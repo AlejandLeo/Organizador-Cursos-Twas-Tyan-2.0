@@ -163,7 +163,6 @@ export class CreateEventoDto {
   @IsOptional()
   @IsString()
   nombre_2?: string;
-<<<<<<< HEAD
 
   @ApiPropertyOptional({ example: '3' })
   @IsOptional()
@@ -174,6 +173,4 @@ export class CreateEventoDto {
   @IsOptional()
   @IsString()
   visibilidad_al_finalizar?: string;
-=======
->>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
 }
