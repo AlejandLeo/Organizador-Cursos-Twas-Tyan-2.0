@@ -12,7 +12,7 @@ export class EventosService {
     @InjectRepository(Evento)
     private readonly eventoRepository: Repository<Evento>,
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
 
   /**
    * Valida si el usuario logueado tiene permisos sobre el evento.
@@ -40,16 +40,12 @@ export class EventosService {
   private formatImageUrl(filenameOrUrl: string, folder: string = 'imagenes'): string | null {
     if (!filenameOrUrl) return null;
     if (filenameOrUrl.startsWith('http')) return filenameOrUrl;
-    
+
     // Evitar doble codificación: decodificar primero por si ya viene codificado
     const cleanFilename = decodeURIComponent(filenameOrUrl);
-    
+
     const baseUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
-<<<<<<< HEAD
     return `${baseUrl}/uploads/${folder}/${encodeURIComponent(cleanFilename)}`;
-=======
-    return `${baseUrl}/uploads/${folder}/${encodeURIComponent(filenameOrUrl)}`;
->>>>>>> 85867c37895188d86c6ac4f1847ac54084a3453d
   }
 
   async findAll() {
@@ -86,8 +82,8 @@ export class EventosService {
     const evento = await this.eventoRepository.findOne({
       where: { id },
       relations: [
-        'actividades', 
-        'actividades.modalidades', 
+        'actividades',
+        'actividades.modalidades',
         'actividades.modalidades.sesiones'
       ]
     });
@@ -116,7 +112,7 @@ export class EventosService {
         const u = imp.usuario;
         const persona = u.persona || {};
         const ga = u.afiliaciones?.[0]?.gradoAcademico || {};
-        
+
         expositoresMap.set(u.id, {
           id: u.id,
           email: u.email,
@@ -179,8 +175,8 @@ export class EventosService {
     const [eventos, total] = await this.eventoRepository.findAndCount({
       where,
       relations: [
-        'actividades', 
-        'actividades.modalidades', 
+        'actividades',
+        'actividades.modalidades',
         'actividades.inscripciones'
       ],
       order: { prioridad: 'ASC', fecha_creacion: 'DESC' },
