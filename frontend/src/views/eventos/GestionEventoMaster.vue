@@ -2106,7 +2106,9 @@ const changeStep = (delta: number) => {
                 <div class="lg:col-span-5 sticky top-8">
                     <div class="flex flex-col h-full">
                         <div class="flex items-center justify-between mb-4">
-                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] italic">Vista Previa Dinámica (Mini-Home)</span>
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] italic">
+                                {{ currentStep === 1 ? 'Vista Previa Dinámica (Mini-Home)' : 'Previsualización de Sección' }}
+                            </span>
                             <div class="flex gap-1">
                                 <div class="w-2 h-2 rounded-full bg-red-400"></div>
                                 <div class="w-2 h-2 rounded-full bg-amber-400"></div>
@@ -2114,14 +2116,14 @@ const changeStep = (delta: number) => {
                             </div>
                         </div>
 
-                        <!-- CONTENEDOR SIMULADOR (COMPACTO Y ELEGANTE) -->
+                    <!-- SECCIONES REACTIVAS: animación de deslizamiento direccional -->
+                    <Transition :name="previewTransition" mode="out-in">
+                    <div :key="currentStep">
+                        <!-- PASO 1: HERO SIMULADOR (COMPACTO Y ELEGANTE) -->
                         <div
+                            v-if="currentStep === 1"
                             ref="heroRef"
-                            :class="[
-                                currentStep === 1 ? 'h-[520px]' : 'h-[200px]',
-                                currentStep === 1 ? 'ring-4 ring-umsa-blue/40 shadow-2xl shadow-umsa-blue/20' : 'ring-0'
-                            ]"
-                            class="transition-all duration-700 ease-in-out bg-slate-100 dark:bg-gray-950 rounded-[3rem] shadow-2xl border border-slate-200 dark:border-gray-800 overflow-hidden relative group"
+                            class="h-[520px] ring-4 ring-umsa-blue/40 shadow-2xl shadow-umsa-blue/20 transition-all duration-700 ease-in-out bg-slate-100 dark:bg-gray-950 rounded-[3rem] border border-slate-200 dark:border-gray-800 overflow-hidden relative group"
                         >
                             
                             <!-- BARRA SUPERIOR ULTRA-LIMPIA -->
@@ -2209,10 +2211,6 @@ const changeStep = (delta: number) => {
                                 </div>
                             </div>
                         </div>
-
-                    <!-- SECCIONES REACTIVAS: animación de deslizamiento direccional -->
-                    <Transition :name="previewTransition" mode="out-in">
-                    <div :key="currentStep" class="mt-8">
                         <!-- SECCIÓN NARRATIVA (PASO 2) -->
                         <div
                             ref="previewStep2Ref"
@@ -2418,6 +2416,70 @@ const changeStep = (delta: number) => {
                                 <div class="border-t border-gray-700 pt-3 text-center flex justify-between items-center text-[6px] text-gray-400">
                                     <p>© {{ formEvento.gestion || '2025' }} - Todos los derechos reservados - BattleBread</p>
                                     <p>Desarrollado por <span class="text-umsa-blue font-medium">BattleBread Academy</span></p>
+                                </div>
+                             </div>
+                        </div>
+
+                        <!-- SECCIÓN CERTIFICADOS (PASO 7) -->
+                        <div
+                            v-if="currentStep === 7"
+                            class="bg-white dark:bg-gray-800 border border-slate-100 dark:border-gray-700 rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-500 ring-4 ring-umsa-gold/40 ring-offset-2"
+                        >
+                             <div class="p-8">
+                                <div class="flex flex-col items-center text-center mb-6">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <div class="h-1 w-4 bg-umsa-gold rounded-full"></div>
+                                        <span class="text-[8px] font-black text-umsa-gold uppercase tracking-widest">
+                                            Certificado para: {{ tipoCertificado === 1 ? 'Logística' : tipoCertificado === 2 ? 'Expositor' : tipoCertificado === 3 ? 'Organizador' : 'Asistente' }}
+                                        </span>
+                                        <div class="h-1 w-4 bg-umsa-gold rounded-full"></div>
+                                    </div>
+                                    <h2 class="text-xl font-black text-primary-dark dark:text-white uppercase italic tracking-tighter">Vista Previa de Tenor</h2>
+                                </div>
+
+                                <!-- MOCK DE CERTIFICADO -->
+                                <div class="aspect-[1.414/1] w-full bg-white border-8 border-double border-umsa-gold/30 rounded-lg p-6 flex flex-col items-center justify-center relative overflow-hidden shadow-inner group/cert">
+                                    <!-- Marca de agua mock -->
+                                    <span class="material-symbols-outlined absolute text-[120px] text-slate-50 opacity-[0.05] rotate-12 transition-transform group-hover/cert:scale-110 duration-1000">workspace_premium</span>
+                                    
+                                    <div class="relative z-10 w-full flex flex-col items-center">
+                                        <!-- Cabecera -->
+                                        <h3 :class="!infoCertificado.cabecera ? 'text-slate-300 italic' : 'text-primary-dark'" class="text-[12px] font-black uppercase mb-3 text-center leading-tight transition-colors">
+                                            {{ infoCertificado.cabecera || '[ CABECERA PENDIENTE ]' }}
+                                        </h3>
+                                        
+                                        <!-- Separador -->
+                                        <div class="w-12 h-[1px] bg-umsa-gold/50 mb-3"></div>
+                                        
+                                        <!-- Tenor -->
+                                        <div class="min-h-[60px] flex items-center justify-center px-2 mb-6">
+                                            <p v-if="infoCertificado.tenor" class="text-[8px] text-slate-600 text-center leading-relaxed italic">
+                                                {{ infoCertificado.tenor }}
+                                            </p>
+                                            <div v-else class="flex flex-col items-center opacity-30 gap-1">
+                                                <span class="material-symbols-outlined text-lg">edit_note</span>
+                                                <p class="text-[7px] text-slate-400 text-center uppercase font-bold tracking-tighter">Esperando redacción del tenor...</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Firmas Mock -->
+                                        <div class="flex justify-between w-full mt-auto pt-4 border-t border-slate-100 border-dashed">
+                                            <div class="flex flex-col items-center opacity-20">
+                                                <div class="w-12 h-0.5 bg-slate-400 mb-1"></div>
+                                                <span class="text-[5px] font-bold uppercase">Firma Coordinación</span>
+                                            </div>
+                                            <div class="flex flex-col items-center opacity-20">
+                                                <div class="w-12 h-0.5 bg-slate-400 mb-1"></div>
+                                                <span class="text-[5px] font-bold uppercase">Firma Ponente</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-6 bg-slate-50 dark:bg-gray-900/50 p-4 rounded-2xl border border-slate-100 dark:border-gray-800">
+                                    <p class="text-[8px] font-bold text-slate-500 uppercase tracking-widest text-center leading-tight">
+                                        <span class="text-umsa-gold">Nota:</span> Estás editando la versión para <span class="text-primary-dark dark:text-white underline">{{ tipoCertificado === 1 ? 'Logística' : tipoCertificado === 2 ? 'Expositor' : tipoCertificado === 3 ? 'Organizador' : 'Asistente' }}</span>. Los cambios se guardan por separado para cada rol.
+                                    </p>
                                 </div>
                              </div>
                         </div>
