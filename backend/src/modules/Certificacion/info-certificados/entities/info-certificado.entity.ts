@@ -37,6 +37,18 @@ export class InfoCertificado {
   @Column({ type: 'text', nullable: true })
   tenor: string;
 
+  /** Imagen de fondo del certificado (URL o nombre de archivo) */
+  @Column({ type: 'text', nullable: true })
+  fondo_url: string;
+
+  /** Tipo de rol al que aplica: 1=Asistente, 2=Expositor, 3=Organizador, 4=Docente, etc. */
+  @Column({ type: 'integer', nullable: true })
+  tipo: number;
+
+  /** JSON con las posiciones (x,y), fuentes y otros metadatos del diseño visual del certificado */
+  @Column({ type: 'jsonb', nullable: true })
+  configuracion: any;
+
   // ── Relaciones ────────────────────────────────────────────────────────────
 
   /** Esta plantilla pertenece a un evento. */

@@ -49,7 +49,7 @@ const isEditingActividad = ref(false);
 const editActividadId = ref<number | null>(null);
 const editEventoId = ref<number | null>(null);
 const currentStep = ref(1);
-const totalSteps = 6;
+const totalSteps = 7;
 const slideDir = ref<'forward' | 'backward'>('forward');
 const previewTransition = computed(() =>
     slideDir.value === 'forward' ? 'preview-slide-forward' : 'preview-slide-backward'
@@ -169,6 +169,62 @@ const resetFormEvento = () => {
         prioridad: '3',
         visibilidad_al_finalizar: 'visible'
     };
+};
+
+const tipoCertificado = ref<number>(1);
+const infoCertificado = ref<any>({
+    cabecera: '',
+    tenor: '',
+    estado: 1
+});
+
+const fetchInfoCertificado = async () => {
+    if (!editEventoId.value) return;
+    try {
+        const res = await api.get(`/info-certificados/evento/${editEventoId.value}?tipo=${tipoCertificado.value}`);
+        if (res.data && res.data.length > 0) {
+            infoCertificado.value = res.data[0];
+        } else {
+            infoCertificado.value = {
+                cabecera: '',
+                tenor: '',
+                estado: 1
+            };
+        }
+    } catch (error) {
+        console.error("Error al obtener info del certificado:", error);
+    }
+};
+
+watch(tipoCertificado, () => {
+    fetchInfoCertificado();
+});
+
+const guardarInfoCertificado = async () => {
+    if (!editEventoId.value) {
+        Swal.fire('Atención', 'Primero debes guardar/crear el evento antes de configurar los certificados.', 'warning');
+        return;
+    }
+    try {
+        await api.post('/info-certificados', {
+            evento_id: editEventoId.value,
+            tipo: tipoCertificado.value,
+            cabecera: infoCertificado.value.cabecera,
+            tenor: infoCertificado.value.tenor
+        });
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: 'Configuración guardada',
+            showConfirmButton: false,
+            timer: 2000
+        });
+        await fetchInfoCertificado();
+    } catch (error) {
+        console.error(error);
+        Swal.fire('Error', 'No se pudo guardar la configuración del certificado', 'error');
+    }
 };
 
 const agregarDiaEvento = () => {
@@ -860,9 +916,20 @@ const eventoActual = computed(() => {
 });
 
 onMounted(async () => {
+    console.log("DIAGNÓSTICO: Componente montado. Iniciando carga de datos...");
     await eventoStore.fetchEventosInfo();
-    fetchEventos();
+    await fetchEventos();
     fetchPonentesYGrados();
+
+    if (route.query.edit) {
+        const evToEdit = eventosPublicados.value.find(ev => ev.id === Number(route.query.edit));
+        if (evToEdit) {
+            editarEvento(evToEdit);
+            if (route.query.step) {
+                currentStep.value = Number(route.query.step);
+            }
+        }
+    }
 });
 
 watch(() => eventoStore.selectedEventoId, () => {
@@ -879,13 +946,6 @@ const getStatusColor = (status: string) => {
   return 'text-slate-500 bg-slate-100 dark:bg-gray-800 dark:text-gray-400 border border-slate-200 dark:border-gray-700';
 };
 
-
-
-onMounted(async () => {
-    console.log("DIAGNÓSTICO: Componente montado. Iniciando carga de datos...");
-    await fetchEventos();
-    await eventoStore.fetchEventosInfo();
-});
 
 const changeStep = (delta: number) => {
   const nextStep = currentStep.value + delta;
@@ -1577,7 +1637,8 @@ const changeStep = (delta: number) => {
                         step === 2 ? 'Narrativa' : 
                         step === 3 ? 'Cronograma' : 
                         step === 4 ? 'Directorio' : 
-                        step === 5 ? 'Ubicación' : 'Contacto' 
+                        step === 5 ? 'Ubicación' : 
+                        step === 6 ? 'Contacto' : 'Certificados'
                     }}
                 </span>
                 <div v-if="step < totalSteps" class="h-[2px] w-8 bg-slate-200 dark:bg-gray-700 mx-2 hidden lg:block"></div>
@@ -1931,6 +1992,93 @@ const changeStep = (delta: number) => {
                                             <input v-model="ausp.link" type="text" placeholder="Enlace (Opcional)" class="w-full bg-white dark:bg-gray-800 border border-slate-100 dark:border-gray-600 rounded-lg px-3 py-2 text-[10px]" />
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PASO 7: CERTIFICADOS -->
+                    <div v-if="currentStep === 7" class="space-y-6">
+                        <div class="flex items-center justify-between border-b border-slate-100 dark:border-gray-800 pb-4 mb-6">
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-umsa-gold">workspace_premium</span>
+                                <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase italic">Paso 7: Plantillas de Certificados</h4>
+                            </div>
+                            <button @click.prevent="guardarInfoCertificado" class="bg-primary-dark text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg hover:shadow-xl hover:bg-emerald-500 hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                                <span class="material-symbols-outlined text-[14px]">save</span> Guardar Tenor
+                            </button>
+                        </div>
+                        
+                        <div class="bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 p-4 rounded-2xl border border-blue-100 dark:border-blue-800 flex gap-3 text-xs mb-4">
+                            <span class="material-symbols-outlined text-xl">info</span>
+                            <p><strong>Configuración Centralizada:</strong> Los diseños y plantillas de certificados se configuran aquí a nivel del evento para mantener una estética unificada. Configura primero el rol (tipo de asistente) y su tenor, luego abre el "Workplace" para subir tu fondo y acomodar las variables (nombres, fechas, firmas).</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <!-- Datos Base -->
+                            <div class="space-y-5">
+                                <div>
+                                    <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Configurar para (Rol)</label>
+                                    <select v-model="tipoCertificado" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-xs text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none transition-all cursor-pointer">
+                                        <option :value="1">Logística</option>
+                                        <option :value="2">Expositor</option>
+                                        <option :value="3">Organizador</option>
+                                        <option :value="4">Asistente</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Cabecera del Certificado</label>
+                                    <input v-model="infoCertificado.cabecera" type="text" placeholder="Ej: Certificado de Asistencia" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-xs text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none transition-all">
+                                </div>
+
+                                <div>
+                                    <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Leyenda Principal (Tenor)</label>
+                                    <textarea v-model="infoCertificado.tenor" rows="4" placeholder="Ej: Por haber participado en..." class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-xs text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none transition-all"></textarea>
+                                    <p class="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 mt-2 italic">Variables dinámicas: {NOMBRE_ESTUDIANTE}, {ACTIVIDAD}</p>
+                                </div>
+                            </div>
+
+                            <!-- Acceso al Lienzo / Workplace -->
+                            <!-- Acceso al Lienzo / Workplace -->
+                            <div class="flex flex-col space-y-6">
+                                <div class="p-6 bg-slate-50 dark:bg-gray-900 border-2 border-dashed border-slate-200 dark:border-gray-700 rounded-[2rem] text-center relative overflow-hidden group">
+                                    <div class="w-20 h-20 rounded-full bg-white dark:bg-gray-800 border border-slate-100 dark:border-gray-700 flex items-center justify-center mx-auto mb-4 shadow-sm group-hover:scale-110 transition-transform">
+                                      <span class="material-symbols-outlined text-[40px] text-umsa-gold">design_services</span>
+                                    </div>
+                                    <h5 class="text-sm font-black text-primary-dark dark:text-white uppercase mb-2">Editor Visual Avanzado</h5>
+                                    <p class="text-[10px] text-slate-500 dark:text-gray-400 max-w-[200px] mx-auto mb-6">
+                                        Abre el Workplace para subir tu imagen de fondo y colocar dinámicamente el nombre, firmas, cabecera y tenor.
+                                    </p>
+                                    <router-link v-if="editEventoId" :to="{ name: 'coordinador-certificado-workplace-evento', params: { id: editEventoId }, query: { tipo: tipoCertificado } }" class="bg-umsa-gold hover:bg-yellow-600 text-white font-black px-6 py-3 rounded-xl text-[10px] uppercase tracking-widest shadow-lg inline-flex items-center gap-2 transition-all mx-auto">
+                                      <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+                                      Abrir Workplace
+                                    </router-link>
+                                    <div v-else class="text-[9px] text-red-500 font-bold uppercase p-3 bg-red-50 dark:bg-red-900/20 rounded-xl inline-block mx-auto">
+                                        Debes guardar el evento primero
+                                    </div>
+                                </div>
+
+                                <div class="bg-slate-100/50 dark:bg-gray-800/30 border border-slate-200 dark:border-gray-700 p-5 rounded-[1.5rem]">
+                                    <h6 class="text-[10px] font-black text-primary-dark dark:text-white uppercase tracking-widest mb-3 flex items-center gap-2">
+                                        <span class="material-symbols-outlined text-sm text-emerald-500">category</span> Guía de Bloques en el Workplace
+                                    </h6>
+                                    <ul class="space-y-3">
+                                        <li class="flex items-start gap-3">
+                                            <div class="w-6 h-6 rounded bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5"><span class="material-symbols-outlined text-[14px]">text_fields</span></div>
+                                            <div>
+                                                <p class="text-[10px] font-bold text-primary-dark dark:text-white">Bloques de Texto (Cabecera / Tenor)</p>
+                                                <p class="text-[9px] text-slate-500 leading-tight">Muestran el contenido que configures arriba. Se adaptarán al ancho que les asignes.</p>
+                                            </div>
+                                        </li>
+                                        <li class="flex items-start gap-3">
+                                            <div class="w-6 h-6 rounded bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5"><span class="material-symbols-outlined text-[14px]">draw</span></div>
+                                            <div>
+                                                <p class="text-[10px] font-bold text-primary-dark dark:text-white">Bloque de Firmas</p>
+                                                <p class="text-[9px] text-slate-500 leading-tight">Contenedor dinámico donde se insertarán horizontalmente las firmas de ponentes y coordinadores.</p>
+                                            </div>
+                                        </li>
+                                    </ul>
                                 </div>
                             </div>
                         </div>

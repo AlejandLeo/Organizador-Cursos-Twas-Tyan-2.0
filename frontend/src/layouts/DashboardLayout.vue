@@ -3,14 +3,16 @@ import { RouterView } from 'vue-router';
 import AppHeader from '@/layouts/AppHeader.vue';
 import AppSidebar from '@/layouts/AppSidebar.vue';
 import { useUIStore } from '@/stores/ui';
+import { useRoute } from 'vue-router';
 
 const uiStore = useUIStore();
+const route = useRoute();
 </script>
 
 <template>
   <div class="min-h-screen bg-[#f8f9fc] dark:bg-black transition-colors duration-300 relative">
     <AppHeader />
-    <AppSidebar />
+    <AppSidebar v-if="!route.meta.hideSidebar" />
     
     <!-- Overlay para móviles -->
     <div v-if="uiStore.isMobile && uiStore.isSidebarOpen" 
@@ -19,10 +21,11 @@ const uiStore = useUIStore();
     </div>
 
     <main :class="[
-            uiStore.isSidebarOpen && !uiStore.isMobile ? 'ml-72' : 'ml-0',
-            'transition-all duration-300 p-4 md:p-10 pt-[100px] md:pt-[105px] min-h-screen relative'
+            uiStore.isSidebarOpen && !uiStore.isMobile && !route.meta.hideSidebar ? 'ml-72' : 'ml-0',
+            route.meta.fullWidth ? 'p-0 pt-[80px] md:pt-[85px]' : 'p-4 md:p-10 pt-[100px] md:pt-[105px]',
+            'transition-all duration-300 min-h-screen relative flex flex-col'
           ]">
-      <div class="max-w-7xl mx-auto">
+      <div :class="route.meta.fullWidth ? 'w-full flex-1 flex' : 'max-w-7xl mx-auto w-full'">
         <RouterView />
       </div>
     </main>

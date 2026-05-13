@@ -9,29 +9,28 @@ export class CreateInfoCertificadoDto {
   @IsInt()
   id_evento: number;
 
-  @ApiProperty({ example: 'plantilla-1.pdf' })
-  @IsNotEmpty()
-  @IsString()
-  url_plantilla_certificado: string;
-
-  @ApiPropertyOptional({ example: '{ "x": 100, "y": 200 }' })
+  @ApiPropertyOptional({ example: 'Certificado de Asistencia' })
   @IsOptional()
   @IsString()
-  config_qr?: string;
+  cabecera?: string;
 
-  @ApiPropertyOptional({ example: '{ "x": 50, "y": 300 }' })
+  @ApiPropertyOptional({ example: 'Se certifica que [NOMBRE] asistió a...' })
   @IsOptional()
   @IsString()
-  config_titular?: string;
+  tenor?: string;
 
-  @ApiPropertyOptional({ example: '{ "x": 50, "y": 400 }' })
+  @ApiPropertyOptional({ example: 'fondo.jpg' })
   @IsOptional()
   @IsString()
-  config_organizadores?: string;
+  fondo_url?: string;
 
-  @ApiPropertyOptional({ example: 40 })
+  @ApiPropertyOptional({ example: 1, description: 'Tipo de rol (1: Asistente, etc.)' })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  horas_academicas?: number;
+  tipo?: number;
+
+  @ApiPropertyOptional({ description: 'JSON con configuracion visual' })
+  @IsOptional()
+  configuracion?: any;
 }
