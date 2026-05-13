@@ -49,9 +49,10 @@ const router = createRouter({
           component: () => import('../views/actividades/ActividadDetalleView.vue'),
         },
         {
-          path: 'actividades/:id/certificado/workplace',
-          name: 'coordinador-certificado-workplace',
+          path: 'eventos/:id/certificado/workplace',
+          name: 'coordinador-certificado-workplace-evento',
           component: () => import('../views/actividades/CertificadoWorkplaceView.vue'),
+          meta: { hideSidebar: true, fullWidth: true }
         },
         {
           path: 'estudiantes',
@@ -126,8 +127,8 @@ const router = createRouter({
           component: () => import('../views/actividades/ActividadDetalleView.vue'),
         },
         {
-          path: 'gestion-eventos/:id/certificado/workplace',
-          name: 'admin-certificado-workplace',
+          path: 'eventos/:id/certificado/workplace',
+          name: 'admin-certificado-workplace-evento',
           component: () => import('../views/actividades/CertificadoWorkplaceView.vue'),
         },
         {

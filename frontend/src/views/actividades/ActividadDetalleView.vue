@@ -45,6 +45,8 @@ const ponenteForm = ref({
     primer_apellido: ''
 });
 
+
+
 const fetchData = async () => {
     try {
         isLoading.value = true;
@@ -97,12 +99,16 @@ const fetchData = async () => {
             ponentesExistentes.value = [];
         }
 
+        // Fetch certificates removed
+
     } catch (error) {
         console.error("Error al cargar la actividad:", error);
     } finally {
         isLoading.value = false;
     }
 };
+
+import { watch } from 'vue';
 
 onMounted(() => {
     fetchData();
@@ -421,9 +427,7 @@ const eliminarPonente = async (id: number) => {
       <button @click="switchTab('ponentes')" :class="activeTab === 'ponentes' ? 'border-b-4 border-umsa-gold text-primary-dark dark:text-white font-black' : 'text-slate-400 font-bold hover:text-primary-dark dark:hover:text-white'" class="pb-4 text-[11px] uppercase tracking-widest transition-colors whitespace-nowrap">Plantel Docente</button>
       <button @click="switchTab('asistencia')" :class="activeTab === 'asistencia' ? 'border-b-4 border-umsa-gold text-primary-dark dark:text-white font-black' : 'text-slate-400 font-bold hover:text-primary-dark dark:hover:text-white'" class="pb-4 text-[11px] uppercase tracking-widest transition-colors flex items-center gap-1 whitespace-nowrap"><span class="material-symbols-outlined text-sm">qr_code_scanner</span> Asistencia</button>
       <button @click="switchTab('reportes')" :class="activeTab === 'reportes' ? 'border-b-4 border-umsa-gold text-primary-dark dark:text-white font-black' : 'text-slate-400 font-bold hover:text-primary-dark dark:hover:text-white'" class="pb-4 text-[11px] uppercase tracking-widest transition-colors whitespace-nowrap">Reportes & Actas</button>
-      <button @click="switchTab('certificados')" :class="activeTab === 'certificados' ? 'border-b-4 border-umsa-gold text-primary-dark dark:text-white font-black' : 'text-slate-400 font-bold hover:text-primary-dark dark:hover:text-white'" class="pb-4 text-[11px] uppercase tracking-widest transition-colors flex items-center gap-1 whitespace-nowrap">
-        <span class="material-symbols-outlined text-sm" :class="activeTab === 'certificados' ? 'text-umsa-gold' : ''">workspace_premium</span> Certificados
-      </button>
+
     </div>
 
     <!-- Tab 1: Estudiantes -->
@@ -681,120 +685,8 @@ const eliminarPonente = async (id: number) => {
                 <button class="mt-6 w-full py-3 bg-primary-dark text-white text-[10px] font-black rounded-xl uppercase hover:bg-emerald-500 transition-colors">Generar Excel</button>
             </div>
         </div>
+    <!-- Tab 5: Certificados removed -->
     </div>
-
-    <!-- Tab 5: Certificados -->
-    <div v-if="activeTab === 'certificados'" class="tab-content block space-y-8 animate-in fade-in">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-            <div>
-              <h3 class="text-2xl font-black text-umsa-gold dark:text-yellow-500 uppercase italic leading-none">Emisión de Certificados</h3>
-              <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Configuración y plantillas para el evento</p>
-            </div>
-            <button class="bg-primary-dark text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:shadow-xl hover:bg-emerald-500 hover:-translate-y-0.5 transition-all flex items-center gap-2">
-                <span class="material-symbols-outlined text-[16px]">save</span> Guardar Configuración
-            </button>
-        </div>
-        
-        <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
-            
-            <!-- Columna Izquierda: Formulario de Metadatos de la BD -->
-            <div class="xl:col-span-1 space-y-6">
-                
-                <!-- BLoque 1: Datos Base -->
-                <div class="bg-white dark:bg-gray-900 p-8 rounded-[2rem] shadow-sm border border-slate-100 dark:border-gray-800">
-                    <h4 class="text-xs font-black text-primary-dark dark:text-white uppercase tracking-widest mb-6 border-b border-slate-100 dark:border-gray-800 pb-3 flex items-center gap-2">
-                      <span class="material-symbols-outlined text-sm text-umsa-gold">database</span> Datos de Registro
-                    </h4>
-                    
-                    <div class="space-y-5">
-                        <div>
-                            <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Tipo de Certificado (tipo)</label>
-                            <select class="w-full bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-xs text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none transition-all cursor-pointer">
-                                <option value="participacion">De Participación</option>
-                                <option value="aprobacion">De Aprobación</option>
-                                <option value="asistencia">De Asistencia</option>
-                                <option value="excelencia">De Excelencia</option>
-                            </select>
-                        </div>
-                        
-                        <div>
-                            <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Plantilla Info (id_info_certificad)</label>
-                            <select class="w-full bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-xs text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none transition-all cursor-pointer">
-                                <option>Plantilla Estándar TWAS</option>
-                                <option>Plantilla Especialidad UMSA</option>
-                                <option>Plantilla de Evento Corto</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Fecha de Emisión Oficial</label>
-                            <input type="date" class="w-full bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-xs text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none transition-all">
-                        </div>
-
-                        <div>
-                            <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Prefijo de Código (codigo_certificado)</label>
-                            <div class="flex items-center">
-                              <input type="text" value="TWAS26-BIO-" class="w-full bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-xs text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none transition-all">
-                            </div>
-                            <p class="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 mt-2 italic">*UUID_archivo y hash_integridad se generarán automáticamente.</p>
-                        </div>
-
-                        <div>
-                            <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Estado (estado)</label>
-                            <div class="bg-slate-50 dark:bg-gray-800 p-2 rounded-xl flex gap-2 border border-slate-200 dark:border-gray-700">
-                               <button class="flex-1 py-2 rounded-lg bg-white dark:bg-gray-900 shadow-sm text-primary-dark dark:text-white text-[10px] font-black uppercase border border-slate-100 dark:border-gray-700">Borrador</button>
-                               <button class="flex-1 py-2 rounded-lg text-slate-400 text-[10px] font-black uppercase hover:bg-white dark:hover:bg-gray-900 transition-all">Emitido</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Bloque 2: Firmas Digitales -->
-                <div class="bg-white dark:bg-gray-900 p-8 rounded-[2rem] shadow-sm border border-slate-100 dark:border-gray-800">
-                    <div class="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-gray-800 pb-3">
-                      <h4 class="text-xs font-black text-primary-dark dark:text-white uppercase tracking-widest flex items-center gap-2">
-                        <span class="material-symbols-outlined text-sm text-umsa-gold">draw</span> Firmas
-                      </h4>
-                      <button class="text-xs text-umsa-blue font-black hover:text-primary-dark transition-colors"><span class="material-symbols-outlined text-[16px]">add_circle</span></button>
-                    </div>
-                    
-                    <div class="space-y-3">
-                        <!-- Item Firma -->
-                        <div class="flex items-center gap-3 p-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl group hover:border-umsa-gold transition-colors cursor-pointer">
-                            <div class="w-10 h-10 rounded-lg bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-700 flex items-center justify-center text-slate-300">
-                               <img src="https://upload.wikimedia.org/wikipedia/commons/f/f6/Firma_de_Andr%C3%A9s_Manuel_L%C3%B3pez_Obrador.svg" class="w-8 h-8 object-contain opacity-50 contrast-0" alt="Firma">
-                            </div>
-                            <div class="flex-1">
-                                <p class="text-[11px] font-black text-primary-dark dark:text-white leading-tight">Director Posgrado</p>
-                                <p class="text-[9px] font-bold text-slate-400 mt-0.5 uppercase">UMSA</p>
-                            </div>
-                            <span class="material-symbols-outlined text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-sm hover:text-red-600">delete</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Columna Derecha: The Workplace / Lienzo -->
-            <div class="xl:col-span-2 flex flex-col h-full">
-                <div class="flex-1 bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 flex flex-col items-center justify-center relative overflow-hidden min-h-[500px]">
-                    <div class="w-32 h-32 rounded-full bg-slate-50 dark:bg-gray-800 border-4 border-slate-100 dark:border-gray-700 flex items-center justify-center mb-8 shadow-inner">
-                      <span class="material-symbols-outlined text-[64px] text-slate-300 dark:text-gray-600">design_services</span>
-                    </div>
-                    <h3 class="text-2xl font-black text-primary-dark dark:text-white uppercase tracking-tight mb-4">Lienzo de Diseño</h3>
-                    <p class="text-slate-500 dark:text-gray-400 max-w-lg mb-10 leading-relaxed font-medium text-center">
-                        Para tener una mejor experiencia al diseñar y ubicar las variables y firmas del certificado, hemos migrado el editor a un entorno de pantalla completa.
-                    </p>
-                    
-                    <router-link :to="{ name: 'coordinador-certificado-workplace', params: { id: route.params.id } }" class="bg-umsa-gold text-white font-black px-10 py-5 rounded-2xl text-[12px] uppercase tracking-widest shadow-lg hover:shadow-xl hover:bg-yellow-500 hover:-translate-y-1 transition-all flex items-center gap-3">
-                      <span class="material-symbols-outlined text-[20px]">open_in_new</span>
-                      Abrir Workplace del Certificado
-                    </router-link>
-                </div>
-            </div>
-            
-        </div>
-    </div>
-
   </div>
 
   <!-- Modal Lista de Asistencia (Vista Coordinador) -->

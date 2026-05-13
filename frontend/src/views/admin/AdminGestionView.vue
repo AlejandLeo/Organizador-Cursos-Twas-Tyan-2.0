@@ -478,6 +478,10 @@ onMounted(() => {
                 </td>
                 <td class="px-6 py-4 text-right">
                   <div class="flex justify-end items-center gap-1">
+                    <router-link :to="{ name: 'admin-gestion-eventos-detalle', params: { id: act.id } }" title="Administrar Estudiantes y Notas"
+                            class="p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-slate-400 hover:text-emerald-600 transition-all">
+                      <span class="material-symbols-outlined text-[18px]">manage_accounts</span>
+                    </router-link>
                     <button @click="abrirEditarActividad(act)" title="Editar"
                             class="p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-slate-400 hover:text-blue-600 transition-all">
                       <span class="material-symbols-outlined text-[18px]">edit</span>

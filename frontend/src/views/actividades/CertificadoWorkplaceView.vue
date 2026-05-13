@@ -1,13 +1,258 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import api, { getImageUrl } from '@/services/api'
+import Swal from 'sweetalert2'
 
 const route = useRoute()
 const router = useRouter()
-const actividadId = route.params.id
+const eventoId = route.params.id
+const tipoCertificado = route.query.tipo || 1
+
+interface ElementoLienzo {
+  id: string
+  tipo: string
+  valor: string
+  x: number // Porcentaje (0-100)
+  y: number // Porcentaje (0-100)
+  width?: number // Ancho en px
+  height?: number // Alto en px
+  fontSize: number
+  color: string
+  fontFamily: string
+}
+
+const infoCertificado = ref<any>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
+const canvasRef = ref<HTMLElement | null>(null)
+
+const elementosLienzo = ref<ElementoLienzo[]>([])
+const elementoSeleccionado = ref<string | null>(null)
+const selectedElementData = ref<ElementoLienzo | null>(null)
+
+const fetchData = async () => {
+    try {
+        if (eventoId) {
+            const infoRes = await api.get(`/info-certificados/evento/${eventoId}?tipo=${tipoCertificado}`)
+            if (infoRes.data && infoRes.data.length > 0) {
+                infoCertificado.value = infoRes.data[0]
+                if (infoCertificado.value.configuracion) {
+                    try {
+                        elementosLienzo.value = typeof infoCertificado.value.configuracion === 'string' 
+                            ? JSON.parse(infoCertificado.value.configuracion) 
+                            : infoCertificado.value.configuracion
+                    } catch(e) {
+                        elementosLienzo.value = []
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching data', error)
+    }
+}
+
+onMounted(() => {
+    fetchData()
+})
+
+const triggerUpload = () => {
+    if (!infoCertificado.value) {
+        return Swal.fire('Atención', 'Primero debes guardar la configuración en la vista anterior.', 'warning')
+    }
+    fileInput.value?.click()
+}
+
+const onFileChange = async (e: Event) => {
+    const target = e.target as HTMLInputElement
+    if (target.files && target.files.length > 0) {
+        const file = target.files[0]
+        const formData = new FormData()
+        formData.append('fondo', file)
+        try {
+            Swal.fire({ title: 'Subiendo fondo...', didOpen: () => Swal.showLoading() })
+            await api.post(`/info-certificados/${infoCertificado.value.id}/fondo`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            })
+            await fetchData()
+            Swal.fire('Éxito', 'Imagen de fondo actualizada.', 'success')
+        } catch (error) {
+            console.error(error)
+            Swal.fire('Error', 'No se pudo subir el fondo.', 'error')
+        }
+    }
+}
 
 const goBack = () => {
-    router.push({ name: 'coordinador-gestion-eventos-detalle', params: { id: actividadId } })
+    router.push({ name: 'coordinador-gestion-eventos', query: { edit: eventoId, step: 7 } })
+}
+
+// === DRAG AND DROP LOGIC ===
+const zoomLevel = ref(1)
+const isDraggingCanvasId = ref<string | null>(null)
+
+const zoomIn = () => { if (zoomLevel.value < 2) zoomLevel.value += 0.1 }
+const zoomOut = () => { if (zoomLevel.value > 0.3) zoomLevel.value -= 0.1 }
+
+const onDragStartPalette = (e: DragEvent, tipo: string, valor: string) => {
+    e.dataTransfer?.setData('application/json', JSON.stringify({ source: 'palette', tipo, valor }))
+}
+
+const onDragStartCanvas = (e: DragEvent, id: string) => {
+    isDraggingCanvasId.value = id
+    e.dataTransfer?.setData('application/json', JSON.stringify({ source: 'canvas', id }))
+    const target = e.target as HTMLElement
+    const rect = target.getBoundingClientRect()
+    const offsetX = e.clientX - rect.left
+    const offsetY = e.clientY - rect.top
+    e.dataTransfer?.setData('offsetX', offsetX.toString())
+    e.dataTransfer?.setData('offsetY', offsetY.toString())
+}
+
+const onDragEndCanvas = () => {
+    isDraggingCanvasId.value = null
+}
+
+const onDropCanvas = (e: DragEvent) => {
+    const dataStr = e.dataTransfer?.getData('application/json')
+    if (!dataStr) return
+    const data = JSON.parse(dataStr)
+
+    if (!canvasRef.value) return
+    const canvasRect = canvasRef.value.getBoundingClientRect()
+    
+    let dropX = e.clientX - canvasRect.left
+    let dropY = e.clientY - canvasRect.top
+    
+    if (data.source === 'canvas') {
+        const offX = Number(e.dataTransfer?.getData('offsetX') || 0)
+        const offY = Number(e.dataTransfer?.getData('offsetY') || 0)
+        dropX -= offX
+        dropY -= offY
+    } else {
+        // Compensate for palette dragging so it drops roughly centered
+        dropX -= data.tipo === 'firma' || data.tipo === 'cabecera' || data.tipo === 'tenor' ? (300 * zoomLevel.value) : (60 * zoomLevel.value)
+        dropY -= 20 * zoomLevel.value
+    }
+
+    const xPercent = (dropX / canvasRect.width) * 100
+    const yPercent = (dropY / canvasRect.height) * 100
+
+    if (data.source === 'palette') {
+        elementosLienzo.value.push({
+            id: Date.now().toString(),
+            tipo: data.tipo,
+            valor: data.valor,
+            x: xPercent,
+            y: yPercent,
+            width: data.tipo === 'qr' ? 100 : (data.tipo === 'firma' || data.tipo === 'cabecera' || data.tipo === 'tenor' ? 600 : undefined),
+            height: data.tipo === 'qr' ? 100 : undefined,
+            fontSize: 24,
+            color: '#000000',
+            fontFamily: 'Arial'
+        })
+    } else if (data.source === 'canvas') {
+        const item = elementosLienzo.value.find(el => el.id === data.id)
+        if (item) {
+            item.x = xPercent
+            item.y = yPercent
+        }
+    }
+}
+
+const selectElement = (id: string, e?: MouseEvent) => {
+    if (e) e.stopPropagation()
+    elementoSeleccionado.value = id
+    selectedElementData.value = elementosLienzo.value.find(el => el.id === id) || null
+}
+
+const deleteElement = (id: string, e?: MouseEvent) => {
+    if (e) e.stopPropagation()
+    elementosLienzo.value = elementosLienzo.value.filter(el => el.id !== id)
+    if (elementoSeleccionado.value === id) {
+        elementoSeleccionado.value = null
+        selectedElementData.value = null
+    }
+}
+
+// === RESIZING LOGIC ===
+const isResizing = ref(false)
+const resizeElement = ref<ElementoLienzo | null>(null)
+const resizeDirection = ref<'width' | 'height' | 'both'>('width')
+const startResizeX = ref(0)
+const startResizeY = ref(0)
+const startResizeWidth = ref(0)
+const startResizeHeight = ref(0)
+
+const startResize = (e: MouseEvent, el: ElementoLienzo, direction: 'width' | 'height' | 'both') => {
+    e.stopPropagation()
+    e.preventDefault()
+    isResizing.value = true
+    resizeElement.value = el
+    resizeDirection.value = direction
+    startResizeX.value = e.clientX
+    startResizeY.value = e.clientY
+    
+    // Si no tiene width/height, inicializamos un valor por defecto al comenzar
+    startResizeWidth.value = el.width || (el.tipo === 'qr' ? 100 : (el.tipo === 'texto' ? 200 : 600))
+    startResizeHeight.value = el.height || (el.tipo === 'qr' ? 100 : (el.tipo === 'texto' ? 40 : 120))
+
+    document.addEventListener('mousemove', onMouseMoveResize)
+    document.addEventListener('mouseup', onMouseUpResize)
+}
+
+const onMouseMoveResize = (e: MouseEvent) => {
+    if (!isResizing.value || !resizeElement.value) return
+    
+    if (resizeElement.value.tipo === 'qr') {
+        const diffX = (e.clientX - startResizeX.value) / zoomLevel.value
+        const diffY = (e.clientY - startResizeY.value) / zoomLevel.value
+        const maxDiff = Math.max(diffX, diffY)
+        const newSize = Math.max(50, startResizeWidth.value + maxDiff)
+        resizeElement.value.width = newSize
+        resizeElement.value.height = newSize
+        return
+    }
+
+    if (resizeDirection.value === 'width' || resizeDirection.value === 'both') {
+        const diffX = (e.clientX - startResizeX.value) / zoomLevel.value
+        resizeElement.value.width = Math.max(50, startResizeWidth.value + diffX)
+    }
+    
+    if (resizeDirection.value === 'height' || resizeDirection.value === 'both') {
+        const diffY = (e.clientY - startResizeY.value) / zoomLevel.value
+        resizeElement.value.height = Math.max(20, startResizeHeight.value + diffY)
+    }
+}
+
+const onMouseUpResize = () => {
+    isResizing.value = false
+    resizeElement.value = null
+    document.removeEventListener('mousemove', onMouseMoveResize)
+    document.removeEventListener('mouseup', onMouseUpResize)
+}
+
+const deselectElement = () => {
+    elementoSeleccionado.value = null
+    selectedElementData.value = null
+}
+
+const guardarDiseno = async () => {
+    if (!infoCertificado.value) return Swal.fire('Atención', 'Primero debes guardar la cabecera en el paso 7.', 'warning')
+    try {
+        Swal.fire({ title: 'Guardando diseño...', didOpen: () => Swal.showLoading() })
+        await api.post('/info-certificados', {
+            evento_id: Number(eventoId),
+            tipo: Number(tipoCertificado),
+            cabecera: infoCertificado.value.cabecera,
+            tenor: infoCertificado.value.tenor,
+            configuracion: elementosLienzo.value
+        })
+        Swal.fire('Éxito', 'Diseño guardado correctamente.', 'success')
+    } catch (error) {
+        console.error(error)
+        Swal.fire('Error', 'No se pudo guardar el diseño.', 'error')
+    }
 }
 </script>
 
@@ -22,7 +267,7 @@ const goBack = () => {
         </button>
         <div>
           <h1 class="text-sm font-black text-primary-dark dark:text-white uppercase tracking-tight">Workplace del Certificado</h1>
-          <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Edición en Lienzo - Actividad #{{ actividadId }}</p>
+          <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Edición en Lienzo - Evento #{{ eventoId }}</p>
         </div>
       </div>
 
@@ -30,7 +275,7 @@ const goBack = () => {
         <button class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-slate-500 dark:text-gray-300 text-[10px] font-black uppercase tracking-widest hover:border-umsa-gold shadow-sm transition-all flex items-center gap-2">
             <span class="material-symbols-outlined text-[14px]">visibility</span> Previsualizar
         </button>
-        <button class="px-6 py-2.5 rounded-xl bg-primary-dark text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 shadow-lg hover:shadow-emerald-500/20 transition-all flex items-center gap-2">
+        <button @click="guardarDiseno" class="px-6 py-2.5 rounded-xl bg-primary-dark text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 shadow-lg hover:shadow-emerald-500/20 transition-all flex items-center gap-2">
             <span class="material-symbols-outlined text-[14px]">save</span> Guardar Diseño
         </button>
       </div>
@@ -52,7 +297,8 @@ const goBack = () => {
                 <div>
                     <h3 class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-3">Imágenes</h3>
                     <div class="space-y-2">
-                        <button class="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-umsa-blue transition-colors group">
+                        <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="onFileChange" />
+                        <button @click="triggerUpload" class="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-umsa-blue transition-colors group">
                             <div class="w-8 h-8 rounded-lg bg-white dark:bg-gray-900 flex items-center justify-center shadow-sm">
                                 <span class="material-symbols-outlined text-slate-400 text-[16px] group-hover:text-umsa-blue transition-colors">image</span>
                             </div>
@@ -63,19 +309,29 @@ const goBack = () => {
 
                 <!-- Seccion 2: Variables Dinámicas -->
                 <div>
-                    <h3 class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-3">Variables Dinámicas (Arrastrar)</h3>
+                    <h3 class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-3">Bloques Dinámicos</h3>
                     <div class="space-y-2">
-                        <div draggable="true" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'cabecera', 'Cabecera del Certificado')" class="flex items-center gap-3 p-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:border-blue-500 transition-colors cursor-move group">
+                            <span class="material-symbols-outlined text-blue-300 text-[14px]">drag_indicator</span>
+                            <span class="text-[10px] font-black text-blue-700 dark:text-blue-300 flex-1 uppercase">Bloque: Cabecera</span>
+                            <span class="material-symbols-outlined text-xs text-blue-400">title</span>
+                        </div>
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'tenor', 'Tenor del Certificado')" class="flex items-center gap-3 p-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:border-blue-500 transition-colors cursor-move group">
+                            <span class="material-symbols-outlined text-blue-300 text-[14px]">drag_indicator</span>
+                            <span class="text-[10px] font-black text-blue-700 dark:text-blue-300 flex-1 uppercase">Bloque: Tenor</span>
+                            <span class="material-symbols-outlined text-xs text-blue-400">notes</span>
+                        </div>
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{NOMBRE_ESTUDIANTE}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group mt-4">
                             <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
                             <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} NOMBRE_ESTUDIANTE {{ '}' }}</span>
-                            <span class="material-symbols-outlined text-xs text-slate-400">text_fields</span>
+                            <span class="material-symbols-outlined text-xs text-slate-400">person</span>
                         </div>
-                        <div draggable="true" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{NOMBRE_CURSO}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
                             <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
                             <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} NOMBRE_CURSO {{ '}' }}</span>
-                            <span class="material-symbols-outlined text-xs text-slate-400">text_fields</span>
+                            <span class="material-symbols-outlined text-xs text-slate-400">school</span>
                         </div>
-                        <div draggable="true" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{CODIGO_CERTIFICADO}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
                             <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
                             <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} CODIGO_CERTIFICADO {{ '}' }}</span>
                             <span class="material-symbols-outlined text-xs text-slate-400">123</span>
@@ -87,13 +343,13 @@ const goBack = () => {
                 <div>
                     <h3 class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-3">Trazabilidad</h3>
                     <div class="grid grid-cols-2 gap-2">
-                        <div draggable="true" class="aspect-square rounded-xl bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-umsa-gold transition-colors flex flex-col items-center justify-center gap-2 cursor-move">
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'qr', 'QR')" class="aspect-square rounded-xl bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-umsa-gold transition-colors flex flex-col items-center justify-center gap-2 cursor-move">
                             <span class="material-symbols-outlined text-[24px] text-slate-400">qr_code_2</span>
                             <span class="text-[9px] font-black uppercase text-slate-500">QR Code</span>
                         </div>
-                        <div draggable="true" class="aspect-square rounded-xl bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-umsa-gold transition-colors flex flex-col items-center justify-center gap-2 cursor-move">
-                            <span class="material-symbols-outlined text-[24px] text-slate-400">draw</span>
-                            <span class="text-[9px] font-black uppercase text-slate-500 text-center">Firma 1<br>(Director)</span>
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'firma', 'Bloque de Firmas')" class="col-span-2 rounded-xl bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors flex items-center justify-center gap-3 cursor-move p-3">
+                            <span class="material-symbols-outlined text-[20px] text-slate-400">signature</span>
+                            <span class="text-[9px] font-black uppercase text-slate-500 text-center">Bloque de Firmas<br>(Dinámico)</span>
                         </div>
                     </div>
                 </div>
@@ -105,41 +361,103 @@ const goBack = () => {
             
             <!-- Controls Overlay (Zoom, etc) -->
             <div class="absolute bottom-8 right-8 flex gap-2 z-20">
-                <button class="w-10 h-10 rounded-full bg-white dark:bg-gray-800 shadow-lg border border-slate-200 dark:border-gray-700 flex items-center justify-center text-slate-500 hover:text-umsa-blue hover:-translate-y-0.5 transition-all">
+                <button @click="zoomOut" class="w-10 h-10 rounded-full bg-white dark:bg-gray-800 shadow-lg border border-slate-200 dark:border-gray-700 flex items-center justify-center text-slate-500 hover:text-umsa-blue hover:-translate-y-0.5 transition-all">
                     <span class="material-symbols-outlined text-[18px]">zoom_out</span>
                 </button>
                 <div class="h-10 px-4 rounded-full bg-white dark:bg-gray-800 shadow-lg border border-slate-200 dark:border-gray-700 flex items-center justify-center text-xs font-black text-primary-dark dark:text-white">
-                    100%
+                    {{ Math.round(zoomLevel * 100) }}%
                 </div>
-                <button class="w-10 h-10 rounded-full bg-white dark:bg-gray-800 shadow-lg border border-slate-200 dark:border-gray-700 flex items-center justify-center text-slate-500 hover:text-umsa-blue hover:-translate-y-0.5 transition-all">
+                <button @click="zoomIn" class="w-10 h-10 rounded-full bg-white dark:bg-gray-800 shadow-lg border border-slate-200 dark:border-gray-700 flex items-center justify-center text-slate-500 hover:text-umsa-blue hover:-translate-y-0.5 transition-all">
                     <span class="material-symbols-outlined text-[18px]">zoom_in</span>
                 </button>
             </div>
 
             <!-- The Document Canvas -->
-            <div class="w-full max-w-[1024px] aspect-[1.414/1] bg-white dark:bg-gray-900 shadow-2xl border border-slate-200 dark:border-gray-800 relative flex items-center justify-center group ring-4 ring-black/5 dark:ring-white/5 mx-auto">
+            <div class="relative w-full h-full flex justify-center items-start overflow-hidden pt-10">
+                <div ref="canvasRef" @dragover.prevent @drop="onDropCanvas" @click.self="deselectElement" class="w-full max-w-[1024px] aspect-[1.414/1] bg-white dark:bg-gray-900 shadow-2xl border border-slate-200 dark:border-gray-800 relative flex items-center justify-center group ring-4 ring-black/5 dark:ring-white/5 bg-cover bg-center overflow-hidden transition-transform duration-200"
+                     :style="{ 
+                        backgroundImage: infoCertificado?.fondo_url ? `url(${getImageUrl('fondos', infoCertificado.fondo_url)})` : undefined,
+                        transform: `scale(${zoomLevel})`,
+                        transformOrigin: 'top center'
+                     }">
                 <!-- Placeholder when empty -->
-                <div class="text-center absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-50 dark:opacity-20">
+                <div v-if="!infoCertificado?.fondo_url" class="text-center absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-50 dark:opacity-20">
                     <span class="material-symbols-outlined text-[80px] text-slate-300 dark:text-gray-600 mb-4">aspect_ratio</span>
                     <h3 class="text-2xl font-black text-slate-400 dark:text-gray-500 uppercase tracking-tight">Formato A4 Horizontal</h3>
                     <p class="text-xs text-slate-400 font-bold mt-2 font-mono">1123 x 794 px</p>
                 </div>
                 
-                <!-- Floating Element Simulations (Workspace bounds) -->
-                <div class="absolute bottom-[20%] right-[15%] w-[160px] h-[50px] bg-slate-50/80 dark:bg-black/80 border border-emerald-500 rounded border-dashed flex items-center justify-center backdrop-blur-md shadow-lg shadow-emerald-500/10 cursor-move hover:border-solid hover:scale-105 transition-all group/el">
-                    <span class="material-symbols-outlined text-xs absolute -top-3 -right-3 w-6 h-6 bg-emerald-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/el:opacity-100 transition-opacity z-10 hover:bg-emerald-600 cursor-pointer">close</span>
-                    <span class="text-[10px] font-black font-mono text-emerald-600 dark:text-emerald-400">{{ '{' }} FIRMA_1 {{ '}' }}</span>
+                <!-- Elementos renderizados -->
+                <div v-for="el in elementosLienzo" :key="el.id"
+                     draggable="true" 
+                     @dragstart="e => onDragStartCanvas(e, el.id)"
+                     @dragend="onDragEndCanvas"
+                     @click.stop="selectElement(el.id)"
+                     class="absolute cursor-move flex items-center justify-center group/el border hover:border-blue-500 transition-colors backdrop-blur-[2px]"
+                     :class="{ 
+                        'border-solid border-umsa-gold ring-2 ring-umsa-gold/30 bg-blue-50/20 dark:bg-white/10': elementoSeleccionado === el.id,
+                        'border-dashed border-slate-300 bg-white/40 dark:bg-black/30': elementoSeleccionado !== el.id,
+                        'w-auto px-4 py-2 rounded-xl': el.tipo === 'texto',
+                        'px-6 py-4 rounded-2xl': el.tipo === 'cabecera' || el.tipo === 'tenor',
+                        'h-[120px] rounded-2xl': el.tipo === 'firma',
+                        'opacity-30': isDraggingCanvasId === el.id
+                     }"
+                     :style="{ 
+                        left: `${el.x}%`, top: `${el.y}%`, 
+                        fontSize: el.tipo !== 'qr' && el.tipo !== 'firma' ? `${el.fontSize}px` : undefined, 
+                        color: el.color, fontFamily: el.fontFamily,
+                        width: el.width ? `${el.width}px` : 'auto',
+                        height: el.height ? `${el.height}px` : 'auto'
+                     }">
+                    
+                    <div v-if="el.tipo === 'texto'" class="flex items-center gap-2">
+                        <span class="material-symbols-outlined opacity-50" :style="{ fontSize: `${el.fontSize * 0.8}px` }">tag</span>
+                        <span class="font-bold whitespace-nowrap">{{ el.valor }}</span>
+                    </div>
+
+                    <div v-if="el.tipo === 'cabecera' || el.tipo === 'tenor'" class="flex flex-col w-full text-center">
+                        <span class="text-[10px] uppercase font-black opacity-50 bg-black/5 rounded px-2 py-0.5 inline-block mx-auto mb-2">{{ el.tipo }}</span>
+                        <span class="font-bold leading-relaxed break-words whitespace-pre-wrap">{{ el.valor }}</span>
+                    </div>
+
+                    <span v-if="el.tipo === 'qr'" class="material-symbols-outlined flex items-center justify-center" :style="{ fontSize: `${el.width || 100}px` }">qr_code_2</span>
+                    
+                    <div v-if="el.tipo === 'firma'" class="flex flex-col items-center justify-center w-full h-full opacity-60">
+                        <div class="flex items-center justify-between w-full px-8 gap-4">
+                            <div class="flex flex-col items-center flex-1"><span class="material-symbols-outlined text-[24px] mb-2">draw</span><div class="w-full border-t-2 border-dashed border-current pt-1 text-[8px] font-black uppercase text-center">Firma 1</div></div>
+                            <div class="flex flex-col items-center flex-1"><span class="material-symbols-outlined text-[24px] mb-2">draw</span><div class="w-full border-t-2 border-dashed border-current pt-1 text-[8px] font-black uppercase text-center">Firma 2</div></div>
+                            <div class="flex flex-col items-center flex-1"><span class="material-symbols-outlined text-[24px] mb-2">draw</span><div class="w-full border-t-2 border-dashed border-current pt-1 text-[8px] font-black uppercase text-center">Firma 3</div></div>
+                            <div class="flex flex-col items-center flex-1"><span class="material-symbols-outlined text-[24px] mb-2">draw</span><div class="w-full border-t-2 border-dashed border-current pt-1 text-[8px] font-black uppercase text-center">Firma 4</div></div>
+                        </div>
+                        <span class="absolute top-2 left-3 text-[10px] uppercase font-black opacity-50 bg-black/5 rounded px-2 py-0.5">Contenedor de Firmas Dinámico</span>
+                    </div>
+
+                    <span @click.stop="deleteElement(el.id)" class="material-symbols-outlined text-[12px] absolute -top-3 -right-3 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/el:opacity-100 transition-opacity z-10 hover:bg-red-600 cursor-pointer shadow-lg">close</span>
+
+                    <!-- Resize Handles -->
+                    <template v-if="elementoSeleccionado === el.id">
+                        <!-- Right Handle (Width) -->
+                        <div v-if="el.tipo !== 'qr'" @mousedown.stop="startResize($event, el, 'width')"
+                             class="absolute top-1/2 -right-1.5 w-3 h-8 -translate-y-1/2 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-ew-resize flex flex-col items-center justify-center gap-[2px] shadow-sm z-20">
+                            <div class="w-0.5 h-1 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
+                            <div class="w-0.5 h-1 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
+                        </div>
+
+                        <!-- Bottom Handle (Height) -->
+                        <div v-if="el.tipo !== 'qr'" @mousedown.stop="startResize($event, el, 'height')"
+                             class="absolute -bottom-1.5 left-1/2 h-3 w-8 -translate-x-1/2 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-ns-resize flex items-center justify-center gap-[2px] shadow-sm z-20">
+                            <div class="w-1 h-0.5 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
+                            <div class="w-1 h-0.5 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
+                        </div>
+
+                        <!-- Bottom-Right Corner (Both) -->
+                        <div @mousedown.stop="startResize($event, el, 'both')"
+                             class="absolute -bottom-1.5 -right-1.5 w-4 h-4 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-nwse-resize shadow-sm z-20 flex items-center justify-center">
+                            <div class="w-1.5 h-1.5 bg-slate-200 dark:bg-gray-400 rounded-full"></div>
+                        </div>
+                    </template>
                 </div>
-                
-                <div class="absolute top-[40%] left-1/2 -translate-x-1/2 w-[400px] h-[60px] bg-slate-50/80 dark:bg-black/80 border border-blue-500 rounded border-dashed flex items-center justify-center backdrop-blur-md shadow-lg shadow-blue-500/10 cursor-move hover:border-solid hover:scale-105 transition-all group/el">
-                    <span class="material-symbols-outlined text-xs absolute -top-3 -right-3 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/el:opacity-100 transition-opacity z-10 hover:bg-blue-600 cursor-pointer">close</span>
-                    <span class="text-[12px] font-black font-mono text-blue-600 dark:text-blue-400">{{ '{' }} NOMBRES_ESTUDIANTE {{ '}' }}</span>
-                </div>
-                
-                <div class="absolute bottom-[10%] left-[8%] w-[80px] h-[80px] bg-slate-50/80 dark:bg-black/80 border border-slate-400 rounded border-dashed flex items-center justify-center backdrop-blur-md shadow-lg cursor-move hover:border-solid hover:border-umsa-gold hover:scale-105 transition-all group/el">
-                    <span class="material-symbols-outlined text-xs absolute -top-3 -right-3 w-6 h-6 bg-slate-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/el:opacity-100 transition-opacity z-10 hover:bg-red-500 cursor-pointer">close</span>
-                    <span class="material-symbols-outlined text-[32px] text-slate-500">qr_code_2</span>
-                </div>
+            </div>
             </div>
         </main>
         
@@ -151,9 +469,59 @@ const goBack = () => {
                 </h2>
             </div>
             
-            <div class="flex-1 overflow-y-auto p-6 flex flex-col items-center justify-center text-center opacity-60">
+            <div v-if="!selectedElementData" class="flex-1 overflow-y-auto p-6 flex flex-col items-center justify-center text-center opacity-60">
                 <span class="material-symbols-outlined text-4xl text-slate-300 dark:text-gray-600 mb-3">touch_app</span>
                 <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-relaxed">Selecciona un elemento<br>en el lienzo para editar</p>
+            </div>
+            
+            <div v-else class="flex-1 overflow-y-auto p-6 space-y-6">
+                <div>
+                    <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Tipo</label>
+                    <p class="text-xs font-bold text-primary-dark dark:text-white bg-slate-50 dark:bg-gray-800 p-2.5 rounded-xl border border-slate-200 dark:border-gray-700 capitalize">{{ selectedElementData.tipo }}</p>
+                </div>
+                
+                <div v-if="selectedElementData.tipo === 'texto'">
+                    <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Valor (Variable)</label>
+                    <input v-model="selectedElementData.valor" type="text" class="w-full bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl py-2.5 px-3 font-bold text-xs text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
+                </div>
+
+                <div v-if="selectedElementData.tipo !== 'qr'">
+                    <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Dimensiones (px)</label>
+                    <div class="flex gap-2">
+                        <div class="flex-1">
+                            <span class="text-[9px] text-slate-400 block mb-1 text-center">Ancho</span>
+                            <input v-model.number="selectedElementData.width" type="number" min="50" max="1000" class="w-full bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg py-2 px-2 font-bold text-xs text-primary-dark dark:text-white focus:border-umsa-gold outline-none text-center">
+                        </div>
+                        <div class="flex-1">
+                            <span class="text-[9px] text-slate-400 block mb-1 text-center">Alto</span>
+                            <input v-model.number="selectedElementData.height" type="number" min="20" max="1000" class="w-full bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg py-2 px-2 font-bold text-xs text-primary-dark dark:text-white focus:border-umsa-gold outline-none text-center">
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Tamaño (px)</label>
+                    <input v-model.number="selectedElementData.fontSize" type="number" min="8" max="120" class="w-full bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl py-2.5 px-3 font-bold text-xs text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
+                </div>
+
+                <div>
+                    <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Color</label>
+                    <div class="flex items-center gap-3">
+                        <input v-model="selectedElementData.color" type="color" class="w-10 h-10 rounded cursor-pointer border-0 p-0 bg-transparent">
+                        <input v-model="selectedElementData.color" type="text" class="flex-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl py-2.5 px-3 font-mono text-xs text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Tipografía</label>
+                    <select v-model="selectedElementData.fontFamily" class="w-full bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl py-2.5 px-3 font-bold text-xs text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
+                        <option value="Arial">Arial</option>
+                        <option value="Times New Roman">Times New Roman</option>
+                        <option value="Courier New">Courier New</option>
+                        <option value="Georgia">Georgia</option>
+                        <option value="Verdana">Verdana</option>
+                    </select>
+                </div>
             </div>
         </aside>
     </div>
