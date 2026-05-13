@@ -9,14 +9,27 @@ import {
   ParseIntPipe,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 import { InfoCertificadosService } from './info-certificados.service';
 import { CreateInfoCertificadoDto } from './dto/create-info-certificado.dto';
 import { UpdateInfoCertificadoDto } from './dto/update-info-certificado.dto';
 import { JwtAuthGuard } from '../../Seguridad/auth/jwt-auth.guard';
 import { RolesGuard } from '../../Seguridad/auth/roles.guard';
 import { Roles } from '../../Seguridad/auth/roles.decorator';
+
+/** Configuración de multer para guardar fondos en uploads/fondos/ */
+const fondoStorage = diskStorage({
+  destination: './uploads/fondos',
+  filename: (_req, file, cb) =>
+    cb(null, `${uuidv4()}${extname(file.originalname)}`),
+});
 
 @ApiTags('Info Certificados (Configuración)')
 @Controller('info-certificados')
@@ -37,6 +50,20 @@ export class InfoCertificadosController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('Coordinador', 'Super Usuario')
   @ApiBearerAuth()
+  @Post(':id/fondo')
+  @UseInterceptors(FileInterceptor('fondo', { storage: fondoStorage }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Subir o actualizar imagen de fondo' })
+  uploadFondo(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.service.updateFondo(id, file.filename);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Coordinador', 'Super Usuario')
+  @ApiBearerAuth()
   @Get()
   @ApiOperation({ summary: 'Listar configuraciones (Coordinador)' })
   @ApiQuery({ name: 'actividadId', required: false })
@@ -45,6 +72,19 @@ export class InfoCertificadosController {
       return this.service.findByActividad(Number(actividadId));
     }
     return this.service.findAll();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Coordinador', 'Super Usuario')
+  @ApiBearerAuth()
+  @Get('evento/:eventoId')
+  @ApiOperation({ summary: 'Listar configuraciones por evento (Coordinador)' })
+  @ApiQuery({ name: 'tipo', required: false })
+  findByEvento(
+    @Param('eventoId', ParseIntPipe) eventoId: number,
+    @Query('tipo') tipo?: string,
+  ) {
+    return this.service.findByEvento(eventoId, tipo ? Number(tipo) : undefined);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

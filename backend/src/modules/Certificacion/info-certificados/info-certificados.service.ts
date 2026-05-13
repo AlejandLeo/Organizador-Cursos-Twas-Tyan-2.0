@@ -17,9 +17,14 @@ export class InfoCertificadosService {
   async create(dto: CreateInfoCertificadoDto) {
     const { id_evento, ...rest } = dto;
     
-    // Validar si ya existe info para esta actividad (evento en este caso)
+    // Validar si ya existe info para esta actividad (evento en este caso) con el mismo tipo
+    const whereClause: any = { evento: { id: id_evento } };
+    if (dto.tipo !== undefined) {
+      whereClause.tipo = dto.tipo;
+    }
+    
     const existe = await this.infoRepository.findOne({
-      where: { evento: { id: id_evento } },
+      where: whereClause,
     });
     
     if (existe) {
@@ -34,11 +39,21 @@ export class InfoCertificadosService {
     return this.infoRepository.save(info);
   }
 
-  async findByEvento(eventoId: number) {
-    return this.infoRepository.findOne({
-      where: { evento: { id: eventoId } },
+  async findByEvento(eventoId: number, tipo?: number) {
+    const whereClause: any = { evento: { id: eventoId } };
+    if (tipo !== undefined) {
+      whereClause.tipo = tipo;
+    }
+    return this.infoRepository.find({
+      where: whereClause,
       relations: ['evento'],
     });
+  }
+
+  async updateFondo(id: number, filename: string) {
+    await this.findOne(id);
+    await this.infoRepository.update(id, { fondo_url: filename });
+    return this.findOne(id);
   }
 
   // Para compatibilidad o uso por actividadId (si se requiere buscar por evento del que depende la actividad)
