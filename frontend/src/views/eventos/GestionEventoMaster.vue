@@ -108,6 +108,7 @@ const formEvento = ref({
   nombre_2: '',
   prioridad: '3',
   visibilidad_al_finalizar: 'visible',
+  fase: 1, // 1: Planificación, 2: Inscripciones, 3: Ejecución, 4: Finalizado, 5: Archivado
   // Paso 6: Contacto, Organización y Auspicios
   contacto_donde: '',
   contacto_telefono: '',
@@ -167,7 +168,8 @@ const resetFormEvento = () => {
         contacto_email: '',
         auspicios: [],
         prioridad: '3',
-        visibilidad_al_finalizar: 'visible'
+        visibilidad_al_finalizar: 'visible',
+        fase: 1
     };
 };
 
@@ -451,6 +453,7 @@ const handleSaveEvento = async () => {
         formData.append('nombre_2', formEvento.value.nombre_2 || '');
         formData.append('prioridad', formEvento.value.prioridad || '3');
         formData.append('visibilidad_al_finalizar', formEvento.value.visibilidad_al_finalizar || 'visible');
+        formData.append('fase', formEvento.value.fase.toString());
 
         // Contacto y Auspicios
         formData.append('telefono', formEvento.value.contacto_telefono || '');
@@ -554,7 +557,8 @@ const editarEvento = (evento: any) => {
         contacto_email: evento.email || '',
         auspicios: [],
         prioridad: evento.prioridad || '3',
-        visibilidad_al_finalizar: evento.visibilidad_al_finalizar || 'visible'
+        visibilidad_al_finalizar: evento.visibilidad_al_finalizar || 'visible',
+        fase: evento.fase || 1
     };
 
     if (evento.organizadores) {
@@ -1751,9 +1755,19 @@ const changeStep = (delta: number) => {
                         <div class="p-6 bg-white dark:bg-gray-900 rounded-3xl border border-slate-100 dark:border-gray-800 space-y-6">
                             <div class="flex items-center gap-2">
                                 <span class="material-symbols-outlined text-amber-500 text-sm">priority_high</span>
-                                <h5 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Prioridad y Visibilidad</h5>
+                                <h5 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Estado, Prioridad y Visibilidad</h5>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="md:col-span-2">
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Fase Actual del Evento (Flujo de Trabajo)</label>
+                                    <select v-model="formEvento.fase" class="w-full bg-emerald-50 dark:bg-gray-800 border-2 border-emerald-100 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-black text-emerald-700">
+                                        <option :value="1">1. Planificación (Oculto para Estudiantes)</option>
+                                        <option :value="2">2. Inscripciones Abiertas (Público)</option>
+                                        <option :value="3">3. En Ejecución (Cerrado a nuevas inscripciones)</option>
+                                        <option :value="4">4. Finalizado (Emisión de Certificados habilitada)</option>
+                                        <option :value="5">5. Archivado (Solo visible para Super Admin)</option>
+                                    </select>
+                                </div>
                                 <div>
                                     <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Orden de Prioridad</label>
                                     <select v-model="formEvento.prioridad" class="w-full bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold">

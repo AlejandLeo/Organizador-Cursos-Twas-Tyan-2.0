@@ -21,6 +21,7 @@ interface Certificado {
     nombre: string;
     evento: {
       nombre: string;
+      fase: number;
     }
   }
 }
@@ -67,6 +68,19 @@ const toggleSelectAll = (event: any) => {
 const handleSendMasivo = async () => {
   if (selectedIds.value.length === 0) return;
 
+  // Validar si hay certificados de eventos no finalizados
+  const problematicos = certificados.value.filter(c => selectedIds.value.includes(c.id) && c.actividadAcademica.evento.fase < 4);
+  
+  if (problematicos.length > 0) {
+    Swal.fire({
+      title: 'Acción Bloqueada',
+      text: `Has seleccionado ${problematicos.length} certificados de eventos que aún no están en fase de "Finalizado". Por normativa, solo se pueden emitir certificados de eventos concluidos.`,
+      icon: 'warning',
+      confirmButtonColor: '#0f172a'
+    });
+    return;
+  }
+
   const result = await Swal.fire({
     title: '¿Iniciar envío masivo?',
     text: `Se enviarán ${selectedIds.value.length} certificados por correo electrónico.`,
@@ -93,6 +107,11 @@ const handleSendMasivo = async () => {
 };
 
 const reintentarUno = async (cert: Certificado) => {
+  if (cert.actividadAcademica.evento.fase < 4) {
+    Swal.fire('Atención', 'El evento asociado aún no ha sido marcado como "Finalizado". No se puede emitir el certificado todavía.', 'warning');
+    return;
+  }
+  
   try {
     cert.estado_envio = 'procesando';
     await certificadosService.reintentarEnvio(cert.id);
@@ -205,7 +224,10 @@ onMounted(fetchCertificados);
                 </div>
               </td>
               <td class="px-6 py-4">
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{{ cert.actividadAcademica.evento.nombre }}</p>
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-tighter flex items-center gap-1">
+                  {{ cert.actividadAcademica.evento.nombre }}
+                  <span v-if="cert.actividadAcademica.evento.fase < 4" class="text-[8px] bg-amber-100 text-amber-700 px-1 rounded">No Finalizado</span>
+                </p>
                 <p class="text-xs font-bold text-slate-700 dark:text-gray-300">{{ cert.actividadAcademica.nombre }}</p>
               </td>
               <td class="px-6 py-4 text-center">

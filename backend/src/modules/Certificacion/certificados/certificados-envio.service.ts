@@ -54,6 +54,14 @@ export class CertificadosEnvioService {
 
     if (!cert) throw new NotFoundException(`Certificado ${id} no encontrado.`);
 
+    // Validar Fase del Evento (Solo permitir fase 4: Finalizado o 5: Archivado)
+    const faseEvento = cert.actividadAcademica.evento.fase;
+    if (faseEvento < 4) {
+      const errorMsg = `No se puede enviar el certificado. El evento '${cert.actividadAcademica.evento.nombre}' aún no ha finalizado (Fase actual: ${faseEvento}).`;
+      this.logger.warn(errorMsg);
+      throw new Error(errorMsg);
+    }
+
     try {
       // 1. Generar el PDF en memoria
       const pdfBuffer = await this.generarBufferPDF(cert);

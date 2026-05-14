@@ -6,12 +6,13 @@ export const useEventoStore = defineStore('eventoGlobal', () => {
 
   const eventosAplanados = ref<any[]>([])
 
-  const getEstadoStr = (num: number) => {
-      switch(num) {
-          case 0: return 'Concluido';
-          case 1: return 'Activo';
-          case 2: return 'Planificación';
-          case 3: return 'Borrador';
+  const getEstadoStr = (fase: number) => {
+      switch(fase) {
+          case 1: return 'Planificación';
+          case 2: return 'Inscripciones';
+          case 3: return 'En Ejecución';
+          case 4: return 'Finalizado';
+          case 5: return 'Archivado';
           default: return 'No definido';
       }
   }
@@ -28,8 +29,8 @@ export const useEventoStore = defineStore('eventoGlobal', () => {
         gestion: ev.gestion,
         version: ev.version || `${ev.gestion}`,
         edicion: ev.version ? `${ev.version}` : `Versión ${ev.gestion}`, 
-        estado: ev.estado,
-        estadoStr: getEstadoStr(ev.estado),
+        fase: ev.fase,
+        estadoStr: getEstadoStr(ev.fase),
         logo: ev.imagen_portada,
         sigla: ev.sigla,
         color_principal: ev.color_principal || '#0070b4',
@@ -40,9 +41,9 @@ export const useEventoStore = defineStore('eventoGlobal', () => {
         organizadores: ev.organizadores
       }));
 
-      // Seleccionar el primero o activo si no hay nada
+      // Seleccionar el primero o el que esté en Inscripciones (2) o Ejecución (3) si no hay nada
       if (eventosAplanados.value.length > 0 && !selectedEventoId.value) {
-          const activos = eventosAplanados.value.filter(e => e.estado === 1);
+          const activos = eventosAplanados.value.filter(e => [2, 3].includes(e.fase));
           const obj = activos.length > 0 ? activos[0] : eventosAplanados.value[0];
           selectedEventoNombre.value = obj.nombre;
           selectedEventoId.value = obj.id;
