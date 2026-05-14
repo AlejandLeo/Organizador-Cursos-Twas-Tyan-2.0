@@ -64,11 +64,11 @@ const accionesHoy = computed(() => {
 onMounted(async () => {
   try {
     const [eventosRes, actividadesRes, usuariosRes] = await Promise.allSettled([
-      api.get('/eventos'),
+      api.get('/admin/eventos/lista?limit=1000'),
       api.get('/actividades-academicas'),
       api.get('/usuarios'),
     ]);
-    if (eventosRes.status === 'fulfilled') stats.value.eventos = eventosRes.value.data?.length || 0;
+    if (eventosRes.status === 'fulfilled') stats.value.eventos = eventosRes.value.data?.total || eventosRes.value.data?.length || 0;
     if (actividadesRes.status === 'fulfilled') stats.value.actividades = actividadesRes.value.data?.length || 0;
     if (usuariosRes.status === 'fulfilled') stats.value.usuarios = usuariosRes.value.data?.length || 0;
   } catch { /* silently */ }

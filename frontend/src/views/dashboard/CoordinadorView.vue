@@ -44,7 +44,7 @@ async function cargarDatos() {
     cargando.value = true;
     try {
         const [resEv, resAct, resUsr, resIns] = await Promise.all([
-            api.get('/eventos'),
+            api.get('/admin/eventos/lista?limit=1000'),
             api.get('/actividades-academicas'),
             api.get('/usuarios'),
             api.get('/inscripciones'),

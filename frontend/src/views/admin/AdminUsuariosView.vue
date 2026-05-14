@@ -1,5 +1,13 @@
 <script setup lang="ts">
+<<<<<<< HEAD
+import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '@/stores/auth';
+import { useAdminHistorialStore } from '@/stores/adminHistorial';
+import { usuariosService } from '@/services/usuarios.service';
+import Swal from 'sweetalert2';
+=======
+import { useAuthStore } from '@/stores/auth';
+>>>>>>> dd5dcbbcab549efef3d4630361299364dfd06cf3
 
 const authStore = useAuthStore();
 const historialStore = useAdminHistorialStore();
@@ -10,8 +18,9 @@ const filtroRol = ref('');
 
 // Modales
 const isCreating = ref(false);
-const isAsignandoPonente = ref(false);
+const isGestionandoRoles = ref(false);
 const usuarioSeleccionado = ref<any>(null);
+const rolesCargando = ref(false);
 
 // IDs de roles (deben coincidir con la BD)
 const ROLE_IDS = { COORDINADOR: 2, LOGISTICA: 3, ESTUDIANTE: 4, PONENTE: 5 };
@@ -92,47 +101,38 @@ const handleSaveUsuario = async () => {
   }
 };
 
-// ── Asignar / Quitar rol Ponente ───────────────────────────────────────────
-const abrirAsignarPonente = (user: any) => {
+// ── Gestión de Múltiples Roles ─────────────────────────────────────────────
+const abrirGestionRoles = (user: any) => {
   usuarioSeleccionado.value = user;
-  isAsignandoPonente.value = true;
+  isGestionandoRoles.value = true;
 };
 
-const confirmarAsignarPonente = async () => {
+const hasRole = (u: any, roleId: number) => {
+  return u.usuariosRoles?.some((ur: any) => ur.rol?.id === roleId);
+};
+
+const toggleRol = async (rolId: number, nombreRol: string) => {
   const u = usuarioSeleccionado.value;
-  if (!u) return;
-  const accion = tienePonente(u) ? 'quitar' : 'asignar';
-  const confirmMsg = tienePonente(u)
-    ? `¿Quitar el rol Ponente de ${u.persona?.nombres}?`
-    : `¿Asignar como Ponente a ${u.persona?.nombres}?`;
+  if (!u || rolesCargando.value) return;
 
-  const result = await Swal.fire({
-    title: accion === 'asignar' ? 'Asignar como Ponente' : 'Quitar rol de Ponente',
-    text: confirmMsg,
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: accion === 'asignar' ? 'Sí, asignar' : 'Sí, quitar',
-    cancelButtonText: 'Cancelar',
-    confirmButtonColor: accion === 'asignar' ? '#dc2626' : '#6b7280',
-  });
-
-  if (!result.isConfirmed) return;
-
+  const activo = hasRole(u, rolId);
+  rolesCargando.value = true;
   try {
-    if (accion === 'asignar') {
-      await usuariosService.asignarRol(u.id, ROLE_IDS.PONENTE);
-      historialStore.registrar('usuario', 'editar', `Asignó rol Ponente a ${u.email}`, { entidadId: u.id, entidadNombre: u.email });
-      Swal.fire('¡Listo!', 'Rol de Ponente asignado correctamente.', 'success');
+    if (activo) {
+      await usuariosService.quitarRol(u.id, rolId);
+      historialStore.registrar('usuario', 'editar', `Quitó rol ${nombreRol} de ${u.email}`, { entidadId: u.id });
     } else {
-      await usuariosService.quitarRol(u.id, ROLE_IDS.PONENTE);
-      historialStore.registrar('usuario', 'editar', `Quitó rol Ponente de ${u.email}`, { entidadId: u.id, entidadNombre: u.email });
-      Swal.fire('¡Listo!', 'Rol de Ponente removido.', 'success');
+      await usuariosService.asignarRol(u.id, rolId);
+      historialStore.registrar('usuario', 'editar', `Asignó rol ${nombreRol} a ${u.email}`, { entidadId: u.id });
     }
-    isAsignandoPonente.value = false;
-    fetchUsuarios();
+    // Refrescar datos localmente o recargar lista
+    await fetchUsuarios();
+    // Actualizar usuarioSeleccionado para reflejar cambios en el modal
+    usuarioSeleccionado.value = usuarios.value.find(usr => usr.id === u.id);
   } catch (error: any) {
-    const msg = error?.response?.data?.message || 'No se pudo actualizar el rol.';
-    Swal.fire('Error', msg, 'error');
+    Swal.fire('Error', error.response?.data?.message || 'No se pudo actualizar el rol.', 'error');
+  } finally {
+    rolesCargando.value = false;
   }
 };
 
@@ -330,12 +330,11 @@ onMounted(fetchUsuarios);
               </td>
               <td class="px-6 py-4">
                 <div class="flex items-center justify-end gap-1">
-                  <!-- Botón asignar/quitar ponente -->
-                  <button @click="abrirAsignarPonente(user)"
-                          :title="tienePonente(user) ? 'Quitar rol Ponente' : 'Asignar como Ponente'"
-                          :class="tienePonente(user) ? 'hover:bg-blue-100 dark:hover:bg-blue-900/20 text-blue-500' : 'hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-blue-500'"
-                          class="p-2 rounded-lg transition-all">
-                    <span class="material-symbols-outlined text-[18px]">{{ tienePonente(user) ? 'person_remove' : 'person_add' }}</span>
+                  <!-- Botón gestionar roles -->
+                  <button @click="abrirGestionRoles(user)"
+                          title="Gestionar Roles"
+                          class="p-2 rounded-lg hover:bg-sky-50 dark:hover:bg-sky-900/20 text-slate-400 hover:text-sky-500 transition-all">
+                    <span class="material-symbols-outlined text-[18px]">verified_user</span>
                   </button>
                   <!-- Botón activar/desactivar -->
                   <button @click="toggleEstado(user)"
@@ -424,52 +423,57 @@ onMounted(fetchUsuarios);
       </div>
     </div>
 
-    <!-- MODAL: ASIGNAR/QUITAR PONENTE -->
-    <div v-if="isAsignandoPonente && usuarioSeleccionado" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
-      <div class="bg-white dark:bg-[#0d0d14] w-full max-w-md rounded-[2rem] border border-white/10 overflow-hidden animate-in zoom-in duration-300">
+    <!-- MODAL: GESTIÓN DE ROLES MÚLTIPLES -->
+    <div v-if="isGestionandoRoles && usuarioSeleccionado" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
+      <div class="bg-white dark:bg-[#0d0d14] w-full max-w-md rounded-[2.5rem] border border-white/10 overflow-hidden animate-in zoom-in duration-300">
         <div class="p-8">
           <div class="flex justify-between items-center mb-6">
             <h2 class="text-xl font-black text-slate-800 dark:text-white uppercase italic">
-              {{ tienePonente(usuarioSeleccionado) ? 'Quitar Ponente' : 'Asignar Ponente' }}
+              Gestionar Permisos
             </h2>
-            <button @click="isAsignandoPonente = false" class="text-slate-400 hover:text-red-600 transition-colors">
+            <button @click="isGestionandoRoles = false" class="text-slate-400 hover:text-red-600 transition-colors">
               <span class="material-symbols-outlined">close</span>
             </button>
           </div>
 
           <!-- Info del usuario -->
-          <div class="flex items-center gap-4 p-4 bg-slate-50 dark:bg-white/5 rounded-2xl mb-6">
-            <div class="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center font-black text-xl">
+          <div class="flex items-center gap-4 p-4 bg-slate-50 dark:bg-white/5 rounded-2xl mb-6 border border-slate-100 dark:border-white/5">
+            <div class="w-12 h-12 rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-600 flex items-center justify-center font-black text-xl shadow-inner">
               {{ usuarioSeleccionado.persona?.nombres?.charAt(0) || '?' }}
             </div>
             <div>
               <p class="font-black text-slate-800 dark:text-white">{{ usuarioSeleccionado.persona?.nombres }} {{ usuarioSeleccionado.persona?.primer_apellido }}</p>
-              <p class="text-xs text-slate-500">{{ usuarioSeleccionado.email }}</p>
-              <div class="flex gap-1 mt-1">
-                <span v-for="nombre in getRoles(usuarioSeleccionado)" :key="nombre"
-                      class="px-1.5 py-0.5 text-[8px] font-black uppercase rounded bg-slate-200 dark:bg-white/10 text-slate-500">{{ nombre }}</span>
-              </div>
+              <p class="text-[10px] text-slate-500 font-bold uppercase tracking-tight">{{ usuarioSeleccionado.email }}</p>
             </div>
           </div>
 
-          <!-- Mensaje -->
-          <div :class="tienePonente(usuarioSeleccionado) ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-400' : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400'"
-               class="p-4 rounded-xl border text-sm mb-6">
-            <span class="material-symbols-outlined text-[18px] align-middle mr-2">{{ tienePonente(usuarioSeleccionado) ? 'warning' : 'info' }}</span>
-            <span v-if="tienePonente(usuarioSeleccionado)">
-              Al quitar el rol de Ponente, el usuario perderá acceso al panel de ponentes. Sus datos no se eliminarán.
-            </span>
-            <span v-else>
-              Al asignar el rol de Ponente, el usuario podrá acceder al panel de ponentes manteniendo también su acceso actual.
-            </span>
+          <!-- Lista de Roles -->
+          <div class="space-y-2 mb-8">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-3">Roles asignados al sistema</p>
+            
+            <div v-for="rol in rolesDisponibles" :key="rol.id"
+                 @click="toggleRol(rol.id, rol.nombre)"
+                 :class="[
+                   hasRole(usuarioSeleccionado, rol.id) 
+                    ? 'border-sky-500 bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-300' 
+                    : 'border-slate-100 dark:border-white/5 bg-white dark:bg-white/3 text-slate-400 hover:border-sky-200'
+                 ]"
+                 class="flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all group">
+              <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-[20px]" 
+                      :class="hasRole(usuarioSeleccionado, rol.id) ? 'text-sky-500' : 'text-slate-300'">
+                  {{ hasRole(usuarioSeleccionado, rol.id) ? 'check_circle' : 'radio_button_unchecked' }}
+                </span>
+                <span class="text-xs font-black uppercase tracking-wide">{{ rol.nombre }}</span>
+              </div>
+              <div v-if="rolesCargando" class="w-4 h-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
           </div>
 
           <div class="flex gap-3">
-            <button @click="isAsignandoPonente = false" class="flex-1 py-4 bg-slate-100 dark:bg-white/5 text-[10px] font-black text-slate-400 uppercase rounded-xl">Cancelar</button>
-            <button @click="confirmarAsignarPonente()"
-                    :class="tienePonente(usuarioSeleccionado) ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/20' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/20'"
-                    class="flex-1 py-4 text-[10px] font-black text-white uppercase rounded-xl shadow-lg transition-colors">
-              {{ tienePonente(usuarioSeleccionado) ? 'Sí, quitar Ponente' : 'Sí, asignar Ponente' }}
+            <button @click="isGestionandoRoles = false" 
+                    class="flex-1 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-xl hover:-translate-y-1 transition-all">
+              Listo, Guardar
             </button>
           </div>
         </div>

@@ -201,12 +201,45 @@ export class ActividadesAcademicasService {
   }
 
   async eliminar(id: number, usuario?: any) {
-    const act = await this.findOne(id);
+    const act = await this.actividadRepository.findOne({
+      where: { id },
+      relations: ['evento', 'inscripciones', 'imparticiones', 'modalidades', 'certificados']
+    });
+    
+    if (!act) throw new NotFoundException(`Actividad ${id} no encontrada.`);
+
     if (usuario) {
       await this.verificarPropiedad(act.evento.id, usuario);
     }
-    await this.actividadRepository.delete(id);
-    return { mensaje: `Actividad ${id} eliminada correctamente.` };
+
+    // 1. Validar dependencias
+    const dependencias: string[] = [];
+    if (act.inscripciones?.length > 0) dependencias.push(`${act.inscripciones.length} inscripciones de estudiantes`);
+    if (act.imparticiones?.length > 0) dependencias.push(`${act.imparticiones.length} ponentes asignados`);
+    if (act.certificados?.length > 0) dependencias.push(`${act.certificados.length} certificados emitidos`);
+
+    if (dependencias.length > 0) {
+      throw new ForbiddenException(
+        `No se puede eliminar la actividad porque tiene registros asociados: ${dependencias.join(', ')}. ` +
+        `Debe anular o desvincular estos registros antes de borrar la actividad.`
+      );
+    }
+
+    try {
+      // 2. Limpiar modalidades antes de borrar la actividad
+      if (act.modalidades?.length > 0) {
+        const modIds = act.modalidades.map(m => m.id);
+        // Las sesiones se borran por cascada o manualmente si es necesario
+        await this.dataSource.query(`DELETE FROM sesiones_academicas WHERE id_curso_modalidad IN (${modIds.join(',')})`);
+        await this.dataSource.query(`DELETE FROM curso_modalidades WHERE id_actividad_academica = $1`, [id]);
+      }
+
+      await this.actividadRepository.delete(id);
+      return { mensaje: `Actividad ${id} eliminada correctamente.` };
+    } catch (error) {
+      console.error('Error eliminando actividad:', error);
+      throw new ForbiddenException('Error de base de datos al intentar eliminar la actividad. Verifique restricciones de integridad.');
+    }
   }
 
   async solicitarActivacion(id: number, usuario: any) {
@@ -270,6 +303,6 @@ export class ActividadesAcademicasService {
   }
 
   remove(id: number) {
-    return this.actividadRepository.delete(id);
+    return this.eliminar(id);
   }
 }

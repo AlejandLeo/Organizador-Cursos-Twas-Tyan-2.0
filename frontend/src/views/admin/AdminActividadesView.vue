@@ -43,7 +43,7 @@ const fetchActividades = async () => {
 
 const fetchEventos = async () => {
   try {
-    const res = await api.get('/eventos');
+    const res = await api.get('/admin/eventos/lista');
     eventos.value = Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : [];
   } catch { eventos.value = []; }
 };

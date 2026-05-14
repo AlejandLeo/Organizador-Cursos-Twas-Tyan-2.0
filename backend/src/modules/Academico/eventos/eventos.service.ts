@@ -49,6 +49,16 @@ export class EventosService {
   }
 
   async findAll() {
+<<<<<<< HEAD
+    const query = this.eventoRepository.createQueryBuilder('evento')
+      .leftJoinAndSelect('evento.actividades', 'actividad')
+      .leftJoinAndSelect('actividad.modalidades', 'modalidad')
+      .leftJoinAndSelect('actividad.inscripciones', 'inscripcion')
+      .orderBy('evento.prioridad', 'ASC')
+      .addOrderBy('evento.fecha_creacion', 'DESC');
+
+    const eventos = await query.getMany();
+=======
     // Para el público general: Solo mostrar lo que está en Inscripciones (2), Ejecución (3) o Finalizado (4)
     // Pero ocultar Planificación (1) y Archivados (5)
     const eventos = await this.eventoRepository.find({
@@ -60,6 +70,7 @@ export class EventosService {
       relations: ['actividades', 'actividades.modalidades', 'actividades.inscripciones'],
       order: { prioridad: 'ASC', fecha_creacion: 'DESC' }
     });
+>>>>>>> dd5dcbbcab549efef3d4630361299364dfd06cf3
     return eventos.map(evento => ({
       ...evento,
       logo: this.formatImageUrl(evento.logo, 'logo'),
@@ -171,38 +182,66 @@ export class EventosService {
    * Para usar en el panel del Coordinador.
    */
   async findAllAdmin(estado?: number, page = 1, limit = 20, usuario?: any) {
-    const where: any = {};
-    if (estado !== undefined) where.estado = estado;
+    const rolesUser = Array.isArray(usuario?.roles) ? usuario.roles.map(r => String(r).toLowerCase().trim()) : [];
+    const esSuper = rolesUser.includes('super usuario') || rolesUser.includes('admin') || rolesUser.includes('superusuario');
 
+<<<<<<< HEAD
+    console.log(`--- DEBUG EVENTOS ---`);
+    console.log(`Usuario: ${usuario?.email} (ID: ${usuario?.id})`);
+    console.log(`Roles Detectados: [${rolesUser.join(', ')}]`);
+    console.log(`¿Es Super Usuario?: ${esSuper}`);
+    console.log(`----------------------`);
+
+    const query = this.eventoRepository.createQueryBuilder('evento')
+      .leftJoinAndSelect('evento.actividades', 'actividad')
+      .leftJoinAndSelect('actividad.modalidades', 'modalidad')
+      .leftJoinAndSelect('actividad.inscripciones', 'inscripcion');
+
+    // 1. Aislamiento por Coordinación (SOLO si no es Super Usuario)
+    if (usuario && !esSuper) {
+      query.innerJoin('evento.coordinaciones', 'coordinacion', 'coordinacion.id_usuario = :userId', { userId: usuario.id });
+=======
     // Aislamiento de datos: Si no es Super Usuario, solo ver sus coordinaciones
     if (usuario && !usuario.roles?.includes('Super Usuario')) {
       where.coordinaciones = { usuario: { id: usuario.id } };
       // El coordinador NO ve los archivados (fase 5) por defecto en su dashboard principal
       where.fase = LessThan(5);
+>>>>>>> dd5dcbbcab549efef3d4630361299364dfd06cf3
     }
 
-    const [eventos, total] = await this.eventoRepository.findAndCount({
-      where,
-      relations: [
-        'actividades',
-        'actividades.modalidades',
-        'actividades.inscripciones'
-      ],
-      order: { prioridad: 'ASC', fecha_creacion: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    // 2. Filtrado por estado
+    if (estado !== undefined) {
+      query.andWhere('evento.estado = :estado', { estado });
+    }
 
-    const data = eventos.map((evento) => ({
-      ...evento,
-      logo: this.formatImageUrl(evento.logo, 'logo'),
-      imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
-      actividades: (evento.actividades || []).map(act => ({
-        ...act,
-        estado: Number(act.estado),
-        imagen: this.formatImageUrl(act.imagen, 'cursos')
-      }))
-    }));
+    // 3. Orden y Paginación
+    query.orderBy('evento.prioridad', 'ASC')
+      .addOrderBy('evento.fecha_creacion', 'DESC');
+
+    // Para evitar problemas de "take" con relaciones OneToMany, usamos findAndCount tradicional 
+    // si es posible, o QueryBuilder sin take si el set es pequeño.
+    const eventos = await query.getMany();
+    const total = eventos.length;
+
+    console.log(`[EventosService] findAllAdmin - Total encontrados en DB: ${total}`);
+
+    // Paginación manual simple
+    const start = (page - 1) * limit;
+    const paginated = eventos.slice(start, start + limit);
+
+    const data = paginated.map((evento) => {
+      // Forzamos la limpieza de URLS
+      return {
+        ...evento,
+        logo: this.formatImageUrl(evento.logo, 'logo'),
+        imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
+        actividades: (evento.actividades || []).map(act => ({
+          ...act,
+          estado: Number(act.estado),
+          imagen: this.formatImageUrl(act.imagen, 'cursos')
+        }))
+      };
+    });
 
     return { data, total, page, limit };
   }
@@ -215,6 +254,7 @@ export class EventosService {
     dto: CreateEventoDto,
     imagenPortada?: Express.Multer.File,
     imagenFondo?: Express.Multer.File,
+    usuario?: any,
   ) {
     const data: Partial<Evento> = { ...dto } as any;
     if (dto.prioridad) data.prioridad = parseInt(dto.prioridad, 10);
@@ -223,6 +263,17 @@ export class EventosService {
 
     const evento = this.eventoRepository.create(data);
     const guardado = await this.eventoRepository.save(evento);
+
+    // Asignación automática de coordinación si el creador es un usuario identificado
+    if (usuario && usuario.id) {
+      const coordinacionRepo = this.eventoRepository.manager.getRepository('CoordinacionEvento');
+      await coordinacionRepo.save({
+        usuario: { id: usuario.id },
+        evento: { id: guardado.id },
+        estado: 1
+      });
+    }
+
     return {
       ...guardado,
       logo: this.formatImageUrl(guardado.logo, 'logo'),
@@ -280,10 +331,43 @@ export class EventosService {
     if (usuario) {
       await this.verificarPropiedad(id, usuario);
     }
-    const evento = await this.eventoRepository.findOneBy({ id });
+    const evento = await this.eventoRepository.findOne({
+      where: { id },
+      relations: ['actividades', 'coordinaciones', 'infosCertificados', 'imparticiones']
+    });
+
     if (!evento) throw new NotFoundException(`Evento ${id} no encontrado.`);
-    await this.eventoRepository.delete(id);
-    return { mensaje: `Evento ${id} eliminado correctamente.` };
+
+    // 1. Validar dependencias para dar mensaje claro
+    const dependencias: string[] = [];
+    const ev = evento as any;
+    if (Array.isArray(ev.actividades) && ev.actividades.length > 0) {
+      dependencias.push(`${ev.actividades.length} actividades (cursos/talleres)`);
+    }
+    if (Array.isArray(ev.coordinaciones) && ev.coordinaciones.length > 0) {
+      dependencias.push(`${ev.coordinaciones.length} responsables asignados`);
+    }
+    if (Array.isArray(ev.infosCertificados) && ev.infosCertificados.length > 0) {
+      dependencias.push(`${ev.infosCertificados.length} plantillas de certificados`);
+    }
+    if (Array.isArray(ev.imparticiones) && ev.imparticiones.length > 0) {
+      dependencias.push(`${ev.imparticiones.length} ponentes vinculados`);
+    }
+
+    if (dependencias.length > 0) {
+      throw new ForbiddenException(
+        `No se puede eliminar el evento porque tiene registros asociados: ${dependencias.join(', ')}. ` +
+        `Debe eliminar o desvincular estos elementos antes de borrar el evento permanentemente.`
+      );
+    }
+
+    try {
+      await this.eventoRepository.delete(id);
+      return { mensaje: `Evento ${id} eliminado correctamente.` };
+    } catch (error) {
+      console.error('Error eliminando evento:', error);
+      throw new ForbiddenException('Error de base de datos al intentar eliminar el evento. Verifique restricciones de integridad.');
+    }
   }
 
   update(id: number, data: Partial<Evento>) {
