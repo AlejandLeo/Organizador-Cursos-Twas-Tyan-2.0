@@ -482,7 +482,7 @@ export class UsuariosController {
   @Roles('Super Usuario', 'Coordinador')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
-  @Post(':id/roles/asignar')
+  @Post(':id/roles')
   @ApiOperation({
     summary: 'Asignar un rol adicional a un usuario (Admin/Coord)',
   })
@@ -496,11 +496,11 @@ export class UsuariosController {
   @Roles('Super Usuario', 'Coordinador')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
-  @Post(':id/roles/quitar')
+  @Delete(':id/roles/:rolId')
   @ApiOperation({ summary: 'Quitar un rol de un usuario (Admin/Coord)' })
   quitarRol(
     @Param('id', ParseIntPipe) id: number,
-    @Body('rolId', ParseIntPipe) rolId: number,
+    @Param('rolId', ParseIntPipe) rolId: number,
   ) {
     return this.usuariosService.quitarRol(id, rolId);
   }

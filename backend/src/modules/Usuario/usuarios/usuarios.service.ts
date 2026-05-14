@@ -418,9 +418,60 @@ export class UsuariosService {
    * Reservado para el Super Usuario.
    */
   async eliminarFisico(id: number): Promise<{ mensaje: string }> {
-    await this.findOne(id); // Valida existencia
-    await this.usuarioRepository.delete(id);
-    return { mensaje: `Usuario ${id} eliminado de forma permanente e inmediata.` };
+    const usuario = await this.usuarioRepository.findOne({
+      where: { id },
+      relations: ['inscripciones', 'coordinaciones', 'imparticiones', 'usuariosRoles', 'afiliaciones', 'persona', 'certificados', 'usuariosCertificados']
+    });
+
+    if (!usuario) {
+      throw new NotFoundException(`Usuario ${id} no encontrado.`);
+    }
+
+    // 1. Validar integridad referencial manual para dar mensajes claros
+    const dependencias: string[] = [];
+    const u = usuario as any;
+    if (Array.isArray(u.inscripciones) && u.inscripciones.length > 0) {
+      dependencias.push(`${u.inscripciones.length} inscripciones de estudiantes`);
+    }
+    if (Array.isArray(u.coordinaciones) && u.coordinaciones.length > 0) {
+      dependencias.push(`${u.coordinaciones.length} eventos asignados como responsable`);
+    }
+    if (Array.isArray(u.imparticiones) && u.imparticiones.length > 0) {
+      dependencias.push(`${u.imparticiones.length} actividades como ponente`);
+    }
+    if (Array.isArray(u.certificados) && u.certificados.length > 0) {
+      dependencias.push(`${u.certificados.length} certificados emitidos`);
+    }
+    if (Array.isArray(u.usuariosCertificados) && u.usuariosCertificados.length > 0) {
+      dependencias.push(`${u.usuariosCertificados.length} vinculaciones a certificados (firmas/aval)`);
+    }
+
+    if (dependencias.length > 0) {
+      throw new BadRequestException(
+        `No se puede eliminar al usuario porque tiene registros asociados: ${dependencias.join(', ')}. ` +
+        `Por seguridad, debe desvincular estos registros antes de proceder con la eliminación física.`
+      );
+    }
+
+    try {
+      // 2. Borrar relaciones "débiles" primero (roles, afiliaciones, persona si no tiene cascade delete)
+      if (usuario.usuariosRoles?.length > 0) {
+        await this.dataSource.getRepository(UsuarioRol).delete({ usuario: { id } });
+      }
+      if (usuario.afiliaciones?.length > 0) {
+        await this.dataSource.getRepository(Afiliacion).delete({ usuario: { id } });
+      }
+      if (usuario.persona) {
+        await this.dataSource.getRepository(Persona).delete({ usuario: { id } });
+      }
+
+      // 3. Borrado final del usuario
+      await this.usuarioRepository.delete(id);
+      return { mensaje: `Usuario ${id} y sus datos básicos han sido eliminados permanentemente.` };
+    } catch (error) {
+      console.error('Error en eliminación física:', error);
+      throw new BadRequestException('Error de integridad en la base de datos. Verifique si el usuario tiene registros en otras tablas (certificados, etc.)');
+    }
   }
 
   /**

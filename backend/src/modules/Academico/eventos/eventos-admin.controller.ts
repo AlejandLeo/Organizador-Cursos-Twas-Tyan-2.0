@@ -92,11 +92,13 @@ export class EventosAdminController {
       imagen_portada?: Express.Multer.File[];
       imagen_fondo?: Express.Multer.File[];
     },
+    @Request() req?: any,
   ) {
     return this.eventosService.crearConImagen(
       dto,
       files?.imagen_portada?.[0],
       files?.imagen_fondo?.[0],
+      req.user
     );
   }
 

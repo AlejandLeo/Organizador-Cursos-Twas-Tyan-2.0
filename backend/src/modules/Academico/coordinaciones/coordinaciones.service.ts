@@ -30,4 +30,11 @@ export class CoordinacionesService {
   remove(id: number) {
     return this.coordinacionRepository.delete(id);
   }
+
+  findByEvento(eventoId: number) {
+    return this.coordinacionRepository.find({
+      where: { evento: { id: eventoId } },
+      relations: ['usuario', 'usuario.persona'],
+    });
+  }
 }

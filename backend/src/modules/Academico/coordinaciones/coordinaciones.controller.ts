@@ -42,4 +42,9 @@ export class CoordinacionesController {
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.coordinacionesService.remove(id);
   }
+
+  @Get('evento/:eventoId')
+  findByEvento(@Param('eventoId', ParseIntPipe) eventoId: number) {
+    return this.coordinacionesService.findByEvento(eventoId);
+  }
 }
