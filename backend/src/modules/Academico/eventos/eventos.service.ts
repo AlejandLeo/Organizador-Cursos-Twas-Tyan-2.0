@@ -49,7 +49,6 @@ export class EventosService {
   }
 
   async findAll() {
-<<<<<<< HEAD
     const query = this.eventoRepository.createQueryBuilder('evento')
       .leftJoinAndSelect('evento.actividades', 'actividad')
       .leftJoinAndSelect('actividad.modalidades', 'modalidad')
@@ -58,19 +57,6 @@ export class EventosService {
       .addOrderBy('evento.fecha_creacion', 'DESC');
 
     const eventos = await query.getMany();
-=======
-    // Para el público general: Solo mostrar lo que está en Inscripciones (2), Ejecución (3) o Finalizado (4)
-    // Pero ocultar Planificación (1) y Archivados (5)
-    const eventos = await this.eventoRepository.find({
-      where: [
-        { fase: 2 },
-        { fase: 3 },
-        { fase: 4 }
-      ],
-      relations: ['actividades', 'actividades.modalidades', 'actividades.inscripciones'],
-      order: { prioridad: 'ASC', fecha_creacion: 'DESC' }
-    });
->>>>>>> dd5dcbbcab549efef3d4630361299364dfd06cf3
     return eventos.map(evento => ({
       ...evento,
       logo: this.formatImageUrl(evento.logo, 'logo'),
