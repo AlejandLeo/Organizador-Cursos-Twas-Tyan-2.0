@@ -1,9 +1,13 @@
 <script setup lang="ts">
+<<<<<<< HEAD
 import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useAdminHistorialStore } from '@/stores/adminHistorial';
 import { usuariosService } from '@/services/usuarios.service';
 import Swal from 'sweetalert2';
+=======
+import { useAuthStore } from '@/stores/auth';
+>>>>>>> dd5dcbbcab549efef3d4630361299364dfd06cf3
 
 const authStore = useAuthStore();
 const historialStore = useAdminHistorialStore();
