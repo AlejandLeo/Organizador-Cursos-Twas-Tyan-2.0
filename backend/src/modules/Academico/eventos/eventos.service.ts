@@ -49,6 +49,7 @@ export class EventosService {
   }
 
   async findAll() {
+
     const query = this.eventoRepository.createQueryBuilder('evento')
       .leftJoinAndSelect('evento.actividades', 'actividad')
       .leftJoinAndSelect('actividad.modalidades', 'modalidad')
