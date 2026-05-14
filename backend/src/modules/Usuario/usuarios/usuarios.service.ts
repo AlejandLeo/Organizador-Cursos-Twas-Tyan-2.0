@@ -113,7 +113,7 @@ export class UsuariosService {
         if (af) {
           // Bloqueo: si ya está completado y ya tiene institución, ignoramos edición crítica
           if (isCompleted && af.institucion) continue;
-          
+
           af.institucion = institucion;
           af.id_grado_academico = item.id_grado_academico;
           af.tipo_afiliacion = item.tipo_afiliacion;
@@ -392,14 +392,14 @@ export class UsuariosService {
    */
   async deshabilitarUsuario(id: number, notificar = true): Promise<{ mensaje: string }> {
     const usuario = await this.findOne(id);
-    
+
     // Calcular fecha de eliminación (hoy + 30 días)
     const fechaEliminacion = new Date();
     fechaEliminacion.setDate(fechaEliminacion.getDate() + 30);
 
-    await this.usuarioRepository.update(id, { 
+    await this.usuarioRepository.update(id, {
       estado: 0,
-      fecha_eliminacion: fechaEliminacion 
+      fecha_eliminacion: fechaEliminacion
     });
 
     const nombreCompleto = usuario.persona
@@ -418,7 +418,6 @@ export class UsuariosService {
    * Reservado para el Super Usuario.
    */
   async eliminarFisico(id: number): Promise<{ mensaje: string }> {
-<<<<<<< HEAD
     const usuario = await this.usuarioRepository.findOne({
       where: { id },
       relations: ['inscripciones', 'coordinaciones', 'imparticiones', 'usuariosRoles', 'afiliaciones', 'persona', 'certificados', 'usuariosCertificados']
@@ -473,11 +472,6 @@ export class UsuariosService {
       console.error('Error en eliminación física:', error);
       throw new BadRequestException('Error de integridad en la base de datos. Verifique si el usuario tiene registros en otras tablas (certificados, etc.)');
     }
-=======
-    await this.findOne(id); // Valida existencia
-    await this.usuarioRepository.delete(id);
-    return { mensaje: `Usuario ${id} eliminado de forma permanente e inmediata.` };
->>>>>>> dd5dcbbcab549efef3d4630361299364dfd06cf3
   }
 
   /**
