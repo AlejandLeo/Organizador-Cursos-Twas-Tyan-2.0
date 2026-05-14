@@ -171,7 +171,6 @@ export class EventosService {
     const rolesUser = Array.isArray(usuario?.roles) ? usuario.roles.map(r => String(r).toLowerCase().trim()) : [];
     const esSuper = rolesUser.includes('super usuario') || rolesUser.includes('admin') || rolesUser.includes('superusuario');
 
-<<<<<<< HEAD
     console.log(`--- DEBUG EVENTOS ---`);
     console.log(`Usuario: ${usuario?.email} (ID: ${usuario?.id})`);
     console.log(`Roles Detectados: [${rolesUser.join(', ')}]`);
@@ -186,13 +185,6 @@ export class EventosService {
     // 1. Aislamiento por Coordinación (SOLO si no es Super Usuario)
     if (usuario && !esSuper) {
       query.innerJoin('evento.coordinaciones', 'coordinacion', 'coordinacion.id_usuario = :userId', { userId: usuario.id });
-=======
-    // Aislamiento de datos: Si no es Super Usuario, solo ver sus coordinaciones
-    if (usuario && !usuario.roles?.includes('Super Usuario')) {
-      where.coordinaciones = { usuario: { id: usuario.id } };
-      // El coordinador NO ve los archivados (fase 5) por defecto en su dashboard principal
-      where.fase = LessThan(5);
->>>>>>> dd5dcbbcab549efef3d4630361299364dfd06cf3
     }
 
     // 2. Filtrado por estado
