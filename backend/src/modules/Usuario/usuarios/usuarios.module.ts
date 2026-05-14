@@ -15,6 +15,8 @@ import { QrModule } from '../../Seguridad/qr/qr.module';
  * DataSource se inyecta automáticamente por NestJS/TypeORM cuando
  * el módulo importa TypeOrmModule — no hay que declararlo explícitamente.
  */
+import { UsuariosCronService } from './usuarios-cron.service';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([Usuario, Persona]),
@@ -22,7 +24,7 @@ import { QrModule } from '../../Seguridad/qr/qr.module';
     QrModule,
   ],
   controllers: [UsuariosController],
-  providers: [UsuariosService],
+  providers: [UsuariosService, UsuariosCronService],
   exports: [UsuariosService],
 })
 export class UsuariosModule {}

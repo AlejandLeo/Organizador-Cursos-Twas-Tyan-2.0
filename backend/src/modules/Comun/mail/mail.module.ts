@@ -2,12 +2,16 @@ import { Module, Global } from '@nestjs/common';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.adapter';
 import { ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
 import { MailService } from './mail.service';
+import { MailLog } from './entities/mail-log.entity';
 
 @Global()
 @Module({
   imports: [
+    TypeOrmModule.forFeature([MailLog]),
+    
     MailerModule.forRootAsync({
       useFactory: async (config: ConfigService) => ({
         transport: {
@@ -16,10 +20,10 @@ import { MailService } from './mail.service';
           secure: config.get('MAIL_PORT') === '465',
           auth: {
             user: config.get('MAIL_USER'),
-            pass: config.get('MAIL_PASS'),
+            pass: config.get('MAIL_PASSWORD'),
           },
           tls: {
-            rejectUnauthorized: false, // Permite certificados auto-firmados
+            rejectUnauthorized: false,
           },
         },
         defaults: {
@@ -40,3 +44,4 @@ import { MailService } from './mail.service';
   exports: [MailService],
 })
 export class MailModule {}
+

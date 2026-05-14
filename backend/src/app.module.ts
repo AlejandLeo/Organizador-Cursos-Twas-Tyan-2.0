@@ -2,7 +2,8 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+
 
 // --- Usuarios y Accesos ---
 import { UsuariosModule } from './modules/Usuario/usuarios/usuarios.module';
@@ -44,12 +45,18 @@ import { MailModule } from './modules/Comun/mail/mail.module';
 // --- Dashboard ---
 import { CoordinadorModule } from './modules/Academico/coordinador/coordinador.module';
 
+import { ScheduleModule } from '@nestjs/schedule';
+
 @Module({
   imports: [
     // --- Config ---
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+
+    ScheduleModule.forRoot(),
+
+
 
     TypeOrmModule.forRoot({
       type: 'postgres',

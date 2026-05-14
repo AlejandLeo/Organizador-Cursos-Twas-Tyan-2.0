@@ -450,6 +450,17 @@ const handleCreateEvento = async () => {
 };
 
 const editarGestion = (gestion: any) => {
+    // Restringir edición si está Finalizado (0)
+    if (gestion.estado === 0) {
+        Swal.fire({
+            icon: 'info',
+            title: 'Modo de Solo Lectura',
+            text: 'Este evento está finalizado y no permite modificaciones.',
+            confirmButtonColor: '#0070b4'
+        });
+        return;
+    }
+
     isEditing.value = true;
     editId.value = gestion.id;
     // Extraer ponentes de la descripcion oculta

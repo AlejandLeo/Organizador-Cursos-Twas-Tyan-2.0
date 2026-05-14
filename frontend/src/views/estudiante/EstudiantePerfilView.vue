@@ -16,24 +16,39 @@ const formData = ref({
   pais_residencia: '',
   fecha_nacimiento: '',
   celular: '',
-  institucion: '',
-  id_grado_academico: null as number | null
+  afiliaciones: [] as any[]
 });
+
+const addAfiliacion = () => {
+  if (isCompleted.value) return;
+  formData.value.afiliaciones.push({
+    institucion: '',
+    id_grado_academico: null,
+    tipo_afiliacion: '',
+    area_tematica: '',
+    disciplina_cientifica: ''
+  });
+};
+
+const removeAfiliacion = (index: number) => {
+  if (isCompleted.value) return;
+  formData.value.afiliaciones.splice(index, 1);
+};
 
 const profilePhotoUrl = ref('');
 const originalData = ref<Record<string, any>>({});
 
-// Lista estática o dinámica de grados académicos
-const gradosAcademicos = ref([
-  { id: 1, nombre: 'Estudiante de Grado / Undergraduate Student' },
-  { id: 2, nombre: 'Licenciatura / Bachelor' },
-  { id: 3, nombre: 'Maestría / Master' },
-  { id: 4, nombre: 'Doctorado / PhD' },
-  { id: 5, nombre: 'Postdoctorado / Postdoc' },
-  { id: 6, nombre: 'Investigador / Researcher' },
-  { id: 7, nombre: 'Profesor / Professor' },
-  { id: 8, nombre: 'Otro / Other' }
-]);
+// Lista dinámica de grados académicos
+const gradosAcademicos = ref<any[]>([]);
+
+const loadGradosAcademicos = async () => {
+  try {
+    const res = await api.get('/grados-academicos');
+    gradosAcademicos.value = res.data.data || res.data;
+  } catch (err) {
+    console.error('Error fetching grados académicos', err);
+  }
+};
 
 const isCompleted = ref(false);
 
@@ -50,10 +65,20 @@ const loadProfile = async () => {
       }
     }
     
-    if (res.data?.afiliaciones && res.data.afiliaciones.length > 0) {
-      const afiliacion = res.data.afiliaciones[0];
-      formData.value.institucion = afiliacion.institucion;
-      formData.value.id_grado_academico = afiliacion.id_grado_academico;
+    if (res.data?.afiliaciones) {
+      formData.value.afiliaciones = res.data.afiliaciones.map((af: any) => ({
+        id: af.id,
+        institucion: af.institucion,
+        id_grado_academico: af.id_grado_academico,
+        tipo_afiliacion: af.tipo_afiliacion,
+        area_tematica: af.area_tematica,
+        disciplina_cientifica: af.disciplina_cientifica
+      }));
+    }
+
+    // Si no hay afiliaciones, añadir una vacía por defecto para que no se vea vacío
+    if (formData.value.afiliaciones.length === 0 && !isCompleted.value) {
+      addAfiliacion();
     }
     
     originalData.value = { ...formData.value };
@@ -66,18 +91,37 @@ const loadProfile = async () => {
 
 const loadPhoto = async () => {
   try {
-    const photoRes = await api.get('/usuarios/perfil/foto', { responseType: 'blob' });
+    const photoRes = await api.get('/usuarios/perfil/foto', { responseType: 'arraybuffer' });
+    
+    // Si no hay datos (200 OK vacío), limpiar foto
+    if (!photoRes.data || photoRes.data.byteLength === 0) {
+      profilePhotoUrl.value = '';
+      return;
+    }
+
+    const blob = new Blob([photoRes.data], { type: photoRes.headers['content-type'] || 'image/jpeg' });
+    
+    // Verificar si el contenido es el texto "NONE" (caso especial del backend)
+    const text = new TextDecoder().decode(photoRes.data);
+    if (text === 'NONE') {
+      profilePhotoUrl.value = '';
+      return;
+    }
+
     if (profilePhotoUrl.value) URL.revokeObjectURL(profilePhotoUrl.value);
-    profilePhotoUrl.value = URL.createObjectURL(photoRes.data);
+    profilePhotoUrl.value = URL.createObjectURL(blob);
   } catch (e) {
     profilePhotoUrl.value = '';
   }
 };
 
 const handleUpdateProfile = async (finalizar = false) => {
-  const hasMissingFields = Object.keys(originalData.value).some(k => !originalData.value[k]);
-  if (isCompleted.value && !hasMissingFields) return;
-  
+  // Verificación básica: al menos una afiliación debe tener institución
+  if (formData.value.afiliaciones.length === 0 || !formData.value.afiliaciones[0].institucion) {
+    error.value = 'Debe registrar al menos una institución de afiliación.';
+    return;
+  }
+
   loading.value = true;
   error.value = '';
   success.value = '';
@@ -147,6 +191,7 @@ const handleDrop = async (e: DragEvent) => {
 
 onMounted(() => {
   loadProfile();
+  loadGradosAcademicos();
 });
 </script>
 
@@ -155,7 +200,7 @@ onMounted(() => {
     <div class="flex items-center justify-between border-b border-slate-200 dark:border-gray-800 pb-6 mb-4 md:mb-8">
       <div class="max-w-[70%]">
         <h1 class="text-xl md:text-3xl font-black text-slate-800 dark:text-white uppercase tracking-tight truncate">Mi Perfil</h1>
-        <p class="text-[10px] md:text-sm font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Gestiona tus datos personales</p>
+        <p class="text-[10px] md:text-sm font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Gestiona tus datos personales y múltiples afiliaciones</p>
       </div>
       <div class="h-10 w-10 md:h-12 md:w-12 rounded-xl md:rounded-2xl bg-umsa-blue/10 dark:bg-blue-900/20 text-umsa-blue dark:text-blue-400 flex items-center justify-center border border-umsa-blue/20">
         <span class="material-symbols-outlined text-[20px] md:text-[24px]">manage_accounts</span>
@@ -202,7 +247,7 @@ onMounted(() => {
       <!-- Formulario de Datos Personales -->
       <div class="md:col-span-2 bg-white dark:bg-gray-900 p-6 md:p-8 rounded-2xl border border-slate-200 dark:border-gray-800 shadow-sm">
         <h3 class="text-sm font-black uppercase text-slate-800 dark:text-white mb-6 tracking-widest border-b border-slate-100 dark:border-gray-800 pb-4 flex items-center justify-between">
-          <span>Datos Personales y Afiliación</span>
+          <span>Datos Personales</span>
           <span v-if="isCompleted" class="text-[9px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full">SOLO LECTURA</span>
         </h3>
         
@@ -253,19 +298,38 @@ onMounted(() => {
             </div>
           </div>
           
-          <div class="mt-6 border-t border-slate-100 dark:border-gray-800 pt-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div class="md:col-span-2">
-              <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Institución / Universidad</label>
-              <input v-model="formData.institucion" type="text" :disabled="isCompleted && !!originalData.institucion" placeholder="Ej. Universidad Mayor de San Andrés" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none disabled:bg-slate-100 dark:disabled:bg-gray-950 disabled:text-slate-400" />
+          <div class="mt-8 border-t border-slate-100 dark:border-gray-800 pt-6">
+            <div class="flex items-center justify-between mb-6">
+              <h3 class="text-sm font-black uppercase text-slate-800 dark:text-white tracking-widest">Afiliaciones Institucionales</h3>
+              <button v-if="!isCompleted" type="button" @click="addAfiliacion" class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-umsa-blue hover:text-blue-700 transition-colors">
+                <span class="material-symbols-outlined text-sm">add_circle</span> Añadir Institución
+              </button>
             </div>
-            <div class="md:col-span-2">
-              <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Grado Académico</label>
-              <select v-model="formData.id_grado_academico" :disabled="isCompleted && !!originalData.id_grado_academico" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none text-slate-700 dark:text-gray-200 disabled:bg-slate-100 dark:disabled:bg-gray-950">
-                <option :value="null">Seleccione un grado académico</option>
-                <option v-for="grado in gradosAcademicos" :key="grado.id" :value="grado.id">
-                  {{ grado.nombre }}
-                </option>
-              </select>
+
+            <div class="space-y-6">
+              <div v-for="(af, index) in formData.afiliaciones" :key="index" class="p-4 rounded-xl border border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-950/50 relative group">
+                <button v-if="!isCompleted && formData.afiliaciones.length > 1" type="button" @click="removeAfiliacion(index)" class="absolute -top-2 -right-2 w-6 h-6 bg-red-100 text-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">
+                  <span class="material-symbols-outlined text-sm">close</span>
+                </button>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div class="md:col-span-2">
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Institución / Universidad</label>
+                    <input v-model="af.institucion" type="text" :disabled="isCompleted && !!af.id" placeholder="Ej. Universidad Mayor de San Andrés" class="w-full py-2 px-3 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none disabled:bg-slate-50 dark:disabled:bg-gray-800" />
+                  </div>
+                  <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Grado Académico</label>
+                    <select v-model="af.id_grado_academico" :disabled="isCompleted && !!af.id" class="w-full py-2 px-3 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none text-slate-700 dark:text-gray-200 disabled:bg-slate-50 dark:disabled:bg-gray-800">
+                      <option :value="null">Seleccionar Grado</option>
+                      <option v-for="grado in gradosAcademicos" :key="grado.id" :value="grado.id">{{ grado.nombre }}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Disciplina / Especialidad</label>
+                    <input v-model="af.disciplina_cientifica" type="text" :disabled="isCompleted && !!af.id" placeholder="Ej. Informática" class="w-full py-2 px-3 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none disabled:bg-slate-50 dark:disabled:bg-gray-800" />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           

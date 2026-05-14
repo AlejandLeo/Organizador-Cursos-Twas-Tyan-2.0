@@ -502,6 +502,16 @@ const handleSaveEvento = async () => {
 };
 
 const editarEvento = (evento: any) => {
+    if (evento.estado === 0 || evento.estado === 'Cerrado' || evento.estado === 'Concluido') {
+        Swal.fire({
+            icon: 'info',
+            title: 'Modo de Solo Lectura',
+            text: 'Este evento está finalizado y no permite modificaciones.',
+            confirmButtonColor: '#0070b4'
+        });
+        return;
+    }
+    
     currentStep.value = 1;
     isEditingEvento.value = true;
     editEventoId.value = evento.id;
@@ -716,6 +726,17 @@ const resetNuevaActividad = (eventoId: number) => {
 };
 
 const editarActividad = (act: any) => {
+  const evento = eventosPublicados.value.find((e: any) => e.id === act.id_evento);
+  if (evento && (evento.estado === 0 || evento.estado === 'Cerrado' || evento.estado === 'Concluido')) {
+    Swal.fire({
+      icon: 'info',
+      title: 'Modo de Solo Lectura',
+      text: 'El evento principal está finalizado. Solo puede visualizar la actividad.',
+      confirmButtonColor: '#0070b4'
+    });
+    openDetalleCurso(act.id); 
+    return;
+  }
   openDetalleCurso(act.id, { edit: 'true' });
 };
 

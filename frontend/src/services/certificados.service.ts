@@ -13,5 +13,18 @@ export const certificadosService = {
   },
   getById(id: number) {
     return api.get<Certificado>(`/certificados/${id}`);
+  },
+
+  // ── Admin ───────────────────────────────────────────────────
+  adminGetAll() {
+    return api.get<Certificado[]>('/admin/certificados');
+  },
+  
+  enviarMasivo(ids: number[]) {
+    return api.post('/admin/certificados/enviar-masivo', { ids });
+  },
+
+  reintentarEnvio(id: number) {
+    return api.post(`/admin/certificados/${id}/reintentar-envio`);
   }
 };

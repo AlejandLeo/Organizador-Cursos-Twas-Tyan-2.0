@@ -91,4 +91,8 @@ export class Usuario {
 
   @UpdateDateColumn({ type: 'timestamptz' })
   fecha_actualizacion: Date;
+
+  /** Fecha programada para eliminación física (cooldown de 30 días) */
+  @Column({ type: 'timestamptz', nullable: true })
+  fecha_eliminacion: Date;
 }

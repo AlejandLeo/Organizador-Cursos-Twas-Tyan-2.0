@@ -203,10 +203,10 @@ const verDocumento = async (id: number, parte?: 'anverso' | 'reverso') => {
     try {
         const response = await api.get(`/usuarios/${id}/doc-aval`, {
             params: { parte },
-            responseType: 'blob'
+            responseType: 'arraybuffer'
         });
         
-        const blob = new Blob([response.data], { type: (response.headers['content-type'] as string) || undefined });
+        const blob = new Blob([response.data], { type: (response.headers['content-type'] as string) || 'application/pdf' });
         const url = window.URL.createObjectURL(blob);
         window.open(url, '_blank');
     } catch (error) {
