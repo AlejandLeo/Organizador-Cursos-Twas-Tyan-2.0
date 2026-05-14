@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { useAuthStore } from '@/stores/auth';
 import { useAdminHistorialStore } from '@/stores/adminHistorial';
+import { coordinacionesService } from '@/services/coordinaciones.service';
+import { usuariosService } from '@/services/usuarios.service';
 import api, { getImageUrl } from '@/services/api';
 import Swal from 'sweetalert2';
 
+const authStore = useAuthStore();
 const historialStore = useAdminHistorialStore();
 
 // ─── Estado Global ─────────────────────────────────────────
@@ -12,7 +16,85 @@ const isLoading = ref(false);
 const filtroTexto = ref('');
 const filtroEstado = ref('');
 
-// ─── Eventos ───────────────────────────────────────────────
+// ─── Gestión de Coordinadores ─────────────────────────────
+const showModalCoordinadores = ref(false);
+const eventoParaCoordinadores = ref<any>(null);
+const coordinadoresActuales = ref<any[]>([]);
+const candidatosCoordinadores = ref<any[]>([]);
+const cargandoCoordinadores = ref(false);
+const queryCandidato = ref('');
+
+const fetchCoordinadores = async (eventoId: number) => {
+  try {
+    cargandoCoordinadores.value = true;
+    const res = await coordinacionesService.getByEvento(eventoId);
+    coordinadoresActuales.value = res.data || [];
+  } catch (err) {
+    console.error('Error fetching coordinadores', err);
+  } finally {
+    cargandoCoordinadores.value = false;
+  }
+};
+
+const fetchCandidatos = async () => {
+  try {
+    const res = await usuariosService.getAll({ soloActivos: 'true' });
+    const allUsers = (res.data as any)?.data ?? res.data;
+    candidatosCoordinadores.value = allUsers.filter((u: any) => {
+      const isCandidate = u.usuariosRoles?.some((ur: any) => [2, 3].includes(ur.rol?.id));
+      const isAlreadyAssigned = coordinadoresActuales.value.some(c => c.usuario?.id === u.id);
+      return isCandidate && !isAlreadyAssigned;
+    });
+  } catch (err) {
+    console.error('Error fetching candidatos', err);
+  }
+};
+
+const abrirCoordinadores = async (evento: any) => {
+  eventoParaCoordinadores.value = evento;
+  showModalCoordinadores.value = true;
+  await fetchCoordinadores(evento.id);
+  await fetchCandidatos();
+};
+
+const asignarCoordinador = async (usuario: any) => {
+  try {
+    await coordinacionesService.asignar(eventoParaCoordinadores.value.id, usuario.id);
+    Swal.fire('¡Éxito!', `Se ha asignado a ${usuario.persona?.nombres} como responsable.`, 'success');
+    await fetchCoordinadores(eventoParaCoordinadores.value.id);
+    await fetchCandidatos();
+  } catch (err) {
+    Swal.fire('Error', 'No se pudo asignar.', 'error');
+  }
+};
+
+const quitarCoordinador = async (coordinacion: any) => {
+  const result = await Swal.fire({
+    title: '¿Quitar responsable?',
+    text: `¿Remover a ${coordinacion.usuario?.persona?.nombres}?`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Sí, quitar'
+  });
+  if (!result.isConfirmed) return;
+  try {
+    await coordinacionesService.quitar(coordinacion.id);
+    await fetchCoordinadores(eventoParaCoordinadores.value.id);
+    await fetchCandidatos();
+  } catch (err) {
+    Swal.fire('Error', 'No se pudo quitar.', 'error');
+  }
+};
+
+const candidatosFiltrados = computed(() => {
+  if (!queryCandidato.value) return candidatosCoordinadores.value;
+  return candidatosCoordinadores.value.filter(u => 
+    u.email.toLowerCase().includes(queryCandidato.value.toLowerCase()) ||
+    u.persona?.nombres.toLowerCase().includes(queryCandidato.value.toLowerCase())
+  );
+});
+
+// ─── Estado de Eventos ────────────────────────────────────
 const eventos = ref<any[]>([]);
 const showModalEvento = ref(false);
 const isEditingEvento = ref(false);
@@ -37,7 +119,7 @@ const estadoEventoConfig: Record<number, { label: string; color: string; bg: str
 const fetchEventos = async () => {
   try {
     isLoading.value = true;
-    const res = await api.get('/eventos');
+    const res = await api.get('/admin/eventos/lista', { params: { estado: filtroEstado.value } });
     eventos.value = res.data?.data || res.data || [];
   } catch (e) {
     console.error('Error fetching eventos:', e);
@@ -45,13 +127,22 @@ const fetchEventos = async () => {
   } finally { isLoading.value = false; }
 };
 
-const eventosFiltrados = computed(() =>
-  eventos.value.filter(e => {
-    const texto = (e.nombre || '').toLowerCase().includes(filtroTexto.value.toLowerCase());
-    const estado = filtroEstado.value === '' || String(e.estado) === filtroEstado.value;
-    return texto && estado;
-  })
-);
+const eventosFiltrados = computed(() => {
+  const data = Array.isArray(eventos.value) ? eventos.value : [];
+  const search = (filtroTexto.value || '').toLowerCase().trim();
+  const estado = filtroEstado.value;
+
+  return data.filter(e => {
+    const matchesTexto = !search || (e.nombre || '').toLowerCase().includes(search);
+    const matchesEstado = estado === '' || String(e.estado) === String(estado);
+    return matchesTexto && matchesEstado;
+  });
+});
+
+const limpiarFiltros = () => {
+  filtroTexto.value = '';
+  filtroEstado.value = '';
+};
 
 const abrirCrearEvento = () => {
   isEditingEvento.value = false;
@@ -103,10 +194,10 @@ const guardarEvento = async () => {
     if (imagenFile.value) { fd.append('imagen_fondo', imagenFile.value); fd.append('imagen_portada', imagenFile.value); }
 
     if (isEditingEvento.value && editEventoId.value) {
-      await api.put(`/eventos/${editEventoId.value}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await api.put(`/admin/eventos/${editEventoId.value}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       historialStore.registrar('evento', 'editar', `Editó el evento: ${formEvento.value.nombre}`, { entidadId: String(editEventoId.value), entidadNombre: formEvento.value.nombre });
     } else {
-      await api.post('/eventos', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await api.post('/admin/eventos', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       historialStore.registrar('evento', 'crear', `Creó el evento: ${formEvento.value.nombre}`, { entidadNombre: formEvento.value.nombre });
     }
     Swal.fire({ toast: true, icon: 'success', title: isEditingEvento.value ? 'Evento actualizado' : 'Evento creado', timer: 2500, showConfirmButton: false, position: 'top-end' });
@@ -126,7 +217,7 @@ const confirmarEliminarEvento = async (ev: any) => {
   });
   if (!isConfirmed) return;
   try {
-    await api.patch(`/eventos/${ev.id}`, { estado: 0 });
+    await api.patch(`/admin/eventos/${ev.id}`, { estado: 0 });
     historialStore.registrar('evento', 'eliminar', `Inhabilitó el evento: ${ev.nombre}`, { entidadId: String(ev.id), entidadNombre: ev.nombre });
     Swal.fire({ toast: true, icon: 'info', title: 'Evento inhabilitado', timer: 2000, showConfirmButton: false, position: 'top-end' });
     fetchEventos();
@@ -335,12 +426,16 @@ onMounted(() => {
                  class="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm outline-none focus:border-red-600/50 text-slate-800 dark:text-white transition-all" />
         </div>
         <template v-if="tabActivo === 'eventos'">
-          <div class="flex gap-1.5 flex-wrap">
+          <div class="flex gap-1.5 flex-wrap items-center">
             <button v-for="(cfg, est) in estadoEventoConfig" :key="est"
                     @click="filtroEstado = filtroEstado === String(est) ? '' : String(est)"
                     :class="filtroEstado === String(est) ? 'bg-slate-800 dark:bg-white text-white dark:text-slate-900' : 'bg-slate-100 dark:bg-white/5 text-slate-500'"
                     class="px-3 py-1.5 text-[9px] font-black uppercase rounded-lg transition-all">
               {{ cfg.label }}
+            </button>
+            <button v-if="filtroEstado || filtroTexto" @click="limpiarFiltros"
+                    class="px-3 py-1.5 text-[9px] font-black uppercase rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all border border-red-100">
+              Limpiar Filtros
             </button>
           </div>
         </template>
@@ -398,14 +493,13 @@ onMounted(() => {
                 <td class="px-6 py-4">
                   <p class="text-[10px] font-bold text-slate-500 truncate max-w-[150px]">{{ ev.ubicacion || '—' }}</p>
                 </td>
-                <td class="px-6 py-4 text-center">
-                  <span :class="[estadoEventoConfig[ev.estado]?.color, estadoEventoConfig[ev.estado]?.bg]"
-                        class="px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-current/10">
-                    {{ estadoEventoConfig[ev.estado]?.label || '—' }}
-                  </span>
-                </td>
                 <td class="px-6 py-4 text-right">
                   <div class="flex justify-end items-center gap-1">
+                    <!-- Botón Gestión de Coordinadores -->
+                    <button @click="abrirCoordinadores(ev)" title="Asignar Responsables"
+                            class="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 hover:bg-emerald-100 transition-all border border-emerald-100 dark:border-emerald-800/30 shadow-sm">
+                      <span class="material-symbols-outlined text-[20px]">group_add</span>
+                    </button>
                     <button @click="abrirEditarEvento(ev)" title="Editar"
                             class="p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-slate-400 hover:text-blue-600 transition-all">
                       <span class="material-symbols-outlined text-[18px]">edit</span>
@@ -760,5 +854,111 @@ onMounted(() => {
       </div>
     </Teleport>
 
+    <!-- ══════════════════════════════════════════════ -->
+    <!--  MODAL: GESTIÓN DE COORDINADORES               -->
+    <!-- ══════════════════════════════════════════════ -->
+    <Teleport to="body">
+      <div v-if="showModalCoordinadores" class="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md">
+        <div class="bg-white dark:bg-[#0d0d14] w-full max-w-2xl rounded-[3rem] border border-white/10 shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 duration-500">
+          
+          <div class="p-10">
+            <!-- Header Modal -->
+            <div class="flex justify-between items-start mb-8">
+              <div>
+                <h2 class="text-2xl font-black text-slate-800 dark:text-white uppercase italic tracking-tight">Personal Responsable</h2>
+                <p class="text-xs text-red-600 font-bold uppercase mt-1">Evento: {{ eventoParaCoordinadores?.nombre }}</p>
+              </div>
+              <button @click="showModalCoordinadores = false" class="p-2 rounded-full hover:bg-red-50 text-slate-400 hover:text-red-600 transition-all">
+                <span class="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+              
+              <!-- Columna 1: Lista Actual -->
+              <div class="space-y-4">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 pb-2">Asignados Actualmente</p>
+                
+                <div v-if="cargandoCoordinadores" class="flex justify-center py-10">
+                  <span class="material-symbols-outlined animate-spin text-red-600">progress_activity</span>
+                </div>
+
+                <div v-else-if="coordinadoresActuales.length === 0" class="py-10 text-center bg-slate-50 dark:bg-white/3 rounded-3xl border-2 border-dashed border-slate-200 dark:border-white/5">
+                  <p class="text-[10px] font-bold text-slate-400 uppercase">Sin personal asignado</p>
+                </div>
+
+                <div v-else class="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                  <div v-for="coord in coordinadoresActuales" :key="coord.id" 
+                       class="flex items-center justify-between p-3 bg-white dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5 group">
+                    <div class="flex items-center gap-3">
+                      <div class="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 flex items-center justify-center text-xs font-black">
+                        {{ coord.usuario?.persona?.nombres?.charAt(0) }}
+                      </div>
+                      <div>
+                        <p class="text-xs font-black text-slate-700 dark:text-white">{{ coord.usuario?.persona?.nombres }}</p>
+                        <p class="text-[9px] text-slate-400 truncate w-32">{{ coord.usuario?.email }}</p>
+                      </div>
+                    </div>
+                    <button @click="quitarCoordinador(coord)" 
+                            class="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-600 transition-all">
+                      <span class="material-symbols-outlined text-[18px]">person_remove</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Columna 2: Buscar y Añadir -->
+              <div class="space-y-4">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 pb-2">Añadir Nuevo Responsable</p>
+                
+                <div class="relative">
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[18px]">search</span>
+                  <input v-model="queryCandidato" type="text" placeholder="Buscar por nombre o email..."
+                         class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-[11px] outline-none focus:border-red-600/50 transition-all" />
+                </div>
+
+                <div class="space-y-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                  <div v-for="user in candidatosFiltrados" :key="user.id"
+                       class="flex items-center justify-between p-3 hover:bg-slate-50 dark:hover:bg-white/3 rounded-2xl transition-colors cursor-pointer group"
+                       @click="asignarCoordinador(user)">
+                    <div class="flex items-center gap-3">
+                      <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/10 text-slate-500 flex items-center justify-center text-xs font-bold">
+                        {{ user.persona?.nombres?.charAt(0) }}
+                      </div>
+                      <div>
+                        <p class="text-xs font-bold text-slate-600 dark:text-slate-300">{{ user.persona?.nombres }} {{ user.persona?.primer_apellido }}</p>
+                        <p class="text-[9px] text-slate-400">{{ user.email }}</p>
+                      </div>
+                    </div>
+                    <span class="material-symbols-outlined text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">add_circle</span>
+                  </div>
+                  
+                  <div v-if="candidatosFiltrados.length === 0" class="py-10 text-center italic text-slate-400 text-[10px]">
+                    No se encontraron candidatos disponibles
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <div class="mt-10 pt-6 border-t border-slate-100 dark:border-white/5 flex justify-end">
+              <button @click="showModalCoordinadores = false"
+                      class="px-8 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:-translate-y-1 transition-all">
+                Finalizar Gestión
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
   </div>
 </template>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+.dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; }
+</style>
