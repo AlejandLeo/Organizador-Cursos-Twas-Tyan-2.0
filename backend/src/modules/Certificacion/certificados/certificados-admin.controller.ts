@@ -14,8 +14,7 @@ import { EmitirLoteDto } from './dto/emitir-lote.dto';
 import { JwtAuthGuard } from '../../Seguridad/auth/jwt-auth.guard';
 import { RolesGuard } from '../../Seguridad/auth/roles.guard';
 import { Roles } from '../../Seguridad/auth/roles.decorator';
-
-import { CertificadosEnvioService } from './certificados-envio.service';
+import { CertificadosQueueService } from './certificados-queue.service';
 
 @ApiTags('Certificados (Admin)')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -25,19 +24,36 @@ import { CertificadosEnvioService } from './certificados-envio.service';
 export class CertificadosAdminController {
   constructor(
     private readonly service: CertificadosService,
-    private readonly envioService: CertificadosEnvioService,
+    private readonly queueService: CertificadosQueueService,
   ) {}
 
+  /**
+   * Encola un lote de certificados para envío asíncrono (BullMQ).
+   * Responde de inmediato con la cantidad de jobs encolados.
+   */
   @Post('enviar-masivo')
-  @ApiOperation({ summary: 'Enviar certificados por email masivamente' })
+  @ApiOperation({ summary: 'Encolar certificados para envío masivo por email (asíncrono)' })
   enviarMasivo(@Body('ids') ids: number[]) {
-    return this.envioService.enviarLoteMasivo(ids);
+    return this.queueService.encolarLote(ids);
   }
 
+  /**
+   * Encola el reintento de un certificado individual.
+   */
   @Post(':id/reintentar-envio')
-  @ApiOperation({ summary: 'Reintentar envío de un certificado individual' })
+  @ApiOperation({ summary: 'Reintentar envío de un certificado individual (asíncrono)' })
   reintentarEnvio(@Param('id', ParseIntPipe) id: number) {
-    return this.envioService.enviarCertificadoIndividual(id);
+    return this.queueService.encolarUno(id);
+  }
+
+  /**
+   * Busca todos los certificados con estado_envio = 'error'
+   * y los encola para reintento masivo sin necesidad de seleccionarlos manualmente.
+   */
+  @Post('reintentar-fallidos')
+  @ApiOperation({ summary: 'Reintentar masivamente todos los certificados con error' })
+  reintentarFallidos() {
+    return this.queueService.reintentarTodosLosFallidos();
   }
 
   @Post('emitir-lote')

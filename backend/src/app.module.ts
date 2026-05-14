@@ -56,8 +56,6 @@ import { ScheduleModule } from '@nestjs/schedule';
 
     ScheduleModule.forRoot(),
 
-
-
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DATABASE_HOST,
