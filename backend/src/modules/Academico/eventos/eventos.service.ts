@@ -49,7 +49,7 @@ export class EventosService {
   }
 
   async findAll() {
-<<<<<<< HEAD
+
     const query = this.eventoRepository.createQueryBuilder('evento')
       .leftJoinAndSelect('evento.actividades', 'actividad')
       .leftJoinAndSelect('actividad.modalidades', 'modalidad')
@@ -58,19 +58,6 @@ export class EventosService {
       .addOrderBy('evento.fecha_creacion', 'DESC');
 
     const eventos = await query.getMany();
-=======
-    // Para el público general: Solo mostrar lo que está en Inscripciones (2), Ejecución (3) o Finalizado (4)
-    // Pero ocultar Planificación (1) y Archivados (5)
-    const eventos = await this.eventoRepository.find({
-      where: [
-        { fase: 2 },
-        { fase: 3 },
-        { fase: 4 }
-      ],
-      relations: ['actividades', 'actividades.modalidades', 'actividades.inscripciones'],
-      order: { prioridad: 'ASC', fecha_creacion: 'DESC' }
-    });
->>>>>>> dd5dcbbcab549efef3d4630361299364dfd06cf3
     return eventos.map(evento => ({
       ...evento,
       logo: this.formatImageUrl(evento.logo, 'logo'),
@@ -185,7 +172,6 @@ export class EventosService {
     const rolesUser = Array.isArray(usuario?.roles) ? usuario.roles.map(r => String(r).toLowerCase().trim()) : [];
     const esSuper = rolesUser.includes('super usuario') || rolesUser.includes('admin') || rolesUser.includes('superusuario');
 
-<<<<<<< HEAD
     console.log(`--- DEBUG EVENTOS ---`);
     console.log(`Usuario: ${usuario?.email} (ID: ${usuario?.id})`);
     console.log(`Roles Detectados: [${rolesUser.join(', ')}]`);
@@ -200,13 +186,6 @@ export class EventosService {
     // 1. Aislamiento por Coordinación (SOLO si no es Super Usuario)
     if (usuario && !esSuper) {
       query.innerJoin('evento.coordinaciones', 'coordinacion', 'coordinacion.id_usuario = :userId', { userId: usuario.id });
-=======
-    // Aislamiento de datos: Si no es Super Usuario, solo ver sus coordinaciones
-    if (usuario && !usuario.roles?.includes('Super Usuario')) {
-      where.coordinaciones = { usuario: { id: usuario.id } };
-      // El coordinador NO ve los archivados (fase 5) por defecto en su dashboard principal
-      where.fase = LessThan(5);
->>>>>>> dd5dcbbcab549efef3d4630361299364dfd06cf3
     }
 
     // 2. Filtrado por estado
