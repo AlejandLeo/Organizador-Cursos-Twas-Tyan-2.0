@@ -26,12 +26,20 @@ export const usuariosService = {
     return api.post<Usuario>('/usuarios/ponente', data);
   },
 
-  update(id: number, data: Partial<Usuario>) {
-    return api.patch<Usuario>(`/usuarios/${id}`, data);
+  update(id: number, data: Partial<Usuario>, notificar = true) {
+    return api.patch<Usuario>(`/usuarios/${id}`, data, {
+      params: { notificar: String(notificar) }
+    });
   },
 
-  delete(id: number) {
-    return api.delete(`/usuarios/${id}`);
+  delete(id: number, notificar = true) {
+    return api.delete(`/usuarios/${id}`, {
+      params: { notificar: String(notificar) }
+    });
+  },
+
+  eliminarFisico(id: number) {
+    return api.delete(`/usuarios/${id}/fisico`);
   },
 
   // ── Gestión de Roles (Solo Super Usuario) ──────────────────────────────────

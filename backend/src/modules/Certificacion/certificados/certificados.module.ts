@@ -7,6 +7,8 @@ import { CertificadosPonenteController } from './certificados-ponente.controller
 import { CertificadosLogisticaController } from './certificados-logistica.controller';
 import { CertificadosAdminController } from './certificados-admin.controller';
 import { Certificado } from './entities/certificado.entity';
+import { CertificadosEnvioService } from './certificados-envio.service';
+import { CertificadosQueueService } from './certificados-queue.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Certificado])],
@@ -17,6 +19,11 @@ import { Certificado } from './entities/certificado.entity';
     CertificadosLogisticaController,
     CertificadosAdminController,
   ],
-  providers: [CertificadosService],
+  providers: [
+    CertificadosService,
+    CertificadosEnvioService,
+    CertificadosQueueService,
+  ],
+  exports: [CertificadosQueueService],
 })
 export class CertificadosModule {}

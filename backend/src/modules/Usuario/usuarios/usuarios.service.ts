@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -33,6 +34,8 @@ import { QrService } from '../../Seguridad/qr/qr.service';
 
 @Injectable()
 export class UsuariosService {
+  private readonly logger = new Logger(UsuariosService.name);
+
   constructor(
     @InjectRepository(Usuario)
     private readonly usuarioRepository: Repository<Usuario>,
@@ -95,44 +98,74 @@ export class UsuariosService {
       await this.personaRepository.update(usuario.persona.id, datosPersona);
     }
 
-    // 2. Extraer campos para Afiliación
-    const institucion = data.institucion || data.afiliacion;
-    const { id_grado_academico, tipo_afiliacion, area_tematica, disciplina_cientifica } = data;
+    // 2. Manejo de Afiliaciones (Múltiples)
+    const afiliacionesInput = Array.isArray(data.afiliaciones) ? data.afiliaciones : null;
+    const afiliacionRepo = this.dataSource.getRepository(Afiliacion);
 
-    if (
-      institucion !== undefined ||
-      id_grado_academico !== undefined ||
-      tipo_afiliacion !== undefined ||
-      area_tematica !== undefined ||
-      disciplina_cientifica !== undefined
-    ) {
-      const afiliacionRepo = this.dataSource.getRepository(Afiliacion);
-      let af = usuario.afiliaciones && usuario.afiliaciones.length > 0
-        ? usuario.afiliaciones[0]
-        : null;
+    if (afiliacionesInput) {
+      // Sincronización de múltiples afiliaciones
+      for (const item of afiliacionesInput) {
+        const institucion = item.institucion || item.afiliacion;
+        if (!institucion) continue;
 
-      if (af) {
-        if (institucion !== undefined) {
-          // Bloqueo: si ya está completado y ya tiene institución, ignoramos
-          if (!(isCompleted && af.institucion)) af.institucion = institucion;
+        let af = item.id ? usuario.afiliaciones.find(a => a.id === item.id) : null;
+
+        if (af) {
+          // Bloqueo: si ya está completado y ya tiene institución, ignoramos edición crítica
+          if (isCompleted && af.institucion) continue;
+          
+          af.institucion = institucion;
+          af.id_grado_academico = item.id_grado_academico;
+          af.tipo_afiliacion = item.tipo_afiliacion;
+          af.area_tematica = item.area_tematica;
+          af.disciplina_cientifica = item.disciplina_cientifica;
+          await afiliacionRepo.save(af);
+        } else {
+          // Si el perfil está completado, no permitimos añadir nuevas afiliaciones (según regla de bloqueo)
+          if (isCompleted) continue;
+
+          const newAf = afiliacionRepo.create({
+            institucion,
+            id_grado_academico: item.id_grado_academico,
+            tipo_afiliacion: item.tipo_afiliacion,
+            area_tematica: item.area_tematica,
+            disciplina_cientifica: item.disciplina_cientifica,
+            usuario: usuario,
+          });
+          await afiliacionRepo.save(newAf);
         }
-        if (id_grado_academico !== undefined) {
-          if (!(isCompleted && af.id_grado_academico)) af.id_grado_academico = id_grado_academico;
+      }
+
+      // Opcional: Eliminar afiliaciones que no vengan en el input (si no está completado)
+      if (!isCompleted) {
+        const inputIds = afiliacionesInput.filter(i => i.id).map(i => i.id);
+        const toDelete = usuario.afiliaciones.filter(a => !inputIds.includes(a.id));
+        if (toDelete.length > 0) {
+          await afiliacionRepo.remove(toDelete);
         }
-        if (tipo_afiliacion !== undefined) af.tipo_afiliacion = tipo_afiliacion;
-        if (area_tematica !== undefined) af.area_tematica = area_tematica;
-        if (disciplina_cientifica !== undefined) af.disciplina_cientifica = disciplina_cientifica;
-        await afiliacionRepo.save(af);
-      } else {
-        const newAf = afiliacionRepo.create({
-          institucion: institucion || '',
-          id_grado_academico,
-          tipo_afiliacion,
-          area_tematica,
-          disciplina_cientifica,
-          usuario: usuario,
-        });
-        await afiliacionRepo.save(newAf);
+      }
+    } else {
+      // Fallback para compatibilidad con el formato antiguo (objeto único)
+      const institucion = data.institucion || data.afiliacion;
+      const { id_grado_academico, tipo_afiliacion, area_tematica, disciplina_cientifica } = data;
+
+      if (institucion !== undefined) {
+        let af = usuario.afiliaciones && usuario.afiliaciones.length > 0 ? usuario.afiliaciones[0] : null;
+        if (af) {
+          if (!(isCompleted && af.institucion)) {
+            af.institucion = institucion;
+            af.id_grado_academico = id_grado_academico !== undefined ? id_grado_academico : af.id_grado_academico;
+            af.tipo_afiliacion = tipo_afiliacion || af.tipo_afiliacion;
+            af.area_tematica = area_tematica || af.area_tematica;
+            af.disciplina_cientifica = disciplina_cientifica || af.disciplina_cientifica;
+            await afiliacionRepo.save(af);
+          }
+        } else if (!isCompleted) {
+          const newAf = afiliacionRepo.create({
+            institucion, id_grado_academico, tipo_afiliacion, area_tematica, disciplina_cientifica, usuario: usuario,
+          });
+          await afiliacionRepo.save(newAf);
+        }
       }
     }
 
@@ -291,6 +324,7 @@ export class UsuariosService {
   async update(
     id: number,
     updateUsuarioDto: UpdateUsuarioDto,
+    notificar = true,
   ): Promise<Usuario> {
     const usuario = await this.findOne(id);
 
@@ -312,8 +346,35 @@ export class UsuariosService {
       );
     }
 
+    const oldEstado = usuario.estado;
+    const newEstado = updateUsuarioDto.estado;
+
     await this.usuarioRepository.update(id, updateUsuarioDto);
-    return this.findOne(id);
+    const updatedUser = await this.findOne(id);
+
+    // Si el estado cambió, notificar por correo
+    if (newEstado !== undefined && newEstado !== oldEstado) {
+      const nombreCompleto = updatedUser.persona
+        ? `${updatedUser.persona.nombres} ${updatedUser.persona.primer_apellido}`
+        : 'Usuario';
+
+      try {
+        if (notificar) {
+          if (newEstado === 1) {
+            await this.mailService.sendAccountReactivationEmail(updatedUser.email, nombreCompleto);
+          } else if (newEstado === 0) {
+            await this.mailService.sendAccountDeactivationEmail(updatedUser.email, nombreCompleto);
+          }
+        }
+      } catch (error) {
+        this.logger.error(`Error enviando notificación de cambio de estado: ${error.message}`);
+        // No lanzamos el error aquí para no romper la actualización en DB si el mail falla en este punto genérico,
+        // pero el usuario pidió control total, así que si falla el mail, lanzamos el error.
+        throw error;
+      }
+    }
+
+    return updatedUser;
   }
 
   /**
@@ -326,32 +387,67 @@ export class UsuariosService {
   }
 
   /**
-   * Deshabilita un usuario (estado = 0) en lugar de eliminarlo físicamente.
-   * Uso del coordinador para suspender accesos sin perder historias.
+   * Programa la eliminación de un usuario (Soft Delete con 30 días de gracia).
+   * El usuario queda deshabilitado (estado = 0) y con fecha programada.
    */
-  async deshabilitarUsuario(id: number): Promise<{ mensaje: string }> {
+  async deshabilitarUsuario(id: number, notificar = true): Promise<{ mensaje: string }> {
     const usuario = await this.findOne(id);
-    await this.usuarioRepository.update(id, { estado: 0 });
+    
+    // Calcular fecha de eliminación (hoy + 30 días)
+    const fechaEliminacion = new Date();
+    fechaEliminacion.setDate(fechaEliminacion.getDate() + 30);
 
-    // Opcional: Notificar por correo
+    await this.usuarioRepository.update(id, { 
+      estado: 0,
+      fecha_eliminacion: fechaEliminacion 
+    });
+
     const nombreCompleto = usuario.persona
       ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
       : 'Usuario';
 
-    await this.mailService.sendAccountRejectionEmail(
-      usuario.email,
-      nombreCompleto,
-      'Tu cuenta ha sido deshabilitada por administración.'
-    );
+    if (notificar) {
+      await this.mailService.sendAccountDeactivationEmail(usuario.email, nombreCompleto);
+    }
 
-    return { mensaje: `Usuario ${id} deshabilitado correctamente.` };
+    return { mensaje: `Usuario ${id} programado para eliminación física en 30 días (${fechaEliminacion.toLocaleDateString()}).` };
+  }
+
+  /**
+   * Elimina un usuario de forma inmediata y definitiva.
+   * Reservado para el Super Usuario.
+   */
+  async eliminarFisico(id: number): Promise<{ mensaje: string }> {
+    await this.findOne(id); // Valida existencia
+    await this.usuarioRepository.delete(id);
+    return { mensaje: `Usuario ${id} eliminado de forma permanente e inmediata.` };
+  }
+
+  /**
+   * Ejecuta la eliminación física de usuarios que han cumplido su periodo de gracia.
+   * Método llamado por el Cron diario.
+   */
+  async procesarEliminacionesProgramadas() {
+    const ahora = new Date();
+    const qb = this.usuarioRepository.createQueryBuilder('u')
+      .where('u.fecha_eliminacion IS NOT NULL')
+      .andWhere('u.fecha_eliminacion <= :ahora', { ahora });
+
+    const usuariosAEliminar = await qb.getMany();
+
+    if (usuariosAEliminar.length > 0) {
+      console.log(`[CRON ELIMINACIÓN] Procesando ${usuariosAEliminar.length} usuarios...`);
+      const ids = usuariosAEliminar.map(u => u.id);
+      await this.usuarioRepository.delete(ids);
+      console.log(`[CRON ELIMINACIÓN] Se eliminaron permanentemente los IDs: ${ids.join(', ')}`);
+    }
   }
 
   /**
    * Habilita un usuario (estado = 1).
    * Uso del coordinador para reactivar accesos sin cambiar contraseñas.
    */
-  async habilitarUsuario(id: number): Promise<{ mensaje: string }> {
+  async habilitarUsuario(id: number, notificar = true): Promise<{ mensaje: string }> {
     const usuario = await this.findOne(id);
     await this.usuarioRepository.update(id, { estado: 1 });
 
@@ -359,7 +455,9 @@ export class UsuariosService {
       ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
       : 'Usuario';
 
-    await this.mailService.sendAccountReactivationEmail(usuario.email, nombreCompleto);
+    if (notificar) {
+      await this.mailService.sendAccountReactivationEmail(usuario.email, nombreCompleto);
+    }
 
     return { mensaje: `Usuario ${id} habilitado correctamente.` };
   }
@@ -487,13 +585,10 @@ export class UsuariosService {
 
       await queryRunner.commitTransaction();
 
-      // Enviar correo de bienvenida al ponente
-      try {
-        const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
-        await this.mailService.sendAccountApprovalEmail(dto.email, nombreCompleto, dto.password);
-      } catch (e) {
-        console.error('Error enviando correo a ponente:', e);
-      }
+      // Enviar correo de bienvenida al ponente con sus credenciales
+      const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
+      await this.mailService.sendAccountApprovalEmail(dto.email, nombreCompleto, dto.password);
+
 
       return this.getPerfil(usuarioGuardado.id);
     } catch (error) {
@@ -753,13 +848,10 @@ export class UsuariosService {
 
       await queryRunner.commitTransaction();
 
-      // Notificar al usuario por correo (especialmente útil para logística/ponentes creados por admin)
-      try {
-        const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
-        await this.mailService.sendAccountApprovalEmail(dto.email, nombreCompleto, dto.password);
-      } catch (e) {
-        console.error('Error enviando correo de bienvenida:', e);
-      }
+      // Notificar al usuario por correo
+      const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
+      await this.mailService.sendWelcomeRegistrationEmail(dto.email, nombreCompleto);
+
 
       // Devolvemos el perfil cargado (usando el método existente)
       return this.getPerfil(usuarioGuardado.id);
@@ -1242,20 +1334,6 @@ export class UsuariosService {
     return this.qrService.generarTokenAsistencia(usuarioId);
   }
 
-  /**
-   * Elimina físicamente un usuario y su persona asociada.
-   * ÚTIL PARA LIMPIEZA DE DATOS DE PRUEBA.
-   */
-  async eliminarFisico(id: number) {
-    const usuario = await this.findOne(id);
 
-    // Al usar onDelete: CASCADE en las relaciones, se borrarían automáticamente,
-    // pero para estar seguros borramos persona si existe.
-    if (usuario.persona) {
-      await this.dataSource.getRepository(Persona).delete(usuario.persona.id);
-    }
-
-    return this.usuarioRepository.delete(id);
-  }
 }
 

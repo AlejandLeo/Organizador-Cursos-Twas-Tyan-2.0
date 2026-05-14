@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
-import { useAdminHistorialStore } from '@/stores/adminHistorial';
-import { usuariosService } from '@/services/usuarios.service';
-import Swal from 'sweetalert2';
+import { useAuthStore } from '@/stores/auth';
 
+const authStore = useAuthStore();
 const historialStore = useAdminHistorialStore();
 const usuarios = ref<any[]>([]);
 const isLoading = ref(true);
@@ -84,7 +82,7 @@ const handleSaveUsuario = async () => {
     });
     const rolName = rolesDisponibles.find(r => r.id === id_rol)?.nombre || 'Usuario';
     historialStore.registrar('usuario', 'crear', `Creó nuevo ${rolName}: ${email}`, { entidadNombre: email });
-    Swal.fire('¡Éxito!', `${rolName} creado correctamente.`, 'success');
+    Swal.fire('¡Éxito!', `${rolName} creado correctamente. Se ha enviado un correo con las credenciales temporales.`, 'success');
     isCreating.value = false;
     formUsuario.value = { email: '', password: '', nombres: '', primer_apellido: '', segundo_apellido: '', cedula: '', id_rol: ROLE_IDS.COORDINADOR };
     fetchUsuarios();
@@ -143,20 +141,91 @@ const toggleEstado = async (user: any) => {
   const nuevoEstado = user.estado === 1 ? 0 : 1;
   const result = await Swal.fire({
     title: nuevoEstado === 0 ? 'Desactivar cuenta' : 'Activar cuenta',
-    text: `¿Confirmar cambio de estado de ${user.email}?`,
+    html: `
+      <div class="space-y-4">
+        <p>¿Confirmar cambio de estado de <b>${user.email}</b>?</p>
+        <div class="flex items-center justify-center gap-2 mt-4">
+          <input type="checkbox" id="swal-notificar" checked class="w-4 h-4 cursor-pointer">
+          <label for="swal-notificar" class="text-sm cursor-pointer">Notificar por correo electrónico</label>
+        </div>
+      </div>
+    `,
     icon: 'question',
     showCancelButton: true,
     confirmButtonText: 'Confirmar',
     cancelButtonText: 'Cancelar',
+    preConfirm: () => {
+      return (document.getElementById('swal-notificar') as HTMLInputElement).checked;
+    }
   });
+  
   if (!result.isConfirmed) return;
+  const notificar = result.value;
+
   try {
-    await usuariosService.update(user.id, { estado: nuevoEstado } as any);
+    await usuariosService.update(user.id, { estado: nuevoEstado } as any, notificar);
     user.estado = nuevoEstado;
-    historialStore.registrar('usuario', 'editar', `Cambió estado de ${user.email} a ${nuevoEstado === 1 ? 'Activo' : 'Inactivo'}`, { entidadId: user.id, entidadNombre: user.email });
+    historialStore.registrar('usuario', 'editar', `Cambió estado de ${user.email} a ${nuevoEstado === 1 ? 'Activo' : 'Inactivo'} (Notificar: ${notificar})`, { entidadId: user.id, entidadNombre: user.email });
     Swal.fire('¡Éxito!', 'Estado actualizado.', 'success');
-  } catch {
-    Swal.fire('Error', 'No se pudo actualizar el estado.', 'error');
+  } catch (error: any) {
+    Swal.fire('Error', error.response?.data?.message || 'No se pudo actualizar el estado.', 'error');
+  }
+};
+
+// ── ELIMINACIÓN DE CUENTA ──────────────────────────────────────────────────
+const eliminarProgramada = async (user: any) => {
+  const result = await Swal.fire({
+    title: '¿Programar eliminación?',
+    html: `
+      <div class="space-y-4 text-left px-4">
+        <p>La cuenta de <b>${user.email}</b> será desactivada ahora y eliminada físicamente de forma automática en 30 días.</p>
+        <div class="flex items-center gap-2 mt-4 p-3 bg-slate-50 dark:bg-white/5 rounded-xl">
+          <input type="checkbox" id="swal-notificar-del" checked class="w-4 h-4 cursor-pointer">
+          <label for="swal-notificar-del" class="text-xs font-bold uppercase cursor-pointer">Notificar al usuario por correo</label>
+        </div>
+      </div>
+    `,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Sí, programar',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#e11d48',
+    preConfirm: () => {
+      return (document.getElementById('swal-notificar-del') as HTMLInputElement).checked;
+    }
+  });
+
+  if (!result.isConfirmed) return;
+  const notificar = result.value;
+
+  try {
+    await usuariosService.delete(user.id, notificar);
+    Swal.fire('Programado', 'La cuenta se eliminará definitivamente en 30 días.', 'success');
+    fetchUsuarios();
+  } catch (err: any) {
+    Swal.fire('Error', err.response?.data?.message || 'No se pudo programar la eliminación.', 'error');
+  }
+};
+
+const eliminarInmediata = async (user: any) => {
+  const result = await Swal.fire({
+    title: '¿ELIMINACIÓN DEFINITIVA?',
+    text: `Esta acción es IRREVERSIBLE. Se borrarán todos los datos de ${user.email} de forma inmediata.`,
+    icon: 'error',
+    showCancelButton: true,
+    confirmButtonText: 'SÍ, BORRAR AHORA',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#991b1b',
+  });
+
+  if (!result.isConfirmed) return;
+
+  try {
+    await usuariosService.eliminarFisico(user.id);
+    Swal.fire('Eliminado', 'Usuario borrado permanentemente.', 'success');
+    fetchUsuarios();
+  } catch (err: any) {
+    Swal.fire('Error', err.response?.data?.message || 'No se pudo realizar la eliminación.', 'error');
   }
 };
 
@@ -249,10 +318,15 @@ onMounted(fetchUsuarios);
                 </div>
               </td>
               <td class="px-6 py-4 text-center">
-                <span :class="user.estado === 1 ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'text-red-500 bg-red-50 dark:bg-red-900/20'"
-                      class="text-[9px] font-black uppercase px-2 py-1 rounded-full">
-                  {{ user.estado === 1 ? 'ACTIVO' : 'INACTIVO' }}
-                </span>
+                <div class="flex flex-col items-center gap-1">
+                  <span :class="user.estado === 1 ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'text-red-500 bg-red-50 dark:bg-red-900/20'"
+                        class="text-[9px] font-black uppercase px-2 py-1 rounded-full">
+                    {{ user.estado === 1 ? 'ACTIVO' : 'INACTIVO' }}
+                  </span>
+                  <span v-if="user.fecha_eliminacion" class="text-[8px] bg-red-600 text-white px-2 py-0.5 rounded-full font-black animate-pulse uppercase">
+                    Pendiente Borrado
+                  </span>
+                </div>
               </td>
               <td class="px-6 py-4">
                 <div class="flex items-center justify-end gap-1">
@@ -269,6 +343,21 @@ onMounted(fetchUsuarios);
                           class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-600 transition-all">
                     <span class="material-symbols-outlined text-[18px]">{{ user.estado === 1 ? 'lock' : 'lock_open' }}</span>
                   </button>
+                  <!-- Botones de eliminación -->
+                  <div class="flex items-center border-l border-slate-200 dark:border-white/10 ml-1 pl-1 gap-1">
+                    <button @click="eliminarProgramada(user)"
+                            v-if="!user.fecha_eliminacion"
+                            title="Programar eliminación (30 días)"
+                            class="p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 text-rose-400 hover:text-rose-600 transition-all">
+                      <span class="material-symbols-outlined text-[18px]">delete_sweep</span>
+                    </button>
+                    <button @click="eliminarInmediata(user)"
+                            v-if="authStore.esSuperUsuario"
+                            title="Eliminar AHORA (Permanente)"
+                            class="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 transition-all">
+                      <span class="material-symbols-outlined text-[18px]">delete_forever</span>
+                    </button>
+                  </div>
                 </div>
               </td>
             </tr>

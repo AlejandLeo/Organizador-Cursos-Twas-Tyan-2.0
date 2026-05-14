@@ -69,12 +69,13 @@ onMounted(() => {
   fetchGrados();
 });
 
-const getEstadoLabel = (estado: number) => {
-  switch (estado) {
-    case 0: return 'Concluido';
-    case 1: return 'Activo';
-    case 2: return 'Planificación';
-    case 3: return 'Borrador';
+const getEstadoLabel = (fase: number) => {
+  switch (fase) {
+    case 1: return 'Planificación';
+    case 2: return 'Inscripciones';
+    case 3: return 'En Ejecución';
+    case 4: return 'Finalizado';
+    case 5: return 'Archivado';
     default: return 'Desconocido';
   }
 };
@@ -93,7 +94,7 @@ const nuevoEvento = ref({
   fecha_fin: '',
   ubicacion: '',
   direccion: '',
-  estado: 2, // 2 = Planificación
+  fase: 1, // 1 = Planificación
   fondo_img: null as any,
   logo_img: null as any, // Campo para el logo del evento
   google_maps_link: '',
@@ -250,16 +251,17 @@ const eventosAgrupados = computed(() => {
         descripcion: ev.sobre_evento_1 || ev.descripcion || '',
         imagen_fondo: ev.imagen_fondo || '',
         logo_img: ev.logo || '',
-        estadoGeneral: getEstadoLabel(ev.estado) === 'Activo' ? 'Activo' : getEstadoLabel(ev.estado),
+        faseGeneral: ev.fase,
         gestiones: []
       });
     }
     const group = map.get(ev.nombre);
-    if (ev.estado === 1) group.estadoGeneral = 'Activo';
+    // Un grupo se considera "Activo" si tiene alguna gestión en fase 2 o 3
+    if ([2, 3].includes(ev.fase)) group.faseGeneral = ev.fase;
     
     group.gestiones.push({
       ...ev,
-      estadoStr: ev.estado === -1 ? 'Inhabilitado' : getEstadoLabel(ev.estado)
+      estadoStr: getEstadoLabel(ev.fase)
     });
   });
 
@@ -371,8 +373,8 @@ const handleCreateEvento = async () => {
          } catch(e) { /* ignore */ }
       }
 
-      if (nuevoEvento.value.estado !== undefined && nuevoEvento.value.estado !== null) {
-          formData.append('estado', nuevoEvento.value.estado.toString());
+      if (nuevoEvento.value.fase !== undefined && nuevoEvento.value.fase !== null) {
+          formData.append('fase', nuevoEvento.value.fase.toString());
       }
 
       if (nuevoEvento.value.fondo_img instanceof File) {
@@ -450,6 +452,17 @@ const handleCreateEvento = async () => {
 };
 
 const editarGestion = (gestion: any) => {
+    // Restringir edición si está Finalizado (0)
+    if (gestion.estado === 0) {
+        Swal.fire({
+            icon: 'info',
+            title: 'Modo de Solo Lectura',
+            text: 'Este evento está finalizado y no permite modificaciones.',
+            confirmButtonColor: '#0070b4'
+        });
+        return;
+    }
+
     isEditing.value = true;
     editId.value = gestion.id;
     // Extraer ponentes de la descripcion oculta
@@ -485,7 +498,7 @@ const editarGestion = (gestion: any) => {
         estado: gestion.estado,
         fondo_img: null,
         logo_img: null,
-        ponentes_seleccionados: [],
+        fase: gestion.fase || 1,
         cronograma: '',
         cronograma_lista: []
     };

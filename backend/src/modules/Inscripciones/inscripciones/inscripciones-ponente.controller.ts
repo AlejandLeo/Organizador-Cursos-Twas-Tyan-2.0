@@ -41,4 +41,12 @@ export class InscripcionesPonenteController {
   ) {
     return this.service.actualizarNotaParaPonente(actividadId, inscripcionId, nota, req.user.id);
   }
+
+  @Get('historial')
+  @ApiOperation({ summary: 'Obtener historial de evaluaciones del ponente' })
+  getHistorial(
+    @Request() req: any,
+  ) {
+    return this.service.getHistorialPonente(req.user.id);
+  }
 }

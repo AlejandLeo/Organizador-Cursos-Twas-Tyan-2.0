@@ -75,6 +75,11 @@ const router = createRouter({
           component: () => import('../views/certificados/CertificadosView.vue'),
         },
         {
+          path: 'certificados/envio',
+          name: 'coordinador-certificados-envio',
+          component: () => import('../views/admin/AdminCertificadosEnvioView.vue'),
+        },
+        {
           path: 'eventos',
           name: 'coordinador-eventos',
           component: () => import('../views/eventos/ListaEventosView.vue'),
@@ -140,6 +145,11 @@ const router = createRouter({
           path: 'certificados',
           name: 'admin-certificados',
           component: () => import('../views/certificados/CertificadosView.vue'),
+        },
+        {
+          path: 'certificados/envio',
+          name: 'admin-certificados-envio',
+          component: () => import('../views/admin/AdminCertificadosEnvioView.vue'),
         },
         {
           path: 'usuarios',

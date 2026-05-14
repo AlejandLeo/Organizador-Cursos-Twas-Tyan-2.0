@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, LessThan, In } from 'typeorm';
 import { Evento } from './entities/evento.entity';
 import { CreateEventoDto } from './dto/create-evento.dto';
 import { UpdateEventoDto } from './dto/update-evento.dto';
@@ -49,7 +49,14 @@ export class EventosService {
   }
 
   async findAll() {
+    // Para el público general: Solo mostrar lo que está en Inscripciones (2), Ejecución (3) o Finalizado (4)
+    // Pero ocultar Planificación (1) y Archivados (5)
     const eventos = await this.eventoRepository.find({
+      where: [
+        { fase: 2 },
+        { fase: 3 },
+        { fase: 4 }
+      ],
       relations: ['actividades', 'actividades.modalidades', 'actividades.inscripciones'],
       order: { prioridad: 'ASC', fecha_creacion: 'DESC' }
     });
@@ -170,6 +177,8 @@ export class EventosService {
     // Aislamiento de datos: Si no es Super Usuario, solo ver sus coordinaciones
     if (usuario && !usuario.roles?.includes('Super Usuario')) {
       where.coordinaciones = { usuario: { id: usuario.id } };
+      // El coordinador NO ve los archivados (fase 5) por defecto en su dashboard principal
+      where.fase = LessThan(5);
     }
 
     const [eventos, total] = await this.eventoRepository.findAndCount({

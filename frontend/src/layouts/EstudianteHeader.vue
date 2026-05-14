@@ -72,62 +72,12 @@ const cambiarAPonente = async () => {
   const yaConfigurado = !!persona?.ponente_configurado;
 
   if (yaConfigurado) {
-    // CASO A: YA ESTÁ ACTIVADO -> Validar contraseña para entrar
-    const { value: passwordCorrecta } = await Swal.fire({
-      title: 'Validar Acceso Ponente',
-      html: `
-        <p class="text-sm text-slate-500 mb-4">Por seguridad, ingrese su contraseña para acceder al portal.</p>
-        <div class="relative flex items-center">
-          <input id="swal-input-password-verify" type="password" class="swal2-input w-full pr-12" style="margin: 0;" placeholder="Contraseña...">
-          <button id="toggle-pass" type="button" class="absolute right-4 text-slate-400 hover:text-slate-600 transition-colors" style="top: 50%; transform: translateY(-50%); z-index: 10;">
-            <span class="material-symbols-outlined">visibility</span>
-          </button>
-        </div>
-      `,
-      showCancelButton: true,
-      confirmButtonText: 'Ingresar',
-      cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#2563eb',
-      showLoaderOnConfirm: true,
-      didOpen: () => {
-        const input = document.getElementById('swal-input-password-verify') as HTMLInputElement;
-        const toggle = document.getElementById('toggle-pass');
-        toggle?.addEventListener('click', () => {
-          input.type = input.type === 'password' ? 'text' : 'password';
-          toggle.innerHTML = `<span class="material-symbols-outlined">${input.type === 'password' ? 'visibility' : 'visibility_off'}</span>`;
-        });
-      },
-      preConfirm: async () => {
-        const password = (document.getElementById('swal-input-password-verify') as HTMLInputElement).value;
-        if (!password) { Swal.showValidationMessage('Debe ingresar su contraseña.'); return false; }
-        
-        try {
-          // Validamos la contraseña específicamente para el portal ponente
-          const response = await api.post('/auth/login', { 
-            email: authStore.user?.email, 
-            password: password,
-            portal: 'Ponente'
-          });
-          
-          // Si el login fue exitoso pero no es la clave de ponente, rechazar
-          if (response.data.rolSugerido !== 'Ponente') {
-            Swal.showValidationMessage('Esta es su clave de estudiante. Use su clave de ponente.');
-            return false;
-          }
-          
-          return true;
-        } catch (error) {
-          Swal.showValidationMessage('Contraseña incorrecta para el portal docente.');
-        }
-      }
-    });
-
-    if (passwordCorrecta) {
-      authStore.cambiarRolActivo('Ponente');
-      router.push('/ponente');
-    }
+    // Si ya está configurado, cambiar directamente sin pedir contraseña
+    authStore.cambiarRolActivo('Ponente');
+    router.push('/ponente');
     return;
   }
+
 
   // CASO B: NO ESTÁ ACTIVADO -> Flujo de Activación (CI + Nueva Password)
   const { value: ciValido } = await Swal.fire({
@@ -369,17 +319,18 @@ onMounted(async () => {
   // Cargar foto de perfil - Manejo silencioso
   try {
     const photoRes = await api.get('/usuarios/perfil/foto', { 
-      responseType: 'blob'
+      responseType: 'arraybuffer'
     });
     
-    if (photoRes.status === 200) {
-      // Si el backend envió 'NONE', es que no hay foto
-      const text = await photoRes.data.text();
+    if (photoRes.status === 200 && photoRes.data && photoRes.data.byteLength > 0) {
+      // Verificar si es el texto "NONE"
+      const text = new TextDecoder().decode(photoRes.data);
       if (text === 'NONE') {
         profilePhotoUrl.value = '';
       } else {
+        const blob = new Blob([photoRes.data], { type: photoRes.headers['content-type'] || 'image/jpeg' });
         if (profilePhotoUrl.value) URL.revokeObjectURL(profilePhotoUrl.value);
-        profilePhotoUrl.value = URL.createObjectURL(photoRes.data);
+        profilePhotoUrl.value = URL.createObjectURL(blob);
       }
     } else {
       profilePhotoUrl.value = '';
@@ -387,6 +338,7 @@ onMounted(async () => {
   } catch (e) {
     profilePhotoUrl.value = '';
   }
+
 
   document.addEventListener('click', closeDropdowns);
 });

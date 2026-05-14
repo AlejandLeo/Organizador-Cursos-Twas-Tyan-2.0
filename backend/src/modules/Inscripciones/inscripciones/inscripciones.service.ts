@@ -6,7 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In, Not, IsNull } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Inscripcion } from './entities/inscripcion.entity';
 import { CreateInscripcionDto } from './dto/create-inscripcion.dto';
@@ -91,6 +91,40 @@ export class InscripcionesService {
     }
 
     return this.actualizarNota(inscripcionId, nota);
+  }
+
+  async getHistorialPonente(ponenteId: number) {
+    // Buscar inscripciones con nota_principal IS NOT NULL
+    // para las actividades donde este usuario es ponente
+    const imparticiones = await this.imparticionRepository.find({
+      where: { usuario: { id: ponenteId } },
+      relations: ['actividadAcademica'],
+    });
+
+    if (imparticiones.length === 0) return [];
+
+    const actividadIds = imparticiones.map(i => i.actividadAcademica.id);
+
+    const inscripciones = await this.inscripcionRepository.find({
+      where: {
+        actividadAcademica: { id: In(actividadIds) },
+        nota_principal: Not(IsNull()),
+      },
+      relations: ['usuario', 'usuario.persona', 'actividadAcademica'],
+      order: { fecha_actualizacion: 'DESC' },
+    });
+
+    return inscripciones.map(ins => ({
+      id: ins.id,
+      estudiante: ins.usuario?.persona 
+        ? `${ins.usuario.persona.nombres} ${ins.usuario.persona.primer_apellido}`.trim()
+        : 'Desconocido',
+      actividad: ins.actividadAcademica?.nombre || 'Desconocida',
+      nota_anterior: 0, 
+      nota_nueva: ins.nota_principal,
+      fecha: ins.fecha_actualizacion,
+      estado: ins.nota_principal >= 51 ? 'aprobado' : 'reprobado',
+    }));
   }
 
   // ── Coordinador ─────────────────────────────────────────────
@@ -190,22 +224,19 @@ export class InscripcionesService {
     await this.inscripcionRepository.update(id, { estado, observacion });
 
     // Notificación por correo
-    try {
-      const email = inscripcion.usuario?.email;
-      const nombre = inscripcion.usuario?.persona 
-        ? `${inscripcion.usuario.persona.nombres} ${inscripcion.usuario.persona.primer_apellido}`
-        : 'Estudiante';
-      const actividad = inscripcion.actividadAcademica?.nombre || 'Actividad';
-      const evento = inscripcion.actividadAcademica?.evento?.nombre || 'Evento';
+    const email = inscripcion.usuario?.email;
+    const nombre = inscripcion.usuario?.persona 
+      ? `${inscripcion.usuario.persona.nombres} ${inscripcion.usuario.persona.primer_apellido}`
+      : 'Estudiante';
+    const actividad = inscripcion.actividadAcademica?.nombre || 'Actividad';
+    const evento = inscripcion.actividadAcademica?.evento?.nombre || 'Evento';
 
-      if (estado === 1) {
-        await this.mailService.sendEnrollmentConfirmedEmail(email, nombre, actividad, evento);
-      } else if (estado === 2) { // Asumiendo que 2 o similar es "Rechazado" o "Observado"
-        await this.mailService.sendEnrollmentRejectedEmail(email, nombre, actividad, observacion);
-      }
-    } catch (error) {
-      console.error('Error enviando correo de cambio de estado:', error);
+    if (estado === 1) {
+      await this.mailService.sendEnrollmentConfirmedEmail(email, nombre, actividad, evento);
+    } else if (estado === 2) { 
+      await this.mailService.sendEnrollmentRejectedEmail(email, nombre, actividad, observacion);
     }
+
 
     return this.inscripcionRepository.findOneBy({ id });
   }

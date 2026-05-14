@@ -20,6 +20,8 @@ build/
 
 # IDEs y editores
 .vscode/
+.vscode/*
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo

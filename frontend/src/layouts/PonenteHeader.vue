@@ -191,17 +191,18 @@ onMounted(async () => {
   // Cargar foto de perfil - Manejo silencioso
   try {
     const photoRes = await api.get('/usuarios/perfil/foto', { 
-      responseType: 'blob'
+      responseType: 'arraybuffer'
     });
     
-    if (photoRes.status === 200) {
-      // Si el backend envió 'NONE', es que no hay foto
-      const text = await photoRes.data.text();
+    if (photoRes.status === 200 && photoRes.data && photoRes.data.byteLength > 0) {
+      // Verificar si es el texto "NONE"
+      const text = new TextDecoder().decode(photoRes.data);
       if (text === 'NONE') {
         profilePhotoUrl.value = '';
       } else {
+        const blob = new Blob([photoRes.data], { type: photoRes.headers['content-type'] || 'image/jpeg' });
         if (profilePhotoUrl.value) URL.revokeObjectURL(profilePhotoUrl.value);
-        profilePhotoUrl.value = URL.createObjectURL(photoRes.data);
+        profilePhotoUrl.value = URL.createObjectURL(blob);
       }
     } else {
       profilePhotoUrl.value = '';
@@ -209,6 +210,7 @@ onMounted(async () => {
   } catch (e) {
     profilePhotoUrl.value = '';
   }
+
 })
 
 onUnmounted(() => {

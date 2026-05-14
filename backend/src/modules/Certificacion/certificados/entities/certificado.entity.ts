@@ -62,6 +62,22 @@ export class Certificado {
   @Column({ type: 'integer', default: 1 })
   estado: number;
 
+  /** Trazabilidad de envío: pendiente | enviado | error */
+  @Column({ length: 50, default: 'pendiente' })
+  estado_envio: string;
+
+  /** Fecha del último intento de envío por correo */
+  @Column({ type: 'timestamptz', nullable: true })
+  fecha_ultimo_envio: Date;
+
+  /** Registro de errores técnicos en caso de fallo de envío */
+  @Column({ type: 'text', nullable: true })
+  log_error_envio: string | null;
+
+  /** Contador de intentos de envío */
+  @Column({ type: 'integer', default: 0 })
+  reintentos: number;
+
   // ── Relaciones ────────────────────────────────────────────────────────────
 
   /** La plantilla de texto utilizada para generar este certificado. */

@@ -3,6 +3,7 @@ import { RouterView, useRoute } from 'vue-router'
 import { computed } from 'vue'
 import AppNavbar from './layouts/AppNavbar.vue'
 import AppFooter from './layouts/AppFooter.vue'
+import ForcePasswordChange from './components/ForcePasswordChange.vue'
 
 const route = useRoute()
 // Rutas que tienen su propio layout (no necesitan navbar/footer globales)
@@ -22,6 +23,9 @@ const isDashboard = computed(() =>
       <RouterView />
     </main>
     <AppFooter v-if="!isDashboard" />
+
+    <!-- Overlay de seguridad global -->
+    <ForcePasswordChange />
   </div>
 </template>
 

@@ -1,19 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { MailLog } from './entities/mail-log.entity';
 import { MailerService } from '@nestjs-modules/mailer';
 
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
 
-  constructor(private mailerService: MailerService) {}
+  constructor(
+    @InjectRepository(MailLog)
+    private readonly mailLogRepository: Repository<MailLog>,
+    private readonly mailerService: MailerService,
+  ) {}
 
   /**
-   * Envía un correo electrónico genérico.
-   * @param to Destinatario
-   * @param subject Asunto
-   * @param template Nombre de la plantilla (opcional)
-   * @param context Contexto para la plantilla (opcional)
-   * @param text Texto plano (si no se usa plantilla)
+   * Envía un correo electrónico de forma síncrona.
+   * Si el envío falla o se alcanza el límite diario, lanza una excepción.
    */
   async sendMail(
     to: string,
@@ -21,13 +24,32 @@ export class MailService {
     template?: string,
     context?: any,
     text?: string,
+    attachments?: any[],
   ) {
-    try {
-      const options: any = {
-        to,
-        subject,
-      };
+    // 1. Control de Límite Diario (Para cuentas Free)
+    const limit = parseInt(process.env.MAIL_DAILY_LIMIT || '100', 10);
+    const countToday = await this.mailLogRepository.createQueryBuilder('log')
+      .where('log.estado = :estado', { estado: 'enviado' })
+      .andWhere('log.fecha_creacion >= CURRENT_DATE')
+      .getCount();
 
+    if (countToday >= limit) {
+      this.logger.warn(`Límite diario de correos alcanzado (${countToday}/${limit}). Bloqueando envío a ${to}.`);
+      throw new Error(`Servicio de mensajería temporalmente agotado (Límite diario alcanzado). Intente mañana o contacte a soporte.`);
+    }
+
+    // 2. Registrar intención de envío
+    const logEntry = new MailLog();
+    logEntry.destinatario = to;
+    logEntry.asunto = subject;
+    logEntry.template = template || undefined;
+    logEntry.contexto = context ? JSON.stringify(context) : undefined;
+    logEntry.estado = 'pendiente';
+
+    const log = await this.mailLogRepository.save(logEntry);
+
+    try {
+      const options: any = { to, subject, attachments };
       if (template) {
         options.template = template;
         options.context = context;
@@ -36,15 +58,30 @@ export class MailService {
       }
 
       const info = await this.mailerService.sendMail(options);
-      this.logger.log(`Correo enviado exitosamente a ${to}. MessageId: ${info.messageId}`);
+
+      // 3. Éxito: Actualizar log
+      await this.mailLogRepository.update(log.id, {
+        estado: 'enviado',
+        message_id: info.messageId,
+        fecha_envio: new Date(),
+      });
+
+      this.logger.log(`Correo enviado correctamente a ${to}. [${countToday + 1}/${limit}] MessageId: ${info.messageId}`);
       return info;
     } catch (error) {
-      // Solo logueamos el error — NO lo relanzamos para que los flujos de negocio
-      // (aprobación, rechazo) no fallen por un problema de correo
-      this.logger.error(`Error enviando correo a ${to}: ${error.message}`, error.stack);
-      return null; // Retorna null en lugar de lanzar excepción
+      // 4. Fallo: Registrar error y relanzar la excepción
+      await this.mailLogRepository.update(log.id, {
+        estado: 'fallido',
+        error: error.message,
+      });
+
+      this.logger.error(`Error crítico enviando correo a ${to}: ${error.message}`);
+      throw error; 
     }
   }
+
+
+
 
   /**
    * Envía correo de aprobación de cuenta con contraseña temporal.
@@ -79,7 +116,7 @@ export class MailService {
   }
 
   /**
-   * Envía correo de rechazo de cuenta.
+   * Envía correo de rechazo de solicitud inicial.
    */
   async sendAccountRejectionEmail(to: string, name: string, reason?: string) {
     return this.sendMail(
@@ -89,6 +126,19 @@ export class MailService {
       { name, reason },
     );
   }
+
+  /**
+   * Envía correo de cuenta desactivada (para cuentas que ya estaban activas).
+   */
+  async sendAccountDeactivationEmail(to: string, name: string) {
+    return this.sendMail(
+      to,
+      'Cuenta Desactivada',
+      'deactivation',
+      { name },
+    );
+  }
+
 
   /**
    * Envía correo de confirmación de inscripción.
@@ -129,8 +179,20 @@ export class MailService {
   }
 
   /**
-   * Ejemplo de método para un correo de bienvenida.
+   * Envía correo de bienvenida tras el registro exitoso.
    */
+  async sendWelcomeRegistrationEmail(to: string, name: string) {
+    return this.sendMail(
+      to,
+      '¡Bienvenido a la Plataforma!',
+      'welcome-registration',
+      { 
+        name,
+        loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
+      },
+    );
+  }
+
   async sendWelcomeEmail(to: string, name: string) {
     return this.sendMail(
       to,

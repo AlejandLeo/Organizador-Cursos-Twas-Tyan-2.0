@@ -55,6 +55,17 @@ export class Evento {
   @Column({ type: 'integer', default: 1 })
   estado: number;
 
+  /** 
+   * Fase del evento: 
+   * 1: Planificación (Oculto)
+   * 2: Inscripciones Abiertas (Público)
+   * 3: En Ejecución
+   * 4: Finalizado (Emisión de certificados habilitada)
+   * 5: Archivado (Solo visible para Super Admin)
+   */
+  @Column({ type: 'integer', default: 1 })
+  fase: number;
+
   /** UUID para localizar el archivo de logo en el servidor. */
   @Column({ length: 255, nullable: true })
   logo: string;

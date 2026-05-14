@@ -453,8 +453,9 @@ export class UsuariosController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateUsuarioDto: UpdateUsuarioDto,
+    @Query('notificar') notificar?: string,
   ) {
-    return this.usuariosService.update(id, updateUsuarioDto);
+    return this.usuariosService.update(id, updateUsuarioDto, notificar !== 'false');
   }
 
   /**
@@ -467,8 +468,11 @@ export class UsuariosController {
   @ApiBearerAuth()
   @Delete(':id')
   @ApiOperation({ summary: 'Deshabilitar usuario (Coord/Admin)' })
-  deshabilitarUsuario(@Param('id', ParseIntPipe) id: number) {
-    return this.usuariosService.deshabilitarUsuario(id);
+  deshabilitarUsuario(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('notificar') notificar?: string,
+  ) {
+    return this.usuariosService.deshabilitarUsuario(id, notificar !== 'false');
   }
 
   // ══════════════════════════════════════════════════════════
