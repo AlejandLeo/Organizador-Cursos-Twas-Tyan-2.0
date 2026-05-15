@@ -52,7 +52,7 @@ const currentStep = ref(1);
 const totalSteps = 7;
 const slideDir = ref<'forward' | 'backward'>('forward');
 const isAdminContext = computed(() => {
-  return route.path.startsWith('/admin') || authStore.user?.id_rol === 1;
+  return route.path.startsWith('/admin') || authStore.id_rol === 1;
 });
 
 const themeColor = computed(() => isAdminContext.value ? 'red' : 'blue');

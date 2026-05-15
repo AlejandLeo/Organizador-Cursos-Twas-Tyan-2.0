@@ -59,7 +59,7 @@
             <div v-else-if="filteredEvents.length > 0" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 <EventCard
                 v-for="course in filteredEvents"
-                :key="course.id_eventos"
+                :key="course.id"
                 :event="course"
                 />
             </div>

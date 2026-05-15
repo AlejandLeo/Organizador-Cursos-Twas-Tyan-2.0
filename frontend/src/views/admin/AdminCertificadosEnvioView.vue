@@ -6,11 +6,11 @@ import Swal from 'sweetalert2';
 interface Certificado {
   id: number;
   codigo_certificado: string;
-  estado_envio: string;
-  fecha_ultimo_envio: string | null;
-  log_error_envio: string | null;
-  reintentos: number;
-  usuario: {
+  estado_envio?: string;
+  fecha_ultimo_envio?: string | null;
+  log_error_envio?: string | null;
+  reintentos?: number;
+  usuario?: {
     id: number;
     email: string;
     persona: {
@@ -18,7 +18,7 @@ interface Certificado {
       primer_apellido: string;
     }
   };
-  actividadAcademica: {
+  actividadAcademica?: {
     nombre: string;
     evento: {
       nombre: string;
@@ -46,8 +46,8 @@ const isSavingEmail = ref(false);
 const filteredCertificados = computed(() => {
   return certificados.value.filter(c => {
     const matchEvent = !filterEvent.value ||
-      c.actividadAcademica.evento.nombre.toLowerCase().includes(filterEvent.value.toLowerCase()) ||
-      c.actividadAcademica.nombre.toLowerCase().includes(filterEvent.value.toLowerCase());
+      c.actividadAcademica?.evento.nombre.toLowerCase().includes(filterEvent.value.toLowerCase()) ||
+      c.actividadAcademica?.nombre.toLowerCase().includes(filterEvent.value.toLowerCase());
     const matchStatus = !filterStatus.value || c.estado_envio === filterStatus.value;
     return matchEvent && matchStatus;
   });
@@ -82,7 +82,7 @@ const handleSendMasivo = async () => {
   if (selectedIds.value.length === 0) return;
 
   const problematicos = certificados.value.filter(
-    c => selectedIds.value.includes(c.id) && c.actividadAcademica.evento.fase < 4
+    c => selectedIds.value.includes(c.id) && (c.actividadAcademica?.evento.fase || 0) < 4
   );
 
   if (problematicos.length > 0) {
@@ -154,7 +154,7 @@ const handleReintentarFallidos = async () => {
 
 // ── Reintento individual ──────────────────────────────────────
 const reintentarUno = async (cert: Certificado) => {
-  if (cert.actividadAcademica.evento.fase < 4) {
+  if ((cert.actividadAcademica?.evento.fase || 0) < 4) {
     Swal.fire('Atención', 'El evento aún no está en fase "Finalizado".', 'warning');
     return;
   }
@@ -174,7 +174,7 @@ const reintentarUno = async (cert: Certificado) => {
 // ── Modal edición de email ────────────────────────────────────
 const abrirEditarEmail = (cert: Certificado) => {
   emailModalCert.value = cert;
-  emailModalValue.value = cert.usuario.email;
+  emailModalValue.value = cert.usuario?.email || '';
   showEmailModal.value = true;
 };
 
@@ -194,6 +194,7 @@ const guardarEmail = async () => {
 
   try {
     isSavingEmail.value = true;
+    if (!emailModalCert.value.usuario) return;
     await certificadosService.editarEmailUsuario(emailModalCert.value.usuario.id, nuevoEmail);
     // Actualizar localmente sin recargar
     emailModalCert.value.usuario.email = nuevoEmail;
@@ -329,13 +330,13 @@ onMounted(fetchCertificados);
               <td class="px-6 py-4">
                 <div class="flex items-center gap-3">
                   <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-gray-800 text-slate-600 flex items-center justify-center font-black text-xs flex-shrink-0">
-                    {{ cert.usuario.persona?.nombres?.charAt(0) || '?' }}
+                    {{ cert.usuario?.persona?.nombres?.charAt(0) || '?' }}
                   </div>
                   <div class="min-w-0">
                     <p class="text-sm font-bold text-slate-800 dark:text-white truncate">
-                      {{ cert.usuario.persona?.nombres }} {{ cert.usuario.persona?.primer_apellido }}
+                      {{ cert.usuario?.persona?.nombres }} {{ cert.usuario?.persona?.primer_apellido }}
                     </p>
-                    <p class="text-[10px] text-slate-500 font-medium truncate">{{ cert.usuario.email }}</p>
+                    <p class="text-[10px] text-slate-500 font-medium truncate">{{ cert.usuario?.email }}</p>
                   </div>
                 </div>
               </td>
@@ -343,13 +344,13 @@ onMounted(fetchCertificados);
               <!-- Evento -->
               <td class="px-6 py-4">
                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-tighter flex items-center gap-1">
-                  {{ cert.actividadAcademica.evento.nombre }}
-                  <span v-if="cert.actividadAcademica.evento.fase < 4"
+                  {{ cert.actividadAcademica?.evento.nombre }}
+                  <span v-if="(cert.actividadAcademica?.evento.fase || 0) < 4"
                         class="text-[8px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-black">
                     No Finalizado
                   </span>
                 </p>
-                <p class="text-xs font-bold text-slate-700 dark:text-gray-300 mt-0.5">{{ cert.actividadAcademica.nombre }}</p>
+                <p class="text-xs font-bold text-slate-700 dark:text-gray-300 mt-0.5">{{ cert.actividadAcademica?.nombre }}</p>
               </td>
 
               <!-- Estado -->
@@ -363,7 +364,7 @@ onMounted(fetchCertificados);
                   }" class="px-2.5 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-widest">
                     {{ cert.estado_envio }}
                   </span>
-                  <span v-if="cert.reintentos > 0" class="text-[8px] text-slate-400">
+                  <span v-if="(cert.reintentos || 0) > 0" class="text-[8px] text-slate-400">
                     {{ cert.reintentos }} intento{{ cert.reintentos !== 1 ? 's' : '' }}
                   </span>
                 </div>
@@ -449,7 +450,7 @@ onMounted(fetchCertificados);
               <p class="text-sm text-slate-500 mb-4">
                 Corrija el correo electrónico de
                 <strong class="text-slate-800 dark:text-white">
-                  {{ emailModalCert?.usuario.persona?.nombres }} {{ emailModalCert?.usuario.persona?.primer_apellido }}
+                  {{ emailModalCert?.usuario?.persona?.nombres }} {{ emailModalCert?.usuario?.persona?.primer_apellido }}
                 </strong>
                 y luego reintente el envío.
               </p>

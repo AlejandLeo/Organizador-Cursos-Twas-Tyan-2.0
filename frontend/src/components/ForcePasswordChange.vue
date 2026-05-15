@@ -23,7 +23,8 @@ const handleUpdatePassword = async () => {
 
   try {
     isSubmitting.value = true;
-    const userId = authStore.user.id;
+    const userId = authStore.user?.id;
+    if (!userId) throw new Error('Usuario no identificado');
     
     await usuariosService.update(userId, { 
       password: password.value, 
@@ -31,7 +32,9 @@ const handleUpdatePassword = async () => {
     });
     
     await Swal.fire('¡Éxito!', 'Tu contraseña ha sido actualizada. Ya puedes usar el sistema.', 'success');
-    authStore.user.requiere_cambio_password = false;
+    if (authStore.user) {
+      authStore.user.requiere_cambio_password = false;
+    }
   } catch (error: any) {
     let msg = error.response?.data?.message || 'No se pudo actualizar la contraseña.';
     if (Array.isArray(msg)) msg = msg.join(' | ');

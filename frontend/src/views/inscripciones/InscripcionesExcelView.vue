@@ -12,6 +12,7 @@ const notificar = ref(true);
 // --- Previsualización ---
 const previewData = ref<any[]>([]);
 const selectedFile = ref<File | null>(null);
+const fileInput = ref<HTMLInputElement | null>(null);
 
 // --- Resultados de la importación ---
 const results = ref<any>(null);
@@ -35,8 +36,10 @@ const handleFile = (file: File) => {
     const data = new Uint8Array(e.target.result);
     const workbook = XLSX.read(data, { type: 'array' });
     const firstSheetName = workbook.SheetNames[0];
+    if (!firstSheetName) return;
     const worksheet = workbook.Sheets[firstSheetName];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+    if (!worksheet) return;
+    const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
     
     previewData.value = jsonData.slice(0, 5); // Mostrar solo las primeras 5 filas
     selectedFile.value = file;
@@ -190,7 +193,7 @@ const getStatusIcon = (status: string) => {
             @dragover.prevent
             @drop.prevent="handleDrop"
             class="border-2 border-dashed border-slate-200 dark:border-white/10 rounded-3xl p-12 flex flex-col items-center justify-center transition-all hover:border-umsa-blue/50 hover:bg-umsa-blue/5 group cursor-pointer"
-            @click="$refs.fileInput.click()"
+            @click="fileInput?.click()"
           >
             <input type="file" ref="fileInput" class="hidden" accept=".xlsx, .xls" @change="onFileChange">
             <div class="w-16 h-16 rounded-2xl bg-slate-50 dark:bg-white/5 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">

@@ -16,7 +16,7 @@ const loadPhoto = async () => {
     if (photoRes.status === 200 && photoRes.data && photoRes.data.byteLength > 0) {
       const text = new TextDecoder().decode(photoRes.data);
       if (text !== 'NONE') {
-        const blob = new Blob([photoRes.data], { type: photoRes.headers['content-type'] || 'image/jpeg' });
+        const blob = new Blob([photoRes.data], { type: (photoRes.headers['content-type'] as any) || 'image/jpeg' });
         if (profilePhotoUrl.value) URL.revokeObjectURL(profilePhotoUrl.value);
         profilePhotoUrl.value = URL.createObjectURL(blob);
       }

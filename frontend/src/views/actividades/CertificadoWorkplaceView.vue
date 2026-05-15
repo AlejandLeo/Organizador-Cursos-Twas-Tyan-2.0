@@ -67,8 +67,9 @@ const onFileChange = async (e: Event) => {
     const target = e.target as HTMLInputElement
     if (target.files && target.files.length > 0) {
         const file = target.files[0]
+        if (!file) return;
         const formData = new FormData()
-        formData.append('fondo', file)
+        formData.append('fondo', file as Blob)
         try {
             Swal.fire({ title: 'Subiendo fondo...', didOpen: () => Swal.showLoading() })
             await api.post(`/info-certificados/${infoCertificado.value.id}/fondo`, formData, {

@@ -418,7 +418,7 @@ const handleCreateEvento = async () => {
          fecha_fin: '',
          ubicacion: '',
          direccion: '',
-         estado: 2,
+         fase: 1,
          version: '',
          fondo_img: null,
          logo_img: null, // Incluimos logo_img para evitar error de TS
@@ -495,10 +495,10 @@ const editarGestion = (gestion: any) => {
         institucion_badge: gestion.institucion_badge || 'Evento Oficial OEA/TYAN',
         link_facebook: gestion.link_facebook || '',
         link_web: gestion.link_web || '',
-        estado: gestion.estado,
+        fase: gestion.fase,
+        ponentes_seleccionados: [],
         fondo_img: null,
         logo_img: null,
-        fase: gestion.fase || 1,
         cronograma: '',
         cronograma_lista: []
     };

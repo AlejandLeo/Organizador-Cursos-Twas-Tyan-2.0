@@ -20,7 +20,7 @@ export const usuariosService = {
     nombres: string;
     primer_apellido: string;
     segundo_apellido?: string;
-    cedula?: string;
+    documento_identidad?: string;
     id_rol: number;
   }) {
     return api.post<Usuario>('/usuarios/ponente', data);

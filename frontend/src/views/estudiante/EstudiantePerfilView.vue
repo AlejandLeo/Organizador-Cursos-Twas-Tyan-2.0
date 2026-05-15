@@ -99,7 +99,7 @@ const loadPhoto = async () => {
       return;
     }
 
-    const blob = new Blob([photoRes.data], { type: photoRes.headers['content-type'] || 'image/jpeg' });
+    const blob = new Blob([photoRes.data], { type: (photoRes.headers['content-type'] as any) || 'image/jpeg' });
     
     // Verificar si el contenido es el texto "NONE" (caso especial del backend)
     const text = new TextDecoder().decode(photoRes.data);
@@ -171,8 +171,9 @@ const uploadFile = async (file: File) => {
 const handlePhotoUpload = async (e: Event) => {
   if (isCompleted.value && !!profilePhotoUrl.value) return;
   const target = e.target as HTMLInputElement;
-  if (!target.files || !target.files.length) return;
-  await uploadFile(target.files[0]);
+  if (target.files && target.files.length > 0) {
+    await uploadFile(target.files[0] as File);
+  }
 };
 
 const handleDrop = async (e: DragEvent) => {
@@ -181,7 +182,7 @@ const handleDrop = async (e: DragEvent) => {
   if (isCompleted.value && !!profilePhotoUrl.value) return;
   if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
     const file = e.dataTransfer.files[0];
-    if (file.type.startsWith('image/')) {
+    if (file && file.type.startsWith('image/')) {
       await uploadFile(file);
     } else {
       error.value = 'El archivo debe ser una imagen.';
