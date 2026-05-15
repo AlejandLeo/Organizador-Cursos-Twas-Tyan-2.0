@@ -19,7 +19,7 @@ const uiStore = useUIStore();
             <span class="material-symbols-outlined text-white text-[16px]">support_agent</span>
           </div>
           <div class="hidden sm:block">
-            <p class="text-[10px] font-black text-teal-600 dark:text-teal-500 uppercase tracking-widest leading-none">Sistema TYAN</p>
+            <p class="text-[10px] font-black text-teal-600 dark:text-teal-500 uppercase tracking-widest leading-none">Sistema SGEA</p>
             <h1 class="text-sm font-black text-slate-800 dark:text-white leading-tight">Panel de Logística</h1>
           </div>
         </div>

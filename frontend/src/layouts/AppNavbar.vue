@@ -95,10 +95,10 @@ onMounted(async () => {
             <div class="flex flex-col items-start justify-center">
               <div :style="{ color: eventoStore.activeEvento?.color_principal || '#004a99' }"
                    class="text-sm md:text-lg font-black uppercase tracking-tighter italic leading-none transition-colors duration-500">
-                {{ eventoStore.activeEvento?.sigla || 'TWAS-TYAN' }}
+                {{ eventoStore.activeEvento?.sigla || 'SGEA' }}
               </div>
               <h1 class="text-[6px] md:text-[7px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.15em] leading-none max-w-[120px] md:max-w-[250px] truncate">
-                {{ eventoStore.activeEvento?.nombre || 'The World Academy of Sciences' }}
+                {{ eventoStore.activeEvento?.nombre || 'Sistema de Gestión de Eventos y Actividades' }}
               </h1>
             </div>
           </RouterLink>
@@ -177,8 +177,8 @@ onMounted(async () => {
           <div class="hidden sm:flex items-center gap-2 border-l pl-4 border-slate-200 dark:border-slate-800 ml-1">
              <a href="https://www.fcpn.edu.bo/" target="_blank" 
                 class="w-10 h-10 flex items-center justify-center hover:scale-110 transition-all cursor-pointer">
-               <img :src="eventoStore.activeEvento?.logo ? `http://localhost:3000/uploads/logo/${eventoStore.activeEvento.logo}` : 'http://localhost:3000/uploads/logo/EscudoFCPN.png'" 
-                    class="w-full h-full object-contain dark:opacity-90" :alt="eventoStore.activeEvento?.logo ? 'Logo Evento' : 'FCPN'" />
+               <img src="/logo/logoOficial.png" 
+                    class="w-full h-full object-contain dark:opacity-90" alt="Logo Oficial" />
              </a>
              <a href="https://www.umsa.bo/" target="_blank" 
                 class="w-10 h-10 rounded-full border border-slate-100 dark:border-slate-700 p-1 flex items-center justify-center bg-white dark:bg-slate-900 shadow-sm hover:scale-110 transition-all cursor-pointer">

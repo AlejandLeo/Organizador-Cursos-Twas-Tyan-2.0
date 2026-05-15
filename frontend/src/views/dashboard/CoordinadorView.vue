@@ -149,7 +149,7 @@ onMounted(cargarDatos);
           Centro de Mando
         </h2>
         <p class="text-sm text-slate-400 dark:text-gray-500 mt-1">
-          Monitoreo en tiempo real · TYAN Gestión Académica UMSA
+          Monitoreo en tiempo real · SGEA Gestión Académica UMSA
         </p>
       </div>
       <div class="flex items-center gap-3 flex-wrap">
@@ -298,7 +298,7 @@ onMounted(cargarDatos);
         </div>
         <div>
           <p class="text-xs font-black text-slate-600 dark:text-gray-300 uppercase tracking-tight italic">Vista Pública</p>
-          <p class="text-[10px] text-slate-400 mt-0.5">Ver portal externo TYAN</p>
+          <p class="text-[10px] text-slate-400 mt-0.5">Ver portal externo SGEA</p>
         </div>
       </button>
     </div>

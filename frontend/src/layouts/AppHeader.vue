@@ -59,7 +59,7 @@ const studentNotificationsRef = ref<HTMLElement | null>(null);
 
 const isCoordinadorOrAdmin = computed(() => {
   const roles = Array.isArray(authStore.user?.usuariosRoles) 
-    ? authStore.user!.usuariosRoles.map((ur: any) => ur.rol?.nombre_rol) 
+    ? authStore.user!.usuariosRoles.map((ur: { rol?: { nombre_rol?: string } }) => ur.rol?.nombre_rol) 
     : [];
   return roles.includes('Coordinador') || roles.includes('Super Usuario');
 });
@@ -67,7 +67,7 @@ const isCoordinadorOrAdmin = computed(() => {
 const isStudent = computed(() => {
   if (!authStore.user) return false;
   const roles = Array.isArray(authStore.user?.usuariosRoles) 
-    ? authStore.user!.usuariosRoles.map((ur: any) => ur.rol?.nombre_rol) 
+    ? authStore.user!.usuariosRoles.map((ur: { rol?: { nombre_rol?: string } }) => ur.rol?.nombre_rol) 
     : [];
   return roles.includes('Estudiante') || (!isCoordinadorOrAdmin.value);
 });
@@ -172,6 +172,17 @@ const goToProfile = () => {
       <div class="flex flex-col flex-shrink-0 cursor-pointer border-r border-slate-200 dark:border-gray-800 pr-4 md:pr-6 justify-center">
         <h2 class="text-black dark:text-white font-clarendon font-black text-[10px] md:text-xs tracking-tighter leading-none">Sistema de Gestión de Eventos</h2>
         <p class="text-[8px] text-slate-500 dark:text-gray-400 font-clarendon mt-0.5">Plataforma Académica</p>
+      </div>
+
+      <!-- Selector Móvil (Visible solo en móvil al lado del logo) -->
+      <div class="lg:hidden flex-1 max-w-[180px] relative group/select ml-2">
+        <select :value="eventoStore.selectedEventoNombre" @change="onNombreChange"
+          style="text-align: left !important; text-align-last: left !important;"
+          :class="[(eventoStore.activeEvento?.estado === 1 || eventoStore.activeEvento?.estado === 2) ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-500 dark:border-emerald-600 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-gray-800 border-slate-300 dark:border-gray-700 text-slate-500 dark:text-gray-400']"
+          class="w-full border text-[10px] font-black rounded-lg py-1.5 pl-2 pr-6 appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all truncate">
+          <option v-for="(nombre, idx) in eventoStore.nombresEventos" :key="idx" :value="nombre">{{ nombre }}</option>
+        </select>
+        <span class="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">unfold_more</span>
       </div>
 
       <!-- Selector Móvil (Visible solo en móvil al lado del logo) -->

@@ -191,18 +191,17 @@ onMounted(async () => {
   // Cargar foto de perfil - Manejo silencioso
   try {
     const photoRes = await api.get('/usuarios/perfil/foto', { 
-      responseType: 'arraybuffer'
+      responseType: 'blob'
     });
     
-    if (photoRes.status === 200 && photoRes.data && photoRes.data.byteLength > 0) {
-      // Verificar si es el texto "NONE"
-      const text = new TextDecoder().decode(photoRes.data);
+    if (photoRes.status === 200) {
+      // Si el backend envió 'NONE', es que no hay foto
+      const text = await photoRes.data.text();
       if (text === 'NONE') {
         profilePhotoUrl.value = '';
       } else {
-        const blob = new Blob([photoRes.data], { type: photoRes.headers['content-type'] || 'image/jpeg' });
         if (profilePhotoUrl.value) URL.revokeObjectURL(profilePhotoUrl.value);
-        profilePhotoUrl.value = URL.createObjectURL(blob);
+        profilePhotoUrl.value = URL.createObjectURL(photoRes.data);
       }
     } else {
       profilePhotoUrl.value = '';
@@ -210,7 +209,6 @@ onMounted(async () => {
   } catch (e) {
     profilePhotoUrl.value = '';
   }
-
 })
 
 onUnmounted(() => {
@@ -227,8 +225,8 @@ onUnmounted(() => {
       </button>
 
       <div class="hidden sm:flex flex-col flex-shrink-0 cursor-pointer border-r border-slate-200 dark:border-gray-800 pr-4 md:pr-6 ml-2" @click="$router.push('/ponente')">
-        <h2 class="text-black dark:text-white font-clarendon font-black text-[10px] md:text-xs tracking-tighter leading-none">Sistema de Gestión de Eventos</h2>
-        <p class="text-[8px] text-slate-500 dark:text-gray-400 font-clarendon mt-0.5">Plataforma Académica</p>
+        <h2 class="text-primary-dark dark:text-white font-black italic text-xl md:text-2xl tracking-tighter leading-none">twas</h2>
+        <p class="text-[6px] leading-tight text-primary-dark/60 dark:text-gray-400 uppercase font-bold tracking-tighter">The World Academy of Sciences</p>
       </div>
 
       <h1 class="text-xs md:text-lg font-black text-umsa-blue dark:text-blue-500 tracking-widest uppercase italic truncate ml-4 lg:ml-6 border-r border-slate-200 dark:border-gray-800 pr-4 md:pr-6">
@@ -293,7 +291,7 @@ onUnmounted(() => {
 
       <!-- Menú Perfil SSA Style -->
       <div class="relative" ref="profileDropdownRef" @click.stop>
-        <button @click="toggleProfile" class="flex items-center gap-2 md:gap-3 bg-slate-50 dark:bg-gray-900 border border-slate-200 dark:border-gray-700 hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors rounded-xl pr-2 md:pr-3 py-1 pl-1 shadow-sm">
+        <button @click="isProfileOpen = !isProfileOpen" class="flex items-center gap-2 md:gap-3 bg-slate-50 dark:bg-gray-900 border border-slate-200 dark:border-gray-700 hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors rounded-xl pr-2 md:pr-3 py-1 pl-1 shadow-sm">
           <div class="h-8 w-8 rounded-full overflow-hidden bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 p-0 flex items-center justify-center shrink-0">
             <img v-if="profilePhotoUrl" :src="profilePhotoUrl" alt="Foto" class="w-full h-full object-cover" />
             <span v-else class="material-symbols-outlined text-2xl text-slate-400">account_circle</span>

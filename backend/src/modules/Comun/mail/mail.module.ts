@@ -20,10 +20,10 @@ import { MailLog } from './entities/mail-log.entity';
           secure: config.get('MAIL_PORT') === '465',
           auth: {
             user: config.get('MAIL_USER'),
-            pass: config.get('MAIL_PASSWORD'),
+            pass: config.get('MAIL_PASS'),
           },
           tls: {
-            rejectUnauthorized: false,
+            rejectUnauthorized: false, // Permite certificados auto-firmados
           },
         },
         defaults: {

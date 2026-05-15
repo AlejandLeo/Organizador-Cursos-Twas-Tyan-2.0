@@ -51,6 +51,15 @@ const editEventoId = ref<number | null>(null);
 const currentStep = ref(1);
 const totalSteps = 7;
 const slideDir = ref<'forward' | 'backward'>('forward');
+const isAdminContext = computed(() => {
+  return route.path.startsWith('/admin') || authStore.user?.id_rol === 1;
+});
+
+const themeColor = computed(() => isAdminContext.value ? 'red' : 'blue');
+const themeBg = computed(() => isAdminContext.value ? 'bg-red-600' : 'bg-blue-600');
+const themeShadow = computed(() => isAdminContext.value ? 'shadow-red-500/20' : 'shadow-blue-500/20');
+const themeHover = computed(() => isAdminContext.value ? 'hover:bg-red-700' : 'hover:bg-blue-700');
+
 const previewTransition = computed(() =>
     slideDir.value === 'forward' ? 'preview-slide-forward' : 'preview-slide-backward'
 );
@@ -108,7 +117,6 @@ const formEvento = ref({
   nombre_2: '',
   prioridad: '3',
   visibilidad_al_finalizar: 'visible',
-  fase: 1, // 1: Planificación, 2: Inscripciones, 3: Ejecución, 4: Finalizado, 5: Archivado
   // Paso 6: Contacto, Organización y Auspicios
   contacto_donde: '',
   contacto_telefono: '',
@@ -135,7 +143,11 @@ const confirmarCancelar = () => {
         cancelButtonText: 'No, seguir editando'
     }).then((result) => {
         if (result.isConfirmed) {
-            isCreatingEvento.value = false;
+            if (isAdminContext.value) {
+                router.push({ name: 'admin-gestion' });
+            } else {
+                isCreatingEvento.value = false;
+            }
         }
     });
 };
@@ -168,8 +180,7 @@ const resetFormEvento = () => {
         contacto_email: '',
         auspicios: [],
         prioridad: '3',
-        visibilidad_al_finalizar: 'visible',
-        fase: 1
+        visibilidad_al_finalizar: 'visible'
     };
 };
 
@@ -453,7 +464,6 @@ const handleSaveEvento = async () => {
         formData.append('nombre_2', formEvento.value.nombre_2 || '');
         formData.append('prioridad', formEvento.value.prioridad || '3');
         formData.append('visibilidad_al_finalizar', formEvento.value.visibilidad_al_finalizar || 'visible');
-        formData.append('fase', formEvento.value.fase.toString());
 
         // Contacto y Auspicios
         formData.append('telefono', formEvento.value.contacto_telefono || '');
@@ -557,8 +567,7 @@ const editarEvento = (evento: any) => {
         contacto_email: evento.email || '',
         auspicios: [],
         prioridad: evento.prioridad || '3',
-        visibilidad_al_finalizar: evento.visibilidad_al_finalizar || 'visible',
-        fase: evento.fase || 1
+        visibilidad_al_finalizar: evento.visibilidad_al_finalizar || 'visible'
     };
 
     if (evento.organizadores) {
@@ -729,19 +738,50 @@ const resetNuevaActividad = (eventoId: number) => {
     currentStep.value = 1;
 };
 
+const prepararEdicionActividad = async (actId: number) => {
+    try {
+        isLoading.value = true;
+        const res = await api.get(`/actividades-academicas/${actId}`);
+        const act = res.data;
+        
+        isEditingActividad.value = true;
+        editActividadId.value = act.id;
+        isCreating.value = true;
+        currentStep.value = 1;
+
+        nuevaActividad.value = {
+            nombre: act.nombre || '',
+            tipo: act.tipo || 'Diplomado',
+            tipoPersonalizado: '',
+            descripcion: act.descripcion || '',
+            id_evento: act.evento?.id || act.id_evento,
+            min_nota: act.min_nota || 71,
+            min_asistencia: act.min_asistencia || 80,
+            modalidad: act.modalidad || 'Presencial',
+            fecha_inicio: act.fecha_inicio ? act.fecha_inicio.split('T')[0] : '',
+            fecha_fin: act.fecha_fin ? act.fecha_fin.split('T')[0] : '',
+            sesiones: act.sesiones || [],
+            requisitos: typeof act.requisitos === 'string' ? JSON.parse(act.requisitos) : (act.requisitos || { base: {}, custom: [] }),
+            lockTipo: true
+        };
+        
+        if (act.imagen) {
+            imagenPreview.value = act.imagen;
+        }
+    } catch (e) {
+        console.error("Error al preparar edición de actividad:", e);
+        Swal.fire('Error', 'No se pudo cargar la actividad para editar.', 'error');
+    } finally {
+        isLoading.value = false;
+    }
+};
+
 const editarActividad = (act: any) => {
-  const evento = eventosPublicados.value.find((e: any) => e.id === act.id_evento);
-  if (evento && (evento.estado === 0 || evento.estado === 'Cerrado' || evento.estado === 'Concluido')) {
-    Swal.fire({
-      icon: 'info',
-      title: 'Modo de Solo Lectura',
-      text: 'El evento principal está finalizado. Solo puede visualizar la actividad.',
-      confirmButtonColor: '#0070b4'
-    });
-    openDetalleCurso(act.id); 
-    return;
+  if (isAdminContext.value) {
+    prepararEdicionActividad(act.id);
+  } else {
+    openDetalleCurso(act.id, { edit: 'true' });
   }
-  openDetalleCurso(act.id, { edit: 'true' });
 };
 
 const inhabilitarActividad = async (id: number, nombre: string) => {
@@ -893,8 +933,6 @@ const publicarActividad = async () => {
             }
         });
 
-        isCreating.value = false;
-        
         registrarAccion(
           'actividad',
           isEditingActividad.value ? 'editar' : 'crear',
@@ -911,12 +949,16 @@ const publicarActividad = async () => {
             }
           }
         );
-        
-        imagenArchivo.value = null;
-        imagenPreview.value = null;
-        nuevaActividad.value.sesiones = [];
-        
-        fetchEventos();
+
+        if (isAdminContext.value) {
+            router.push({ name: 'admin-gestion' });
+        } else {
+            isCreating.value = false;
+            imagenArchivo.value = null;
+            imagenPreview.value = null;
+            nuevaActividad.value.sesiones = [];
+            fetchEventos();
+        }
     } catch (error: any) {
         console.error(error);
         Swal.fire({
@@ -940,22 +982,6 @@ const eventoActual = computed(() => {
     return eventosPublicados.value.find(ev => ev.id === nuevaActividad.value.id_evento);
 });
 
-onMounted(async () => {
-    console.log("DIAGNÓSTICO: Componente montado. Iniciando carga de datos...");
-    await eventoStore.fetchEventosInfo();
-    await fetchEventos();
-    fetchPonentesYGrados();
-
-    if (route.query.edit) {
-        const evToEdit = eventosPublicados.value.find(ev => ev.id === Number(route.query.edit));
-        if (evToEdit) {
-            editarEvento(evToEdit);
-            if (route.query.step) {
-                currentStep.value = Number(route.query.step);
-            }
-        }
-    }
-});
 
 watch(() => eventoStore.selectedEventoId, () => {
     fetchEventos();
@@ -971,6 +997,47 @@ const getStatusColor = (status: string) => {
   return 'text-slate-500 bg-slate-100 dark:bg-gray-800 dark:text-gray-400 border border-slate-200 dark:border-gray-700';
 };
 
+onMounted(async () => {
+    console.log("DIAGNÓSTICO: Componente montado. Iniciando carga de datos...");
+    await Promise.all([
+        fetchEventos(),
+        fetchPonentesYGrados(),
+        eventoStore.fetchEventosInfo()
+    ]);
+
+    // Manejar edición desde Query Params (viniendo desde AdminGestionView)
+    if (route.query.edit) {
+        const evId = Number(route.query.edit);
+        const ev = eventosPublicados.value.find(e => e.id === evId);
+        if (ev) {
+            editarEvento(ev);
+        }
+    }
+
+    // Manejar creación directa desde Query Params (Evitar doble vista)
+    if (route.query.create === 'true') {
+        nextTick(() => {
+            isCreatingEvento.value = true;
+            isEditingEvento.value = false;
+            resetFormEvento();
+        });
+    }
+
+    // Manejar creación directa de nueva actividad (viniendo desde AdminGestionView con evento seleccionado)
+    if (route.query.newAct === 'true' && route.query.eventoId) {
+        nextTick(() => {
+            resetNuevaActividad(Number(route.query.eventoId));
+            isCreating.value = true;
+        });
+    }
+
+    // Manejar edición profunda de actividad (viniendo desde AdminGestionView)
+    if (route.query.editAct) {
+        nextTick(() => {
+            prepararEdicionActividad(Number(route.query.editAct));
+        });
+    }
+});
 
 const changeStep = (delta: number) => {
   const nextStep = currentStep.value + delta;
@@ -1010,7 +1077,8 @@ const changeStep = (delta: number) => {
         
         <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
           <button @click="isCreatingEvento = true; isEditingEvento = false; resetFormEvento()" 
-            class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-black px-8 py-4 rounded-2xl text-[12px] uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:shadow-blue-500/40 hover:-translate-y-1 active:translate-y-0 transition-all flex items-center gap-3 justify-center">
+            :class="[themeBg, themeHover, themeShadow]"
+            class="w-full sm:w-auto text-white font-black px-8 py-4 rounded-2xl text-[12px] uppercase tracking-widest hover:-translate-y-1 active:translate-y-0 transition-all flex items-center gap-3 justify-center shadow-xl">
             <span class="material-symbols-outlined text-[24px]">add_business</span> NUEVO EVENTO
           </button>
         </div>
@@ -1194,7 +1262,7 @@ const changeStep = (delta: number) => {
               <h2 class="text-3xl font-black text-primary-dark dark:text-white tracking-tighter uppercase italic">Configurar Nueva Actividad</h2>
               <p class="text-slate-400 dark:text-gray-500 font-medium mt-1 text-sm">Diseño, reglas y horarios del curso.</p>
           </div>
-          <button @click="isCreating = false" class="flex items-center gap-2 px-6 py-2.5 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 font-black text-[10px] uppercase rounded-xl hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-200 transition-all shadow-sm">
+          <button @click="isAdminContext ? router.push({ name: 'admin-gestion' }) : isCreating = false" class="flex items-center gap-2 px-6 py-2.5 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 font-black text-[10px] uppercase rounded-xl hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-200 transition-all shadow-sm">
               <span class="material-symbols-outlined text-sm">arrow_back</span> Volver al Listado
           </button>
       </div>
@@ -1205,7 +1273,7 @@ const changeStep = (delta: number) => {
               
               <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
-                       :class="currentStep === 1 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(188,156,49,0.4)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
+                       :class="currentStep === 1 ? [themeBg, 'text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(188,156,49,0.4)]'] : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
                       <span class="material-symbols-outlined text-xl">demography</span>
                   </div>
                   <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 1 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Diseño</span>
@@ -1213,7 +1281,7 @@ const changeStep = (delta: number) => {
               
               <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
-                       :class="currentStep >= 2 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
+                       :class="currentStep >= 2 ? [themeBg, 'text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)]'] : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
                       <span class="material-symbols-outlined text-xl">verified</span>
                   </div>
                   <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 2 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Aprobación</span>
@@ -1221,7 +1289,7 @@ const changeStep = (delta: number) => {
 
               <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
-                       :class="currentStep >= 3 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
+                       :class="currentStep >= 3 ? [themeBg, 'text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)]'] : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
                       <span class="material-symbols-outlined text-xl">schedule</span>
                   </div>
                   <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 3 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Horarios</span>
@@ -1229,7 +1297,7 @@ const changeStep = (delta: number) => {
 
               <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
-                       :class="currentStep >= 4 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
+                       :class="currentStep >= 4 ? [themeBg, 'text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)]'] : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
                       <span class="material-symbols-outlined text-xl">person_add_alt</span>
                   </div>
                   <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 4 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Requisitos</span>
@@ -1237,7 +1305,7 @@ const changeStep = (delta: number) => {
 
               <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
-                       :class="currentStep === 5 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(188,156,49,0.4)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
+                       :class="currentStep === 5 ? [themeBg, 'text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(188,156,49,0.4)]'] : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
                       <span class="material-symbols-outlined text-xl">check_circle</span>
                   </div>
                   <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 5 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Resumen</span>
@@ -1411,7 +1479,7 @@ const changeStep = (delta: number) => {
                       <label class="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase mb-2 block">Hora Fin</label>
                       <input v-model="nuevaSesion.hora_fin" type="time" class="w-full border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-xl px-4 py-3 font-bold text-sm text-primary-dark dark:text-gray-200 focus:ring-2 focus:ring-umsa-blue outline-none transition-all cursor-pointer">
                   </div>
-                  <button @click="agregarSesion" title="Añadir Horario" class="w-12 h-[46px] flex items-center justify-center bg-primary-dark dark:bg-blue-600 hover:bg-emerald-500 dark:hover:bg-blue-500 text-white rounded-xl shadow-md transition-all mb-[1px]">
+                  <button @click="agregarSesion" title="Añadir Horario" :class="[themeBg, themeHover]" class="w-12 h-[46px] flex items-center justify-center text-white rounded-xl shadow-md transition-all mb-[1px]">
                       <span class="material-symbols-outlined text-[20px]">add</span>
                   </button>
               </div>
@@ -1612,7 +1680,8 @@ const changeStep = (delta: number) => {
           </button>
           
           <button v-if="currentStep < 5" @click="changeStep(1)" 
-            class="px-8 py-3 bg-primary-dark dark:bg-blue-600 text-white font-black text-[11px] uppercase rounded-xl hover:bg-umsa-blue dark:hover:bg-blue-500 flex items-center gap-2 transition-all shadow-xl hover:-translate-y-0.5">
+            :class="[themeBg, themeHover]"
+            class="px-8 py-3 text-white font-black text-[11px] uppercase rounded-xl flex items-center gap-2 transition-all shadow-xl hover:-translate-y-0.5">
               Continuar <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
           </button>
 
@@ -1625,8 +1694,8 @@ const changeStep = (delta: number) => {
     </div>
 
     <!-- PANEL FUSIÓN: CLON LITERAL DE GESTIÓN DE EVENTOS -->
-    <div v-if="isCreatingEvento" class="bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl shadow-umsa-blue/10 dark:shadow-black/50 border border-blue-100 dark:border-gray-800 animate-in slide-in-from-top-4 duration-500 overflow-hidden relative mb-20">
-        <div class="bg-gradient-to-r from-umsa-blue to-emerald-500 p-8 pb-10 relative overflow-hidden">
+    <div v-if="isCreatingEvento" :class="isAdminContext ? 'shadow-red-900/10 border-red-100' : 'shadow-umsa-blue/10 border-blue-100'" class="bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl dark:shadow-black/50 border dark:border-gray-800 animate-in slide-in-from-top-4 duration-500 overflow-hidden relative mb-20">
+        <div :class="isAdminContext ? 'from-red-600 to-red-800' : 'from-umsa-blue to-emerald-500'" class="bg-gradient-to-r p-8 pb-10 relative overflow-hidden">
             <span class="material-symbols-outlined absolute -right-4 -top-8 text-[120px] text-white/10 rotate-12">design_services</span>
             <div class="flex justify-between items-start relative z-20">
                 <h3 class="text-2xl md:text-3xl font-black text-white uppercase italic tracking-tighter drop-shadow-md flex items-center gap-3">
@@ -1649,8 +1718,8 @@ const changeStep = (delta: number) => {
         <div class="bg-slate-50 dark:bg-gray-800/50 border-b border-slate-100 dark:border-gray-800 px-8 py-4 flex items-center justify-between overflow-x-auto thin-scrollbar">
             <div v-for="step in totalSteps" :key="step" class="flex items-center gap-2 shrink-0">
                 <div :class="[
-                    currentStep === step ? 'bg-umsa-blue text-white ring-4 ring-blue-100 dark:ring-blue-900/30' : 
-                    (currentStep > step ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-gray-700 text-slate-500'),
+                    currentStep === step ? [themeBg, 'text-white ring-4', isAdminContext ? 'ring-red-100 dark:ring-red-900/30' : 'ring-blue-100 dark:ring-blue-900/30'] : 
+                    (currentStep > step ? (isAdminContext ? 'bg-red-800 text-white' : 'bg-emerald-500 text-white') : 'bg-slate-200 dark:bg-gray-700 text-slate-500'),
                     'w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black transition-all duration-500'
                 ]">
                     <span v-if="currentStep > step" class="material-symbols-outlined text-sm">check</span>
@@ -1755,19 +1824,9 @@ const changeStep = (delta: number) => {
                         <div class="p-6 bg-white dark:bg-gray-900 rounded-3xl border border-slate-100 dark:border-gray-800 space-y-6">
                             <div class="flex items-center gap-2">
                                 <span class="material-symbols-outlined text-amber-500 text-sm">priority_high</span>
-                                <h5 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Estado, Prioridad y Visibilidad</h5>
+                                <h5 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Prioridad y Visibilidad</h5>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div class="md:col-span-2">
-                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Fase Actual del Evento (Flujo de Trabajo)</label>
-                                    <select v-model="formEvento.fase" class="w-full bg-emerald-50 dark:bg-gray-800 border-2 border-emerald-100 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-black text-emerald-700">
-                                        <option :value="1">1. Planificación (Oculto para Estudiantes)</option>
-                                        <option :value="2">2. Inscripciones Abiertas (Público)</option>
-                                        <option :value="3">3. En Ejecución (Cerrado a nuevas inscripciones)</option>
-                                        <option :value="4">4. Finalizado (Emisión de Certificados habilitada)</option>
-                                        <option :value="5">5. Archivado (Solo visible para Super Admin)</option>
-                                    </select>
-                                </div>
                                 <div>
                                     <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Orden de Prioridad</label>
                                     <select v-model="formEvento.prioridad" class="w-full bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold">
@@ -2158,7 +2217,11 @@ const changeStep = (delta: number) => {
                         <div
                             v-if="currentStep === 1"
                             ref="heroRef"
-                            class="h-[520px] ring-4 ring-umsa-blue/40 shadow-2xl shadow-umsa-blue/20 transition-all duration-700 ease-in-out bg-slate-100 dark:bg-gray-950 rounded-[3rem] border border-slate-200 dark:border-gray-800 overflow-hidden relative group"
+                            :class="[
+                                currentStep === 1 ? 'h-[520px]' : 'h-[200px]',
+                                currentStep === 1 ? 'ring-4 ring-umsa-blue/40 shadow-2xl shadow-umsa-blue/20' : 'ring-0'
+                            ]"
+                            class="transition-all duration-700 ease-in-out bg-slate-100 dark:bg-gray-950 rounded-[3rem] shadow-2xl border border-slate-200 dark:border-gray-800 overflow-hidden relative group"
                         >
                             
                             <!-- BARRA SUPERIOR ULTRA-LIMPIA -->

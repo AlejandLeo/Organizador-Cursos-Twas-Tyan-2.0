@@ -49,15 +49,10 @@ export class EventosService {
   }
 
   async findAll() {
-
-    const query = this.eventoRepository.createQueryBuilder('evento')
-      .leftJoinAndSelect('evento.actividades', 'actividad')
-      .leftJoinAndSelect('actividad.modalidades', 'modalidad')
-      .leftJoinAndSelect('actividad.inscripciones', 'inscripcion')
-      .orderBy('evento.prioridad', 'ASC')
-      .addOrderBy('evento.fecha_creacion', 'DESC');
-
-    const eventos = await query.getMany();
+    const eventos = await this.eventoRepository.find({
+      relations: ['actividades', 'actividades.modalidades', 'actividades.inscripciones'],
+      order: { prioridad: 'ASC', fecha_creacion: 'DESC' }
+    });
     return eventos.map(evento => ({
       ...evento,
       logo: this.formatImageUrl(evento.logo, 'logo'),
@@ -188,39 +183,27 @@ export class EventosService {
       query.innerJoin('evento.coordinaciones', 'coordinacion', 'coordinacion.id_usuario = :userId', { userId: usuario.id });
     }
 
-    // 2. Filtrado por estado
-    if (estado !== undefined) {
-      query.andWhere('evento.estado = :estado', { estado });
-    }
-
-    // 3. Orden y Paginación
-    query.orderBy('evento.prioridad', 'ASC')
-      .addOrderBy('evento.fecha_creacion', 'DESC');
-
-    // Para evitar problemas de "take" con relaciones OneToMany, usamos findAndCount tradicional 
-    // si es posible, o QueryBuilder sin take si el set es pequeño.
-    const eventos = await query.getMany();
-    const total = eventos.length;
-
-    console.log(`[EventosService] findAllAdmin - Total encontrados en DB: ${total}`);
-
-    // Paginación manual simple
-    const start = (page - 1) * limit;
-    const paginated = eventos.slice(start, start + limit);
-
-    const data = paginated.map((evento) => {
-      // Forzamos la limpieza de URLS
-      return {
-        ...evento,
-        logo: this.formatImageUrl(evento.logo, 'logo'),
-        imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
-        actividades: (evento.actividades || []).map(act => ({
-          ...act,
-          estado: Number(act.estado),
-          imagen: this.formatImageUrl(act.imagen, 'cursos')
-        }))
-      };
+    const [eventos, total] = await this.eventoRepository.findAndCount({
+      relations: [
+        'actividades',
+        'actividades.modalidades',
+        'actividades.inscripciones'
+      ],
+      order: { prioridad: 'ASC', fecha_creacion: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
+
+    const data = eventos.map((evento) => ({
+      ...evento,
+      logo: this.formatImageUrl(evento.logo, 'logo'),
+      imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
+      actividades: (evento.actividades || []).map(act => ({
+        ...act,
+        estado: Number(act.estado),
+        imagen: this.formatImageUrl(act.imagen, 'cursos')
+      }))
+    }));
 
     return { data, total, page, limit };
   }

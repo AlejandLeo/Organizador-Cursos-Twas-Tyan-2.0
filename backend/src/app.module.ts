@@ -41,6 +41,7 @@ import { QrModule } from './modules/Seguridad/qr/qr.module';
 import { UploadsModule } from './modules/Comun/uploads/uploads.module';
 import { SoporteModule } from './modules/Comun/soporte/soporte.module';
 import { MailModule } from './modules/Comun/mail/mail.module';
+import { AuditLogModule } from './modules/Comun/audit-log/audit-log.module';
 
 // --- Dashboard ---
 import { CoordinadorModule } from './modules/Academico/coordinador/coordinador.module';
@@ -106,6 +107,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 
     // --- Especiales ---
     CoordinadorModule,
+    AuditLogModule,
   ],
   controllers: [AppController],
   providers: [AppService],

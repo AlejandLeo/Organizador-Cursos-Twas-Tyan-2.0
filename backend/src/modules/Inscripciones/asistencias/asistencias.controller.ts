@@ -27,7 +27,7 @@ export class AsistenciasController {
   constructor(
     private readonly service: AsistenciasService,
     private readonly qrService: QrService
-  ) {}
+  ) { }
 
   /**
    * Endpoint usado por Docente/Logística para escanear el QR del estudiante.

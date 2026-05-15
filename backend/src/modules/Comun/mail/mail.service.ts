@@ -69,14 +69,10 @@ export class MailService {
       this.logger.log(`Correo enviado correctamente a ${to}. [${countToday + 1}/${limit}] MessageId: ${info.messageId}`);
       return info;
     } catch (error) {
-      // 4. Fallo: Registrar error y relanzar la excepción
-      await this.mailLogRepository.update(log.id, {
-        estado: 'fallido',
-        error: error.message,
-      });
-
-      this.logger.error(`Error crítico enviando correo a ${to}: ${error.message}`);
-      throw error; 
+      // Solo logueamos el error — NO lo relanzamos para que los flujos de negocio
+      // (aprobación, rechazo) no fallen por un problema de correo
+      this.logger.error(`Error enviando correo a ${to}: ${error.message}`, error.stack);
+      return null; // Retorna null en lugar de lanzar excepción
     }
   }
 

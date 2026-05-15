@@ -256,11 +256,11 @@ onMounted(fetchEventos);
             <span class="material-symbols-outlined text-white text-[22px]">corporate_fare</span>
           </div>
           <div>
-            <p class="text-[10px] font-black text-red-600 dark:text-red-500 uppercase tracking-widest leading-none">Módulo Independiente</p>
+            <p class="text-[10px] font-black text-red-600 dark:text-red-500 uppercase tracking-widest leading-none">Módulo SGEA</p>
             <h1 class="text-2xl font-black text-slate-800 dark:text-white tracking-tight uppercase italic">Gestión de Eventos</h1>
           </div>
         </div>
-        <p class="text-slate-500 text-sm ml-1">Control total de eventos del sistema · {{ eventosFiltrados.length }} registros</p>
+        <p class="text-slate-500 text-sm ml-1">Control total de eventos del sistema SGEA · {{ eventosFiltrados.length }} registros</p>
       </div>
 
       <button @click="abrirCrear()"
