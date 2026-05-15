@@ -68,7 +68,7 @@ function drawHeader(doc: jsPDF, titulo: string, subtitulo: string): number {
     doc.setTextColor(C.white[0], C.white[1], C.white[2]);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
-    doc.text('TYAN · GESTIÓN ACADÉMICA — UMSA', 12, 9);
+    doc.text('SISTEMA DE GESTIÓN DE EVENTOS Y ACTIVIDADES — UMSA', 12, 9);
 
     // Fecha de generación (arriba der.)
     doc.setFont('helvetica', 'normal');
@@ -106,7 +106,7 @@ function drawFooters(doc: jsPDF): void {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7);
         doc.setTextColor(C.muted[0], C.muted[1], C.muted[2]);
-        doc.text('Sistema de Gestión Académica TYAN — UMSA', 12, H - 4);
+        doc.text('Sistema de Gestión de Eventos y Actividades — UMSA', 12, H - 4);
         doc.text(`Página ${i} / ${total}`, W - 12, H - 4, { align: 'right' });
     }
 }
@@ -208,7 +208,7 @@ export function generarPdfEventos(eventos: any[]): void {
     });
 
     drawFooters(doc);
-    doc.save(`TYAN_Eventos_${timestamp()}.pdf`);
+    doc.save(`SGEA_Eventos_${timestamp()}.pdf`);
 }
 
 export function generarExcelEventos(eventos: any[]): void {
@@ -239,7 +239,7 @@ export function generarExcelEventos(eventos: any[]): void {
     exportToExcel([
         { name: 'Todos los Eventos', rows: todos },
         { name: 'Activos', rows: activos }
-    ], 'TYAN_Eventos');
+    ], 'SGEA_Eventos');
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -314,7 +314,7 @@ export function generarPdfActividades(actividades: any[]): void {
     });
 
     drawFooters(doc);
-    doc.save(`TYAN_Actividades_${timestamp()}.pdf`);
+    doc.save(`SGEA_Actividades_${timestamp()}.pdf`);
 }
 
 export function generarExcelActividades(actividades: any[]): void {
@@ -351,7 +351,7 @@ export function generarExcelActividades(actividades: any[]): void {
         sheets.push({ name: tipo.slice(0, 30), rows: subSet });
     });
 
-    exportToExcel(sheets, 'TYAN_Actividades');
+    exportToExcel(sheets, 'SGEA_Actividades');
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -371,10 +371,10 @@ export function generarPdfGeneral(eventos: any[], actividades: any[]): void {
     doc.setTextColor(C.white[0], C.white[1], C.white[2]);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(28);
-    doc.text('TYAN', 30, 60);
+    doc.text('SGEA', 30, 60);
     doc.setFontSize(13);
     doc.setFont('helvetica', 'normal');
-    doc.text('Sistema de Gestión de Cursos y Eventos Académicos', 30, 72);
+    doc.text('SISTEMA DE GESTIÓN DE EVENTOS Y ACTIVIDADES', 30, 72);
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
     doc.text('REPORTE GENERAL CONSOLIDADO', 30, 100);
@@ -442,7 +442,7 @@ export function generarPdfGeneral(eventos: any[], actividades: any[]): void {
     autoTable(doc, { ...tableStyles(C.emeraldDark), startY: y3, head: [actHeaders], body: actRows });
 
     drawFooters(doc);
-    doc.save(`TYAN_Reporte_General_${timestamp()}.pdf`);
+    doc.save(`SGEA_Reporte_General_${timestamp()}.pdf`);
 }
 
 export function generarExcelGeneral(eventos: any[], actividades: any[]): void {
@@ -486,7 +486,7 @@ export function generarExcelGeneral(eventos: any[], actividades: any[]): void {
         { name: 'Eventos', rows: shEventos },
         { name: 'Actividades', rows: shActiv },
         { name: 'Resumen', rows: resumen }
-    ], 'TYAN_Reporte_General');
+    ], 'SGEA_Reporte_General');
 }
 
 // ============================================================
@@ -503,7 +503,7 @@ function exportToExcel(sheets: { name: string; rows: any[] }[], fileName: string
 
             // 1. Crear datos con encabezado decorativo
             const metadata = [
-                ['TYAN · SISTEMA DE GESTIÓN ACADÉMICA UMSA'],
+                ['SISTEMA DE GESTIÓN DE EVENTOS Y ACTIVIDADES UMSA'],
                 [`REPORTE: ${name.toUpperCase()}`],
                 [`FECHA: ${new Date().toLocaleString('es-BO')}`],
                 [] // Fila vacía de separación

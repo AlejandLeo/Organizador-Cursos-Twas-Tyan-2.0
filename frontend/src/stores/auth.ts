@@ -32,14 +32,10 @@ export const useAuthStore = defineStore('auth', () => {
   const esLogistica = computed(() => userRoles.value.includes('Logística'));
 
   /** True si el usuario es Super Usuario */
-  const esSuperUsuario = computed(() => {
-    if (!user.value) return false;
-    const roles = userRoles.value.map(r => r.toLowerCase().trim());
-    return roles.includes('super usuario') || 
-           roles.includes('superusuario') ||
-           roles.includes('admin') ||
-           (user.value as any)?.usuariosRoles?.some((ur: any) => ur.rol?.id === 1);
-  });
+  const esSuperUsuario = computed(
+    () => userRoles.value.includes('Super Usuario') ||
+      (user.value as any)?.usuariosRoles?.some((ur: any) => ur.rol?.id === 1)
+  );
 
   /** Cambia el contexto de rol activo y lo persiste */
   function cambiarRolActivo(nuevoRol: string) {
