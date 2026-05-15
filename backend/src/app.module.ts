@@ -27,6 +27,7 @@ import { SesionesAcademicasModule } from './modules/Academico/sesiones-academica
 import { InscripcionesModule } from './modules/Inscripciones/inscripciones/inscripciones.module';
 import { InscripcionModalidadesModule } from './modules/Inscripciones/inscripcion-modalidades/inscripcion-modalidades.module';
 import { AsistenciasModule } from './modules/Inscripciones/asistencias/asistencias.module';
+import { InscripcionesExcelModule } from './modules/Inscripciones/inscripciones-excel/inscripciones-excel.module';
 
 // --- Certificados ---
 import { InfoCertificadosModule } from './modules/Certificacion/info-certificados/info-certificados.module';
@@ -89,6 +90,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     InscripcionesModule,
     InscripcionModalidadesModule,
     AsistenciasModule,
+    InscripcionesExcelModule,
 
     // --- Certificados ---
     InfoCertificadosModule,

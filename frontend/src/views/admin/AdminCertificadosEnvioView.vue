@@ -114,7 +114,9 @@ const handleSendMasivo = async () => {
     selectedIds.value = [];
     setTimeout(fetchCertificados, 2000);
   } catch (error: any) {
-    Swal.fire('Error', error.response?.data?.message || 'Error al encolar el envío', 'error');
+    let msg = error.response?.data?.message || 'Error al encolar el envío';
+    if (Array.isArray(msg)) msg = msg.join(' | ');
+    Swal.fire('Error', String(msg), 'error');
   } finally {
     isSending.value = false;
   }
@@ -142,7 +144,9 @@ const handleReintentarFallidos = async () => {
     Swal.fire('¡Encolado!', res.data.mensaje, 'success');
     setTimeout(fetchCertificados, 2000);
   } catch (error: any) {
-    Swal.fire('Error', error.response?.data?.message || 'Error al reintentar', 'error');
+    let msg = error.response?.data?.message || 'Error al reintentar';
+    if (Array.isArray(msg)) msg = msg.join(' | ');
+    Swal.fire('Error', String(msg), 'error');
   } finally {
     isRetryingAll.value = false;
   }
@@ -160,7 +164,9 @@ const reintentarUno = async (cert: Certificado) => {
     Swal.fire('¡Encolado!', res.data.mensaje || 'El reintento fue encolado.', 'success');
     setTimeout(fetchCertificados, 2000);
   } catch (error: any) {
-    Swal.fire('Error', error.response?.data?.message || 'No se pudo encolar el reintento', 'error');
+    let msg = error.response?.data?.message || 'No se pudo encolar el reintento';
+    if (Array.isArray(msg)) msg = msg.join(' | ');
+    Swal.fire('Error', String(msg), 'error');
     fetchCertificados();
   }
 };
@@ -200,7 +206,9 @@ const guardarEmail = async () => {
       showConfirmButton: false,
     });
   } catch (error: any) {
-    Swal.fire('Error', error.response?.data?.message || 'No se pudo actualizar el email', 'error');
+    let msg = error.response?.data?.message || 'No se pudo actualizar el email';
+    if (Array.isArray(msg)) msg = msg.join(' | ');
+    Swal.fire('Error', String(msg), 'error');
   } finally {
     isSavingEmail.value = false;
   }

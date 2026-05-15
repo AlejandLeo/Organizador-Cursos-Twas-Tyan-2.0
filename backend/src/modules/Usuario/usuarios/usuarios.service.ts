@@ -576,7 +576,7 @@ export class UsuariosService {
    * Crea un usuario tipo Ponente: credenciales + persona + rol Ponente.
    * Se ejecuta dentro de una transacción.
    */
-  async crearPonente(dto: CrearPonenteDto): Promise<Omit<Usuario, 'password'>> {
+  async crearPonente(dto: CrearPonenteDto): Promise<any> {
     const existe = await this.usuarioRepository.findOneBy({ email: dto.email });
     if (existe) {
       throw new ConflictException(
@@ -636,14 +636,22 @@ export class UsuariosService {
 
       await queryRunner.commitTransaction();
 
-      // Enviar correo de bienvenida al ponente con sus credenciales
-      const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
-      await this.mailService.sendAccountApprovalEmail(dto.email, nombreCompleto, dto.password);
+      // Enviar correo de bienvenida al ponente con sus credenciales (No-bloqueante)
+      let correoEnviado = false;
+      try {
+        const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
+        await this.mailService.sendAccountApprovalEmail(dto.email, nombreCompleto, dto.password);
+        correoEnviado = true;
+      } catch (mailError) {
+        this.logger.error(`Error enviando correo de bienvenida a ponente ${dto.email}: ${mailError.message}`);
+      }
 
-
-      return this.getPerfil(usuarioGuardado.id);
+      const perfil = await this.getPerfil(usuarioGuardado.id);
+      return { ...perfil, correoEnviado };
     } catch (error) {
-      await queryRunner.rollbackTransaction();
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
       throw error;
     } finally {
       await queryRunner.release();
@@ -822,7 +830,7 @@ export class UsuariosService {
    * Registro unificado: crea un usuario, su perfil de persona,
    * le asigna el rol de Estudiante (ID 4) y opcionalmente su primera afiliación.
    */
-  async register(dto: RegisterDto): Promise<Omit<Usuario, 'password'>> {
+  async register(dto: RegisterDto): Promise<any> {
     const existe = await this.usuarioRepository.findOneBy({ email: dto.email });
     if (existe) {
       throw new ConflictException(
@@ -899,15 +907,23 @@ export class UsuariosService {
 
       await queryRunner.commitTransaction();
 
-      // Notificar al usuario por correo
-      const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
-      await this.mailService.sendWelcomeRegistrationEmail(dto.email, nombreCompleto);
-
+      // Notificar al usuario por correo (No-bloqueante)
+      let correoEnviado = false;
+      try {
+        const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
+        await this.mailService.sendWelcomeRegistrationEmail(dto.email, nombreCompleto);
+        correoEnviado = true;
+      } catch (mailError) {
+        this.logger.error(`Error enviando correo de bienvenida a ${dto.email}: ${mailError.message}`);
+      }
 
       // Devolvemos el perfil cargado (usando el método existente)
-      return this.getPerfil(usuarioGuardado.id);
+      const perfil = await this.getPerfil(usuarioGuardado.id);
+      return { ...perfil, correoEnviado };
     } catch (error) {
-      await queryRunner.rollbackTransaction();
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
       throw error;
     } finally {
       await queryRunner.release();
@@ -1153,7 +1169,7 @@ export class UsuariosService {
   async registrarSolicitud(
     dto: SolicitudRegistroDto,
     docFile: string,
-  ): Promise<{ mensaje: string }> {
+  ): Promise<{ mensaje: string; correoEnviado: boolean }> {
     const existe = await this.usuarioRepository.findOneBy({ email: dto.email });
     if (existe) {
       throw new ConflictException(
@@ -1204,19 +1220,24 @@ export class UsuariosService {
       await queryRunner.commitTransaction();
 
       // Notificar a administración (opcional/no-bloqueante)
+      let correoEnviado = false;
       try {
         const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
         await this.mailService.sendNewRegistrationRequestNotification(nombreCompleto, dto.email);
-      } catch (e) {
-        console.error('Error enviando notificación de solicitud a admin:', e);
+        correoEnviado = true;
+      } catch (mailError) {
+        this.logger.error(`Error enviando notificación de solicitud a admin: ${mailError.message}`);
       }
 
       return {
         mensaje:
           'Su solicitud fue recepcionada correctamente. La confirmación de su cuenta se realizará una vez finalice el proceso de inscripciones y sea validada por administración.',
+        correoEnviado
       };
     } catch (error) {
-      await queryRunner.rollbackTransaction();
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
       throw error;
     } finally {
       await queryRunner.release();
@@ -1252,7 +1273,7 @@ export class UsuariosService {
     id: number,
     accion: 'aprobar' | 'rechazar',
     motivo?: string,
-  ): Promise<{ mensaje: string }> {
+  ): Promise<{ mensaje: string; correoEnviado: boolean }> {
     const usuario = await this.usuarioRepository.findOne({
       where: { id },
       relations: ['persona'],
@@ -1281,8 +1302,14 @@ export class UsuariosService {
           ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
           : 'Usuario';
 
-        await this.mailService.sendAccountApprovalEmail(usuario.email, nombreCompleto, 'La elegida en su registro');
-        return { mensaje: 'Solicitud aprobada. El usuario ya puede ingresar con su contraseña original.' };
+        let correoEnviado = false;
+        try {
+          await this.mailService.sendAccountApprovalEmail(usuario.email, nombreCompleto, 'La elegida en su registro');
+          correoEnviado = true;
+        } catch (mailError) {
+          this.logger.error(`Error enviando correo de aprobación a ${usuario.email}: ${mailError.message}`);
+        }
+        return { mensaje: 'Solicitud aprobada.', correoEnviado };
       }
       // SI EL ESTADO ERA 0: Es una reactivación
       else {
@@ -1290,8 +1317,14 @@ export class UsuariosService {
         const nombreCompleto = usuario.persona
           ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
           : 'Usuario';
-        await this.mailService.sendAccountReactivationEmail(usuario.email, nombreCompleto);
-        return { mensaje: 'Cuenta reactivada y usuario notificado.' };
+        let correoEnviado = false;
+        try {
+          await this.mailService.sendAccountReactivationEmail(usuario.email, nombreCompleto);
+          correoEnviado = true;
+        } catch (mailError) {
+          this.logger.error(`Error enviando correo de reactivación a ${usuario.email}: ${mailError.message}`);
+        }
+        return { mensaje: 'Cuenta reactivada.', correoEnviado };
       }
     } else {
       // Rechazar: estado = -1
@@ -1301,13 +1334,19 @@ export class UsuariosService {
         ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
         : 'Usuario';
 
-      await this.mailService.sendAccountRejectionEmail(
-        usuario.email,
-        nombreCompleto,
-        motivo || 'La solicitud de registro no cumple con los criterios de validación.'
-      );
+      let correoEnviado = false;
+      try {
+        await this.mailService.sendAccountRejectionEmail(
+          usuario.email,
+          nombreCompleto,
+          motivo || 'La solicitud de registro no cumple con los criterios de validación.'
+        );
+        correoEnviado = true;
+      } catch (mailError) {
+        this.logger.error(`Error enviando correo de rechazo a ${usuario.email}: ${mailError.message}`);
+      }
 
-      return { mensaje: 'Solicitud rechazada (estado -1). El usuario ha sido notificado.' };
+      return { mensaje: 'Solicitud rechazada.', correoEnviado };
     }
   }
 

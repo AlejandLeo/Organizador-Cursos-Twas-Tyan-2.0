@@ -44,6 +44,11 @@ const router = createRouter({
           component: () => import('../views/coordinador/CoordinadorSolicitudesView.vue'),
         },
         {
+          path: 'inscripciones-excel',
+          name: 'coordinador-inscripciones-excel',
+          component: () => import('../views/inscripciones/InscripcionesExcelView.vue'),
+        },
+        {
           path: 'gestion-eventos/:id',
           name: 'coordinador-gestion-eventos-detalle',
           component: () => import('../views/actividades/ActividadDetalleView.vue'),
@@ -170,6 +175,11 @@ const router = createRouter({
           path: 'soporte',
           name: 'admin-soporte',
           component: () => import('../views/admin/AdminSoporteView.vue'),
+        },
+        {
+          path: 'inscripciones-excel',
+          name: 'admin-inscripciones-excel',
+          component: () => import('../views/inscripciones/InscripcionesExcelView.vue'),
         },
       ]
     },

@@ -62,6 +62,16 @@ const onNombreChange = (e: any) => {
         <span class="text-[10px] sm:text-xs uppercase tracking-wider font-bold">Solicitudes y Asignación</span>
         <span class="material-symbols-outlined text-[18px] transition-colors" :class="[ $route.name === 'coordinador-solicitudes' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">how_to_reg</span>
       </button>
+
+      <button @click="navigate('coordinador-inscripciones-excel')"
+        :class="[ $route.name === 'coordinador-inscripciones-excel' ? 'nav-active bg-umsa-blue text-white shadow-md shadow-umsa-blue/20' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500' ]"
+        class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group mt-2">
+        <span class="text-[10px] sm:text-xs uppercase tracking-wider font-bold">Importar Excel</span>
+        <div class="flex items-center gap-2">
+          <span class="text-[8px] font-black text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Nuevo</span>
+          <span class="material-symbols-outlined text-[18px] transition-colors" :class="[ $route.name === 'coordinador-inscripciones-excel' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">upload_file</span>
+        </div>
+      </button>
     </nav>
 
     <div class="mt-auto space-y-2">

@@ -115,6 +115,17 @@ const isActive = (name: string) => route.name === name;
         </div>
       </button>
 
+      <!-- Inscripciones Excel -->
+      <button @click="navigate('admin-inscripciones-excel')"
+        :class="[isActive('admin-inscripciones-excel') ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5']"
+        class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold mt-1">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-[20px]">upload_file</span>
+          <span class="text-[11px] uppercase tracking-wider">Importar Excel</span>
+        </div>
+        <span class="text-[9px] font-black text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Nuevo</span>
+      </button>
+
       <!-- Tickets de Soporte -->
       <button @click="navigate('admin-soporte')"
         :class="[isActive('admin-soporte') ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5']"

@@ -34,7 +34,7 @@ const formUsuario = ref({
   nombres: '',
   primer_apellido: '',
   segundo_apellido: '',
-  cedula: '',
+  documento_identidad: '',
   id_rol: ROLE_IDS.COORDINADOR,
 });
 
@@ -76,24 +76,38 @@ const handleSaveUsuario = async () => {
     return Swal.fire('Campos requeridos', 'Complete todos los campos obligatorios.', 'warning');
   }
   try {
-    await usuariosService.crearConRol({
+    const res = await usuariosService.crearConRol({
       email,
       password,
       nombres,
       primer_apellido,
       segundo_apellido: formUsuario.value.segundo_apellido || undefined,
-      cedula: formUsuario.value.cedula || undefined,
+      documento_identidad: formUsuario.value.documento_identidad || undefined,
       id_rol,
     });
+    
+    const resData = res.data as any;
     const rolName = rolesDisponibles.find(r => r.id === id_rol)?.nombre || 'Usuario';
     historialStore.registrar('usuario', 'crear', `Creó nuevo ${rolName}: ${email}`, { entidadNombre: email });
-    Swal.fire('¡Éxito!', `${rolName} creado correctamente. Se ha enviado un correo con las credenciales temporales.`, 'success');
+    
+    if (resData.correoEnviado) {
+      Swal.fire('¡Éxito!', `${rolName} creado correctamente. Se ha enviado un correo con las credenciales temporales.`, 'success');
+    } else {
+      Swal.fire({
+        title: '¡Usuario Creado!',
+        text: `${rolName} registrado, pero NO se pudo enviar el correo de bienvenida. Verifique la configuración SMTP o notifique manualmente.`,
+        icon: 'warning',
+        confirmButtonColor: '#f59e0b'
+      });
+    }
+    
     isCreating.value = false;
-    formUsuario.value = { email: '', password: '', nombres: '', primer_apellido: '', segundo_apellido: '', cedula: '', id_rol: ROLE_IDS.COORDINADOR };
+    formUsuario.value = { email: '', password: '', nombres: '', primer_apellido: '', segundo_apellido: '', documento_identidad: '', id_rol: ROLE_IDS.COORDINADOR };
     fetchUsuarios();
   } catch (error: any) {
-    const msg = error?.response?.data?.message || 'No se pudo crear el usuario.';
-    Swal.fire('Error', msg, 'error');
+    let msg = error?.response?.data?.message || 'No se pudo crear el usuario.';
+    if (Array.isArray(msg)) msg = msg.join(' | ');
+    Swal.fire('Error', String(msg), 'error');
   }
 };
 
@@ -392,7 +406,7 @@ onMounted(fetchUsuarios);
               </div>
               <div class="space-y-1">
                 <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Cédula / CI</label>
-                <input v-model="formUsuario.cedula" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-red-600/50" />
+                <input v-model="formUsuario.documento_identidad" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-red-600/50" />
               </div>
             </div>
             <div class="space-y-1">

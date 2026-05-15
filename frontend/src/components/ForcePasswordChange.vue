@@ -2,9 +2,11 @@
 import { ref, computed } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { usuariosService } from '@/services/usuarios.service';
+import { useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
 
 const authStore = useAuthStore();
+const router = useRouter();
 const showOverlay = computed(() => authStore.isAuthenticated && authStore.user?.requiere_cambio_password);
 
 const password = ref('');
@@ -12,8 +14,8 @@ const confirmPassword = ref('');
 const isSubmitting = ref(false);
 
 const handleUpdatePassword = async () => {
-  if (password.value.length < 6) {
-    return Swal.fire('Error', 'La contraseña debe tener al menos 6 caracteres.', 'error');
+  if (password.value.length < 8) {
+    return Swal.fire('Error', 'La contraseña debe tener al menos 8 caracteres.', 'error');
   }
   if (password.value !== confirmPassword.value) {
     return Swal.fire('Error', 'Las contraseñas no coinciden.', 'error');
@@ -21,22 +23,19 @@ const handleUpdatePassword = async () => {
 
   try {
     isSubmitting.value = true;
-    // Usamos el ID del usuario actual de la store
     const userId = authStore.user.id;
     
-    // El servicio tiene changePassword que verifica la actual, 
-    // pero aquí el Admin nos forzó el reset, así que necesitamos un endpoint
-    // que use el ID pero no pida la actual si ya estamos logueados con el flag.
-    // O podemos usar changePassword mandando la temporal que el admin nos dio.
-    // Sin embargo, para simplificar, usaremos el endpoint de reset si el backend lo permite o creamos uno.
+    await usuariosService.update(userId, { 
+      password: password.value, 
+      requiere_cambio_password: false 
+    });
     
-    // Como el usuario YA está logueado, podemos llamar a un nuevo método en el servicio.
-    await usuariosService.update(userId, { password: password.value, requiere_cambio_password: false });
-    
+    await Swal.fire('¡Éxito!', 'Tu contraseña ha sido actualizada. Ya puedes usar el sistema.', 'success');
     authStore.user.requiere_cambio_password = false;
-    Swal.fire('¡Éxito!', 'Tu contraseña ha sido actualizada. Ya puedes usar el sistema.', 'success');
   } catch (error: any) {
-    Swal.fire('Error', error.response?.data?.message || 'No se pudo actualizar la contraseña.', 'error');
+    let msg = error.response?.data?.message || 'No se pudo actualizar la contraseña.';
+    if (Array.isArray(msg)) msg = msg.join(' | ');
+    Swal.fire('Error', String(msg), 'error');
   } finally {
     isSubmitting.value = false;
   }
@@ -44,6 +43,7 @@ const handleUpdatePassword = async () => {
 
 const handleLogout = () => {
   authStore.logout();
+  router.push('/login');
 };
 </script>
 
@@ -65,7 +65,7 @@ const handleLogout = () => {
             <label class="text-[10px] font-black text-slate-500 uppercase ml-4 tracking-widest">Nueva Contraseña</label>
             <div class="relative">
               <span class="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400">lock</span>
-              <input v-model="password" type="password" required placeholder="Mínimo 6 caracteres"
+              <input v-model="password" type="password" required placeholder="Mínimo 8 caracteres"
                      class="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-sm focus:border-amber-500/50 outline-none transition-all" />
             </div>
           </div>
