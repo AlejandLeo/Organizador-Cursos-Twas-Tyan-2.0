@@ -740,6 +740,57 @@ const eliminarPonente = async (id: number) => {
       </div>
   </div>
 
+  <!-- Modal Lista de Asistencia (Vista Coordinador) -->
+  <div id="modal-lista-asistencia" class="fixed inset-0 bg-primary-dark/80 z-[200] hidden items-center justify-center backdrop-blur-sm">
+      <div class="bg-white dark:bg-gray-900 rounded-[2rem] w-full max-w-2xl p-10 shadow-2xl">
+          <div class="flex justify-between items-center mb-8 border-b border-slate-100 dark:border-gray-800 pb-4">
+              <div>
+                  <h3 class="text-2xl font-black text-primary-dark dark:text-white italic uppercase">Lista de Asistencia</h3>
+                  <p class="text-[10px] text-slate-400 font-bold uppercase mt-1">Sesión 1: Martes 14/Nov</p>
+              </div>
+              <button @click="closeModal('modal-lista-asistencia')" class="text-slate-400 hover:text-red-500 transition-colors"><span class="material-symbols-outlined">close</span></button>
+          </div>
+          <div class="space-y-4 max-h-[400px] overflow-y-auto">
+              <!-- Item Estudiante -->
+              <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-700 rounded-2xl">
+                  <div class="flex items-center gap-4">
+                      <div class="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center"><span class="material-symbols-outlined text-sm font-bold">check</span></div>
+                      <div>
+                          <p class="font-black text-primary-dark dark:text-white text-sm uppercase">PÉREZ NOGALES BRENDA</p>
+                          <p class="text-[10px] text-slate-400 font-medium">CI: 1234567</p>
+                      </div>
+                  </div>
+                  <span class="bg-green-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase">Presente</span>
+              </div>
+              
+              <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-700 rounded-2xl">
+                  <div class="flex items-center gap-4">
+                      <div class="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center"><span class="material-symbols-outlined text-sm font-bold">check</span></div>
+                      <div>
+                          <p class="font-black text-primary-dark dark:text-white text-sm uppercase">GÓMEZ LÓPEZ CARLOS</p>
+                          <p class="text-[10px] text-slate-400 font-medium">CI: 7654321</p>
+                      </div>
+                  </div>
+                  <span class="bg-green-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase">Presente</span>
+              </div>
+              
+              <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-700 rounded-2xl">
+                  <div class="flex items-center gap-4">
+                      <div class="w-10 h-10 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center"><span class="material-symbols-outlined text-sm font-bold">close</span></div>
+                      <div>
+                          <p class="font-black text-primary-dark dark:text-white text-sm uppercase">MAMANI QUISPE JHOEL</p>
+                          <p class="text-[10px] text-slate-400 font-medium">CI: 9876543</p>
+                      </div>
+                  </div>
+                  <span class="bg-red-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase">Ausente</span>
+              </div>
+          </div>
+          <div class="mt-8 flex justify-end pt-4 border-t border-slate-100 dark:border-gray-800">
+              <button @click="closeModal('modal-lista-asistencia')" class="px-8 py-3 bg-primary-dark text-white rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-500 shadow-lg transition-all">Cerrar</button>
+          </div>
+      </div>
+  </div>
+
   <!-- Modal Estudiante -->
   <div id="modal-estudiante" class="fixed inset-0 bg-primary-dark/80 z-[200] hidden items-center justify-center backdrop-blur-sm">
       <div class="bg-white dark:bg-gray-900 rounded-[2rem] w-full max-w-lg p-10 shadow-2xl">

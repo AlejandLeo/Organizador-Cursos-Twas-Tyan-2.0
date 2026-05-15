@@ -19,7 +19,7 @@ const uiStore = useUIStore();
             <span class="material-symbols-outlined text-white text-[16px]">shield_person</span>
           </div>
           <div class="hidden sm:block">
-            <p class="text-[10px] font-black text-red-600 dark:text-red-500 uppercase tracking-widest leading-none">Sistema TYAN</p>
+            <p class="text-[10px] font-black text-red-600 dark:text-red-500 uppercase tracking-widest leading-none">Sistema SGEA</p>
             <h1 class="text-sm font-black text-slate-800 dark:text-white leading-tight">Panel de Super Administrador</h1>
           </div>
         </div>

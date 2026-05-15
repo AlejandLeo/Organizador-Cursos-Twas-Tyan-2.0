@@ -21,7 +21,7 @@ export class AsistenciasService {
     @InjectRepository(InscripcionModalidad)
     private readonly inscripcionModalidadRepository: Repository<InscripcionModalidad>,
     private readonly qrService: QrService,
-  ) {}
+  ) { }
 
   // ── Coordinador: Registro en Lote ──────────────────────────
 
@@ -251,7 +251,7 @@ export class AsistenciasService {
     const usuarioId = await this.qrService.validarTokenAsistencia(token);
 
     // 2. Verificar Sesión y Horario
-    const sesion = await this.sesionRepository.findOne({ 
+    const sesion = await this.sesionRepository.findOne({
       where: { id: id_sesion },
       relations: ['cursoModalidad', 'cursoModalidad.actividadAcademica']
     });

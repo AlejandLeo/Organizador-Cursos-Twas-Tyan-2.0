@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { QrService } from './qr.service';
+import { QrController } from './qr.controller';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
@@ -15,6 +16,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     }),
   ],
   providers: [QrService],
+  controllers: [QrController],
   exports: [QrService],
 })
 export class QrModule {}

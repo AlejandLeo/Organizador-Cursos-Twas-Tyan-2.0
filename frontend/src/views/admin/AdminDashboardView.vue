@@ -91,7 +91,7 @@ onMounted(async () => {
             <h1 class="text-2xl font-black text-slate-800 dark:text-white tracking-tight uppercase italic">Dashboard Global</h1>
           </div>
         </div>
-        <p class="text-slate-500 text-sm ml-1">Vista general del sistema TYAN · Acceso total garantizado</p>
+        <p class="text-slate-500 text-sm ml-1">Vista general del sistema SGEA · Acceso total garantizado</p>
       </div>
       <div class="flex items-center gap-3">
         <div class="px-4 py-2 bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-700/30 rounded-xl text-center">
@@ -186,6 +186,36 @@ onMounted(async () => {
           </div>
         </div>
 
+        <!-- SYSTEM REPORTS -->
+        <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-6 shadow-sm dark:shadow-none">
+          <div class="flex items-center gap-2 mb-6">
+            <span class="material-symbols-outlined text-red-600">assessment</span>
+            <h2 class="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest italic">Reportes de Auditoría</h2>
+          </div>
+          <div class="grid grid-cols-1 gap-3">
+            <button @click="router.push('/admin/historial')"
+                    class="w-full flex items-center gap-3 p-4 bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-800/30 rounded-2xl hover:border-red-500 transition-all group text-left">
+              <div class="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                <span class="material-symbols-outlined">picture_as_pdf</span>
+              </div>
+              <div>
+                <p class="text-[10px] font-black text-red-700 dark:text-red-400 uppercase tracking-widest">Exportar PDF</p>
+                <p class="text-[8px] text-slate-500 uppercase tracking-tighter">Historial completo</p>
+              </div>
+            </button>
+            <button @click="router.push('/admin/historial')"
+                    class="w-full flex items-center gap-3 p-4 bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-800/30 rounded-2xl hover:border-emerald-500 transition-all group text-left">
+              <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                <span class="material-symbols-outlined">table_chart</span>
+              </div>
+              <div>
+                <p class="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest">Exportar Excel</p>
+                <p class="text-[8px] text-slate-500 uppercase tracking-tighter">Bitácora en XLSX</p>
+              </div>
+            </button>
+          </div>
+        </div>
+
         <!-- ACTIVITY BY MODULE -->
         <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-6 shadow-sm dark:shadow-none">
           <div class="flex items-center gap-2 mb-6 text-red-600">
@@ -193,19 +223,21 @@ onMounted(async () => {
             <h2 class="text-xs font-black dark:text-white uppercase tracking-widest italic">Actividad por Módulo</h2>
           </div>
           <div class="space-y-5">
-            <div v-for="(count, mod) in historialStore.porModulo" :key="mod" class="space-y-1.5">
-              <div class="flex justify-between items-center px-1">
-                <span class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-1">
-                  <span class="material-symbols-outlined text-[11px]">{{ moduloConfig[mod]?.icon || 'circle' }}</span>
-                  {{ moduloConfig[mod]?.label || mod }}
-                </span>
-                <span class="text-[10px] font-black text-slate-800 dark:text-white">{{ count }}</span>
+            <template v-if="historialStore.porModulo">
+              <div v-for="(count, mod) in historialStore.porModulo" :key="mod" class="space-y-1.5">
+                <div class="flex justify-between items-center px-1">
+                  <span class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[11px]">{{ moduloConfig[mod]?.icon || 'circle' }}</span>
+                    {{ moduloConfig[mod]?.label || mod }}
+                  </span>
+                  <span class="text-[10px] font-black text-slate-800 dark:text-white">{{ count }}</span>
+                </div>
+                <div class="h-1.5 w-full bg-slate-100 dark:bg-black/50 rounded-full overflow-hidden">
+                  <div class="h-full bg-red-600 transition-all duration-1000" :style="{ width: (count / (historialStore.registros.length || 1) * 100) + '%' }"></div>
+                </div>
               </div>
-              <div class="h-1.5 w-full bg-slate-100 dark:bg-black/50 rounded-full overflow-hidden">
-                <div class="h-full bg-red-600 transition-all duration-1000" :style="{ width: (count / (historialStore.registros.length || 1) * 100) + '%' }"></div>
-              </div>
-            </div>
-            <p v-if="Object.keys(historialStore.porModulo).length === 0" class="text-[10px] text-slate-400 uppercase italic text-center py-4">Sin datos registrados</p>
+            </template>
+            <p v-if="!historialStore.porModulo || Object.keys(historialStore.porModulo).length === 0" class="text-[10px] text-slate-400 uppercase italic text-center py-4">Sin datos registrados</p>
           </div>
         </div>
       </div>

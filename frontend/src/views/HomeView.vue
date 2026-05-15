@@ -101,7 +101,7 @@ const cargarEventos = async () => {
             }
         } else {
             eventoSeleccionado.value = {
-                title: 'Bienvenidos al Portal TYAN',
+                title: 'Bienvenidos al Portal SGEA',
                 subtitle: 'Universidad Mayor de San Andrés',
                 dateShort: 'Próximamente',
                 description: 'Actualmente no hay eventos programados. Manténgase atento para futuras actualizaciones y convocatorias en la red académica.',
@@ -179,7 +179,7 @@ const abrirMapa = (url: string) => {
                
                <!-- Etiqueta Oficial Dinámica -->
                 <span :style="{ backgroundColor: eventoSeleccionado?.color_principal || '#10b981' }" class="inline-flex items-center w-full sm:w-auto h-[56px] px-6 text-white border border-white/20 text-[10px] md:text-sm font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-black/20 animate-in slide-in-from-right-4 duration-700">
-                  <span class="material-symbols-outlined text-[18px] mr-2">public</span> {{ eventoSeleccionado?.institucion_badge || 'Evento Oficial OEA/TYAN' }}
+                  <span class="material-symbols-outlined text-[18px] mr-2">public</span> {{ eventoSeleccionado?.institucion_badge || 'Evento Oficial OEA/SGEA' }}
                 </span>
             </div>
             
