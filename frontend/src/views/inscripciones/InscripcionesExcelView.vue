@@ -13,10 +13,85 @@ const isUploading = ref(false);
 const notificar = ref(true);
 const crearUsuarios = ref(false);
 
-// --- Selección de Evento ---
 const eventos = ref<any[]>([]);
 const selectedEventoId = ref<string>('');
 const isLoadingSelects = ref(false);
+
+// --- Selección de Plantilla ---
+const plantillas = ref<any[]>([]);
+const selectedTemplateId = ref<string>('');
+const showPreviewModal = ref(false);
+const previewTemplateHtml = ref('');
+
+const fetchPlantillas = async () => {
+  try {
+    // Para registro de usuarios (WELCOME) y inscripciones (ENROLLMENT)
+    const tipo = activeTab.value === 'usuarios' ? 'WELCOME' : 'ENROLLMENT';
+    const res = await api.get(`/admin/mail-templates/tipo/${tipo}`);
+    plantillas.value = Array.isArray(res.data) ? res.data : [];
+  } catch (e) {
+    console.error('Error fetching plantillas:', e);
+  }
+};
+
+const openPreviewTemplate = async () => {
+  let subject = '';
+  let body = '';
+  
+  if (selectedTemplateId.value) {
+    const t = plantillas.value.find(p => String(p.id) === selectedTemplateId.value);
+    if (!t) return;
+    subject = t.asunto;
+    body = t.cuerpo;
+  } else {
+    // Si no hay seleccionada, traemos la de sistema (base)
+    try {
+      const tipo = activeTab.value === 'usuarios' ? 'WELCOME' : 'ENROLLMENT';
+      const keySubject = tipo === 'WELCOME' ? 'WELCOME_MESSAGE_SUBJECT' : 'ENROLLMENT_MESSAGE_SUBJECT';
+      const keyBody = tipo === 'WELCOME' ? 'WELCOME_MESSAGE_BODY' : 'ENROLLMENT_MESSAGE_BODY';
+      
+      const resSubject = await api.get(`/admin/sistema-config/key/${keySubject}`);
+      const resBody = await api.get(`/admin/sistema-config/key/${keyBody}`);
+      
+      subject = resSubject.data?.valor || 'Notificación de Sistema';
+      body = resBody.data?.valor || 'Hola {{nombre}}, tienes una nueva notificación.';
+    } catch (e) {
+      subject = 'Bienvenida';
+      body = 'Hola {{nombre}}, bienvenido al sistema.';
+    }
+  }
+
+  // Renderizado para previsualización
+  const resLayout = await api.get('/admin/sistema-config/key/MAIL_MASTER_LAYOUT');
+  const resUrl = await api.get('/admin/sistema-config/key/SYSTEM_URL');
+  
+  const masterLayout = resLayout.data?.valor || '<html><body>{{{content}}}</body></html>';
+  const systemUrl = resUrl.data?.valor || window.location.origin;
+  
+  let contentHtml = body.replace(/\n/g, '<br>');
+  
+  // Reemplazo de variables
+  const context = {
+    nombre: 'Juan Perez',
+    email: 'ejemplo@correo.com',
+    password: '********',
+    actividad: 'Curso de Especialización',
+    evento: 'Congreso Internacional 2026',
+    url_sistema: systemUrl,
+    year: new Date().getFullYear()
+  };
+
+  Object.keys(context).forEach(key => {
+    const regex = new RegExp(`{{${key}}}`, 'g');
+    contentHtml = contentHtml.replace(regex, String((context as any)[key]));
+  });
+
+  previewTemplateHtml.value = masterLayout
+    .replace('{{{content}}}', contentHtml)
+    .replace('{{year}}', context.year.toString());
+    
+  showPreviewModal.value = true;
+};
 
 const fetchEventos = async () => {
   try {
@@ -36,6 +111,12 @@ const fetchEventos = async () => {
 
 onMounted(() => {
   fetchEventos();
+  fetchPlantillas();
+});
+
+watch(activeTab, () => {
+  selectedTemplateId.value = '';
+  fetchPlantillas();
 });
 
 // --- Previsualización ---
@@ -147,6 +228,9 @@ const importar = async (modo: 'verificar' | 'guardar') => {
   
   if ((activeTab.value === 'inscripciones' || activeTab.value === 'ponentes') && selectedEventoId.value) {
     formData.append('id_evento', selectedEventoId.value);
+  }
+  if (selectedTemplateId.value) {
+    formData.append('id_template', selectedTemplateId.value);
   }
   formData.append('modo', modo);
 
@@ -269,13 +353,29 @@ const getStatusIcon = (status: string) => {
               <span class="material-symbols-outlined text-umsa-blue">upload</span>
               Subir Archivo
             </h2>
-            <button 
-              @click="descargarPlantilla"
-              class="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl text-xs font-bold hover:bg-emerald-500/20 transition-all border border-emerald-500/20"
-            >
-              <span class="material-symbols-outlined text-sm">download</span>
-              Descargar Plantilla
-            </button>
+            <div class="flex items-center gap-4">
+              <!-- Selector Integrado en Header -->
+              <div class="flex items-center gap-2 bg-slate-50 dark:bg-white/5 px-3 py-1.5 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
+                <span class="material-symbols-outlined text-slate-400 text-sm">mail</span>
+                <select v-model="selectedTemplateId"
+                        class="bg-transparent text-[11px] font-bold text-slate-600 dark:text-slate-300 outline-none cursor-pointer min-w-[140px]">
+                  <option value="">Plantilla por Defecto</option>
+                  <option v-for="p in plantillas" :key="p.id" :value="String(p.id)">{{ p.nombre }}</option>
+                </select>
+                <div class="w-px h-4 bg-slate-200 dark:bg-white/10 mx-1"></div>
+                <button @click="openPreviewTemplate" class="w-7 h-7 flex items-center justify-center text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all" title="Ver visor de plantilla">
+                  <span class="material-symbols-outlined text-[18px]">visibility</span>
+                </button>
+              </div>
+
+              <button 
+                @click="descargarPlantilla"
+                class="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl text-xs font-bold hover:bg-emerald-500/20 transition-all border border-emerald-500/20"
+              >
+                <span class="material-symbols-outlined text-sm">download</span>
+                Plantilla Excel
+              </button>
+            </div>
           </div>
 
           <!-- Selectores de Evento (Para Inscripciones y Ponentes) -->
@@ -375,6 +475,7 @@ const getStatusIcon = (status: string) => {
                   <p class="text-[10px] text-slate-400">Sujeto a límite diario</p>
                 </div>
               </div>
+
 
               <div class="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
                 <!-- Botón de Verificar (Siempre disponible si hay archivo) -->
@@ -529,6 +630,29 @@ const getStatusIcon = (status: string) => {
               <p class="text-xs text-slate-600 dark:text-slate-400 font-medium">Inicia el proceso y descarga los resultados si es necesario.</p>
             </li>
           </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de Previsualización de Plantilla -->
+    <div v-if="showPreviewModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+      <div class="bg-white dark:bg-[#1a1a24] w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden border border-white/10 flex flex-col max-h-[90vh]">
+        <div class="p-6 border-b border-slate-100 dark:border-white/5 flex items-center justify-between bg-slate-50/50 dark:bg-black/20">
+          <h3 class="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
+            <span class="material-symbols-outlined text-blue-500">visibility</span>
+            Previsualización de Correo
+          </h3>
+          <button @click="showPreviewModal = false" class="w-10 h-10 rounded-full hover:bg-slate-200 dark:hover:bg-white/10 flex items-center justify-center transition-all">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="flex-1 overflow-y-auto bg-slate-100 dark:bg-black/40 p-4 md:p-8">
+          <div class="bg-white rounded-xl shadow-sm overflow-hidden mx-auto max-w-[600px] border border-slate-200">
+            <div v-html="previewTemplateHtml" class="mail-preview-content"></div>
+          </div>
+        </div>
+        <div class="p-4 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 text-center">
+          <p class="text-[10px] text-slate-400 font-medium">※ Los datos mostrados (Juan Perez, etc.) son solo para fines de previsualización.</p>
         </div>
       </div>
     </div>

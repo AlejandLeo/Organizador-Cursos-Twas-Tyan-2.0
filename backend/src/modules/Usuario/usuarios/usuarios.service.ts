@@ -1484,20 +1484,12 @@ export class UsuariosService {
    */
   private async enviarBienvenidaPersonalizada(email: string, nombre: string, passwordTemp: string) {
     try {
-      const subjectTemplate = await this.configService.getConfig('WELCOME_MESSAGE_SUBJECT');
-      const bodyTemplate = await this.configService.getConfig('WELCOME_MESSAGE_BODY');
-
-      // Reemplazar variables
-      const subject = subjectTemplate.replace(/{{nombre}}/g, nombre).replace(/{{email}}/g, email);
-      let body = bodyTemplate
-        .replace(/{{nombre}}/g, nombre)
-        .replace(/{{email}}/g, email)
-        .replace(/{{password}}/g, passwordTemp);
-      
-      // Convertir saltos de línea a <br> si es HTML
-      body = body.replace(/\n/g, '<br>');
-
-      await this.mailQueueService.enqueue(email, subject, body);
+      await this.mailQueueService.renderAndEnqueue(
+        email, 
+        { nombre, email, password: passwordTemp },
+        undefined, // No templateId for now (uses default)
+        'WELCOME'
+      );
       return true;
     } catch (error) {
       this.logger.error(`Error al encolar bienvenida personalizada para ${email}: ${error.message}`);

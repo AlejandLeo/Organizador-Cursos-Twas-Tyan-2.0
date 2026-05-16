@@ -191,6 +191,11 @@ const router = createRouter({
           name: 'admin-configuracion',
           component: () => import('../views/admin/AdminConfiguracionView.vue'),
         },
+        {
+          path: 'mail-templates',
+          name: 'admin-mail-templates',
+          component: () => import('../views/admin/AdminMailTemplatesView.vue'),
+        },
       ]
     },
     // ─── RUTAS COORDINADOR ────────────────────────────────────────────────────

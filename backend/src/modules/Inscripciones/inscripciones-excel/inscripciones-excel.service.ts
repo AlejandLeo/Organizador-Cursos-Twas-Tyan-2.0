@@ -16,8 +16,9 @@ import { UsuarioRol } from '../../Usuario/usuarios-roles/entities/usuario-rol.en
 import { Inscripcion } from '../inscripciones/entities/inscripcion.entity';
 import { ActividadAcademica } from '../../Academico/actividades-academicas/entities/actividad-academica.entity';
 import { Imparticion } from '../../Academico/imparticiones/entities/imparticion.entity';
-import { Evento } from '../../Academico/eventos/entities/evento.entity';
 import { MailService } from '../../Comun/mail/mail.service';
+import { MailTemplateService } from '../../Comun/mail/mail-template.service';
+import { MailQueueService } from '../../Comun/mail/mail-queue.service';
 
 // ─── Tipos de resultado ───────────────────────────────────────────────────────
 
@@ -66,6 +67,8 @@ export class InscripcionesExcelService {
     private readonly actividadRepo: Repository<ActividadAcademica>,
     private readonly dataSource: DataSource,
     private readonly mailService: MailService,
+    private readonly mailTemplateService: MailTemplateService,
+    private readonly mailQueueService: MailQueueService,
   ) {}
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -75,14 +78,13 @@ export class InscripcionesExcelService {
   async registroMasivoUsuarios(
     fileBuffer: Buffer,
     notificar = false,
-    modo: 'verificar' | 'guardar' = 'guardar'
+    modo: 'verificar' | 'guardar' = 'guardar',
+    templateId?: number
   ): Promise<ResultadoImportacion> {
     const filas = this.parsearExcel(fileBuffer);
 
     if (filas.length === 0) {
-      throw new BadRequestException(
-        'El archivo Excel está vacío o no tiene filas de datos.',
-      );
+      throw new BadRequestException('El archivo Excel está vacío o no tiene filas de datos.');
     }
 
     const detalle: ResultadoFila[] = [];
@@ -91,7 +93,6 @@ export class InscripcionesExcelService {
     let errores = 0;
     let advertenciasCorreo = 0;
 
-    // ── Transacción Global ────────────────────────────────────────
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -99,10 +100,9 @@ export class InscripcionesExcelService {
     try {
       for (let i = 0; i < filas.length; i++) {
         const fila = filas[i];
-        const numFila = i + 2; // +2: encabezado en fila 1, datos desde fila 2
+        const numFila = i + 2;
         const email = String(fila['email'] || '').trim().toLowerCase();
 
-        // ── Validación básica ────────────────────────────────────────────
         if (!email) {
           detalle.push({ fila: numFila, estado: 'error', mensaje: 'Email vacío o inválido.' });
           errores++;
@@ -116,26 +116,18 @@ export class InscripcionesExcelService {
           continue;
         }
 
-        const generoRaw = fila['genero'];
-        const genero = generoRaw !== undefined && generoRaw !== '' ? Number(generoRaw) : null;
-
-        // ── Verificar si ya existe ────────────────────────────────────────
-        // Usamos manager para buscar dentro de la transacción actual
         const existe = await queryRunner.manager.findOne(Usuario, { where: { email } });
         if (existe) {
-          detalle.push({ fila: numFila, email, estado: 'omitido', mensaje: 'El email ya está registrado en el sistema.' });
-          omitidos++;
+          detalle.push({ fila: numFila, email, estado: 'error', mensaje: 'El correo electrónico ya está registrado. Elimina esta fila si no deseas crear una cuenta nueva.' });
+          errores++;
           continue;
         }
 
-        // ── Creación en Savepoint ─────────────────────────────────────────
         const savepointName = `row_${i}`;
         await queryRunner.query(`SAVEPOINT ${savepointName}`);
 
         try {
           const hash = await bcrypt.hash(password, 10);
-
-          // 1. Usuario
           const usuario = queryRunner.manager.create(Usuario, {
             email,
             password: hash,
@@ -144,90 +136,45 @@ export class InscripcionesExcelService {
           });
           const usuarioGuardado = await queryRunner.manager.save(usuario);
 
-          // 2. Persona
           const nombres = String(fila['nombres'] || '').trim();
           const primerApellido = String(fila['primer_apellido'] || '').trim();
           
-          // Parsear fecha de nacimiento para manejar objetos Date de Excel y strings
-          let fechaNacimientoStr: string | undefined = undefined;
-          const fnRaw = fila['fecha_nacimiento'];
-          if (fnRaw) {
-            let d: Date | null = null;
-            if (fnRaw instanceof Date) {
-              d = fnRaw;
-            } else if (typeof fnRaw === 'number') {
-              d = new Date(Math.round((fnRaw - 25569) * 86400 * 1000));
-            } else if (typeof fnRaw === 'string') {
-              const parts = fnRaw.split('/');
-              if (parts.length === 3) {
-                d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T12:00:00Z`);
-              } else {
-                d = new Date(fnRaw);
-              }
-            }
-            if (d && !isNaN(d.getTime())) {
-              fechaNacimientoStr = d.toISOString().split('T')[0];
-            } else {
-              fechaNacimientoStr = String(fnRaw).trim();
-            }
-          }
-
           const persona = queryRunner.manager.create(Persona, {
             nombres: nombres || undefined,
             primer_apellido: primerApellido || undefined,
             segundo_apellido: String(fila['segundo_apellido'] || '').trim() || undefined,
             documento_identidad: String(fila['documento_identidad'] || '').trim() || undefined,
-            genero: genero !== null && !isNaN(genero) ? genero : undefined,
-            pais_origen: String(fila['pais_origen'] || '').trim() || undefined,
-            pais_residencia: String(fila['pais_residencia'] || '').trim() || undefined,
-            fecha_nacimiento: fechaNacimientoStr,
             celular: String(fila['celular'] || '').trim() || undefined,
             usuario: usuarioGuardado,
           });
           await queryRunner.manager.save(persona);
 
-          // 3. Afiliación (opcional)
-          const institucion = String(fila['institucion'] || '').trim();
-          if (institucion) {
-            const idGradoRaw = fila['id_grado_academico'];
-            const afiliacion = queryRunner.manager.create(Afiliacion, {
-              institucion,
-              tipo_afiliacion: String(fila['tipo_afiliacion'] || '').trim() || undefined,
-              area_tematica: String(fila['area_tematica'] || '').trim() || undefined,
-              disciplina_cientifica: String(fila['disciplina_cientifica'] || '').trim() || undefined,
-              id_grado_academico: idGradoRaw ? Number(idGradoRaw) : undefined,
-              usuario: usuarioGuardado,
-            });
-            await queryRunner.manager.save(afiliacion);
-          }
-
-          // 4. Rol
           const idRolRaw = fila['id_rol'];
           const rolId = idRolRaw ? Number(idRolRaw) : ROL_ESTUDIANTE_ID;
           const rol = await queryRunner.manager.findOne(Rol, { where: { id: rolId } });
           if (rol) {
-            const usuarioRol = queryRunner.manager.create(UsuarioRol, {
+            await queryRunner.manager.save(queryRunner.manager.create(UsuarioRol, {
               usuario: usuarioGuardado,
               rol,
               estado: 1,
-            });
-            await queryRunner.manager.save(usuarioRol);
+            }));
           }
 
-          // ── Envío de Correo Diferido ───────────────────────────────
           let correoEnviado = false;
           let correoAdvertencia: string | undefined;
 
-          // Solo notificamos si el modo es guardar (luego lo haremos fuera de la transaccion idealmente, pero aqui simulamos)
           if (notificar && modo === 'guardar') {
-            const nombreCompleto = `${nombres} ${primerApellido}`.trim() || email;
+            const nombre = `${nombres} ${primerApellido}`.trim() || email;
             try {
-              await this.mailService.sendAccountApprovalEmail(email, nombreCompleto, password);
+              await this.mailQueueService.renderAndEnqueue(
+                email,
+                { nombre, email, password },
+                templateId,
+                'WELCOME'
+              );
               correoEnviado = true;
             } catch (mailError) {
-              correoAdvertencia = mailError.message?.includes('Límite diario')
-                ? 'Límite diario de correos alcanzado. No se envió notificación.'
-                : `Error de correo: ${mailError.message}`;
+              correoAdvertencia = `Error de encolado: ${mailError.message}`;
               advertenciasCorreo++;
             }
           }
@@ -236,40 +183,23 @@ export class InscripcionesExcelService {
             fila: numFila,
             email,
             estado: modo === 'verificar' ? 'omitido' : 'creado',
-            mensaje: modo === 'verificar' ? 'Válido para ser creado.' : `Usuario creado correctamente${rol ? ` con rol "${rol.nombre_rol}"` : ''}.`,
+            mensaje: modo === 'verificar' ? 'Válido para ser creado.' : `Usuario creado correctamente.`,
             correoEnviado,
             correoAdvertencia,
           });
           creados++;
         } catch (error) {
           await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-          detalle.push({
-            fila: numFila,
-            email,
-            estado: 'error',
-            mensaje: error.message || 'Error de base de datos al crear el usuario.',
-          });
+          detalle.push({ fila: numFila, email, estado: 'error', mensaje: error.message });
           errores++;
         }
       }
 
-      // ── Decisión Final: Todo o Nada ─────────────────────────────────
       if (modo === 'verificar' || errores > 0) {
         await queryRunner.rollbackTransaction();
-        if (modo === 'guardar' && errores > 0) {
-          // Si intentaba guardar y hubo errores, cambiamos el estado de los "creados" a "omitidos"
-          detalle.forEach(d => {
-            if (d.estado === 'creado') {
-              d.estado = 'omitido';
-              d.mensaje = 'Omitido debido a errores en otras filas (Modo Estricto).';
-            }
-          });
-          creados = 0;
-        }
       } else {
         await queryRunner.commitTransaction();
       }
-
     } catch (e) {
       await queryRunner.rollbackTransaction();
       throw e;
@@ -277,14 +207,7 @@ export class InscripcionesExcelService {
       await queryRunner.release();
     }
 
-    return {
-      total: filas.length,
-      creados,
-      omitidos,
-      errores,
-      advertenciasCorreo,
-      detalle,
-    };
+    return { total: filas.length, creados, omitidos, errores, advertenciasCorreo, detalle };
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -297,15 +220,11 @@ export class InscripcionesExcelService {
     idActividad?: number,
     idEvento?: number,
     modo: 'verificar' | 'guardar' = 'guardar',
-    crearUsuarios = false
+    crearUsuarios = false,
+    templateId?: number
   ): Promise<ResultadoImportacion> {
     const filas = this.parsearExcel(fileBuffer);
-
-    if (filas.length === 0) {
-      throw new BadRequestException(
-        'El archivo Excel está vacío o no tiene filas de datos.',
-      );
-    }
+    if (filas.length === 0) throw new BadRequestException('El archivo Excel está vacío.');
 
     const detalle: ResultadoFila[] = [];
     let inscritos = 0;
@@ -313,11 +232,8 @@ export class InscripcionesExcelService {
     let omitidos = 0;
     let errores = 0;
     let advertenciasCorreo = 0;
-
-    // Cache de actividades para no re-consultar en cada fila
     const actividadCache = new Map<string, ActividadAcademica | null>();
 
-    // ── Transacción Global ────────────────────────────────────────
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -335,18 +251,10 @@ export class InscripcionesExcelService {
           continue;
         }
 
-        if (!nombreActividad && !idActividad) {
-          detalle.push({ fila: numFila, email, estado: 'error', mensaje: 'nombre_actividad_academica vacío y no hay id_actividad seleccionado.' });
-          errores++;
-          continue;
-        }
-
-        // ── Creación en Savepoint ─────────────────────────────────────────
         const savepointName = `row_insc_${i}`;
         await queryRunner.query(`SAVEPOINT ${savepointName}`);
 
         try {
-          // ── 1. Buscar o Crear usuario ───────────────────────────────────────────
           let usuario = await queryRunner.manager.findOne(Usuario, {
             where: { email },
             relations: ['persona', 'usuariosRoles', 'usuariosRoles.rol'],
@@ -356,132 +264,68 @@ export class InscripcionesExcelService {
           let passwordTemporal = '';
 
           if (!usuario) {
-            // Si no se permite crear usuarios, lanzamos error
-            if (!crearUsuarios) {
-              throw new Error(`Usuario con email "${email}" no encontrado. Activa "Registrar usuarios nuevos" para crearlo automáticamente.`);
-            }
-
-            // Si no existe, lo creamos (Similar a registroMasivoUsuarios)
+            if (!crearUsuarios) throw new Error(`Usuario "${email}" no encontrado. Activa "Registrar usuarios nuevos".`);
+            
             passwordTemporal = String(fila['password'] || fila['documento_identidad'] || 'Usuario123!').trim();
             const hash = await bcrypt.hash(passwordTemporal, 10);
-
-            usuario = queryRunner.manager.create(Usuario, {
-              email,
-              password: hash,
-              estado: 1,
-              requiere_cambio_password: true,
-            });
-            const usuarioGuardado = await queryRunner.manager.save(usuario);
+            usuario = queryRunner.manager.create(Usuario, { email, password: hash, estado: 1, requiere_cambio_password: true });
+            const userSaved = await queryRunner.manager.save(usuario);
 
             const persona = queryRunner.manager.create(Persona, {
               nombres: String(fila['nombres'] || '').trim() || 'Estudiante',
               primer_apellido: String(fila['primer_apellido'] || '').trim() || 'Nuevo',
-              segundo_apellido: String(fila['segundo_apellido'] || '').trim() || undefined,
-              documento_identidad: String(fila['documento_identidad'] || '').trim() || undefined,
-              celular: String(fila['celular'] || '').trim() || undefined,
-              usuario: usuarioGuardado,
+              usuario: userSaved,
             });
             await queryRunner.manager.save(persona);
 
-            // Asignar rol estudiante
             const rol = await queryRunner.manager.findOne(Rol, { where: { id: ROL_ESTUDIANTE_ID } });
-            if (rol) {
-              const usuarioRol = queryRunner.manager.create(UsuarioRol, {
-                usuario: usuarioGuardado,
-                rol,
-                estado: 1,
-              });
-              await queryRunner.manager.save(usuarioRol);
-            }
-            usuario = { ...usuarioGuardado, persona };
+            if (rol) await queryRunner.manager.save(queryRunner.manager.create(UsuarioRol, { usuario: userSaved, rol, estado: 1 }));
+            usuario = { ...userSaved, persona };
             fueCreado = true;
-          } else {
-            // Validar que el usuario existente tenga el rol de Estudiante (4)
-            const tieneRolEstudiante = usuario.usuariosRoles?.some(ur => ur.rol?.id === ROL_ESTUDIANTE_ID);
-            if (!tieneRolEstudiante) {
-              throw new Error(`El usuario existe pero no tiene el rol de "Estudiante". No se puede inscribir.`);
-            }
           }
 
-          // ── 2. Buscar actividad académica (siempre por nombre dentro del evento) ─────────
-          let actividad: ActividadAcademica | null | undefined;
-
-          if (idEvento) {
-            const cacheKey = `ev_${idEvento}_${nombreActividad.toLowerCase()}`;
-            if (actividadCache.has(cacheKey)) {
-              actividad = actividadCache.get(cacheKey);
-            } else {
-              actividad = await queryRunner.manager.findOne(ActividadAcademica, {
-                where: { 
-                  nombre: ILike(nombreActividad),
-                  evento: { id: idEvento }
-                },
-                relations: ['evento'],
-              });
-              actividadCache.set(cacheKey, actividad);
-            }
-          } else {
-            throw new Error('Debe seleccionarse un evento para buscar la actividad.');
+          if (!idEvento) throw new Error('Evento no seleccionado.');
+          const cacheKey = `ev_${idEvento}_${nombreActividad.toLowerCase()}`;
+          let actividad = actividadCache.get(cacheKey);
+          if (actividad === undefined) {
+            actividad = await queryRunner.manager.findOne(ActividadAcademica, {
+              where: { nombre: ILike(nombreActividad), evento: { id: idEvento } },
+              relations: ['evento'],
+            });
+            actividadCache.set(cacheKey, actividad);
           }
 
-          if (!actividad) {
-            throw new Error(idEvento 
-              ? `Actividad "${nombreActividad}" no encontrada en el evento seleccionado.` 
-              : `Actividad "${nombreActividad}" no encontrada.`);
-          }
+          if (!actividad) throw new Error(`Actividad "${nombreActividad}" no encontrada.`);
 
-          // ── 3. Verificar si ya está inscrito ────────────────────────────────
           const inscripcionExistente = await queryRunner.manager.findOne(Inscripcion, {
-            where: {
-              usuario: { id: usuario.id },
-              actividadAcademica: { id: actividad.id },
-            },
+            where: { usuario: { id: usuario.id }, actividadAcademica: { id: actividad.id } },
           });
 
           if (inscripcionExistente) {
-            detalle.push({
-              fila: numFila,
-              email,
-              estado: 'omitido',
-              mensaje: `El usuario ya está inscrito en "${actividad.nombre}".`,
-            });
+            detalle.push({ fila: numFila, email, estado: 'omitido', mensaje: `Ya inscrito en "${actividad.nombre}".` });
             omitidos++;
             await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
             continue;
           }
 
-          // ── 4. Inscribir ──────────────────────────────────────────────────
-          const inscripcion = queryRunner.manager.create(Inscripcion, {
-            usuario,
-            actividadAcademica: actividad,
-            estado: 1,
-            miembro_tyan: 0,
-          });
-          await queryRunner.manager.save(inscripcion);
+          await queryRunner.manager.save(queryRunner.manager.create(Inscripcion, { usuario, actividadAcademica: actividad, estado: 1, miembro_tyan: 0 }));
 
-          // ── 5. Notificación ──────────────────────────────────────────────
           let correoEnviado = false;
           let correoAdvertencia: string | undefined;
 
           if (notificar && modo === 'guardar') {
-            const nombre = usuario.persona
-              ? `${usuario.persona.nombres || ''} ${usuario.persona.primer_apellido || ''}`.trim()
-              : email;
-            const eventoNombre = actividad['evento']?.nombre || 'Evento';
-            
+            const nombre = usuario.persona ? `${usuario.persona.nombres || ''} ${usuario.persona.primer_apellido || ''}`.trim() : email;
             try {
-              if (fueCreado) {
-                // Si fue creado, enviamos datos de acceso
-                await this.mailService.sendAccountApprovalEmail(email, nombre, passwordTemporal);
+              if (templateId) {
+                await this.mailQueueService.renderAndEnqueue(email, { nombre, email, password: passwordTemporal, actividad: actividad.nombre, evento: actividad.evento?.nombre }, templateId);
+              } else if (fueCreado) {
+                await this.mailQueueService.renderAndEnqueue(email, { nombre, email, password: passwordTemporal }, undefined, 'WELCOME');
               } else {
-                // Si ya existía, solo confirmación de inscripción
-                await this.mailService.sendEnrollmentConfirmedEmail(email, nombre, actividad.nombre, eventoNombre);
+                await this.mailQueueService.renderAndEnqueue(email, { nombre, actividad: actividad.nombre, evento: actividad.evento?.nombre }, undefined, 'GENERAL');
               }
               correoEnviado = true;
             } catch (mailError) {
-              correoAdvertencia = mailError.message?.includes('Límite diario')
-                ? 'Límite diario de correos alcanzado.'
-                : `Error correo: ${mailError.message}`;
+              correoAdvertencia = `Error encolando: ${mailError.message}`;
               advertenciasCorreo++;
             }
           }
@@ -490,45 +334,21 @@ export class InscripcionesExcelService {
             fila: numFila,
             email,
             estado: modo === 'verificar' ? 'omitido' : (fueCreado ? 'creado' : 'inscrito'),
-            mensaje: modo === 'verificar' 
-              ? `Válido para ${fueCreado ? 'crear e inscribir' : 'inscribir'} en "${actividad.nombre}".` 
-              : `${fueCreado ? 'Usuario creado e inscrito' : 'Inscrito'} correctamente en "${actividad.nombre}".`,
+            mensaje: modo === 'verificar' ? 'Válido.' : 'Procesado correctamente.',
             correoEnviado,
             correoAdvertencia,
           });
-
           if (fueCreado) creados++;
           inscritos++;
-
         } catch (error) {
           await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-          detalle.push({
-            fila: numFila,
-            email,
-            estado: 'error',
-            mensaje: error.message || 'Error al procesar fila.',
-          });
+          detalle.push({ fila: numFila, email, estado: 'error', mensaje: error.message });
           errores++;
         }
       }
 
-      // ── Decisión Final ─────────────────────────────────────────────
-      if (modo === 'verificar' || errores > 0) {
-        await queryRunner.rollbackTransaction();
-        if (modo === 'guardar' && errores > 0) {
-          detalle.forEach(d => {
-            if (d.estado === 'inscrito' || d.estado === 'creado') {
-              d.estado = 'omitido';
-              d.mensaje = 'Omitido por errores en otras filas.';
-            }
-          });
-          inscritos = 0;
-          creados = 0;
-        }
-      } else {
-        await queryRunner.commitTransaction();
-      }
-
+      if (modo === 'verificar' || errores > 0) await queryRunner.rollbackTransaction();
+      else await queryRunner.commitTransaction();
     } catch (e) {
       await queryRunner.rollbackTransaction();
       throw e;
@@ -536,84 +356,7 @@ export class InscripcionesExcelService {
       await queryRunner.release();
     }
 
-    return {
-      total: filas.length,
-      inscritos,
-      creados,
-      omitidos,
-      errores,
-      advertenciasCorreo,
-      detalle,
-    };
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  //  Generación de plantillas Excel
-  // ══════════════════════════════════════════════════════════════════════════
-
-  generarPlantillaUsuarios(): Buffer {
-    const ws = XLSX.utils.aoa_to_sheet([
-      [
-        'email', 'password', 'nombres', 'primer_apellido', 'segundo_apellido',
-        'documento_identidad', 'genero', 'pais_origen', 'pais_residencia',
-        'fecha_nacimiento', 'celular', 'institucion', 'tipo_afiliacion',
-        'area_tematica', 'disciplina_cientifica', 'id_grado_academico', 'id_rol',
-      ],
-      [
-        'ejemplo@correo.com', 'Clave1234', 'Ana María', 'López', 'García',
-        '12345678', 1, 'Bolivia', 'Bolivia', '2000-05-15', '77712345',
-        'Universidad Mayor de San Andrés', 'Universidad', 'Ciencias Exactas',
-        'Informática', 2, 4,
-      ],
-    ]);
-
-    // Ancho de columnas
-    ws['!cols'] = Array(17).fill({ wch: 22 });
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Registro Usuarios');
-
-    // Hoja de referencia de géneros
-    const wsRef = XLSX.utils.aoa_to_sheet([
-      ['Código género', 'Descripción'],
-      [0, 'Masculino'],
-      [1, 'Femenino'],
-      [2, 'Otro'],
-      [3, 'Prefiero no decir'],
-      ['', ''],
-      ['Código rol', 'Descripción'],
-      [4, 'Estudiante (por defecto)'],
-      [3, 'Ponente'],
-      [2, 'Coordinador'],
-    ]);
-    wsRef['!cols'] = [{ wch: 18 }, { wch: 25 }];
-    XLSX.utils.book_append_sheet(wb, wsRef, 'Referencia');
-
-    return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
-  }
-
-  generarPlantillaInscripciones(): Buffer {
-    const ws = XLSX.utils.aoa_to_sheet([
-      [
-        'email', 'nombre_actividad_academica', 'nombres', 'primer_apellido', 
-        'segundo_apellido', 'documento_identidad'
-      ],
-      [
-        'estudiante_nuevo@correo.com', 'Taller de Machine Learning', 'Juan', 'Perez',
-        'Villazón', '12345678'
-      ],
-      [
-        'usuario_existente@correo.com', 'Curso de Bioinformática', '', '', '', ''
-      ],
-    ]);
-    ws['!cols'] = [
-      { wch: 30 }, { wch: 35 }, { wch: 20 }, { wch: 20 }, 
-      { wch: 20 }, { wch: 15 }
-    ];
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Inscripción Masiva');
-    return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+    return { total: filas.length, inscritos, creados, omitidos, errores, advertenciasCorreo, detalle };
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -659,7 +402,6 @@ export class InscripcionesExcelService {
         await queryRunner.query(`SAVEPOINT ${savepointName}`);
 
         try {
-          // 1. Buscar o Crear usuario
           let usuario = await queryRunner.manager.findOne(Usuario, {
             where: { email },
             relations: ['persona', 'usuariosRoles', 'usuariosRoles.rol'],
@@ -673,131 +415,80 @@ export class InscripcionesExcelService {
             
             passwordTemporal = String(fila['password'] || fila['documento_identidad'] || 'Ponente123!').trim();
             const hash = await bcrypt.hash(passwordTemporal, 10);
-
-            usuario = queryRunner.manager.create(Usuario, {
-              email,
-              password: hash,
-              estado: 1,
-              requiere_cambio_password: true,
-            });
-            const usuarioGuardado = await queryRunner.manager.save(usuario);
-
-            const persona = queryRunner.manager.create(Persona, {
-              nombres: String(fila['nombres'] || '').trim() || 'Ponente',
-              primer_apellido: String(fila['primer_apellido'] || '').trim() || 'Nuevo',
-              segundo_apellido: String(fila['segundo_apellido'] || '').trim() || undefined,
-              documento_identidad: String(fila['documento_identidad'] || '').trim() || undefined,
-              usuario: usuarioGuardado,
-            });
+            usuario = queryRunner.manager.create(Usuario, { email, password: hash, estado: 1, requiere_cambio_password: true });
+            const userSaved = await queryRunner.manager.save(usuario);
+            const persona = queryRunner.manager.create(Persona, { nombres: String(fila['nombres'] || '').trim() || 'Ponente', primer_apellido: String(fila['primer_apellido'] || '').trim() || 'Nuevo', usuario: userSaved });
             await queryRunner.manager.save(persona);
-
             const rol = await queryRunner.manager.findOne(Rol, { where: { id: ROL_PONENTE_ID } });
-            if (rol) {
-              await queryRunner.manager.save(queryRunner.manager.create(UsuarioRol, {
-                usuario: usuarioGuardado,
-                rol,
-                estado: 1,
-              }));
-            }
-            usuario = { ...usuarioGuardado, persona };
+            if (rol) await queryRunner.manager.save(queryRunner.manager.create(UsuarioRol, { usuario: userSaved, rol, estado: 1 }));
+            usuario = { ...userSaved, persona };
             fueCreado = true;
-          } else {
-            // Validar rol ponente (2)
-            const tieneRolPonente = usuario.usuariosRoles?.some(ur => ur.rol?.id === ROL_PONENTE_ID);
-            if (!tieneRolPonente) throw new Error(`El usuario existe pero no tiene el rol de "Ponente".`);
           }
 
-          // 2. Actividad
           if (!idEvento) throw new Error('Evento no seleccionado.');
           const cacheKey = `ev_${idEvento}_${nombreActividad.toLowerCase()}`;
           let actividad = actividadCache.get(cacheKey);
           if (actividad === undefined) {
-            actividad = await queryRunner.manager.findOne(ActividadAcademica, {
-              where: { nombre: ILike(nombreActividad), evento: { id: idEvento } },
-              relations: ['evento'],
-            });
+            actividad = await queryRunner.manager.findOne(ActividadAcademica, { where: { nombre: ILike(nombreActividad), evento: { id: idEvento } }, relations: ['evento'] });
             actividadCache.set(cacheKey, actividad);
           }
 
-          if (!actividad) throw new Error(`Actividad "${nombreActividad}" no encontrada en el evento.`);
+          if (!actividad) throw new Error(`Actividad "${nombreActividad}" no encontrada.`);
 
-          // 3. Duplicado
-          const existente = await queryRunner.manager.findOne(Imparticion, {
-            where: { usuario: { id: usuario.id }, actividadAcademica: { id: actividad.id } }
-          });
-
+          const existente = await queryRunner.manager.findOne(Imparticion, { where: { usuario: { id: usuario.id }, actividadAcademica: { id: actividad.id } } });
           if (existente) {
-            detalle.push({ fila: numFila, email, estado: 'omitido', mensaje: 'Ya está asignado como ponente a esta actividad.' });
+            detalle.push({ fila: numFila, email, estado: 'omitido', mensaje: 'Ya asignado.' });
             omitidos++;
             await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
             continue;
           }
 
-          // 4. Asignar
-          const imparticion = queryRunner.manager.create(Imparticion, {
-            usuario,
-            actividadAcademica: actividad,
-            evento: actividad.evento,
-          });
-          await queryRunner.manager.save(imparticion);
-
-          detalle.push({
-            fila: numFila,
-            email,
-            estado: modo === 'verificar' ? 'omitido' : (fueCreado ? 'creado' : 'asignado'),
-            mensaje: modo === 'verificar' ? 'Válido para asignación.' : 'Asignado correctamente.',
-          });
-
+          await queryRunner.manager.save(queryRunner.manager.create(Imparticion, { usuario, actividadAcademica: actividad, evento: actividad.evento }));
+          detalle.push({ fila: numFila, email, estado: modo === 'verificar' ? 'omitido' : (fueCreado ? 'creado' : 'asignado'), mensaje: 'Procesado.' });
           if (fueCreado) creados++;
           asignados++;
-
         } catch (error) {
           await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
           detalle.push({ fila: numFila, email, estado: 'error', mensaje: error.message });
           errores++;
         }
       }
-
-      if (modo === 'verificar' || errores > 0) {
-        await queryRunner.rollbackTransaction();
-      } else {
-        await queryRunner.commitTransaction();
-      }
+      if (modo === 'verificar' || errores > 0) await queryRunner.rollbackTransaction();
+      else await queryRunner.commitTransaction();
     } catch (e) {
       await queryRunner.rollbackTransaction();
       throw e;
     } finally {
       await queryRunner.release();
     }
-
     return { total: filas.length, asignados, creados, omitidos, errores, advertenciasCorreo, detalle };
   }
 
-  generarPlantillaPonentes(): Buffer {
-    const ws = XLSX.utils.aoa_to_sheet([
-      ['email', 'nombre_actividad_academica', 'nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad'],
-      ['ponente_ejemplo@correo.com', 'Taller de IA', 'Maria', 'Gomez', 'Lopez', '87654321'],
-    ]);
-    ws['!cols'] = [{ wch: 30 }, { wch: 35 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 15 }];
+  generarPlantillaUsuarios(): Buffer {
+    const ws = XLSX.utils.aoa_to_sheet([['email', 'password', 'nombres', 'primer_apellido'], ['ejemplo@correo.com', 'Clave1234', 'Ana', 'Lopez']]);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Asignación de Ponentes');
+    XLSX.utils.book_append_sheet(wb, ws, 'Registro');
     return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  //  Utilidades privadas
-  // ══════════════════════════════════════════════════════════════════════════
+  generarPlantillaInscripciones(): Buffer {
+    const ws = XLSX.utils.aoa_to_sheet([['email', 'nombre_actividad_academica', 'nombres', 'primer_apellido']]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Inscripción');
+    return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+  }
+
+  generarPlantillaPonentes(): Buffer {
+    const ws = XLSX.utils.aoa_to_sheet([['email', 'nombre_actividad_academica', 'nombres', 'primer_apellido']]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Asignación');
+    return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+  }
 
   private parsearExcel(buffer: Buffer): Record<string, any>[] {
-    try {
-      const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
-      const primerHoja = workbook.SheetNames[0];
-      if (!primerHoja) throw new BadRequestException('El archivo no contiene hojas.');
-      const ws = workbook.Sheets[primerHoja];
-      return XLSX.utils.sheet_to_json(ws, { defval: '' });
-    } catch (error) {
-      if (error instanceof BadRequestException) throw error;
-      throw new BadRequestException(`Error al leer el archivo Excel: ${error.message}`);
-    }
+    const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
+    const primerHoja = workbook.SheetNames[0];
+    const ws = workbook.Sheets[primerHoja];
+    return XLSX.utils.sheet_to_json(ws, { defval: '' });
   }
 }

@@ -9,10 +9,14 @@ import { MailLog } from './entities/mail-log.entity';
 import { MailQueue } from './entities/mail-queue.entity';
 import { MailQueueService } from './mail-queue.service';
 
+import { MailTemplate } from './entities/mail-template.entity';
+import { MailTemplateService } from './mail-template.service';
+import { MailTemplateController } from './mail-template.controller';
+
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([MailLog, MailQueue]),
+    TypeOrmModule.forFeature([MailLog, MailQueue, MailTemplate]),
     
     MailerModule.forRootAsync({
       useFactory: async (config: ConfigService) => ({
@@ -42,8 +46,9 @@ import { MailQueueService } from './mail-queue.service';
       inject: [ConfigService],
     }),
   ],
-  providers: [MailService, MailQueueService],
-  exports: [MailService, MailQueueService],
+  providers: [MailService, MailQueueService, MailTemplateService],
+  controllers: [MailTemplateController],
+  exports: [MailService, MailQueueService, MailTemplateService],
 })
 export class MailModule {}
 

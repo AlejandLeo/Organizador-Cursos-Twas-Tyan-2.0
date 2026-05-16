@@ -43,7 +43,7 @@ const formUsuario = ref({
 const fetchUsuarios = async () => {
   try {
     isLoading.value = true;
-    const res = await usuariosService.getAll({ soloActivos: 'false' });
+    const res = await usuariosService.getAll({ soloActivos: 'false', limit: 1000 } as any);
     console.log('AdminUsuariosView: Datos recibidos:', res.data);
     const data = (res.data as any)?.data ?? res.data;
     usuarios.value = Array.isArray(data) ? data : [];
@@ -307,11 +307,18 @@ onMounted(fetchUsuarios);
         </div>
         <p class="text-slate-500 text-sm ml-1">Crea, administra y asigna roles desde un solo lugar</p>
       </div>
-      <button @click="isCreating = true"
-              class="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-600/20">
-        <span class="material-symbols-outlined text-[18px]">person_add</span>
-        Nuevo Usuario
-      </button>
+      <div class="flex items-center gap-3">
+        <button @click="router.push({ name: 'admin-configuracion' })"
+                class="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all border border-slate-200 dark:border-white/10">
+          <span class="material-symbols-outlined text-[18px]">mail</span>
+          Configurar Bienvenida
+        </button>
+        <button @click="isCreating = true"
+                class="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-red-600/20 hover:-translate-y-1 transition-all">
+          <span class="material-symbols-outlined text-[18px]">person_add</span>
+          Nuevo Usuario
+        </button>
+      </div>
     </div>
 
     <!-- FILTROS -->

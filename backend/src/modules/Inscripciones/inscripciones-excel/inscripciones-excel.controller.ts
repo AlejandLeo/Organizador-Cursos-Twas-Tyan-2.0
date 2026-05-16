@@ -37,6 +37,8 @@ export class InscripcionesExcelController {
       properties: {
         file: { type: 'string', format: 'binary' },
         notificar: { type: 'string', description: 'true/false' },
+        modo: { type: 'string', description: 'verificar / guardar' },
+        id_template: { type: 'string', description: 'ID de la plantilla de correo' },
       },
       required: ['file'],
     },
@@ -57,9 +59,15 @@ export class InscripcionesExcelController {
     file: Express.Multer.File,
     @Body('notificar') notificar?: string,
     @Body('modo') modo?: 'verificar' | 'guardar',
+    @Body('id_template') idTemplate?: string,
   ) {
     if (!file) throw new BadRequestException('Debe adjuntar un archivo Excel.');
-    return this.service.registroMasivoUsuarios(file.buffer, notificar === 'true', modo || 'guardar');
+    return this.service.registroMasivoUsuarios(
+      file.buffer, 
+      notificar === 'true', 
+      modo || 'guardar',
+      idTemplate ? Number(idTemplate) : undefined
+    );
   }
 
   @Roles('Coordinador', 'Super Usuario')
@@ -74,6 +82,7 @@ export class InscripcionesExcelController {
         notificar: { type: 'string', description: 'true/false' },
         id_actividad: { type: 'string', description: 'ID de la actividad académica' },
         modo: { type: 'string', description: 'verificar / guardar' },
+        id_template: { type: 'string', description: 'ID de la plantilla de correo' },
       },
       required: ['file'],
     },
@@ -97,6 +106,7 @@ export class InscripcionesExcelController {
     @Body('id_evento') idEvento?: string,
     @Body('crear_usuarios') crearUsuarios?: string,
     @Body('modo') modo?: 'verificar' | 'guardar',
+    @Body('id_template') idTemplate?: string,
   ) {
     if (!file) throw new BadRequestException('Debe adjuntar un archivo Excel.');
     return this.service.inscripcionMasivaEvento(
@@ -105,7 +115,8 @@ export class InscripcionesExcelController {
       idActividad ? Number(idActividad) : undefined,
       idEvento ? Number(idEvento) : undefined,
       modo || 'guardar',
-      crearUsuarios === 'true'
+      crearUsuarios === 'true',
+      idTemplate ? Number(idTemplate) : undefined
     );
   }
 

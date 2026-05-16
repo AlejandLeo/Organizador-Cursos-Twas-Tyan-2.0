@@ -4,6 +4,8 @@ import { Repository, LessThan } from 'typeorm';
 import { MailQueue } from './entities/mail-queue.entity';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { MailService } from './mail.service';
+import { MailTemplateService } from './mail-template.service';
+import { SistemaConfigService } from '../sistema-config/sistema-config.service';
 
 @Injectable()
 export class MailQueueService {
@@ -14,6 +16,8 @@ export class MailQueueService {
     @InjectRepository(MailQueue)
     private readonly mailQueueRepository: Repository<MailQueue>,
     private readonly mailService: MailService,
+    private readonly templateService: MailTemplateService,
+    private readonly configService: SistemaConfigService,
   ) {}
 
   /**
@@ -27,6 +31,53 @@ export class MailQueueService {
       estado: 'PENDING',
     });
     return this.mailQueueRepository.save(entry);
+  }
+
+  /**
+   * Renderiza una plantilla (DB o Default) y la encola.
+   */
+  async renderAndEnqueue(to: string, context: any, templateId?: number, defaultTipo?: string) {
+    let subject = '';
+    let body = '';
+
+    if (templateId) {
+      const template = await this.templateService.findOne(templateId);
+      subject = template.asunto;
+      body = template.cuerpo;
+    } else {
+      // Fallback a configuración global si no hay templateId
+      if (defaultTipo === 'WELCOME') {
+        subject = await this.configService.getConfig('WELCOME_MESSAGE_SUBJECT');
+        body = await this.configService.getConfig('WELCOME_MESSAGE_BODY');
+      } else {
+        subject = 'Notificación de Sistema';
+        body = 'Hola {{nombre}}, tienes una nueva notificación.';
+      }
+    }
+
+    const masterLayout = await this.configService.getConfig('MAIL_MASTER_LAYOUT');
+    const systemUrl = await this.configService.getConfig('SYSTEM_URL');
+
+    // Reemplazar variables
+    const fullContext = { ...context, url_sistema: systemUrl, year: new Date().getFullYear() };
+    
+    const replaceVars = (text: string) => {
+      let result = text;
+      Object.keys(fullContext).forEach(key => {
+        const regex = new RegExp(`{{${key}}}`, 'g');
+        result = result.replace(regex, String(fullContext[key]));
+      });
+      return result;
+    };
+
+    const finalSubject = replaceVars(subject);
+    let contentHtml = replaceVars(body).replace(/\n/g, '<br>');
+
+    const finalHtml = masterLayout
+      .replace('{{{content}}}', contentHtml)
+      .replace('{{year}}', fullContext.year.toString());
+
+    return this.enqueue(to, finalSubject, finalHtml);
   }
 
   /**
