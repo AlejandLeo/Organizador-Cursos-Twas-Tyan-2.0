@@ -69,7 +69,7 @@ export class InscripcionesExcelService {
     private readonly mailService: MailService,
     private readonly mailTemplateService: MailTemplateService,
     private readonly mailQueueService: MailQueueService,
-  ) {}
+  ) { }
 
   // ══════════════════════════════════════════════════════════════════════════
   //  ESCENARIO 1 — Registro masivo de usuarios desde Excel
@@ -138,7 +138,7 @@ export class InscripcionesExcelService {
 
           const nombres = String(fila['nombres'] || '').trim();
           const primerApellido = String(fila['primer_apellido'] || '').trim();
-          
+
           const persona = queryRunner.manager.create(Persona, {
             nombres: nombres || undefined,
             primer_apellido: primerApellido || undefined,
@@ -164,11 +164,12 @@ export class InscripcionesExcelService {
           let correoAdvertencia: string | undefined;
 
           if (notificar && modo === 'guardar') {
-            const nombre = `${nombres} ${primerApellido}`.trim() || email;
+            const nombre = nombres || 'Usuario';
+            const apellidos = primerApellido || '';
             try {
               await this.mailQueueService.renderAndEnqueue(
                 email,
-                { nombre, email, password },
+                { nombre, apellidos, email, password },
                 templateId,
                 'WELCOME'
               );
@@ -265,7 +266,7 @@ export class InscripcionesExcelService {
 
           if (!usuario) {
             if (!crearUsuarios) throw new Error(`Usuario "${email}" no encontrado. Activa "Registrar usuarios nuevos".`);
-            
+
             passwordTemporal = String(fila['password'] || fila['documento_identidad'] || 'Usuario123!').trim();
             const hash = await bcrypt.hash(passwordTemporal, 10);
             usuario = queryRunner.manager.create(Usuario, { email, password: hash, estado: 1, requiere_cambio_password: true });
@@ -314,14 +315,15 @@ export class InscripcionesExcelService {
           let correoAdvertencia: string | undefined;
 
           if (notificar && modo === 'guardar') {
-            const nombre = usuario.persona ? `${usuario.persona.nombres || ''} ${usuario.persona.primer_apellido || ''}`.trim() : email;
+            const nombre = usuario.persona?.nombres || 'Usuario';
+            const apellidos = usuario.persona?.primer_apellido || '';
             try {
               if (templateId) {
-                await this.mailQueueService.renderAndEnqueue(email, { nombre, email, password: passwordTemporal, actividad: actividad.nombre, evento: actividad.evento?.nombre }, templateId);
+                await this.mailQueueService.renderAndEnqueue(email, { nombre, apellidos, email, password: passwordTemporal, actividad: actividad.nombre, evento: actividad.evento?.nombre }, templateId);
               } else if (fueCreado) {
-                await this.mailQueueService.renderAndEnqueue(email, { nombre, email, password: passwordTemporal }, undefined, 'WELCOME');
+                await this.mailQueueService.renderAndEnqueue(email, { nombre, apellidos, email, password: passwordTemporal }, undefined, 'WELCOME');
               } else {
-                await this.mailQueueService.renderAndEnqueue(email, { nombre, actividad: actividad.nombre, evento: actividad.evento?.nombre }, undefined, 'GENERAL');
+                await this.mailQueueService.renderAndEnqueue(email, { nombre, apellidos, actividad: actividad.nombre, evento: actividad.evento?.nombre }, undefined, 'GENERAL');
               }
               correoEnviado = true;
             } catch (mailError) {
@@ -412,7 +414,7 @@ export class InscripcionesExcelService {
 
           if (!usuario) {
             if (!crearUsuarios) throw new Error(`Ponente "${email}" no encontrado. Activa el registro automático.`);
-            
+
             passwordTemporal = String(fila['password'] || fila['documento_identidad'] || 'Ponente123!').trim();
             const hash = await bcrypt.hash(passwordTemporal, 10);
             usuario = queryRunner.manager.create(Usuario, { email, password: hash, estado: 1, requiere_cambio_password: true });

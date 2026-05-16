@@ -3,14 +3,61 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useAdminHistorialStore } from '@/stores/adminHistorial';
 import { usuariosService } from '@/services/usuarios.service';
+import api from '@/services/api';
 import Swal from 'sweetalert2';
 
 const authStore = useAuthStore();
 const historialStore = useAdminHistorialStore();
-const usuarios = ref<any[]>([]);
 const isLoading = ref(true);
+const usuarios = ref<any[]>([]);
 const filtroTexto = ref('');
 const filtroRol = ref('');
+
+// Plantilla de correo de bienvenida
+const plantillasCorreo = ref<any[]>([]);
+const selectedTemplateId = ref('');
+const showPreviewModal = ref(false);
+const previewHtml = ref('');
+
+const fetchPlantillas = async () => {
+  try {
+    const res = await api.get('/admin/mail-templates');
+    plantillasCorreo.value = res.data || [];
+  } catch { /* silencioso */ }
+};
+
+const openMailPreview = async () => {
+  previewHtml.value = '';
+  if (!selectedTemplateId.value) {
+    // Plantilla por defecto: admission.hbs
+    try {
+      const res = await api.get('/admin/mail-templates/default-preview');
+      previewHtml.value = res.data?.html || '<p>No se pudo cargar.</p>';
+    } catch {
+      previewHtml.value = '<p style="color:red">Error al cargar admission.hbs</p>';
+    }
+  } else {
+    const t = plantillasCorreo.value.find((p: any) => String(p.id) === selectedTemplateId.value);
+    if (!t) return;
+    try {
+      const resLayout = await api.get('/admin/configuracion/key/MAIL_MASTER_LAYOUT');
+      const resUrl    = await api.get('/admin/configuracion/key/SYSTEM_URL');
+      const masterLayout = resLayout.data?.valor || '<html><body>{{{content}}}</body></html>';
+      const systemUrl    = resUrl.data?.valor    || window.location.origin;
+      const ctx: Record<string, string | number> = {
+        nombre: 'Juan Pérez', name: 'Juan Pérez', email: 'ejemplo@correo.com',
+        password: 'Contraseña123', url_sistema: systemUrl, loginUrl: systemUrl,
+        year: new Date().getFullYear(),
+      };
+      let html = (t.cuerpo || '').replace(/\n/g, '<br>');
+      Object.keys(ctx).forEach(k => { html = html.replace(new RegExp(`{{${k}}}`, 'g'), String(ctx[k])); });
+      previewHtml.value = masterLayout.replace('{{{content}}}', html).replace('{{year}}', String(new Date().getFullYear()));
+    } catch {
+      previewHtml.value = '<p style="color:red">Error al renderizar.</p>';
+    }
+  }
+  showPreviewModal.value = true;
+};
 
 // Modales
 const isCreating = ref(false);
@@ -38,6 +85,7 @@ const formUsuario = ref({
   segundo_apellido: '',
   documento_identidad: '',
   id_rol: ROLE_IDS.COORDINADOR,
+  notificar: true
 });
 
 const fetchUsuarios = async () => {
@@ -104,7 +152,7 @@ const isSavingForm = ref(false);
 const handleSaveUsuario = async () => {
   if (isSavingForm.value) return;
   
-  const { email, password, nombres, primer_apellido, id_rol } = formUsuario.value;
+  const { email, password, nombres, primer_apellido, id_rol, notificar } = formUsuario.value;
   if (!email || !password || !nombres || !primer_apellido) {
     return Swal.fire('Campos requeridos', 'Complete todos los campos obligatorios.', 'warning');
   }
@@ -119,6 +167,7 @@ const handleSaveUsuario = async () => {
       segundo_apellido: formUsuario.value.segundo_apellido || undefined,
       documento_identidad: formUsuario.value.documento_identidad || undefined,
       id_rol,
+      notificar,
     });
     
     const resData = res.data as any;
@@ -126,7 +175,7 @@ const handleSaveUsuario = async () => {
     historialStore.registrar('usuario', 'crear', `Creó nuevo ${rolName}: ${email}`, { entidadNombre: email });
     
     if (resData.correoEnviado) {
-      Swal.fire('¡Éxito!', `${rolName} creado correctamente. Se ha enviado un correo con las credenciales temporales.`, 'success');
+      Swal.fire('¡Éxito!', `${rolName} creado correctamente. Se ha puesto en cola el envío de un correo con las credenciales temporales.`, 'success');
     } else {
       Swal.fire({
         title: '¡Usuario Creado!',
@@ -137,7 +186,7 @@ const handleSaveUsuario = async () => {
     }
     
     isCreating.value = false;
-    formUsuario.value = { email: '', password: '', nombres: '', primer_apellido: '', segundo_apellido: '', documento_identidad: '', id_rol: ROLE_IDS.COORDINADOR };
+    formUsuario.value = { email: '', password: '', nombres: '', primer_apellido: '', segundo_apellido: '', documento_identidad: '', id_rol: ROLE_IDS.COORDINADOR, notificar: true };
     await fetchUsuarios();
     currentPage.value = 1;
   } catch (error: any) {
@@ -175,9 +224,9 @@ const guardarRoles = async () => {
     const data = res.data as any;
     
     if (data.correoEnviado) {
-      Swal.fire('¡Éxito!', 'Roles actualizados y notificación enviada al usuario.', 'success');
+      Swal.fire('¡Éxito!', 'Roles actualizados y notificación encolada para el usuario.', 'success');
     } else if (notificarRoles.value) {
-      Swal.fire('Actualizado', 'Roles actualizados, pero hubo un problema al enviar el correo.', 'warning');
+      Swal.fire('Actualizado', 'Roles actualizados, pero hubo un problema al encolar el correo.', 'warning');
     } else {
       Swal.fire('¡Éxito!', 'Roles actualizados correctamente.', 'success');
     }
@@ -284,7 +333,8 @@ const eliminarInmediata = async (user: any) => {
   }
 };
 
-onMounted(fetchUsuarios);
+onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
+
 </script>
 
 <template>
@@ -308,11 +358,18 @@ onMounted(fetchUsuarios);
         <p class="text-slate-500 text-sm ml-1">Crea, administra y asigna roles desde un solo lugar</p>
       </div>
       <div class="flex items-center gap-3">
-        <button @click="router.push({ name: 'admin-configuracion' })"
-                class="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all border border-slate-200 dark:border-white/10">
-          <span class="material-symbols-outlined text-[18px]">mail</span>
-          Configurar Bienvenida
-        </button>
+        <!-- Selector de plantilla de bienvenida -->
+        <div class="hidden md:flex items-center gap-2 bg-slate-50 dark:bg-white/5 px-3 py-2 rounded-xl border border-slate-200 dark:border-white/10">
+          <span class="material-symbols-outlined text-slate-400 text-sm">mail</span>
+          <select v-model="selectedTemplateId"
+                  class="bg-transparent text-[11px] font-bold text-slate-600 dark:text-slate-300 outline-none cursor-pointer min-w-[150px]">
+            <option value="">Plantilla por Defecto (admission)</option>
+            <option v-for="p in plantillasCorreo" :key="p.id" :value="String(p.id)">{{ p.nombre }}</option>
+          </select>
+          <button @click="openMailPreview" class="w-6 h-6 flex items-center justify-center text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all" title="Previsualizar plantilla">
+            <span class="material-symbols-outlined text-[17px]">visibility</span>
+          </button>
+        </div>
         <button @click="isCreating = true"
                 class="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-red-600/20 hover:-translate-y-1 transition-all">
           <span class="material-symbols-outlined text-[18px]">person_add</span>
@@ -504,6 +561,19 @@ onMounted(fetchUsuarios);
               <input v-model="formUsuario.password" type="password" placeholder="••••••••"
                      class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-red-600/50" />
             </div>
+
+            <!-- Notificar checkbox -->
+            <div class="col-span-1 md:col-span-2 pt-2 border-t border-slate-100 dark:border-white/5">
+              <div class="flex items-center gap-2 cursor-pointer w-fit" @click="formUsuario.notificar = !formUsuario.notificar">
+                <div :class="formUsuario.notificar ? 'bg-red-600 border-red-600' : 'bg-transparent border-slate-300 dark:border-slate-600'" 
+                     class="w-5 h-5 rounded border flex items-center justify-center transition-colors">
+                  <span v-if="formUsuario.notificar" class="material-symbols-outlined text-white text-[14px] font-bold">check</span>
+                </div>
+                <span class="text-[11px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors select-none">
+                  Enviar correo con credenciales de acceso
+                </span>
+              </div>
+            </div>
           </div>
           <!-- Botones -->
           <div class="flex items-center gap-3 pt-6 mt-4 border-t border-slate-100 dark:border-gray-800">
@@ -584,6 +654,29 @@ onMounted(fetchUsuarios);
               Listo, Guardar Cambios
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Previsualización Correo de Bienvenida -->
+    <div v-if="showPreviewModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+      <div class="bg-white dark:bg-[#1a1a24] w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden border border-white/10 flex flex-col max-h-[90vh]">
+        <div class="p-6 border-b border-slate-100 dark:border-white/5 flex items-center justify-between bg-slate-50/50 dark:bg-black/20">
+          <h3 class="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
+            <span class="material-symbols-outlined text-blue-500">mark_email_read</span>
+            Vista Previa — Correo de Bienvenida
+          </h3>
+          <button @click="showPreviewModal = false" class="w-10 h-10 rounded-full hover:bg-slate-200 dark:hover:bg-white/10 flex items-center justify-center transition-all">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="flex-1 overflow-y-auto bg-slate-100 dark:bg-black/40 p-4 md:p-8">
+          <div class="bg-white rounded-xl shadow-sm overflow-hidden mx-auto max-w-[600px] border border-slate-200">
+            <div v-html="previewHtml"></div>
+          </div>
+        </div>
+        <div class="p-4 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 text-center">
+          <p class="text-[10px] text-slate-400 font-medium">※ Los datos mostrados son solo de ejemplo para previsualización.</p>
         </div>
       </div>
     </div>

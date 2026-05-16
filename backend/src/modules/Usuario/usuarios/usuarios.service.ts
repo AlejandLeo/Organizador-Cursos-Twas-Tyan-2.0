@@ -447,7 +447,7 @@ export class UsuariosService {
         const nombreCompleto = usuario.persona
           ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
           : 'Usuario';
-        
+
         try {
           await this.mailService.sendRoleUpdateEmail(
             usuario.email,
@@ -461,8 +461,8 @@ export class UsuariosService {
         }
       }
 
-      return { 
-        mensaje: 'Roles actualizados correctamente.', 
+      return {
+        mensaje: 'Roles actualizados correctamente.',
         correoEnviado,
         cambios: { anadidos: rolesAnadidosNombres, quitados: rolesQuitadosNombres }
       };
@@ -626,13 +626,14 @@ export class UsuariosService {
 
       await queryRunner.commitTransaction();
 
-      // Enviar correo de bienvenida al ponente con sus credenciales (No-bloqueante)
+      // Enviar correo de bienvenida (Opcional)
       let correoEnviado = false;
-      try {
-        const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
-        correoEnviado = await this.enviarBienvenidaPersonalizada(dto.email, nombreCompleto, dto.password);
-      } catch (mailError) {
-        this.logger.error(`Error enviando correo de bienvenida a ponente ${dto.email}: ${mailError.message}`);
+      if (dto.notificar !== false) {
+        try {
+          correoEnviado = await this.enviarBienvenidaPersonalizada(dto.email, dto.nombres || 'Usuario', dto.primer_apellido || '', dto.password);
+        } catch (mailError) {
+          this.logger.error(`Error enviando correo de bienvenida a ponente ${dto.email}: ${mailError.message}`);
+        }
       }
 
       const perfil = await this.getPerfil(usuarioGuardado.id);
@@ -1262,6 +1263,7 @@ export class UsuariosService {
     id: number,
     accion: 'aprobar' | 'rechazar',
     motivo?: string,
+    notificar: boolean = true,
   ): Promise<{ mensaje: string; correoEnviado: boolean }> {
     const usuario = await this.usuarioRepository.findOne({
       where: { id },
@@ -1287,15 +1289,15 @@ export class UsuariosService {
           requiere_cambio_password: false
         });
 
-        const nombreCompleto = usuario.persona
-          ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
-          : 'Usuario';
-
         let correoEnviado = false;
-        try {
-          correoEnviado = await this.enviarBienvenidaPersonalizada(usuario.email, nombreCompleto, 'La elegida en su registro');
-        } catch (mailError) {
-          this.logger.error(`Error enviando correo de aprobación a ${usuario.email}: ${mailError.message}`);
+        if (notificar) {
+          try {
+            const nombres = usuario.persona?.nombres || 'Usuario';
+            const apellidos = usuario.persona?.primer_apellido || '';
+            correoEnviado = await this.enviarBienvenidaPersonalizada(usuario.email, nombres, apellidos, 'La elegida en su registro');
+          } catch (mailError) {
+            this.logger.error(`Error enviando correo de aprobación a ${usuario.email}: ${mailError.message}`);
+          }
         }
         return { mensaje: 'Solicitud aprobada.', correoEnviado };
       }
@@ -1306,11 +1308,13 @@ export class UsuariosService {
           ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
           : 'Usuario';
         let correoEnviado = false;
-        try {
-          await this.mailService.sendAccountReactivationEmail(usuario.email, nombreCompleto);
-          correoEnviado = true;
-        } catch (mailError) {
-          this.logger.error(`Error enviando correo de reactivación a ${usuario.email}: ${mailError.message}`);
+        if (notificar) {
+          try {
+            await this.mailService.sendAccountReactivationEmail(usuario.email, nombreCompleto);
+            correoEnviado = true;
+          } catch (mailError) {
+            this.logger.error(`Error enviando correo de reactivación a ${usuario.email}: ${mailError.message}`);
+          }
         }
         return { mensaje: 'Cuenta reactivada.', correoEnviado };
       }
@@ -1323,17 +1327,18 @@ export class UsuariosService {
         : 'Usuario';
 
       let correoEnviado = false;
-      try {
-        await this.mailService.sendAccountRejectionEmail(
-          usuario.email,
-          nombreCompleto,
-          motivo || 'La solicitud de registro no cumple con los criterios de validación.'
-        );
-        correoEnviado = true;
-      } catch (mailError) {
-        this.logger.error(`Error enviando correo de rechazo a ${usuario.email}: ${mailError.message}`);
+      if (notificar) {
+        try {
+          await this.mailService.sendAccountRejectionEmail(
+            usuario.email,
+            nombreCompleto,
+            motivo || 'La solicitud de registro no cumple con los criterios de validación.'
+          );
+          correoEnviado = true;
+        } catch (mailError) {
+          this.logger.error(`Error enviando correo de rechazo a ${usuario.email}: ${mailError.message}`);
+        }
       }
-
       return { mensaje: 'Solicitud rechazada.', correoEnviado };
     }
   }
@@ -1417,7 +1422,7 @@ export class UsuariosService {
    */
   async procesarEliminacionesProgramadas() {
     this.logger.log('Buscando usuarios con fecha de eliminación cumplida...');
-    
+
     const usuariosAEliminar = await this.usuarioRepository.find({
       where: {
         fecha_eliminacion: LessThanOrEqual(new Date())
@@ -1446,7 +1451,7 @@ export class UsuariosService {
   async eliminarFisico(id: number) {
     const usuario = await this.findOne(id);
     const queryRunner = this.dataSource.createQueryRunner();
-    
+
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
@@ -1482,11 +1487,11 @@ export class UsuariosService {
    * Envía un correo de bienvenida personalizado usando la configuración del sistema.
    * Utiliza la cola de correos para escalabilidad.
    */
-  private async enviarBienvenidaPersonalizada(email: string, nombre: string, passwordTemp: string) {
+  private async enviarBienvenidaPersonalizada(email: string, nombres: string, apellidos: string, passwordTemp: string) {
     try {
       await this.mailQueueService.renderAndEnqueue(
-        email, 
-        { nombre, email, password: passwordTemp },
+        email,
+        { nombre: nombres, apellidos, email, password: passwordTemp },
         undefined, // No templateId for now (uses default)
         'WELCOME'
       );

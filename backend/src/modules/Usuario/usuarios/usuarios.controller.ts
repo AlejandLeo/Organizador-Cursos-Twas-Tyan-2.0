@@ -703,11 +703,12 @@ export class UsuariosController {
     @Param('id', ParseIntPipe) id: number,
     @Param('accion') accion: 'aprobar' | 'rechazar',
     @Body('motivo') motivo?: string,
+    @Body('notificar') notificar?: boolean,
   ) {
     if (accion !== 'aprobar' && accion !== 'rechazar') {
       throw new BadRequestException('Acción inválida. Use aprobar o rechazar.');
     }
-    return this.usuariosService.aprobarRechazarSolicitud(id, accion, motivo);
+    return this.usuariosService.aprobarRechazarSolicitud(id, accion, motivo, notificar ?? true);
   }
 
   @Roles('Coordinador', 'Super Usuario')
