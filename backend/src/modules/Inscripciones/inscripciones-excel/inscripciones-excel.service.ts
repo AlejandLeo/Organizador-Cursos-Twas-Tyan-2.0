@@ -291,7 +291,9 @@ export class InscripcionesExcelService {
     fileBuffer: Buffer,
     notificar = false,
     idActividad?: number,
-    modo: 'verificar' | 'guardar' = 'guardar'
+    idEvento?: number,
+    modo: 'verificar' | 'guardar' = 'guardar',
+    crearUsuarios = false
   ): Promise<ResultadoImportacion> {
     const filas = this.parsearExcel(fileBuffer);
 
@@ -303,6 +305,7 @@ export class InscripcionesExcelService {
 
     const detalle: ResultadoFila[] = [];
     let inscritos = 0;
+    let creados = 0;
     let omitidos = 0;
     let errores = 0;
     let advertenciasCorreo = 0;
@@ -334,80 +337,116 @@ export class InscripcionesExcelService {
           continue;
         }
 
-        // ── Buscar usuario ───────────────────────────────────────────────
-        const usuario = await queryRunner.manager.findOne(Usuario, {
-          where: { email },
-          relations: ['persona'],
-        });
-        if (!usuario) {
-          detalle.push({ fila: numFila, email, estado: 'error', mensaje: 'Usuario no encontrado en el sistema.' });
-          errores++;
-          continue;
-        }
-
-        // ── Buscar actividad académica (con cache o ID directo) ─────────
-        let actividad: ActividadAcademica | null | undefined;
-
-        if (idActividad) {
-          const cacheKey = `id_${idActividad}`;
-          if (actividadCache.has(cacheKey)) {
-            actividad = actividadCache.get(cacheKey);
-          } else {
-            actividad = await queryRunner.manager.findOne(ActividadAcademica, {
-              where: { id: idActividad },
-              relations: ['evento'],
-            });
-            actividadCache.set(cacheKey, actividad);
-          }
-        } else {
-          const cacheKey = nombreActividad.toLowerCase();
-          if (actividadCache.has(cacheKey)) {
-            actividad = actividadCache.get(cacheKey);
-          } else {
-            actividad = await queryRunner.manager.findOne(ActividadAcademica, {
-              where: { nombre: ILike(nombreActividad) },
-              relations: ['evento'],
-            });
-            actividadCache.set(cacheKey, actividad);
-          }
-        }
-
-        if (!actividad) {
-          detalle.push({
-            fila: numFila,
-            email,
-            estado: 'error',
-            mensaje: idActividad
-              ? `Actividad con ID ${idActividad} no encontrada.`
-              : `Actividad académica "${nombreActividad}" no encontrada.`,
-          });
-          errores++;
-          continue;
-        }
-
-        // ── Verificar si ya está inscrito ────────────────────────────────
-        const inscripcionExistente = await queryRunner.manager.findOne(Inscripcion, {
-          where: {
-            usuario: { id: usuario.id },
-            actividadAcademica: { id: actividad.id },
-          },
-        });
-        if (inscripcionExistente) {
-          detalle.push({
-            fila: numFila,
-            email,
-            estado: 'omitido',
-            mensaje: `Ya tiene una inscripción en "${actividad.nombre}".`,
-          });
-          omitidos++;
-          continue;
-        }
-
         // ── Creación en Savepoint ─────────────────────────────────────────
         const savepointName = `row_insc_${i}`;
         await queryRunner.query(`SAVEPOINT ${savepointName}`);
 
         try {
+          // ── 1. Buscar o Crear usuario ───────────────────────────────────────────
+          let usuario = await queryRunner.manager.findOne(Usuario, {
+            where: { email },
+            relations: ['persona', 'usuariosRoles', 'usuariosRoles.rol'],
+          });
+
+          let fueCreado = false;
+          let passwordTemporal = '';
+
+          if (!usuario) {
+            // Si no se permite crear usuarios, lanzamos error
+            if (!crearUsuarios) {
+              throw new Error(`Usuario con email "${email}" no encontrado. Activa "Registrar usuarios nuevos" para crearlo automáticamente.`);
+            }
+
+            // Si no existe, lo creamos (Similar a registroMasivoUsuarios)
+            passwordTemporal = String(fila['password'] || fila['documento_identidad'] || 'Usuario123!').trim();
+            const hash = await bcrypt.hash(passwordTemporal, 10);
+
+            usuario = queryRunner.manager.create(Usuario, {
+              email,
+              password: hash,
+              estado: 1,
+              requiere_cambio_password: true,
+            });
+            const usuarioGuardado = await queryRunner.manager.save(usuario);
+
+            const persona = queryRunner.manager.create(Persona, {
+              nombres: String(fila['nombres'] || '').trim() || 'Estudiante',
+              primer_apellido: String(fila['primer_apellido'] || '').trim() || 'Nuevo',
+              segundo_apellido: String(fila['segundo_apellido'] || '').trim() || undefined,
+              documento_identidad: String(fila['documento_identidad'] || '').trim() || undefined,
+              celular: String(fila['celular'] || '').trim() || undefined,
+              usuario: usuarioGuardado,
+            });
+            await queryRunner.manager.save(persona);
+
+            // Asignar rol estudiante
+            const rol = await queryRunner.manager.findOne(Rol, { where: { id: ROL_ESTUDIANTE_ID } });
+            if (rol) {
+              const usuarioRol = queryRunner.manager.create(UsuarioRol, {
+                usuario: usuarioGuardado,
+                rol,
+                estado: 1,
+              });
+              await queryRunner.manager.save(usuarioRol);
+            }
+            usuario = { ...usuarioGuardado, persona };
+            fueCreado = true;
+          } else {
+            // Validar que el usuario existente tenga el rol de Estudiante (4)
+            const tieneRolEstudiante = usuario.usuariosRoles?.some(ur => ur.rol?.id === ROL_ESTUDIANTE_ID);
+            if (!tieneRolEstudiante) {
+              throw new Error(`El usuario existe pero no tiene el rol de "Estudiante". No se puede inscribir.`);
+            }
+          }
+
+          // ── 2. Buscar actividad académica (siempre por nombre dentro del evento) ─────────
+          let actividad: ActividadAcademica | null | undefined;
+
+          if (idEvento) {
+            const cacheKey = `ev_${idEvento}_${nombreActividad.toLowerCase()}`;
+            if (actividadCache.has(cacheKey)) {
+              actividad = actividadCache.get(cacheKey);
+            } else {
+              actividad = await queryRunner.manager.findOne(ActividadAcademica, {
+                where: { 
+                  nombre: ILike(nombreActividad),
+                  evento: { id: idEvento }
+                },
+                relations: ['evento'],
+              });
+              actividadCache.set(cacheKey, actividad);
+            }
+          } else {
+            throw new Error('Debe seleccionarse un evento para buscar la actividad.');
+          }
+
+          if (!actividad) {
+            throw new Error(idEvento 
+              ? `Actividad "${nombreActividad}" no encontrada en el evento seleccionado.` 
+              : `Actividad "${nombreActividad}" no encontrada.`);
+          }
+
+          // ── 3. Verificar si ya está inscrito ────────────────────────────────
+          const inscripcionExistente = await queryRunner.manager.findOne(Inscripcion, {
+            where: {
+              usuario: { id: usuario.id },
+              actividadAcademica: { id: actividad.id },
+            },
+          });
+
+          if (inscripcionExistente) {
+            detalle.push({
+              fila: numFila,
+              email,
+              estado: 'omitido',
+              mensaje: `El usuario ya está inscrito en "${actividad.nombre}".`,
+            });
+            omitidos++;
+            await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+            continue;
+          }
+
+          // ── 4. Inscribir ──────────────────────────────────────────────────
           const inscripcion = queryRunner.manager.create(Inscripcion, {
             usuario,
             actividadAcademica: actividad,
@@ -416,7 +455,7 @@ export class InscripcionesExcelService {
           });
           await queryRunner.manager.save(inscripcion);
 
-          // ── Notificación por correo ──────────────────────────────────
+          // ── 5. Notificación ──────────────────────────────────────────────
           let correoEnviado = false;
           let correoAdvertencia: string | undefined;
 
@@ -425,18 +464,20 @@ export class InscripcionesExcelService {
               ? `${usuario.persona.nombres || ''} ${usuario.persona.primer_apellido || ''}`.trim()
               : email;
             const eventoNombre = actividad['evento']?.nombre || 'Evento';
+            
             try {
-              await this.mailService.sendEnrollmentConfirmedEmail(
-                email,
-                nombre || email,
-                actividad.nombre,
-                eventoNombre,
-              );
+              if (fueCreado) {
+                // Si fue creado, enviamos datos de acceso
+                await this.mailService.sendAccountApprovalEmail(email, nombre, passwordTemporal);
+              } else {
+                // Si ya existía, solo confirmación de inscripción
+                await this.mailService.sendEnrollmentConfirmedEmail(email, nombre, actividad.nombre, eventoNombre);
+              }
               correoEnviado = true;
             } catch (mailError) {
               correoAdvertencia = mailError.message?.includes('Límite diario')
-                ? 'Límite diario de correos alcanzado. No se envió notificación.'
-                : `Error de correo: ${mailError.message}`;
+                ? 'Límite diario de correos alcanzado.'
+                : `Error correo: ${mailError.message}`;
               advertenciasCorreo++;
             }
           }
@@ -444,35 +485,41 @@ export class InscripcionesExcelService {
           detalle.push({
             fila: numFila,
             email,
-            estado: modo === 'verificar' ? 'omitido' : 'inscrito',
-            mensaje: modo === 'verificar' ? `Válido para inscribir en "${actividad.nombre}".` : `Inscrito correctamente en "${actividad.nombre}".`,
+            estado: modo === 'verificar' ? 'omitido' : (fueCreado ? 'creado' : 'inscrito'),
+            mensaje: modo === 'verificar' 
+              ? `Válido para ${fueCreado ? 'crear e inscribir' : 'inscribir'} en "${actividad.nombre}".` 
+              : `${fueCreado ? 'Usuario creado e inscrito' : 'Inscrito'} correctamente en "${actividad.nombre}".`,
             correoEnviado,
             correoAdvertencia,
           });
+
+          if (fueCreado) creados++;
           inscritos++;
+
         } catch (error) {
           await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
           detalle.push({
             fila: numFila,
             email,
             estado: 'error',
-            mensaje: error.message || 'Error de base de datos al crear la inscripción.',
+            mensaje: error.message || 'Error al procesar fila.',
           });
           errores++;
         }
       }
 
-      // ── Decisión Final: Todo o Nada ─────────────────────────────────
+      // ── Decisión Final ─────────────────────────────────────────────
       if (modo === 'verificar' || errores > 0) {
         await queryRunner.rollbackTransaction();
         if (modo === 'guardar' && errores > 0) {
           detalle.forEach(d => {
-            if (d.estado === 'inscrito') {
+            if (d.estado === 'inscrito' || d.estado === 'creado') {
               d.estado = 'omitido';
-              d.mensaje = 'Omitido debido a errores en otras filas (Modo Estricto).';
+              d.mensaje = 'Omitido por errores en otras filas.';
             }
           });
           inscritos = 0;
+          creados = 0;
         }
       } else {
         await queryRunner.commitTransaction();
@@ -488,6 +535,7 @@ export class InscripcionesExcelService {
     return {
       total: filas.length,
       inscritos,
+      creados,
       omitidos,
       errores,
       advertenciasCorreo,
@@ -542,11 +590,22 @@ export class InscripcionesExcelService {
 
   generarPlantillaInscripciones(): Buffer {
     const ws = XLSX.utils.aoa_to_sheet([
-      ['email', 'nombre_actividad_academica'],
-      ['estudiante@correo.com', 'Taller de Machine Learning'],
-      ['otro@correo.com', 'Curso de Bioinformática'],
+      [
+        'email', 'nombre_actividad_academica', 'nombres', 'primer_apellido', 
+        'segundo_apellido', 'documento_identidad'
+      ],
+      [
+        'estudiante_nuevo@correo.com', 'Taller de Machine Learning', 'Juan', 'Perez',
+        'Villazón', '12345678'
+      ],
+      [
+        'usuario_existente@correo.com', 'Curso de Bioinformática', '', '', '', ''
+      ],
     ]);
-    ws['!cols'] = [{ wch: 35 }, { wch: 45 }];
+    ws['!cols'] = [
+      { wch: 30 }, { wch: 35 }, { wch: 20 }, { wch: 20 }, 
+      { wch: 20 }, { wch: 15 }
+    ];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Inscripción Masiva');

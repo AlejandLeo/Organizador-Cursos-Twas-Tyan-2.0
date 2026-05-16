@@ -94,6 +94,8 @@ export class InscripcionesExcelController {
     file: Express.Multer.File,
     @Body('notificar') notificar?: string,
     @Body('id_actividad') idActividad?: string,
+    @Body('id_evento') idEvento?: string,
+    @Body('crear_usuarios') crearUsuarios?: string,
     @Body('modo') modo?: 'verificar' | 'guardar',
   ) {
     if (!file) throw new BadRequestException('Debe adjuntar un archivo Excel.');
@@ -101,7 +103,9 @@ export class InscripcionesExcelController {
       file.buffer,
       notificar === 'true',
       idActividad ? Number(idActividad) : undefined,
-      modo || 'guardar'
+      idEvento ? Number(idEvento) : undefined,
+      modo || 'guardar',
+      crearUsuarios === 'true'
     );
   }
 
