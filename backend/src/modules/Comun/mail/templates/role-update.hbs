@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px; }
+        .header { background: #f8f9fa; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; border-bottom: 4px solid #d32f2f; }
+        .content { padding: 30px; }
+        .footer { text-align: center; font-size: 12px; color: #777; padding: 20px; border-top: 1px solid #eee; }
+        .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; text-transform: uppercase; margin: 2px; }
+        .badge-added { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+        .badge-removed { background-color: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+        .role-list { margin: 15px 0; padding: 15px; background: #fafafa; border-radius: 10px; }
+        .btn { display: inline-block; padding: 12px 24px; background-color: #d32f2f; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2 style="margin:0; color:#d32f2f;">Actualización de Roles</h2>
+        </div>
+        <div class="content">
+            <p>Hola <strong>{{name}}</strong>,</p>
+            <p>Se han realizado cambios en los permisos de tu cuenta en la plataforma.</p>
+            
+            <div class="role-list">
+                {{#if addedRoles.length}}
+                <p style="margin-top:0; font-weight:bold; color:#2e7d32;">Roles asignados:</p>
+                <div>
+                    {{#each addedRoles}}
+                    <span class="badge badge-added">{{this}}</span>
+                    {{/each}}
+                </div>
+                {{/if}}
+
+                {{#if removedRoles.length}}
+                <p style="margin-top:15px; font-weight:bold; color:#c62828;">Roles revocados:</p>
+                <div>
+                    {{#each removedRoles}}
+                    <span class="badge badge-removed">{{this}}</span>
+                    {{/each}}
+                </div>
+                {{/if}}
+            </div>
+
+            <p>Ahora puedes acceder a las secciones correspondientes a tus nuevos permisos.</p>
+            
+            <div style="text-align: center;">
+                <a href="{{loginUrl}}" class="btn">Ir al Panel de Control</a>
+            </div>
+        </div>
+        <div class="footer">
+            <p>Este es un mensaje automático, por favor no respondas a este correo.</p>
+            <p>&copy; {{currentYear}} UMSA - Sistema de Gestión de Cursos</p>
+        </div>
+    </div>
+</body>
+</html>

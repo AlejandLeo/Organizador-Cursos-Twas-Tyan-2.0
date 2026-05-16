@@ -32,6 +32,9 @@ import { join } from 'path';
 import { MailService } from '../../Comun/mail/mail.service';
 import { QrService } from '../../Seguridad/qr/qr.service';
 
+import { SistemaConfigService } from '../../Comun/sistema-config/sistema-config.service';
+import { MailQueueService } from '../../Comun/mail/mail-queue.service';
+
 @Injectable()
 export class UsuariosService {
   private readonly logger = new Logger(UsuariosService.name);
@@ -43,7 +46,9 @@ export class UsuariosService {
     private readonly personaRepository: Repository<Persona>,
     private readonly dataSource: DataSource,
     private readonly mailService: MailService,
+    private readonly mailQueueService: MailQueueService,
     private readonly qrService: QrService,
+    private readonly configService: SistemaConfigService,
   ) { }
 
   // ══════════════════════════════════════════════════════════
@@ -254,18 +259,16 @@ export class UsuariosService {
    * @param soloActivos  Si es true (por defecto) filtra por estado = 1.
    *                     Pasar false para administración interna.
    */
-  findAll(soloActivos = true): Promise<Usuario[]> {
-    return this.usuarioRepository.find({
+  async findAll(soloActivos = true): Promise<Usuario[]> {
+    const usuarios = await this.usuarioRepository.find({
       where: soloActivos ? { estado: 1 } : undefined,
       relations: ['persona', 'usuariosRoles', 'usuariosRoles.rol'],
-      select: {
-        id: true,
-        email: true,
-        estado: true,
-        fecha_creacion: true,
-        fecha_actualizacion: true,
-        // password nunca se devuelve en listados
-      },
+    });
+
+    // Eliminamos el password de la respuesta por seguridad
+    return usuarios.map(u => {
+      delete (u as any).password;
+      return u;
     });
   }
 
@@ -360,6 +363,14 @@ export class UsuariosService {
     const usuario = await this.findOne(id);
     await this.usuarioRepository.update(id, { estado: 0 });
 
+    // Calcular fecha de eliminación (hoy + 30 días)
+    const fechaEliminacion = new Date();
+    fechaEliminacion.setDate(fechaEliminacion.getDate() + 30);
+
+    await this.usuarioRepository.update(id, {
+      estado: 0,
+      fecha_eliminacion: fechaEliminacion
+    });
     // Opcional: Notificar por correo
     const nombreCompleto = usuario.persona
       ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
@@ -371,7 +382,97 @@ export class UsuariosService {
       'Tu cuenta ha sido deshabilitada por administración.'
     );
 
-    return { mensaje: `Usuario ${id} deshabilitado correctamente.` };
+    return { mensaje: `Usuario ${id} programado para eliminación física en 30 días (${fechaEliminacion.toLocaleDateString()}).` };
+  }
+
+  /**
+   * Actualiza los roles de un usuario de forma masiva y notifica por correo si se solicita.
+   */
+  async actualizarRolesBulk(id: number, nuevosRolIds: number[], notificar = true) {
+    const usuario = await this.usuarioRepository.findOne({
+      where: { id },
+      relations: ['persona', 'usuariosRoles', 'usuariosRoles.rol'],
+    });
+
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
+
+    const rolesActuales = usuario.usuariosRoles || [];
+    const idsActuales = rolesActuales.map(ur => ur.rol.id);
+
+    const idsParaAnadir = nuevosRolIds.filter(id => !idsActuales.includes(id));
+    const idsParaQuitar = idsActuales.filter(id => !nuevosRolIds.includes(id));
+
+    if (idsParaAnadir.length === 0 && idsParaQuitar.length === 0) {
+      return { mensaje: 'No se detectaron cambios en los roles.' };
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const rolesAnadidosNombres: string[] = [];
+      const rolesQuitadosNombres: string[] = [];
+
+      // 1. Quitar roles
+      if (idsParaQuitar.length > 0) {
+        for (const idRol of idsParaQuitar) {
+          const ur = rolesActuales.find(r => r.rol.id === idRol);
+          if (ur) {
+            rolesQuitadosNombres.push(ur.rol.nombre_rol);
+            await queryRunner.manager.delete(UsuarioRol, ur.id);
+          }
+        }
+      }
+
+      // 2. Añadir roles
+      if (idsParaAnadir.length > 0) {
+        const rolesNuevos = await queryRunner.manager.findByIds(Rol, idsParaAnadir);
+        for (const rol of rolesNuevos) {
+          rolesAnadidosNombres.push(rol.nombre_rol);
+          const ur = queryRunner.manager.create(UsuarioRol, {
+            usuario: { id } as Usuario,
+            rol: rol,
+            estado: 1,
+          });
+          await queryRunner.manager.save(ur);
+        }
+      }
+
+      await queryRunner.commitTransaction();
+
+      // 3. Notificar si se solicita
+      let correoEnviado = false;
+      if (notificar) {
+        const nombreCompleto = usuario.persona
+          ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
+          : 'Usuario';
+        
+        try {
+          await this.mailService.sendRoleUpdateEmail(
+            usuario.email,
+            nombreCompleto,
+            rolesAnadidosNombres,
+            rolesQuitadosNombres
+          );
+          correoEnviado = true;
+        } catch (mailError) {
+          this.logger.error(`Error enviando notificación de roles a ${usuario.email}: ${mailError.message}`);
+        }
+      }
+
+      return { 
+        mensaje: 'Roles actualizados correctamente.', 
+        correoEnviado,
+        cambios: { anadidos: rolesAnadidosNombres, quitados: rolesQuitadosNombres }
+      };
+
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   /**
@@ -427,7 +528,12 @@ export class UsuariosService {
     }
 
     if (rol) {
-      qb.andWhere('LOWER(r.nombre_rol) = LOWER(:rol)', { rol });
+      const roles = rol.split(',').map(r => r.trim().toLowerCase());
+      if (roles.length > 1) {
+        qb.andWhere('LOWER(r.nombre_rol) IN (:...roles)', { roles });
+      } else {
+        qb.andWhere('LOWER(r.nombre_rol) = LOWER(:rol)', { rol: roles[0] });
+      }
     }
 
     if (q) {
@@ -438,12 +544,18 @@ export class UsuariosService {
     }
 
     const total = await qb.getCount();
-
     qb.skip((page - 1) * limit).take(limit);
+    qb.orderBy('u.id', 'DESC'); // Ordenar por ID descendente por defecto
 
     const data = await qb.getMany();
 
-    return { data, total, page: Number(page), limit: Number(limit) };
+    // Seguridad: ocultar passwords
+    const finalData = data.map(u => {
+      delete (u as any).password;
+      return u;
+    });
+
+    return { data: finalData, total, page: Number(page), limit: Number(limit) };
   }
 
   // ══════════════════════════════════════════════════════════
@@ -454,7 +566,7 @@ export class UsuariosService {
    * Crea un usuario tipo Ponente: credenciales + persona + rol Ponente.
    * Se ejecuta dentro de una transacción.
    */
-  async crearPonente(dto: CrearPonenteDto): Promise<Omit<Usuario, 'password'>> {
+  async crearPonente(dto: CrearPonenteDto): Promise<any> {
     const existe = await this.usuarioRepository.findOneBy({ email: dto.email });
     if (existe) {
       throw new ConflictException(
@@ -514,14 +626,21 @@ export class UsuariosService {
 
       await queryRunner.commitTransaction();
 
-      // Enviar correo de bienvenida al ponente con sus credenciales
-      const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
-      await this.mailService.sendAccountApprovalEmail(dto.email, nombreCompleto, dto.password);
+      // Enviar correo de bienvenida al ponente con sus credenciales (No-bloqueante)
+      let correoEnviado = false;
+      try {
+        const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
+        correoEnviado = await this.enviarBienvenidaPersonalizada(dto.email, nombreCompleto, dto.password);
+      } catch (mailError) {
+        this.logger.error(`Error enviando correo de bienvenida a ponente ${dto.email}: ${mailError.message}`);
+      }
 
-
-      return this.getPerfil(usuarioGuardado.id);
+      const perfil = await this.getPerfil(usuarioGuardado.id);
+      return { ...perfil, correoEnviado };
     } catch (error) {
-      await queryRunner.rollbackTransaction();
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
       throw error;
     } finally {
       await queryRunner.release();
@@ -700,7 +819,7 @@ export class UsuariosService {
    * Registro unificado: crea un usuario, su perfil de persona,
    * le asigna el rol de Estudiante (ID 4) y opcionalmente su primera afiliación.
    */
-  async register(dto: RegisterDto): Promise<Omit<Usuario, 'password'>> {
+  async register(dto: RegisterDto): Promise<any> {
     const existe = await this.usuarioRepository.findOneBy({ email: dto.email });
     if (existe) {
       throw new ConflictException(
@@ -777,18 +896,24 @@ export class UsuariosService {
 
       await queryRunner.commitTransaction();
 
-      // Notificar al usuario por correo (especialmente útil para logística/ponentes creados por admin)
+      // Notificar al usuario por correo (No-bloqueante)
+      let correoEnviado = false;
       try {
         const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
-        await this.mailService.sendAccountApprovalEmail(dto.email, nombreCompleto, dto.password);
-      } catch (e) {
-        console.error('Error enviando correo de bienvenida:', e);
+        await this.mailService.sendWelcomeRegistrationEmail(dto.email, nombreCompleto);
+        correoEnviado = true;
+      } catch (mailError) {
+        this.logger.error(`Error enviando correo de bienvenida a ${dto.email}: ${mailError.message}`);
+      }
       }
 
       // Devolvemos el perfil cargado (usando el método existente)
-      return this.getPerfil(usuarioGuardado.id);
+      const perfil = await this.getPerfil(usuarioGuardado.id);
+      return { ...perfil, correoEnviado };
     } catch (error) {
-      await queryRunner.rollbackTransaction();
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
       throw error;
     } finally {
       await queryRunner.release();
@@ -1034,7 +1159,7 @@ export class UsuariosService {
   async registrarSolicitud(
     dto: SolicitudRegistroDto,
     docFile: string,
-  ): Promise<{ mensaje: string }> {
+  ): Promise<{ mensaje: string; correoEnviado: boolean }> {
     const existe = await this.usuarioRepository.findOneBy({ email: dto.email });
     if (existe) {
       throw new ConflictException(
@@ -1085,19 +1210,24 @@ export class UsuariosService {
       await queryRunner.commitTransaction();
 
       // Notificar a administración (opcional/no-bloqueante)
+      let correoEnviado = false;
       try {
         const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
         await this.mailService.sendNewRegistrationRequestNotification(nombreCompleto, dto.email);
-      } catch (e) {
-        console.error('Error enviando notificación de solicitud a admin:', e);
+        correoEnviado = true;
+      } catch (mailError) {
+        this.logger.error(`Error enviando notificación de solicitud a admin: ${mailError.message}`);
       }
 
       return {
         mensaje:
           'Su solicitud fue recepcionada correctamente. La confirmación de su cuenta se realizará una vez finalice el proceso de inscripciones y sea validada por administración.',
+        correoEnviado
       };
     } catch (error) {
-      await queryRunner.rollbackTransaction();
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
       throw error;
     } finally {
       await queryRunner.release();
@@ -1133,7 +1263,7 @@ export class UsuariosService {
     id: number,
     accion: 'aprobar' | 'rechazar',
     motivo?: string,
-  ): Promise<{ mensaje: string }> {
+  ): Promise<{ mensaje: string; correoEnviado: boolean }> {
     const usuario = await this.usuarioRepository.findOne({
       where: { id },
       relations: ['persona'],
@@ -1162,8 +1292,13 @@ export class UsuariosService {
           ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
           : 'Usuario';
 
-        await this.mailService.sendAccountApprovalEmail(usuario.email, nombreCompleto, 'La elegida en su registro');
-        return { mensaje: 'Solicitud aprobada. El usuario ya puede ingresar con su contraseña original.' };
+        let correoEnviado = false;
+        try {
+          correoEnviado = await this.enviarBienvenidaPersonalizada(usuario.email, nombreCompleto, 'La elegida en su registro');
+        } catch (mailError) {
+          this.logger.error(`Error enviando correo de aprobación a ${usuario.email}: ${mailError.message}`);
+        }
+        return { mensaje: 'Solicitud aprobada.', correoEnviado };
       }
       // SI EL ESTADO ERA 0: Es una reactivación
       else {
@@ -1171,8 +1306,14 @@ export class UsuariosService {
         const nombreCompleto = usuario.persona
           ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
           : 'Usuario';
-        await this.mailService.sendAccountReactivationEmail(usuario.email, nombreCompleto);
-        return { mensaje: 'Cuenta reactivada y usuario notificado.' };
+        let correoEnviado = false;
+        try {
+          await this.mailService.sendAccountReactivationEmail(usuario.email, nombreCompleto);
+          correoEnviado = true;
+        } catch (mailError) {
+          this.logger.error(`Error enviando correo de reactivación a ${usuario.email}: ${mailError.message}`);
+        }
+        return { mensaje: 'Cuenta reactivada.', correoEnviado };
       }
     } else {
       // Rechazar: estado = -1
@@ -1182,13 +1323,19 @@ export class UsuariosService {
         ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
         : 'Usuario';
 
-      await this.mailService.sendAccountRejectionEmail(
-        usuario.email,
-        nombreCompleto,
-        motivo || 'La solicitud de registro no cumple con los criterios de validación.'
-      );
+      let correoEnviado = false;
+      try {
+        await this.mailService.sendAccountRejectionEmail(
+          usuario.email,
+          nombreCompleto,
+          motivo || 'La solicitud de registro no cumple con los criterios de validación.'
+        );
+        correoEnviado = true;
+      } catch (mailError) {
+        this.logger.error(`Error enviando correo de rechazo a ${usuario.email}: ${mailError.message}`);
+      }
 
-      return { mensaje: 'Solicitud rechazada (estado -1). El usuario ha sido notificado.' };
+      return { mensaje: 'Solicitud rechazada.', correoEnviado };
     }
   }
 
@@ -1299,14 +1446,56 @@ export class UsuariosService {
    */
   async eliminarFisico(id: number) {
     const usuario = await this.findOne(id);
+    const queryRunner = this.dataSource.createQueryRunner();
+    
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    // Al usar onDelete: CASCADE en las relaciones, se borrarían automáticamente,
-    // pero para estar seguros borramos persona si existe.
-    if (usuario.persona) {
-      await this.dataSource.getRepository(Persona).delete(usuario.persona.id);
+    try {
+      // 1. Eliminar Roles asociados (Tabla pivote)
+      await queryRunner.manager.delete(UsuarioRol, { usuario: { id: id } });
+
+      // 2. Eliminar Afiliaciones
+      await queryRunner.manager.delete(Afiliacion, { usuario: { id: id } });
+
+      // 3. Eliminar Persona (Perfil)
+      if (usuario.persona) {
+        await queryRunner.manager.delete(Persona, usuario.persona.id);
+      }
+
+      // 4. Eliminar Usuario
+      await queryRunner.manager.delete(Usuario, id);
+
+      await queryRunner.commitTransaction();
+      return { affected: 1 };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      if (error.code === '23503') {
+        throw new BadRequestException('No se puede eliminar permanentemente a este usuario porque tiene datos vitales (inscripciones, certificados o coordinaciones) vinculados a él.');
+      }
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
+  }
 
-    return this.usuarioRepository.delete(id);
+  /**
+   * Envía un correo de bienvenida personalizado usando la configuración del sistema.
+   * Utiliza la cola de correos para escalabilidad.
+   */
+  private async enviarBienvenidaPersonalizada(email: string, nombre: string, passwordTemp: string) {
+    try {
+      await this.mailQueueService.renderAndEnqueue(
+        email, 
+        { nombre, email, password: passwordTemp },
+        undefined, // No templateId for now (uses default)
+        'WELCOME'
+      );
+      return true;
+    } catch (error) {
+      this.logger.error(`Error al encolar bienvenida personalizada para ${email}: ${error.message}`);
+      return false;
+    }
   }
 }
 

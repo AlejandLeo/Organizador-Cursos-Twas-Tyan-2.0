@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
+import { AppController } from 'src/app.controller';
 import { AppService } from './app.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -27,6 +27,7 @@ import { SesionesAcademicasModule } from './modules/Academico/sesiones-academica
 import { InscripcionesModule } from './modules/Inscripciones/inscripciones/inscripciones.module';
 import { InscripcionModalidadesModule } from './modules/Inscripciones/inscripcion-modalidades/inscripcion-modalidades.module';
 import { AsistenciasModule } from './modules/Inscripciones/asistencias/asistencias.module';
+import { InscripcionesExcelModule } from './modules/Inscripciones/inscripciones-excel/inscripciones-excel.module';
 
 // --- Certificados ---
 import { InfoCertificadosModule } from './modules/Certificacion/info-certificados/info-certificados.module';
@@ -41,6 +42,7 @@ import { QrModule } from './modules/Seguridad/qr/qr.module';
 import { UploadsModule } from './modules/Comun/uploads/uploads.module';
 import { SoporteModule } from './modules/Comun/soporte/soporte.module';
 import { MailModule } from './modules/Comun/mail/mail.module';
+import { SistemaConfigModule } from './modules/Comun/sistema-config/sistema-config.module';
 import { AuditLogModule } from './modules/Comun/audit-log/audit-log.module';
 
 // --- Dashboard ---
@@ -90,6 +92,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     InscripcionesModule,
     InscripcionModalidadesModule,
     AsistenciasModule,
+    InscripcionesExcelModule,
 
     // --- Certificados ---
     InfoCertificadosModule,
@@ -104,6 +107,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     UploadsModule,
     SoporteModule,
     MailModule,
+    SistemaConfigModule,
 
     // --- Especiales ---
     CoordinadorModule,

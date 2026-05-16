@@ -34,7 +34,7 @@ export class CoordinacionesService {
   findByEvento(eventoId: number) {
     return this.coordinacionRepository.find({
       where: { evento: { id: eventoId } },
-      relations: ['usuario', 'usuario.persona'],
+      relations: ['usuario', 'usuario.persona', 'usuario.usuariosRoles', 'usuario.usuariosRoles.rol'],
     });
   }
 }

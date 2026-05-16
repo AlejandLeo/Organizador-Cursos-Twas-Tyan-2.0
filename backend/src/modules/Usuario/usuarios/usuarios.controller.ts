@@ -17,6 +17,7 @@ import {
   Res,
   BadRequestException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FileInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express';
@@ -41,6 +42,7 @@ import { Roles } from '../../Seguridad/auth/roles.decorator';
 @ApiTags('Usuarios')
 @Controller('usuarios')
 export class UsuariosController {
+  private readonly logger = new Logger(UsuariosController.name);
   constructor(private readonly usuariosService: UsuariosService) { }
 
   @UseGuards(JwtAuthGuard)
@@ -406,6 +408,7 @@ export class UsuariosController {
       return this.usuariosService.findConFiltros(filtros);
     }
     const filtrar = filtros.soloActivos !== 'false';
+    this.logger.log(`Listando usuarios (findAll) - soloActivos: ${filtrar}`);
     return this.usuariosService.findAll(filtrar);
   }
 
@@ -420,6 +423,27 @@ export class UsuariosController {
     filtros.rol = rol || 'Ponente'; // Por defecto Ponente
     filtros.limit = 100;
     return this.usuariosService.findConFiltros(filtros);
+  }
+
+  /**
+   * GET /usuarios/:id
+   * Busca un usuario por ID. Incluye persona + roles asignados.
+   */
+  /**
+   * PATCH /usuarios/:id/roles
+   * Actualización masiva de roles de un usuario con opción de notificación.
+   */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Super Usuario', 'Coordinador')
+  @ApiBearerAuth()
+  @Patch(':id/roles')
+  @ApiOperation({ summary: 'Actualización masiva de roles de un usuario' })
+  async updateRolesBulk(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('rolIds') rolIds: number[],
+    @Body('notificar') notificar?: boolean,
+  ) {
+    return this.usuariosService.actualizarRolesBulk(id, rolIds, notificar ?? true);
   }
 
   /**

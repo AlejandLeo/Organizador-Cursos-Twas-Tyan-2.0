@@ -37,6 +37,20 @@ export const useAuthStore = defineStore('auth', () => {
       (user.value as any)?.usuariosRoles?.some((ur: any) => ur.rol?.id === 1)
   );
 
+  /** True si el usuario es Super Usuario o Coordinador (Permisos Admin) */
+  const esAdmin = computed(() => esSuperUsuario.value || userRoles.value.includes('Coordinador'));
+
+  /** ID del rol principal (jerarquía: SU > Coord > Log > Ponente > Estudiante) */
+  const id_rol = computed(() => {
+    const roles = (user.value as any)?.usuariosRoles?.map((ur: any) => ur.rol?.id) || [];
+    if (roles.includes(1)) return 1;
+    if (roles.includes(2)) return 2;
+    if (roles.includes(3)) return 3;
+    if (roles.includes(5)) return 5;
+    if (roles.includes(4)) return 4;
+    return null;
+  });
+
   /** Cambia el contexto de rol activo y lo persiste */
   function cambiarRolActivo(nuevoRol: string) {
     rolActivo.value = nuevoRol;
@@ -166,5 +180,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     logout,
     fetchUser,
+    esAdmin,
+    id_rol,
   };
 });
