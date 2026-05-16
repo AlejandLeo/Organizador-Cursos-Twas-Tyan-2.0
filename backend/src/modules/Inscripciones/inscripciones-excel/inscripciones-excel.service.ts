@@ -164,11 +164,12 @@ export class InscripcionesExcelService {
           let correoAdvertencia: string | undefined;
 
           if (notificar && modo === 'guardar') {
-            const nombre = `${nombres} ${primerApellido}`.trim() || email;
+            const nombre = nombres || 'Usuario';
+            const apellidos = primerApellido || '';
             try {
               await this.mailQueueService.renderAndEnqueue(
                 email,
-                { nombre, email, password },
+                { nombre, apellidos, email, password },
                 templateId,
                 'WELCOME'
               );
@@ -314,14 +315,15 @@ export class InscripcionesExcelService {
           let correoAdvertencia: string | undefined;
 
           if (notificar && modo === 'guardar') {
-            const nombre = usuario.persona ? `${usuario.persona.nombres || ''} ${usuario.persona.primer_apellido || ''}`.trim() : email;
+            const nombre = usuario.persona?.nombres || 'Usuario';
+            const apellidos = usuario.persona?.primer_apellido || '';
             try {
               if (templateId) {
-                await this.mailQueueService.renderAndEnqueue(email, { nombre, email, password: passwordTemporal, actividad: actividad.nombre, evento: actividad.evento?.nombre }, templateId);
+                await this.mailQueueService.renderAndEnqueue(email, { nombre, apellidos, email, password: passwordTemporal, actividad: actividad.nombre, evento: actividad.evento?.nombre }, templateId);
               } else if (fueCreado) {
-                await this.mailQueueService.renderAndEnqueue(email, { nombre, email, password: passwordTemporal }, undefined, 'WELCOME');
+                await this.mailQueueService.renderAndEnqueue(email, { nombre, apellidos, email, password: passwordTemporal }, undefined, 'WELCOME');
               } else {
-                await this.mailQueueService.renderAndEnqueue(email, { nombre, actividad: actividad.nombre, evento: actividad.evento?.nombre }, undefined, 'GENERAL');
+                await this.mailQueueService.renderAndEnqueue(email, { nombre, apellidos, actividad: actividad.nombre, evento: actividad.evento?.nombre }, undefined, 'GENERAL');
               }
               correoEnviado = true;
             } catch (mailError) {

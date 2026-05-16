@@ -629,8 +629,7 @@ export class UsuariosService {
       // Enviar correo de bienvenida al ponente con sus credenciales (No-bloqueante)
       let correoEnviado = false;
       try {
-        const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
-        correoEnviado = await this.enviarBienvenidaPersonalizada(dto.email, nombreCompleto, dto.password);
+        correoEnviado = await this.enviarBienvenidaPersonalizada(dto.email, dto.nombres || 'Usuario', dto.primer_apellido || '', dto.password);
       } catch (mailError) {
         this.logger.error(`Error enviando correo de bienvenida a ponente ${dto.email}: ${mailError.message}`);
       }
@@ -1287,13 +1286,11 @@ export class UsuariosService {
           requiere_cambio_password: false
         });
 
-        const nombreCompleto = usuario.persona
-          ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
-          : 'Usuario';
-
         let correoEnviado = false;
         try {
-          correoEnviado = await this.enviarBienvenidaPersonalizada(usuario.email, nombreCompleto, 'La elegida en su registro');
+          const nombres = usuario.persona?.nombres || 'Usuario';
+          const apellidos = usuario.persona?.primer_apellido || '';
+          correoEnviado = await this.enviarBienvenidaPersonalizada(usuario.email, nombres, apellidos, 'La elegida en su registro');
         } catch (mailError) {
           this.logger.error(`Error enviando correo de aprobación a ${usuario.email}: ${mailError.message}`);
         }
@@ -1482,11 +1479,11 @@ export class UsuariosService {
    * Envía un correo de bienvenida personalizado usando la configuración del sistema.
    * Utiliza la cola de correos para escalabilidad.
    */
-  private async enviarBienvenidaPersonalizada(email: string, nombre: string, passwordTemp: string) {
+  private async enviarBienvenidaPersonalizada(email: string, nombres: string, apellidos: string, passwordTemp: string) {
     try {
       await this.mailQueueService.renderAndEnqueue(
         email, 
-        { nombre, email, password: passwordTemp },
+        { nombre: nombres, apellidos, email, password: passwordTemp },
         undefined, // No templateId for now (uses default)
         'WELCOME'
       );

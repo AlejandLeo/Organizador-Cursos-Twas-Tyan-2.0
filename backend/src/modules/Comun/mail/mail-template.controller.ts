@@ -1,4 +1,6 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 import { MailTemplateService } from './mail-template.service';
 import { MailTemplateType } from './entities/mail-template.entity';
 import { JwtAuthGuard } from '../../Seguridad/auth/jwt-auth.guard';
@@ -18,6 +20,27 @@ export class MailTemplateController {
   @ApiOperation({ summary: 'Listar todas las plantillas de correo' })
   findAll() {
     return this.mailTemplateService.findAll();
+  }
+
+  @Get('default-preview')
+  @Roles('Super Usuario')
+  @ApiOperation({ summary: 'Devuelve el HTML de admission.hbs con datos de muestra para previsualización' })
+  getDefaultPreview() {
+    const templatePath = path.join(process.cwd(), 'src', 'modules', 'Comun', 'mail', 'templates', 'admission.hbs');
+    let html = fs.readFileSync(templatePath, 'utf-8');
+
+    const sampleContext: Record<string, string> = {
+      name: 'Juan Pérez',
+      email: 'ejemplo@correo.com',
+      password: 'Contraseña123',
+      loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+    };
+
+    Object.keys(sampleContext).forEach((key) => {
+      html = html.replace(new RegExp(`{{${key}}}`, 'g'), sampleContext[key]);
+    });
+
+    return { html };
   }
 
   @Get('tipo/:tipo')

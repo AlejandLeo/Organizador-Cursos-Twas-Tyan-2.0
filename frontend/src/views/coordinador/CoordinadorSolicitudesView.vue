@@ -5,6 +5,7 @@ import Swal from 'sweetalert2';
 import type { Persona } from '@/types/admin';
 import { useAuthStore } from '@/stores/auth';
 
+
 const authStore = useAuthStore();
 
 const activeTab = ref('cuentas');
@@ -13,6 +14,54 @@ const cuentasPendientes = ref<any[]>([]);
 const allUsers = ref<any[]>([]);
 const loading = ref(true);
 const searchTerm = ref('');
+
+// ── Plantilla correo bienvenida ────────────────────────────────────────────
+const plantillasCorreo = ref<any[]>([]);
+const selectedTemplateId = ref('');
+const showMailPreview = ref(false);
+const mailPreviewHtml = ref('');
+
+const fetchPlantillas = async () => {
+  try {
+    const res = await api.get('/admin/mail-templates');
+    plantillasCorreo.value = res.data || [];
+  } catch { /* silencioso */ }
+};
+
+const openMailPreview = async () => {
+  mailPreviewHtml.value = '';
+  if (!selectedTemplateId.value) {
+    try {
+      const res = await api.get('/admin/mail-templates/default-preview');
+      mailPreviewHtml.value = res.data?.html || '<p>No se pudo cargar.</p>';
+    } catch {
+      mailPreviewHtml.value = '<p style="color:red">Error al cargar admission.hbs</p>';
+    }
+  } else {
+    const t = plantillasCorreo.value.find((p: any) => String(p.id) === selectedTemplateId.value);
+    if (!t) return;
+    try {
+      const resLayout = await api.get('/admin/configuracion/key/MAIL_MASTER_LAYOUT');
+      const resUrl    = await api.get('/admin/configuracion/key/SYSTEM_URL');
+      const masterLayout = resLayout.data?.valor || '<html><body>{{{content}}}</body></html>';
+      const systemUrl    = resUrl.data?.valor    || window.location.origin;
+      const ctx: Record<string, string | number> = {
+        nombre: 'Juan Pérez', name: 'Juan Pérez', email: 'ejemplo@correo.com',
+        password: 'Contraseña123', url_sistema: systemUrl, loginUrl: systemUrl,
+        year: new Date().getFullYear(),
+      };
+      let html = (t.cuerpo || '').replace(/\n/g, '<br>');
+      Object.keys(ctx).forEach(k => { html = html.replace(new RegExp(`{{${k}}}`, 'g'), String(ctx[k])); });
+      mailPreviewHtml.value = masterLayout.replace('{{{content}}}', html).replace('{{year}}', String(new Date().getFullYear()));
+    } catch {
+      mailPreviewHtml.value = '<p style="color:red">Error al renderizar.</p>';
+    }
+  }
+  showMailPreview.value = true;
+};
+
+// ──────────────────────────────────────────────────────────────────────────
+
 
 
 const parseFullName = (persona?: Persona) => {
@@ -63,7 +112,8 @@ const refreshData = () => {
     else fetchPersonalLogistica();
 };
 
-onMounted(refreshData);
+onMounted(() => { refreshData(); fetchPlantillas(); });
+
 
 
 
@@ -160,8 +210,13 @@ const aprobarCuenta = async (id: number) => {
 
         if (!isConfirmed) return;
 
-        await api.patch(`/usuarios/${id}/solicitud/aprobar`);
-        Swal.fire({ icon: 'success', title: 'Cuenta Aprobada', text: 'El usuario ya puede acceder al sistema.', timer: 1500, showConfirmButton: false });
+        const res = await api.patch(`/usuarios/${id}/solicitud/aprobar`);
+        const data = res.data as any;
+        if (data.correoEnviado) {
+            Swal.fire({ icon: 'success', title: 'Cuenta Aprobada', text: 'El usuario ya puede acceder al sistema y su correo fue encolado.', timer: 2000, showConfirmButton: false });
+        } else {
+            Swal.fire({ icon: 'success', title: 'Cuenta Aprobada', text: 'El usuario ya puede acceder al sistema.', timer: 1500, showConfirmButton: false });
+        }
         await fetchCuentasPendientes();
     } catch (error) {
         console.error(error);
@@ -190,8 +245,13 @@ const rechazarCuenta = async (id: number) => {
 
         if (!isConfirmed) return;
 
-        await api.patch(`/usuarios/${id}/solicitud/rechazar`, { motivo });
-        Swal.fire({ icon: 'success', title: 'Cuenta Rechazada', text: 'La solicitud ha sido rechazada y se notificó al usuario.', timer: 1500, showConfirmButton: false });
+        const res = await api.patch(`/usuarios/${id}/solicitud/rechazar`, { motivo });
+        const data = res.data as any;
+        if (data.correoEnviado) {
+            Swal.fire({ icon: 'success', title: 'Cuenta Rechazada', text: 'La solicitud ha sido rechazada y el correo de notificación fue encolado.', timer: 2000, showConfirmButton: false });
+        } else {
+            Swal.fire({ icon: 'success', title: 'Cuenta Rechazada', text: 'La solicitud ha sido rechazada.', timer: 1500, showConfirmButton: false });
+        }
         await fetchCuentasPendientes();
     } catch (error) {
         console.error(error);
@@ -276,9 +336,23 @@ const tieneReverso = (firmaDig?: string) => {
                     {{ cuentasPendientes.length }} Cuentas nuevas por revisar
                 </p>
             </div>
-            <button @click="refreshData" class="p-2 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-slate-400 hover:text-sky-500 transition-colors">
-                <span class="material-symbols-outlined text-[18px]">refresh</span>
-            </button>
+            <div class="flex items-center gap-3">
+              <!-- Selector plantilla correo bienvenida -->
+              <div class="hidden md:flex items-center gap-2 bg-white dark:bg-gray-700 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-gray-600">
+                <span class="material-symbols-outlined text-slate-400 text-sm">mail</span>
+                <select v-model="selectedTemplateId"
+                        class="bg-transparent text-[11px] font-bold text-slate-600 dark:text-slate-300 outline-none cursor-pointer min-w-[140px]">
+                  <option value="">Plantilla por Defecto (admission)</option>
+                  <option v-for="p in plantillasCorreo" :key="p.id" :value="String(p.id)">{{ p.nombre }}</option>
+                </select>
+                <button @click="openMailPreview" class="w-6 h-6 flex items-center justify-center text-sky-500 hover:bg-sky-500/10 rounded-lg transition-all" title="Previsualizar plantilla">
+                  <span class="material-symbols-outlined text-[17px]">visibility</span>
+                </button>
+              </div>
+              <button @click="refreshData" class="p-2 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-slate-400 hover:text-sky-500 transition-colors">
+                  <span class="material-symbols-outlined text-[18px]">refresh</span>
+              </button>
+            </div>
       </div>
 
       <div class="w-full overflow-x-auto">
@@ -447,6 +521,30 @@ const tieneReverso = (firmaDig?: string) => {
             </div>
         </div>
     </div>
+
+    <!-- Modal Previsualización Correo de Bienvenida -->
+    <div v-if="showMailPreview" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+      <div class="bg-white dark:bg-[#1a1a24] w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden border border-white/10 flex flex-col max-h-[90vh]">
+        <div class="p-6 border-b border-slate-100 dark:border-white/5 flex items-center justify-between bg-slate-50/50 dark:bg-black/20">
+          <h3 class="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
+            <span class="material-symbols-outlined text-sky-500">mark_email_read</span>
+            Vista Previa — Correo de Bienvenida
+          </h3>
+          <button @click="showMailPreview = false" class="w-10 h-10 rounded-full hover:bg-slate-200 dark:hover:bg-white/10 flex items-center justify-center transition-all">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="flex-1 overflow-y-auto bg-slate-100 dark:bg-black/40 p-4 md:p-8">
+          <div class="bg-white rounded-xl shadow-sm overflow-hidden mx-auto max-w-[600px] border border-slate-200">
+            <div v-html="mailPreviewHtml"></div>
+          </div>
+        </div>
+        <div class="p-4 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 text-center">
+          <p class="text-[10px] text-slate-400 font-medium">※ Los datos mostrados son solo de ejemplo para previsualización.</p>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
