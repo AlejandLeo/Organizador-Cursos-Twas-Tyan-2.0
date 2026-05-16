@@ -26,9 +26,10 @@ type n = number;
 
 // ─── Utilidades compartidas ───────────────────────────────────────────────────
 
-/** Timestamp para nombres de archivo: "22-04-2026" */
 function timestamp(): string {
-    return new Date().toLocaleDateString('es-BO').replace(/\//g, '-');
+    const d = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}_${pad(d.getHours())}-${pad(d.getMinutes())}`;
 }
 
 /** Formatea una fecha ISO o Date a "DD/MM/YYYY". */

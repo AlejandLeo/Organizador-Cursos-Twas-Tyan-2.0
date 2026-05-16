@@ -16,6 +16,18 @@ const crearUsuarios = ref(false);
 const eventos = ref<any[]>([]);
 const selectedEventoId = ref<string>('');
 const isLoadingSelects = ref(false);
+const searchQuery = ref('');
+
+// Computed para filtrar eventos
+import { computed } from 'vue';
+const filteredEventos = computed(() => {
+  if (!searchQuery.value) return eventos.value;
+  const q = searchQuery.value.toLowerCase();
+  return eventos.value.filter(e => 
+    e.nombre.toLowerCase().includes(q) || 
+    (e.gestion && String(e.gestion).toLowerCase().includes(q))
+  );
+});
 
 // --- Selección de Plantilla ---
 const plantillas = ref<any[]>([]);
@@ -378,37 +390,113 @@ const getStatusIcon = (status: string) => {
 
           <!-- Selectores de Evento (Para Inscripciones y Ponentes) -->
           <div v-if="activeTab === 'inscripciones' || activeTab === 'ponentes'" class="mb-8 p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 space-y-4 animate-in slide-in-from-top-4 duration-500">
-            <p class="text-[10px] font-black text-umsa-blue uppercase tracking-widest flex items-center gap-2 mb-2">
-              <span class="material-symbols-outlined text-sm">target</span>
-              Destino de {{ activeTab === 'inscripciones' ? 'Inscripción' : 'Asignación' }}
-            </p>
-            <div class="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
-              <div class="flex items-start gap-2">
-                <span class="material-symbols-outlined text-blue-500 text-sm mt-0.5">info</span>
-                <p class="text-[10px] text-blue-700 dark:text-blue-300 font-medium max-w-sm">
-                  <strong>Nota:</strong> Si el email no existe, puedes activar el registro automático. El sistema usará los datos del Excel para crear las cuentas.
+            
+            <!-- Encabezado y Buscador -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-white/10 pb-4">
+              <div>
+                <h3 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Selección de Evento Destino</h3>
+                <p class="text-[10px] text-slate-500 font-bold">Elige el evento para cargar {{ activeTab === 'inscripciones' ? 'inscritos' : 'ponentes' }}</p>
+              </div>
+              
+              <div class="relative w-full md:w-72">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[18px]">search</span>
+                <input 
+                  v-model="searchQuery" 
+                  type="text" 
+                  placeholder="FILTRAR POR NOMBRE O GESTIÓN..." 
+                  class="w-full bg-white dark:bg-gray-800 border border-slate-200 dark:border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-[10px] font-black uppercase tracking-widest outline-none focus:border-umsa-blue transition-all shadow-sm"
+                />
+              </div>
+            </div>
+
+            <!-- Opciones Rápidas -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 p-3 bg-white dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                  <span class="material-symbols-outlined text-blue-600 dark:text-blue-400 text-sm">info</span>
+                </div>
+                <p class="text-[9px] text-slate-500 font-bold max-w-xs leading-tight">
+                  <span class="text-blue-600 font-black">REGISTRO AUTOMÁTICO:</span> Actívalo para crear cuentas a usuarios nuevos detectados en el Excel.
                 </p>
               </div>
-              <div class="flex items-center gap-3 bg-white/50 dark:bg-black/20 px-4 py-2 rounded-xl border border-blue-500/20">
+              <div class="flex items-center gap-3 bg-slate-50 dark:bg-black/20 px-4 py-1.5 rounded-xl border border-slate-200 dark:border-white/5">
+                <span class="text-[9px] font-black text-slate-500 uppercase tracking-tighter">Desactivado</span>
                 <label class="relative inline-flex items-center cursor-pointer">
                   <input type="checkbox" v-model="crearUsuarios" class="sr-only peer">
-                  <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-white/10 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-umsa-blue"></div>
+                  <div class="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-white/10 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-umsa-blue"></div>
                 </label>
-                <span class="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-tight">Registrar usuarios nuevos</span>
+                <span class="text-[9px] font-black text-umsa-blue uppercase tracking-tighter">Activado</span>
               </div>
             </div>
-            <div class="grid grid-cols-1 gap-4">
-              <div class="space-y-1.5">
-                <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Seleccionar Evento (Obligatorio)</label>
-                <select v-model="selectedEventoId"
-                        class="w-full bg-white dark:bg-gray-800 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-umsa-blue/50 transition-all cursor-pointer">
-                  <option value="">Seleccionar evento...</option>
-                  <option v-for="ev in eventos" :key="ev.id" :value="String(ev.id)">{{ ev.nombre }}</option>
-                </select>
+
+            <!-- Lista Estructurada de Eventos -->
+            <div class="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-white/5 overflow-hidden shadow-sm">
+              <div class="overflow-y-auto max-h-[320px] custom-scrollbar">
+                <div 
+                  v-for="ev in filteredEventos" 
+                  :key="ev.id"
+                  @click="selectedEventoId = String(ev.id)"
+                  :class="[
+                    selectedEventoId === String(ev.id) 
+                      ? 'bg-blue-50 dark:bg-blue-500/5 border-l-4 border-umsa-blue' 
+                      : 'hover:bg-slate-50 dark:hover:bg-white/5 border-l-4 border-transparent'
+                  ]"
+                  class="group flex items-center justify-between p-4 border-b border-slate-100 dark:border-white/5 cursor-pointer transition-all duration-200"
+                >
+                  <div class="flex items-center gap-4 min-w-0">
+                    <div 
+                      :class="selectedEventoId === String(ev.id) ? 'bg-umsa-blue text-white shadow-md' : 'bg-slate-100 dark:bg-white/10 text-slate-400'"
+                      class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-all"
+                    >
+                      <span class="material-symbols-outlined text-[18px]">{{ selectedEventoId === String(ev.id) ? 'check_circle' : 'event' }}</span>
+                    </div>
+                    <div class="min-w-0">
+                      <h4 class="text-[11px] font-black text-slate-700 dark:text-slate-200 uppercase tracking-tight truncate">
+                        {{ ev.nombre }}
+                      </h4>
+                      <div class="flex items-center gap-3 mt-0.5">
+                        <span class="flex items-center gap-1 text-[8px] font-bold text-slate-400 uppercase">
+                          <span class="material-symbols-outlined text-[10px]">calendar_today</span> {{ ev.gestion }}
+                        </span>
+                        <span class="w-1 h-1 rounded-full bg-slate-300"></span>
+                        <span class="flex items-center gap-1 text-[8px] font-bold text-slate-400 uppercase">
+                          <span class="material-symbols-outlined text-[10px]">location_on</span> {{ ev.modalidad || 'Presencial' }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-4">
+                    <span 
+                      class="px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border"
+                      :class="ev.estado === 1 ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'"
+                    >
+                      {{ ev.estado === 1 ? 'Activo' : 'En espera' }}
+                    </span>
+                    <span v-if="selectedEventoId === String(ev.id)" class="material-symbols-outlined text-umsa-blue text-sm animate-bounce">keyboard_arrow_left</span>
+                  </div>
+                </div>
+
+                <!-- Estado Vacío -->
+                <div v-if="filteredEventos.length === 0" class="py-16 flex flex-col items-center justify-center text-slate-300">
+                  <span class="material-symbols-outlined text-4xl mb-2 opacity-20">search_off</span>
+                  <p class="text-[10px] font-black uppercase tracking-widest">No hay resultados para la búsqueda</p>
+                </div>
               </div>
             </div>
-            <p v-if="!selectedEventoId" class="text-[9px] text-amber-600 font-bold italic pl-2">※ Debes elegir un evento para realizar el proceso.</p>
-            <p v-else class="text-[9px] text-slate-500 font-bold italic pl-2">※ Se usarán los nombres de las actividades académicas definidos en el archivo Excel dentro del evento seleccionado.</p>
+
+            <!-- Barra de Estado Inferior -->
+            <div class="flex items-center justify-between px-2 pt-2 border-t border-slate-200 dark:border-white/5">
+              <div v-if="!selectedEventoId" class="flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
+                <p class="text-[9px] text-amber-600 font-black uppercase">Acción pendiente: Selecciona un evento de la lista</p>
+              </div>
+              <div v-else class="flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+                <p class="text-[9px] text-emerald-600 font-black uppercase">Evento seleccionado: <span class="text-slate-700 dark:text-white underline decoration-emerald-500/50">{{ eventos.find(e => String(e.id) === selectedEventoId)?.nombre }}</span></p>
+              </div>
+              <p class="text-[8px] text-slate-400 font-bold uppercase">{{ filteredEventos.length }} eventos encontrados</p>
+            </div>
           </div>
 
           <!-- Dropzone -->
@@ -687,5 +775,19 @@ const getStatusIcon = (status: string) => {
 .overflow-x-auto::-webkit-scrollbar-thumb {
   background: rgba(148, 163, 184, 0.2);
   border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
 }
 </style>

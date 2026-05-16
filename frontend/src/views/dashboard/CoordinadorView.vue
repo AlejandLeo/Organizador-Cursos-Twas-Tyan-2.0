@@ -269,18 +269,20 @@ onMounted(cargarDatos);
 
     <!-- ══════════════════ ACCESOS RÁPIDOS ══════════════════ -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-      <button @click="router.push({ name: 'coordinador-usuarios' })"
+      <!-- 1. Eventos -->
+      <button @click="router.push({ name: 'admin-eventos' })"
         class="p-6 bg-white dark:bg-gray-900 rounded-[2rem] border border-slate-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all flex items-center gap-4 group text-left">
         <div class="w-12 h-12 p-3 rounded-2xl bg-sky-50 dark:bg-sky-900/20 text-sky-500 group-hover:bg-sky-500 group-hover:text-white transition-colors shrink-0">
-          <span class="material-symbols-outlined text-2xl">manage_accounts</span>
+          <span class="material-symbols-outlined text-2xl">event_available</span>
         </div>
         <div>
-          <p class="text-xs font-black text-sky-700 dark:text-sky-300 uppercase tracking-tight italic">Gestionar Usuarios</p>
-          <p class="text-[10px] text-slate-400 mt-0.5">Control de accesos y roles</p>
+          <p class="text-xs font-black text-sky-700 dark:text-sky-300 uppercase tracking-tight italic">Gestión de Eventos</p>
+          <p class="text-[10px] text-slate-400 mt-0.5">Crear y administrar eventos</p>
         </div>
       </button>
 
-      <button @click="router.push({ name: 'coordinador-solicitudes' })"
+      <!-- 2. Solicitudes -->
+      <button @click="router.push({ name: 'admin-solicitudes' })"
         class="p-6 bg-white dark:bg-gray-900 rounded-[2rem] border border-slate-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all flex items-center gap-4 group text-left">
         <div class="w-12 h-12 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors shrink-0">
           <span class="material-symbols-outlined text-2xl">how_to_reg</span>
@@ -291,14 +293,15 @@ onMounted(cargarDatos);
         </div>
       </button>
 
-      <button @click="router.push({ name: 'home' })"
-        class="p-6 bg-white dark:bg-gray-900 rounded-[2rem] border-2 border-dashed border-sky-100 dark:border-gray-700 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all flex items-center gap-4 group text-left">
-        <div class="w-12 h-12 p-3 rounded-2xl bg-slate-50 dark:bg-gray-800 text-slate-400 group-hover:bg-sky-500 group-hover:text-white transition-colors shrink-0">
-          <span class="material-symbols-outlined text-2xl">visibility</span>
+      <!-- 3. Certificados -->
+      <button @click="router.push({ name: 'admin-certificados' })"
+        class="p-6 bg-white dark:bg-gray-900 rounded-[2rem] border border-slate-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all flex items-center gap-4 group text-left">
+        <div class="w-12 h-12 p-3 rounded-2xl bg-amber-50 dark:bg-amber-900/20 text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-colors shrink-0">
+          <span class="material-symbols-outlined text-2xl">workspace_premium</span>
         </div>
         <div>
-          <p class="text-xs font-black text-slate-600 dark:text-gray-300 uppercase tracking-tight italic">Vista Pública</p>
-          <p class="text-[10px] text-slate-400 mt-0.5">Ver portal externo SGEA</p>
+          <p class="text-xs font-black text-amber-600 dark:text-gray-300 uppercase tracking-tight italic">Certificados</p>
+          <p class="text-[10px] text-slate-400 mt-0.5">Gestión de acreditaciones</p>
         </div>
       </button>
     </div>

@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import api from '@/services/api';
+import Swal from 'sweetalert2';
+import { useAuthStore } from '@/stores/auth';
+
+const authStore = useAuthStore();
 
 const loading = ref(false);
 const error = ref('');
@@ -18,6 +22,10 @@ const formData = ref({
   celular: '',
   afiliaciones: [] as any[]
 });
+
+const isCoordinator = ref(false);
+const firmaUrl = ref('');
+const isDraggingFirma = ref(false);
 
 const addAfiliacion = () => {
   if (isCompleted.value) return;
@@ -76,6 +84,10 @@ const loadProfile = async () => {
       }));
     }
 
+    // Detectar si es Coordinador, Super Usuario o Ponente para mostrar la firma (case-insensitive)
+    const roles = res.data?.usuariosRoles?.map((ur: any) => (ur.rol?.nombre_rol || '').toLowerCase()) || [];
+    isCoordinator.value = roles.includes('coordinador') || roles.includes('super usuario') || roles.includes('admin') || roles.includes('ponente');
+    
     // Si no hay afiliaciones, añadir una vacía por defecto para que no se vea vacío
     if (formData.value.afiliaciones.length === 0 && !isCompleted.value) {
       addAfiliacion();
@@ -84,8 +96,24 @@ const loadProfile = async () => {
     originalData.value = { ...formData.value };
     
     await loadPhoto();
+    if (isCoordinator.value) await loadFirma();
   } catch (err) {
     console.error('Error loading profile', err);
+  }
+};
+
+const loadFirma = async () => {
+  try {
+    const res = await api.get('/usuarios/perfil/firma', { responseType: 'arraybuffer' });
+    if (!res.data || res.data.byteLength === 0) {
+      firmaUrl.value = '';
+      return;
+    }
+    const blob = new Blob([res.data], { type: 'image/png' });
+    if (firmaUrl.value) URL.revokeObjectURL(firmaUrl.value);
+    firmaUrl.value = URL.createObjectURL(blob);
+  } catch (e) {
+    firmaUrl.value = '';
   }
 };
 
@@ -178,6 +206,7 @@ const handlePhotoUpload = async (e: Event) => {
 
 const handleDrop = async (e: DragEvent) => {
   e.preventDefault();
+  e.stopPropagation();
   isDragging.value = false;
   if (isCompleted.value && !!profilePhotoUrl.value) return;
   if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
@@ -190,6 +219,179 @@ const handleDrop = async (e: DragEvent) => {
   }
 };
 
+const firmaRef = ref<HTMLInputElement | null>(null);
+
+const uploadFirmaFile = async (file: File) => {
+  if (file.type !== 'image/png') {
+    error.value = 'La firma digital debe estar en formato PNG (fondo transparente recomendado).';
+    return;
+  }
+  
+  const fd = new FormData();
+  fd.append('file', file);
+  
+  try {
+    loading.value = true;
+    await api.post('/usuarios/perfil/upload-firma', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    success.value = 'Firma digital actualizada correctamente.';
+    await loadFirma();
+  } catch (err: unknown) {
+    const errorRes = err as { response?: { data?: { message?: string } } };
+    error.value = errorRes.response?.data?.message || 'Error al subir la firma.';
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handleFirmaUpload = async (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  if (target.files && target.files.length > 0) {
+    const file = target.files[0];
+    if (file) await uploadFirmaFile(file);
+  }
+};
+
+const handleFirmaDrop = async (e: DragEvent) => {
+  e.preventDefault();
+  e.stopPropagation();
+  isDraggingFirma.value = false;
+  if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+    const file = e.dataTransfer.files[0];
+    if (file) await uploadFirmaFile(file);
+  }
+};
+
+const abrirSoporteDatos = () => {
+  Swal.fire({
+    title: 'Reportar Error en Datos',
+    html: `
+      <div class="text-left space-y-4">
+        <p class="text-sm text-slate-600 font-medium italic">¿Qué información deseas corregir?</p>
+        <div class="space-y-2">
+          <button id="btn-soporte-datos" class="w-full p-4 bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-200 rounded-2xl flex items-center gap-3 transition-all group text-left">
+            <span class="material-symbols-outlined text-amber-500 group-hover:scale-110 transition-transform">edit_note</span>
+            <span class="text-xs font-bold text-slate-700">Hay un error en mis datos personales</span>
+          </button>
+          <button id="btn-soporte-otro" class="w-full p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl flex items-center gap-3 transition-all group text-left">
+            <span class="material-symbols-outlined text-slate-400 group-hover:scale-110 transition-transform">help</span>
+            <span class="text-xs font-bold text-slate-700">Tengo otro tipo de problema</span>
+          </button>
+        </div>
+      </div>
+    `,
+    showConfirmButton: false,
+    showCloseButton: true,
+    didOpen: () => {
+      const showTicketForm = (tipo: string) => {
+        Swal.fire({
+          title: 'Enviar Ticket de Corrección',
+          html: `
+            <div class="text-left space-y-4">
+              <div class="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-100 dark:border-amber-800">
+                <p class="text-[10px] font-black uppercase text-amber-600 dark:text-amber-400">Tipo de Corrección:</p>
+                <p class="text-xs font-bold text-slate-700 dark:text-gray-300">${tipo}</p>
+              </div>
+              <div class="space-y-2">
+                <label class="text-[10px] font-black uppercase text-slate-400 pl-1">Detalla los datos erróneos:</label>
+                <textarea id="swal-ticket-msg" class="swal2-textarea w-full rounded-2xl border-slate-200 text-sm" placeholder="Ej: Mi apellido correcto es..." style="margin: 0; height: 120px;"></textarea>
+              </div>
+            </div>
+          `,
+          showCancelButton: true,
+          confirmButtonText: 'Enviar Solicitud',
+          cancelButtonText: 'Volver',
+          confirmButtonColor: '#d97706',
+          showLoaderOnConfirm: true,
+          preConfirm: async () => {
+            const mensaje = (document.getElementById('swal-ticket-msg') as HTMLTextAreaElement).value;
+            if (!mensaje) { Swal.showValidationMessage('Por favor detalla el error.'); return false; }
+            try {
+              await api.post('/soporte', { tipo, mensaje });
+              return true;
+            } catch (error) {
+              Swal.showValidationMessage('Error al enviar la solicitud.');
+            }
+          }
+        }).then((result) => {
+          if (result.isConfirmed) {
+            Swal.fire({ icon: 'success', title: 'Solicitud Enviada', text: 'Soporte revisará tus datos pronto.', timer: 2000, showConfirmButton: false });
+          } else if (result.dismiss === Swal.DismissReason.cancel) {
+            abrirSoporteDatos();
+          }
+        });
+      };
+      document.getElementById('btn-soporte-datos')?.addEventListener('click', () => showTicketForm('Error en mis datos personales'));
+      document.getElementById('btn-soporte-otro')?.addEventListener('click', () => showTicketForm('Problema técnico en mi perfil'));
+    }
+  });
+};
+
+const cambiarContrasena = () => {
+  Swal.fire({
+    title: 'Cambiar Contraseña',
+    html: `
+      <div class="space-y-4 text-left">
+        <div>
+          <label class="text-xs font-bold text-slate-600">Contraseña Actual</label>
+          <input type="password" id="swal-old-pwd" class="w-full mt-1 px-3 py-2 border rounded-xl border-slate-200" placeholder="••••••••">
+        </div>
+        <div>
+          <label class="text-xs font-bold text-slate-600">Nueva Contraseña</label>
+          <input type="password" id="swal-new-pwd" class="w-full mt-1 px-3 py-2 border rounded-xl border-slate-200" placeholder="Mínimo 8 caracteres">
+        </div>
+        <div>
+          <label class="text-xs font-bold text-slate-600">Confirmar Nueva Contraseña</label>
+          <input type="password" id="swal-confirm-pwd" class="w-full mt-1 px-3 py-2 border rounded-xl border-slate-200" placeholder="••••••••">
+        </div>
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: 'Actualizar Contraseña',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#2563eb',
+    preConfirm: async () => {
+      const oldPwd = (document.getElementById('swal-old-pwd') as HTMLInputElement).value;
+      const newPwd = (document.getElementById('swal-new-pwd') as HTMLInputElement).value;
+      const confirmPwd = (document.getElementById('swal-confirm-pwd') as HTMLInputElement).value;
+
+      if (!oldPwd || !newPwd || !confirmPwd) {
+        Swal.showValidationMessage('Todos los campos son obligatorios');
+        return false;
+      }
+      if (newPwd.length < 8) {
+        Swal.showValidationMessage('La nueva contraseña debe tener al menos 8 caracteres');
+        return false;
+      }
+      if (newPwd !== confirmPwd) {
+        Swal.showValidationMessage('Las contraseñas nuevas no coinciden');
+        return false;
+      }
+
+      try {
+        const userId = authStore.user?.id;
+        if (!userId) throw new Error('No se pudo identificar al usuario');
+        
+        await api.patch(`/usuarios/${userId}/password`, {
+          password_actual: oldPwd,
+          password_nuevo: newPwd
+        });
+        return true;
+      } catch (error: unknown) {
+        const errObj = error as Error;
+        const errorRes = error as { response?: { data?: { message?: string } } };
+        Swal.showValidationMessage(errorRes.response?.data?.message || errObj.message || 'Error al cambiar la contraseña');
+        return false;
+      }
+    }
+  }).then((result) => {
+    if (result.isConfirmed) {
+      Swal.fire('¡Actualizada!', 'Tu contraseña ha sido cambiada correctamente.', 'success');
+    }
+  });
+};
+
 onMounted(() => {
   loadProfile();
   loadGradosAcademicos();
@@ -198,13 +400,31 @@ onMounted(() => {
 
 <template>
   <div class="p-4 md:p-8 max-w-4xl mx-auto space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-    <div class="flex items-center justify-between border-b border-slate-200 dark:border-gray-800 pb-6 mb-4 md:mb-8">
-      <div class="max-w-[70%]">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-200 dark:border-gray-800 pb-6 mb-4 md:mb-8 gap-4">
+      <div class="max-w-full sm:max-w-[60%]">
         <h1 class="text-xl md:text-3xl font-black text-slate-800 dark:text-white uppercase tracking-tight truncate">Mi Perfil</h1>
-        <p class="text-[10px] md:text-sm font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Gestiona tus datos personales y múltiples afiliaciones</p>
+        <p class="text-[10px] md:text-sm font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Gestiona tus datos personales y credenciales</p>
       </div>
-      <div class="h-10 w-10 md:h-12 md:w-12 rounded-xl md:rounded-2xl bg-umsa-blue/10 dark:bg-blue-900/20 text-umsa-blue dark:text-blue-400 flex items-center justify-center border border-umsa-blue/20">
-        <span class="material-symbols-outlined text-[20px] md:text-[24px]">manage_accounts</span>
+      <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+        <button @click="cambiarContrasena" class="bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-300 px-3 md:px-4 py-2 rounded-xl text-[10px] font-black hover:bg-slate-100 dark:hover:bg-gray-700 transition-all uppercase flex items-center gap-1 md:gap-2 shadow-sm tracking-widest">
+            <span class="material-symbols-outlined text-[14px] md:text-[16px]">key</span>
+            <span class="hidden sm:inline">Contraseña</span>
+        </button>
+        <button @click="abrirSoporteDatos" class="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 text-amber-600 dark:text-amber-400 px-3 md:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-100 transition-all flex items-center gap-1 md:gap-2">
+            <span class="material-symbols-outlined text-[14px] md:text-[16px]">support_agent</span>
+            Soporte
+        </button>
+      </div>
+    </div>
+
+    <!-- Alerta de Firma Digital Faltante -->
+    <div v-if="isCoordinator && !firmaUrl && !loading" class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 md:p-6 rounded-2xl flex items-start gap-3 md:gap-4 shadow-sm animate-pulse">
+      <span class="material-symbols-outlined text-amber-500 dark:text-amber-400 text-2xl md:text-3xl shrink-0">warning</span>
+      <div>
+        <h4 class="text-amber-800 dark:text-amber-300 font-black uppercase text-xs md:text-sm">Firma Digital Faltante</h4>
+        <p class="text-amber-700/80 dark:text-amber-400/80 text-[10px] md:text-xs mt-1 leading-relaxed">
+          Atención: Como autoridad o ponente, es <strong>obligatorio</strong> que suba su firma digital (formato PNG) para garantizar la correcta emisión de los certificados institucionales.
+        </p>
       </div>
     </div>
 
@@ -241,6 +461,44 @@ onMounted(() => {
           <button @click="photoRef?.click()" :disabled="loading || (isCompleted && !!profilePhotoUrl)" 
             class="text-xs px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 font-bold rounded-lg transition-colors border border-slate-200 dark:border-gray-700 w-full uppercase tracking-wider disabled:opacity-50">
             {{ (isCompleted && !!profilePhotoUrl) ? 'Bloqueado' : 'Subir Foto' }}
+          </button>
+        </div>
+
+        <!-- Firma Digital (Solo Coordinadores/Admin/Ponente) -->
+        <div v-if="isCoordinator" 
+          @dragenter.prevent="isDraggingFirma = true"
+          @dragover.prevent="isDraggingFirma = true"
+          @dragleave.prevent="isDraggingFirma = false"
+          @drop.prevent="handleFirmaDrop"
+          :class="[isDraggingFirma ? 'border-umsa-blue bg-blue-50 dark:bg-blue-900/10 ring-4 ring-umsa-blue/10' : 'border-slate-200 dark:border-gray-800 bg-white dark:bg-gray-900']"
+          class="p-6 rounded-2xl border-2 border-dashed shadow-sm flex flex-col items-center text-center transition-all duration-300 relative group overflow-hidden">
+          
+          <div v-if="loading" class="absolute inset-0 bg-white/60 dark:bg-gray-900/60 z-10 flex flex-col items-center justify-center backdrop-blur-sm">
+             <div class="w-8 h-8 border-4 border-umsa-blue border-t-transparent rounded-full animate-spin mb-2"></div>
+             <p class="text-[10px] font-black uppercase text-umsa-blue">Subiendo Firma...</p>
+          </div>
+
+          <div class="w-full aspect-[3/2] rounded-xl border border-slate-100 dark:border-gray-800 mb-4 bg-slate-50 dark:bg-black/20 flex items-center justify-center overflow-hidden relative">
+            <img v-if="firmaUrl" :src="firmaUrl" alt="Firma Digital" class="max-w-[90%] max-h-[90%] object-contain" />
+            <div v-else class="flex flex-col items-center text-slate-300 dark:text-gray-600">
+              <span class="material-symbols-outlined text-5xl">draw</span>
+              <p class="text-[9px] font-bold uppercase mt-1">Sin Firma</p>
+            </div>
+            
+            <div v-if="firmaUrl" class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+               <button @click="firmaRef?.click()" class="bg-white text-slate-900 p-2 rounded-full shadow-lg">
+                 <span class="material-symbols-outlined">edit</span>
+               </button>
+            </div>
+          </div>
+          
+          <h3 class="text-sm font-black uppercase text-slate-700 dark:text-gray-200">Firma Digital</h3>
+          <p class="text-[10px] text-slate-400 mb-4 mt-1 leading-tight">Obligatoria para emisión de certificados<br>Formato: <strong class="text-blue-500">Solo PNG</strong> (Transparente)</p>
+          
+          <input type="file" ref="firmaRef" class="hidden" accept="image/png" @change="handleFirmaUpload" />
+          <button @click="firmaRef?.click()" :disabled="loading" 
+            class="text-xs px-4 py-2 bg-umsa-blue/10 hover:bg-umsa-blue/20 text-umsa-blue dark:text-blue-400 font-black rounded-lg transition-colors border border-umsa-blue/20 w-full uppercase tracking-wider disabled:opacity-50">
+            {{ firmaUrl ? 'Actualizar Firma' : 'Cargar Firma' }}
           </button>
         </div>
       </div>
@@ -322,7 +580,7 @@ onMounted(() => {
                     <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Grado Académico</label>
                     <select v-model="af.id_grado_academico" :disabled="isCompleted && !!af.id" class="w-full py-2 px-3 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none text-slate-700 dark:text-gray-200 disabled:bg-slate-50 dark:disabled:bg-gray-800">
                       <option :value="null">Seleccionar Grado</option>
-                      <option v-for="grado in gradosAcademicos" :key="grado.id" :value="grado.id">{{ grado.nombre }}</option>
+                      <option v-for="grado in gradosAcademicos" :key="grado.id" :value="grado.id">{{ grado.descripcion }}</option>
                     </select>
                   </div>
                   <div>

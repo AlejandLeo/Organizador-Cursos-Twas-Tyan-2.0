@@ -16,7 +16,28 @@ api.interceptors.request.use(
     }
     return config;
   },
+  (error) => Promise.reject(error)
+);
+
+// Interceptor para manejar errores globales (como caídas del servidor)
+api.interceptors.response.use(
+  (response) => {
+    // Si la respuesta llega bien, aseguramos que el estado sea online
+    try {
+      const { useUIStore } = require('@/stores/ui');
+      const ui = useUIStore();
+      if (!ui.isServerOnline) ui.setServerStatus(true);
+    } catch (e) {}
+    return response;
+  },
   (error) => {
+    // Si no hay respuesta del servidor (ERR_CONNECTION_REFUSED, etc)
+    if (!error.response || error.code === 'ERR_NETWORK') {
+      try {
+        const { useUIStore } = require('@/stores/ui');
+        useUIStore().setServerStatus(false);
+      } catch (e) {}
+    }
     return Promise.reject(error);
   }
 );

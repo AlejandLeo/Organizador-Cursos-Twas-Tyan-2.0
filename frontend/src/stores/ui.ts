@@ -40,6 +40,12 @@ export const useUIStore = defineStore('ui', () => {
         }
     };
 
+    const isServerOnline = ref(true);
+
+    const setServerStatus = (status: boolean) => {
+        isServerOnline.value = status;
+    };
+
     onMounted(() => {
         window.addEventListener('resize', updateDimensions);
 
@@ -53,10 +59,11 @@ export const useUIStore = defineStore('ui', () => {
     return {
         isSidebarOpen,
         isMobile,
-
         isDark,
+        isServerOnline,
         toggleSidebar,
         toggleTheme,
-        closeSidebar
+        closeSidebar,
+        setServerStatus
     };
 });
