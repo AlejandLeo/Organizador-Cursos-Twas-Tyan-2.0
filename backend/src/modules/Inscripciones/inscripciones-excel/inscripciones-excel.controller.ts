@@ -56,9 +56,10 @@ export class InscripcionesExcelController {
     @UploadedFile(new ParseFilePipe({ validators: [new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 })] }))
     file: Express.Multer.File,
     @Body('notificar') notificar?: string,
+    @Body('modo') modo?: 'verificar' | 'guardar',
   ) {
     if (!file) throw new BadRequestException('Debe adjuntar un archivo Excel.');
-    return this.service.registroMasivoUsuarios(file.buffer, notificar === 'true');
+    return this.service.registroMasivoUsuarios(file.buffer, notificar === 'true', modo || 'guardar');
   }
 
   @Roles('Coordinador', 'Super Usuario')
@@ -71,6 +72,8 @@ export class InscripcionesExcelController {
       properties: {
         file: { type: 'string', format: 'binary' },
         notificar: { type: 'string', description: 'true/false' },
+        id_actividad: { type: 'string', description: 'ID de la actividad académica' },
+        modo: { type: 'string', description: 'verificar / guardar' },
       },
       required: ['file'],
     },
@@ -90,9 +93,16 @@ export class InscripcionesExcelController {
     @UploadedFile(new ParseFilePipe({ validators: [new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 })] }))
     file: Express.Multer.File,
     @Body('notificar') notificar?: string,
+    @Body('id_actividad') idActividad?: string,
+    @Body('modo') modo?: 'verificar' | 'guardar',
   ) {
     if (!file) throw new BadRequestException('Debe adjuntar un archivo Excel.');
-    return this.service.inscripcionMasivaEvento(file.buffer, notificar === 'true');
+    return this.service.inscripcionMasivaEvento(
+      file.buffer,
+      notificar === 'true',
+      idActividad ? Number(idActividad) : undefined,
+      modo || 'guardar'
+    );
   }
 
   @Roles('Coordinador', 'Super Usuario')

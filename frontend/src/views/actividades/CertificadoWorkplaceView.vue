@@ -243,7 +243,7 @@ const guardarDiseno = async () => {
     try {
         Swal.fire({ title: 'Guardando diseño...', didOpen: () => Swal.showLoading() })
         await api.post('/info-certificados', {
-            evento_id: Number(eventoId),
+            id_evento: Number(eventoId),
             tipo: Number(tipoCertificado),
             cabecera: infoCertificado.value.cabecera,
             tenor: infoCertificado.value.tenor,

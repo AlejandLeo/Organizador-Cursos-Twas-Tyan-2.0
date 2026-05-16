@@ -83,13 +83,54 @@ const isActive = (name: string) => route.name === name;
 
       <p class="text-[9px] font-black text-slate-400 dark:text-red-900/60 uppercase tracking-widest mb-3 mt-6 pl-2">Gestión Académica</p>
 
-      <!-- Gestión Académica (Unificada) -->
-      <button @click="navigate('admin-gestion')"
-        :class="[isActive('admin-gestion') || isActive('admin-eventos') || isActive('admin-actividades') ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5']"
+      <!-- Eventos -->
+      <button @click="navigate('admin-eventos')"
+        :class="[
+          isActive('admin-eventos') || 
+          (isActive('admin-gestion-eventos') && (route.query.edit || route.query.create))
+          ? 'bg-red-600 text-white shadow-md' 
+          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'
+        ]"
         class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold">
         <div class="flex items-center gap-3">
-          <span class="material-symbols-outlined text-[20px]">auto_stories</span>
-          <span class="text-[11px] uppercase tracking-wider">Gestión Académica</span>
+          <span class="material-symbols-outlined text-[20px]">corporate_fare</span>
+          <span class="text-[11px] uppercase tracking-wider">Eventos</span>
+        </div>
+      </button>
+
+      <!-- Actividades -->
+      <button @click="navigate('admin-actividades')"
+        :class="[
+          isActive('admin-actividades') || 
+          isActive('admin-gestion-eventos-detalle') || 
+          (isActive('admin-gestion-eventos') && (route.query.newAct || route.query.editAct))
+          ? 'bg-red-600 text-white shadow-md' 
+          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'
+        ]"
+        class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold mt-1">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-[20px]">school</span>
+          <span class="text-[11px] uppercase tracking-wider">Actividades</span>
+        </div>
+      </button>
+
+      <!-- Solicitudes -->
+      <button @click="navigate('admin-solicitudes')"
+        :class="[isActive('admin-solicitudes') ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5']"
+        class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold mt-1">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-[20px]">notification_important</span>
+          <span class="text-[11px] uppercase tracking-wider">Solicitudes</span>
+        </div>
+      </button>
+
+      <!-- Gestión General -->
+      <button @click="navigate('admin-gestion')"
+        :class="[isActive('admin-gestion') ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5']"
+        class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold mt-1">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-[20px]">settings_suggest</span>
+          <span class="text-[11px] uppercase tracking-wider">Gestión General</span>
         </div>
       </button>
 

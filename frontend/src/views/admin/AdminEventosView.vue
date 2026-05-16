@@ -42,13 +42,23 @@ const fetchCandidatos = async () => {
     const res = await usuariosService.getAll({ soloActivos: 'true' });
     const allUsers = (res.data as any)?.data ?? res.data;
     candidatosCoordinadores.value = allUsers.filter((u: any) => {
-      const isCandidate = u.usuariosRoles?.some((ur: any) => [2, 3].includes(ur.rol?.id));
+      // Filtrar solo Coordinadores (2) y Logística (3)
+      const roles = u.usuariosRoles?.map((ur: any) => ur.rol?.id) || [];
+      const hasValidRole = roles.includes(2) || roles.includes(3);
+      
       const isAlreadyAssigned = coordinadoresActuales.value.some(c => c.usuario?.id === u.id);
-      return isCandidate && !isAlreadyAssigned;
+      return hasValidRole && !isAlreadyAssigned;
     });
   } catch (err) {
     console.error('Error fetching candidatos', err);
   }
+};
+
+const getRoleName = (u: any) => {
+  const roles = u?.usuariosRoles?.map((ur: any) => ur.rol?.nombre_rol) || [];
+  if (roles.includes('Coordinador')) return 'Coordinador';
+  if (roles.includes('Logística')) return 'Logística';
+  return roles[0] || 'Usuario';
 };
 
 const abrirCoordinadores = async (evento: any) => {
@@ -116,7 +126,8 @@ const formEvento = ref({
   telefono: '',
   email: '',
   organizadores: '',
-  logo: null as any
+  logo: null as any,
+  fase: 1
 });
 
 const estadoConfig: Record<number, { label: string; color: string; bg: string }> = {
@@ -161,7 +172,8 @@ const abrirCrear = () => {
     telefono: '',
     email: '',
     organizadores: '',
-    logo: null
+    logo: null,
+    fase: 1
   };
   showModal.value = true;
 };
@@ -181,7 +193,8 @@ const abrirEditar = (evento: any) => {
     telefono: evento.telefono || '',
     email: evento.email || '',
     organizadores: evento.organizadores || '',
-    logo: null
+    logo: null,
+    fase: evento.fase || 1
   };
   showModal.value = true;
 };
@@ -340,10 +353,24 @@ onMounted(fetchEventos);
               </td>
               <td class="px-6 py-4 text-right">
                 <div class="flex items-center justify-end gap-1">
-                  <!-- Botón Gestión de Coordinadores (Habilitado para todos en vista admin temporalmente) -->
+                  <!-- Inscripción Masiva (Excel) -->
+                  <button @click="$router.push({ name: 'admin-inscripciones-excel', query: { eventoId: evento.id } })"
+                          title="Inscripción Masiva (Excel)"
+                          class="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 hover:bg-emerald-100 transition-all border border-emerald-100 dark:border-emerald-800/30 shadow-sm">
+                    <span class="material-symbols-outlined text-[20px]">grid_on</span>
+                  </button>
+
+                  <!-- Emitir Certificados -->
+                  <button @click="$router.push({ name: 'admin-certificados-envio', query: { search: evento.nombre } })"
+                          title="Emitir Certificados"
+                          class="p-2 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 hover:bg-amber-100 transition-all border border-amber-100 dark:border-amber-800/30 shadow-sm">
+                    <span class="material-symbols-outlined text-[20px]">verified_user</span>
+                  </button>
+
+                  <!-- Botón Gestión de Coordinadores -->
                   <button @click="abrirCoordinadores(evento)" 
                           title="Asignar Responsables (Coordinadores/Logística)"
-                          class="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 hover:bg-emerald-100 transition-all border border-emerald-100 dark:border-emerald-800/30 shadow-sm">
+                          class="p-2 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 hover:bg-red-100 transition-all border border-red-100 dark:border-red-800/30 shadow-sm">
                     <span class="material-symbols-outlined text-[20px]">group_add</span>
                   </button>
                   <button @click="abrirEditar(evento)" title="Editar"
@@ -505,7 +532,12 @@ onMounted(fetchEventos);
                       </div>
                       <div>
                         <p class="text-xs font-black text-slate-700 dark:text-white">{{ coord.usuario?.persona?.nombres }}</p>
-                        <p class="text-[9px] text-slate-400 truncate w-32">{{ coord.usuario?.email }}</p>
+                        <div class="flex items-center gap-1.5">
+                          <span class="text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-white/10 text-slate-500">
+                            {{ getRoleName(coord.usuario) }}
+                          </span>
+                          <span class="text-[9px] text-slate-400 truncate w-24">{{ coord.usuario?.email }}</span>
+                        </div>
                       </div>
                     </div>
                     <button @click="quitarCoordinador(coord)" 
@@ -536,7 +568,13 @@ onMounted(fetchEventos);
                       </div>
                       <div>
                         <p class="text-xs font-bold text-slate-600 dark:text-slate-300">{{ user.persona?.nombres }} {{ user.persona?.primer_apellido }}</p>
-                        <p class="text-[9px] text-slate-400">{{ user.email }}</p>
+                        <div class="flex items-center gap-1.5">
+                          <span :class="getRoleName(user) === 'Coordinador' ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'text-teal-500 bg-teal-50 dark:bg-teal-900/20'"
+                                class="text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md">
+                            {{ getRoleName(user) }}
+                          </span>
+                          <p class="text-[9px] text-slate-400">{{ user.email }}</p>
+                        </div>
                       </div>
                     </div>
                     <span class="material-symbols-outlined text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">add_circle</span>

@@ -50,14 +50,14 @@ export const usuariosService = {
    * @param rolId     ID del rol a asignar (1=SU, 2=Coord, 3=Log, 4=Estudiante, 5=Ponente)
    */
   asignarRol(usuarioId: number, rolId: number) {
-    return api.post<Usuario>(`/usuarios/${usuarioId}/roles`, { rolId });
+    return api.post<Usuario>(`/usuarios/${usuarioId}/roles/asignar`, { rolId });
   },
 
   /**
    * Quita un rol específico de un usuario.
    */
   quitarRol(usuarioId: number, rolId: number) {
-    return api.delete<Usuario>(`/usuarios/${usuarioId}/roles/${rolId}`);
+    return api.post<Usuario>(`/usuarios/${usuarioId}/roles/quitar`, { rolId });
   },
 
   /**

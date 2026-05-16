@@ -435,7 +435,12 @@ export class UsuariosService {
     }
 
     if (rol) {
-      qb.andWhere('LOWER(r.nombre_rol) = LOWER(:rol)', { rol });
+      const roles = rol.split(',').map(r => r.trim().toLowerCase());
+      if (roles.length > 1) {
+        qb.andWhere('LOWER(r.nombre_rol) IN (:...roles)', { roles });
+      } else {
+        qb.andWhere('LOWER(r.nombre_rol) = LOWER(:rol)', { rol: roles[0] });
+      }
     }
 
     if (q) {
@@ -1343,14 +1348,37 @@ export class UsuariosService {
    */
   async eliminarFisico(id: number) {
     const usuario = await this.findOne(id);
+    const queryRunner = this.dataSource.createQueryRunner();
+    
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    // Al usar onDelete: CASCADE en las relaciones, se borrarían automáticamente,
-    // pero para estar seguros borramos persona si existe.
-    if (usuario.persona) {
-      await this.dataSource.getRepository(Persona).delete(usuario.persona.id);
+    try {
+      // 1. Eliminar Roles asociados (Tabla pivote)
+      await queryRunner.manager.delete(UsuarioRol, { usuario: { id: id } });
+
+      // 2. Eliminar Afiliaciones
+      await queryRunner.manager.delete(Afiliacion, { usuario: { id: id } });
+
+      // 3. Eliminar Persona (Perfil)
+      if (usuario.persona) {
+        await queryRunner.manager.delete(Persona, usuario.persona.id);
+      }
+
+      // 4. Eliminar Usuario
+      await queryRunner.manager.delete(Usuario, id);
+
+      await queryRunner.commitTransaction();
+      return { affected: 1 };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      if (error.code === '23503') {
+        throw new BadRequestException('No se puede eliminar permanentemente a este usuario porque tiene datos vitales (inscripciones, certificados o coordinaciones) vinculados a él.');
+      }
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
-
-    return this.usuarioRepository.delete(id);
   }
 }
 

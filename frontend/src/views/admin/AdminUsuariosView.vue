@@ -61,7 +61,24 @@ const usuariosFiltrados = computed(() => {
       !filtroRol.value ||
       u.usuariosRoles?.some((ur: any) => ur.rol?.id === Number(filtroRol.value));
     return coincideTexto && coincideRol;
-  });
+  }).sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
+});
+
+// ── Paginación ─────────────────────────────────────────────────────────────
+const currentPage = ref(1);
+const itemsPerPage = ref(10);
+
+const totalPages = computed(() => Math.ceil(usuariosFiltrados.value.length / itemsPerPage.value));
+
+const paginatedUsuarios = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage.value;
+  return usuariosFiltrados.value.slice(start, start + itemsPerPage.value);
+});
+
+// Reiniciar a la página 1 si cambian los filtros
+import { watch } from 'vue';
+watch([filtroTexto, filtroRol, itemsPerPage], () => {
+  currentPage.value = 1;
 });
 
 const getRoles = (u: any): string[] =>
@@ -70,11 +87,17 @@ const getRoles = (u: any): string[] =>
 const tienePonente = (u: any) => getRoles(u).includes('Ponente');
 
 // ── Crear usuario ──────────────────────────────────────────────────────────
+const isSavingForm = ref(false);
+
 const handleSaveUsuario = async () => {
+  if (isSavingForm.value) return;
+  
   const { email, password, nombres, primer_apellido, id_rol } = formUsuario.value;
   if (!email || !password || !nombres || !primer_apellido) {
     return Swal.fire('Campos requeridos', 'Complete todos los campos obligatorios.', 'warning');
   }
+  
+  isSavingForm.value = true;
   try {
     const res = await usuariosService.crearConRol({
       email,
@@ -103,11 +126,14 @@ const handleSaveUsuario = async () => {
     
     isCreating.value = false;
     formUsuario.value = { email: '', password: '', nombres: '', primer_apellido: '', segundo_apellido: '', documento_identidad: '', id_rol: ROLE_IDS.COORDINADOR };
-    fetchUsuarios();
+    await fetchUsuarios();
+    currentPage.value = 1;
   } catch (error: any) {
     let msg = error?.response?.data?.message || 'No se pudo crear el usuario.';
     if (Array.isArray(msg)) msg = msg.join(' | ');
     Swal.fire('Error', String(msg), 'error');
+  } finally {
+    isSavingForm.value = false;
   }
 };
 
@@ -298,7 +324,7 @@ onMounted(fetchUsuarios);
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 dark:divide-white/5">
-            <tr v-for="user in usuariosFiltrados" :key="user.id" class="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
+            <tr v-for="user in paginatedUsuarios" :key="user.id" class="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
               <td class="px-6 py-4">
                 <div class="flex items-center gap-3">
                   <div class="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 flex items-center justify-center font-black text-sm">
@@ -370,11 +396,36 @@ onMounted(fetchUsuarios);
                 </div>
               </td>
             </tr>
-            <tr v-if="usuariosFiltrados.length === 0">
-              <td colspan="4" class="py-16 text-center text-sm text-slate-400">No se encontraron usuarios.</td>
-            </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Paginación Footer -->
+      <div v-if="usuariosFiltrados.length > 0" class="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t border-slate-100 dark:border-gray-800 bg-slate-50 dark:bg-gray-800/30">
+        <div class="flex items-center gap-3 text-xs font-bold text-slate-500">
+          <span>Mostrar</span>
+          <select v-model="itemsPerPage" class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-lg px-2 py-1 outline-none focus:border-umsa-blue transition-colors">
+            <option :value="10">10</option>
+            <option :value="25">25</option>
+            <option :value="50">50</option>
+            <option :value="100">100</option>
+          </select>
+          <span>registros (Total: {{ usuariosFiltrados.length }})</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button @click="currentPage--" :disabled="currentPage === 1" class="w-8 h-8 rounded-lg flex items-center justify-center border border-slate-200 dark:border-gray-700 text-slate-500 hover:bg-slate-100 dark:hover:bg-gray-800 hover:text-umsa-blue transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            <span class="material-symbols-outlined text-[16px]">chevron_left</span>
+          </button>
+          
+          <div class="flex items-center gap-1">
+            <span class="text-xs font-black text-primary-dark dark:text-white px-2">Página {{ currentPage }} de {{ totalPages }}</span>
+          </div>
+
+          <button @click="currentPage++" :disabled="currentPage === totalPages" class="w-8 h-8 rounded-lg flex items-center justify-center border border-slate-200 dark:border-gray-700 text-slate-500 hover:bg-slate-100 dark:hover:bg-gray-800 hover:text-umsa-blue transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -425,9 +476,18 @@ onMounted(fetchUsuarios);
                      class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-red-600/50" />
             </div>
           </div>
-          <div class="mt-6 flex gap-3">
-            <button @click="isCreating = false" class="flex-1 py-4 bg-slate-100 dark:bg-white/5 text-[10px] font-black text-slate-400 uppercase rounded-xl">Cancelar</button>
-            <button @click="handleSaveUsuario()" class="flex-1 py-4 bg-red-600 text-[10px] font-black text-white uppercase rounded-xl shadow-lg shadow-red-600/20 hover:bg-red-700 transition-colors">Registrar Usuario</button>
+          <!-- Botones -->
+          <div class="flex items-center gap-3 pt-6 mt-4 border-t border-slate-100 dark:border-gray-800">
+            <button type="button" @click="isCreating = false" :disabled="isSavingForm"
+                    class="flex-1 px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 font-bold text-xs uppercase hover:bg-slate-50 dark:hover:bg-gray-800 hover:border-slate-300 dark:hover:border-gray-600 transition-all">
+              Cancelar
+            </button>
+            <button type="submit" @click="handleSaveUsuario()" :disabled="isSavingForm"
+                    class="flex-1 px-4 py-3 rounded-xl bg-umsa-blue text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-blue-700 hover:shadow-blue-500/40 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+              <span v-if="isSavingForm" class="material-symbols-outlined animate-spin text-[16px]">refresh</span>
+              <span v-else class="material-symbols-outlined text-[16px]">person_add</span>
+              {{ isSavingForm ? 'Guardando...' : 'Crear Usuario' }}
+            </button>
           </div>
         </div>
       </div>

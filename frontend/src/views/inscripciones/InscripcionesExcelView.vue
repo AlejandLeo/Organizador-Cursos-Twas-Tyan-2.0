@@ -1,13 +1,64 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { ref, reactive, onMounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import api from '@/services/api';
 import Swal from 'sweetalert2';
 import * as XLSX from 'xlsx';
+
+const route = useRoute();
 
 // --- Estado de la vista ---
 const activeTab = ref<'usuarios' | 'inscripciones'>('usuarios');
 const isUploading = ref(false);
 const notificar = ref(true);
+
+// --- Selección de Evento/Actividad ---
+const eventos = ref<any[]>([]);
+const actividades = ref<any[]>([]);
+const selectedEventoId = ref<string>('');
+const selectedActividadId = ref<string>('');
+const isLoadingSelects = ref(false);
+
+const fetchEventos = async () => {
+  try {
+    const res = await api.get('/admin/eventos/lista');
+    eventos.value = res.data?.data || res.data || [];
+    
+    // Si viene por query param
+    const evId = route.query.eventoId as string;
+    if (evId) {
+      selectedEventoId.value = evId;
+      activeTab.value = 'inscripciones';
+    }
+  } catch (e) {
+    console.error('Error fetching eventos:', e);
+  }
+};
+
+const fetchActividades = async (eventoId: string) => {
+  if (!eventoId) {
+    actividades.value = [];
+    return;
+  }
+  try {
+    isLoadingSelects.value = true;
+    const res = await api.get(`/actividades-academicas?eventoId=${eventoId}`);
+    actividades.value = res.data?.data || res.data || [];
+  } catch (e) {
+    console.error('Error fetching actividades:', e);
+  } finally {
+    isLoadingSelects.value = false;
+  }
+};
+
+watch(selectedEventoId, (newId) => {
+  selectedActividadId.value = '';
+  fetchActividades(newId);
+});
+
+onMounted(() => {
+  fetchEventos();
+});
 
 // --- Previsualización ---
 const previewData = ref<any[]>([]);
@@ -16,6 +67,7 @@ const fileInput = ref<HTMLInputElement | null>(null);
 
 // --- Resultados de la importación ---
 const results = ref<any>(null);
+const ultimoModo = ref<'verificar' | 'guardar' | null>(null);
 
 // --- Métodos ---
 const onFileChange = (e: any) => {
@@ -52,6 +104,7 @@ const clearFile = () => {
   selectedFile.value = null;
   previewData.value = [];
   results.value = null;
+  ultimoModo.value = null;
 };
 
 const descargarPlantilla = async () => {
@@ -60,26 +113,53 @@ const descargarPlantilla = async () => {
     : '/admin/inscripciones-excel/plantilla-inscripciones';
   
   try {
-    const response = await api.get(endpoint, { responseType: 'blob' });
-    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const token = localStorage.getItem('token');
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    
+    // Usamos fetch nativo para bypass de interceptores XHR que causan el error InvalidStateError
+    const response = await fetch(`${baseUrl}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) throw new Error('Respuesta del servidor no válida');
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.setAttribute('download', activeTab.value === 'usuarios' ? 'plantilla_usuarios.xlsx' : 'plantilla_inscripciones.xlsx');
     document.body.appendChild(link);
     link.click();
-    link.remove();
+    
+    // Limpieza
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   } catch (error: any) {
+    console.error('Error al descargar plantilla:', error);
     Swal.fire('Error', 'No se pudo descargar la plantilla', 'error');
   }
 };
 
-const importar = async () => {
+const importar = async (modo: 'verificar' | 'guardar') => {
   if (!selectedFile.value) return;
+
+  if (activeTab.value === 'inscripciones' && !selectedActividadId.value) {
+    Swal.fire('Atención', 'Debes seleccionar una actividad académica primero.', 'warning');
+    return;
+  }
 
   isUploading.value = true;
   const formData = new FormData();
   formData.append('file', selectedFile.value);
   formData.append('notificar', String(notificar.value));
+  
+  if (selectedActividadId.value) {
+    formData.append('id_actividad', selectedActividadId.value);
+  }
+  formData.append('modo', modo);
 
   const endpoint = activeTab.value === 'usuarios' 
     ? '/admin/inscripciones-excel/registro-masivo' 
@@ -91,14 +171,24 @@ const importar = async () => {
     });
     
     results.value = response.data;
+    ultimoModo.value = modo;
     const hasMailWarnings = response.data.advertenciasCorreo > 0;
     
+    let textMsg = '';
+    if (modo === 'verificar') {
+      textMsg = response.data.errores > 0 
+        ? `Se verificaron los datos pero hay ${response.data.errores} errores. Corrige el archivo antes de guardar.`
+        : 'Verificación exitosa. Todos los datos son válidos. Ahora puedes Guardar.';
+    } else {
+      textMsg = hasMailWarnings 
+        ? `Se procesaron y guardaron los datos, pero hubo ${response.data.advertenciasCorreo} errores al enviar correos.` 
+        : 'Se han procesado y guardado los datos correctamente.';
+    }
+
     Swal.fire({
-      title: hasMailWarnings ? 'Proceso con Advertencias' : 'Proceso Completado',
-      text: hasMailWarnings 
-        ? `Se procesaron los datos, pero hubo ${response.data.advertenciasCorreo} errores al enviar correos (ver detalle abajo).` 
-        : 'Se han procesado los datos correctamente.',
-      icon: hasMailWarnings ? 'warning' : 'success',
+      title: modo === 'verificar' ? (response.data.errores > 0 ? 'Verificación Fallida' : 'Verificación Exitosa') : (hasMailWarnings ? 'Proceso con Advertencias' : 'Proceso Completado'),
+      text: textMsg,
+      icon: (modo === 'verificar' && response.data.errores > 0) ? 'error' : (hasMailWarnings ? 'warning' : 'success'),
       confirmButtonColor: hasMailWarnings ? '#f59e0b' : '#3085d6',
     });
   } catch (error: any) {
@@ -187,6 +277,39 @@ const getStatusIcon = (status: string) => {
             </button>
           </div>
 
+          <!-- Selectores de Evento/Actividad (Solo para Inscripciones) -->
+          <div v-if="activeTab === 'inscripciones'" class="mb-8 p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 space-y-4 animate-in slide-in-from-top-4 duration-500">
+            <p class="text-[10px] font-black text-umsa-blue uppercase tracking-widest flex items-center gap-2 mb-2">
+              <span class="material-symbols-outlined text-sm">target</span>
+              Destino de Inscripción
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="space-y-1.5">
+                <label class="text-[10px] font-black text-slate-400 uppercase ml-2">1. Seleccionar Evento</label>
+                <select v-model="selectedEventoId"
+                        class="w-full bg-white dark:bg-gray-800 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-umsa-blue/50 transition-all cursor-pointer">
+                  <option value="">Seleccionar evento...</option>
+                  <option v-for="ev in eventos" :key="ev.id" :value="String(ev.id)">{{ ev.nombre }}</option>
+                </select>
+              </div>
+              <div class="space-y-1.5">
+                <label class="text-[10px] font-black text-slate-400 uppercase ml-2">2. Seleccionar Actividad</label>
+                <div class="relative">
+                  <select v-model="selectedActividadId"
+                          :disabled="!selectedEventoId || isLoadingSelects"
+                          class="w-full bg-white dark:bg-gray-800 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-umsa-blue/50 transition-all cursor-pointer disabled:opacity-50">
+                    <option value="">{{ isLoadingSelects ? 'Cargando actividades...' : 'Seleccionar actividad...' }}</option>
+                    <option v-for="act in actividades" :key="act.id" :value="String(act.id)">{{ act.nombre }} ({{ act.tipo }})</option>
+                  </select>
+                  <div v-if="isLoadingSelects" class="absolute right-10 top-1/2 -translate-y-1/2">
+                    <span class="animate-spin material-symbols-outlined text-umsa-blue text-sm">progress_activity</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p v-if="!selectedEventoId" class="text-[9px] text-amber-600 font-bold italic pl-2">※ Debes elegir un evento para ver sus actividades disponibles.</p>
+          </div>
+
           <!-- Dropzone -->
           <div 
             v-if="!selectedFile"
@@ -250,15 +373,35 @@ const getStatusIcon = (status: string) => {
                 </div>
               </div>
 
-              <button 
-                @click="importar"
-                :disabled="isUploading"
-                class="w-full md:w-auto px-8 py-3.5 bg-umsa-blue text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-blue-500/30 hover:bg-blue-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                <span v-if="isUploading" class="animate-spin material-symbols-outlined text-sm">progress_activity</span>
-                <span v-else class="material-symbols-outlined text-sm">rocket_launch</span>
-                {{ isUploading ? 'Procesando...' : (activeTab === 'usuarios' ? 'Iniciar Registro Masivo' : 'Iniciar Inscripción Masiva') }}
-              </button>
+              <div class="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                <!-- Botón de Verificar (Siempre disponible si hay archivo) -->
+                <button 
+                  @click="importar('verificar')"
+                  :disabled="isUploading"
+                  class="w-full sm:w-auto px-6 py-3.5 bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-200 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200 dark:hover:bg-white/20 transition-all disabled:opacity-50 flex items-center justify-center gap-2 border border-slate-300 dark:border-white/10"
+                >
+                  <span v-if="isUploading && ultimoModo === 'verificar'" class="animate-spin material-symbols-outlined text-sm">progress_activity</span>
+                  <span v-else class="material-symbols-outlined text-sm">fact_check</span>
+                  Verificar
+                </button>
+
+                <!-- Botón de Guardar (Bloqueado si no se ha verificado o si hay errores) -->
+                <button 
+                  @click="importar('guardar')"
+                  :disabled="isUploading || ultimoModo !== 'verificar' || (results && results.errores > 0)"
+                  :class="[
+                    'w-full sm:w-auto px-6 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest transition-all flex items-center justify-center gap-2 border',
+                    (ultimoModo === 'verificar' && results && results.errores === 0) 
+                      ? 'bg-umsa-blue text-white hover:bg-blue-700 shadow-lg shadow-blue-500/30 border-blue-600'
+                      : 'bg-slate-50 dark:bg-white/5 text-slate-400 border-slate-200 dark:border-white/5 cursor-not-allowed opacity-60'
+                  ]"
+                  title="Debes verificar primero y asegurar que no haya errores"
+                >
+                  <span v-if="isUploading && ultimoModo === 'guardar'" class="animate-spin material-symbols-outlined text-sm">progress_activity</span>
+                  <span v-else class="material-symbols-outlined text-sm">save</span>
+                  Guardar Datos
+                </button>
+              </div>
             </div>
           </div>
         </div>

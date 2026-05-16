@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useAdminHistorialStore } from '@/stores/adminHistorial';
 import api, { getImageUrl } from '@/services/api';
+import { coordinacionesService } from '@/services/coordinaciones.service';
+import { usuariosService } from '@/services/usuarios.service';
 import Swal from 'sweetalert2';
 
 const router = useRouter();
@@ -30,7 +32,7 @@ const formEvento = ref({
   nombre: '', descripcion: '', gestion: new Date().getFullYear().toString(),
   version: '', fecha_inicio: '', fecha_fin: '', ubicacion: '', direccion: '',
   estado: 2, google_maps_link: '', sobre_evento_1: '', sobre_evento_2: '',
-  frase_destacada: '', cronograma: '',
+  frase_destacada: '', cronograma: '', fase: 1
 });
 
 const estadoEventoConfig: Record<number, { label: string; color: string; bg: string }> = {
@@ -123,6 +125,83 @@ const confirmarEliminarEvento = async (ev: any) => {
     fetchEventos();
   } catch { Swal.fire('Error', 'No se pudo inhabilitar', 'error'); }
 };
+
+// ─── Coordinadores y Logística ─────────────────────────────
+const showModalCoordinadores = ref(false);
+const eventoParaCoordinadores = ref<any>(null);
+const coordinadoresActuales = ref<any[]>([]);
+const candidatosCoordinadores = ref<any[]>([]);
+const cargandoCoordinadores = ref(false);
+const queryCandidato = ref('');
+
+const fetchCoordinadores = async (eventoId: number) => {
+  try {
+    cargandoCoordinadores.value = true;
+    const res = await coordinacionesService.getByEvento(eventoId);
+    coordinadoresActuales.value = res.data || [];
+  } catch (err) {
+    console.error('Error fetching coordinadores', err);
+  } finally {
+    cargandoCoordinadores.value = false;
+  }
+};
+
+const fetchCandidatos = async () => {
+  try {
+    const res = await usuariosService.getAll({ soloActivos: 'true' });
+    const allUsers = (res.data as any)?.data ?? res.data;
+    candidatosCoordinadores.value = allUsers.filter((u: any) => {
+      const isAlreadyAssigned = coordinadoresActuales.value.some(c => c.usuario?.id === u.id);
+      return !isAlreadyAssigned;
+    });
+  } catch (err) {
+    console.error('Error fetching candidatos', err);
+  }
+};
+
+const abrirCoordinadores = async (evento: any) => {
+  eventoParaCoordinadores.value = evento;
+  showModalCoordinadores.value = true;
+  await fetchCoordinadores(evento.id);
+  await fetchCandidatos();
+};
+
+const asignarCoordinador = async (usuario: any) => {
+  try {
+    await coordinacionesService.asignar(eventoParaCoordinadores.value.id, usuario.id);
+    Swal.fire({ toast: true, icon: 'success', title: 'Responsable asignado', timer: 2000, showConfirmButton: false, position: 'top-end' });
+    await fetchCoordinadores(eventoParaCoordinadores.value.id);
+    await fetchCandidatos();
+  } catch (err) {
+    Swal.fire('Error', 'No se pudo asignar.', 'error');
+  }
+};
+
+const quitarCoordinador = async (coordinacion: any) => {
+  const result = await Swal.fire({
+    title: '¿Quitar responsable?',
+    text: `¿Remover a ${coordinacion.usuario?.persona?.nombres}?`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Sí, quitar'
+  });
+  if (!result.isConfirmed) return;
+  try {
+    await coordinacionesService.quitar(coordinacion.id);
+    await fetchCoordinadores(eventoParaCoordinadores.value.id);
+    await fetchCandidatos();
+  } catch (err) {
+    Swal.fire('Error', 'No se pudo quitar.', 'error');
+  }
+};
+
+const candidatosFiltrados = computed(() => {
+  if (!queryCandidato.value) return candidatosCoordinadores.value;
+  return candidatosCoordinadores.value.filter(u => 
+    u.email.toLowerCase().includes(queryCandidato.value.toLowerCase()) ||
+    u.persona?.nombres.toLowerCase().includes(queryCandidato.value.toLowerCase())
+  );
+});
 
 // ─── Actividades ───────────────────────────────────────────
 const actividades = ref<any[]>([]);
@@ -479,14 +558,48 @@ onMounted(() => {
                 <td class="px-6 py-4">
                   <p class="text-[10px] font-bold text-slate-500 truncate max-w-[150px]">{{ ev.ubicacion || '—' }}</p>
                 </td>
+                <td class="px-6 py-4 text-center">
+                   <div class="flex flex-col items-center gap-1">
+                      <span v-if="ev.estado !== undefined && estadoEventoConfig[ev.estado]" 
+                            :class="[estadoEventoConfig[ev.estado]?.bg, estadoEventoConfig[ev.estado]?.color]"
+                            class="px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest border border-current opacity-80">
+                        {{ estadoEventoConfig[ev.estado]?.label }}
+                      </span>
+                      <span v-if="ev.fase" class="text-[7px] font-black text-slate-400 uppercase tracking-tighter">
+                         {{ ev.fase === 4 ? '🏁 Finalizado' : ev.fase === 1 ? '📝 Planificación' : ev.fase === 2 ? '👥 Inscripciones' : ev.fase === 3 ? '⚡ Ejecución' : '📁 Archivado' }}
+                      </span>
+                   </div>
+                </td>
                 <td class="px-6 py-4 text-right">
-                  <div class="flex justify-end items-center gap-1">
+                  <div class="flex justify-end items-center gap-2">
+                    <!-- Inscripción Masiva (Excel) -->
+                    <button @click="router.push({ name: 'admin-inscripciones-excel', query: { eventoId: ev.id } })"
+                            title="Inscripción Masiva (Excel)"
+                            class="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-sm">
+                      <span class="material-symbols-outlined text-[18px]">grid_on</span>
+                    </button>
+
+                    <!-- Gestionar Coordinadores -->
+                    <button @click="abrirCoordinadores(ev)"
+                            title="Gestionar Responsables"
+                            class="p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 text-slate-600 hover:bg-slate-800 hover:text-white transition-all shadow-sm">
+                      <span class="material-symbols-outlined text-[18px]">group_add</span>
+                    </button>
+
+                    <!-- Emitir Certificados -->
+                    <button @click="ev.fase === 4 ? router.push({ name: 'admin-certificados-envio', query: { search: ev.nombre } }) : Swal.fire('Aviso', 'Solo se pueden emitir certificados de eventos en fase FINALIZADO.', 'info')"
+                            title="Emitir Certificados"
+                            :class="ev.fase === 4 ? 'bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white' : 'bg-slate-50 text-slate-300 cursor-not-allowed'"
+                            class="p-2.5 rounded-xl dark:bg-amber-900/20 transition-all shadow-sm">
+                      <span class="material-symbols-outlined text-[18px]">verified_user</span>
+                    </button>
+
                     <button @click="abrirEditarEvento(ev)" title="Editar"
-                            class="p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-slate-400 hover:text-blue-600 transition-all">
+                            class="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm">
                       <span class="material-symbols-outlined text-[18px]">edit</span>
                     </button>
                     <button @click="confirmarEliminarEvento(ev)" title="Inhabilitar"
-                            class="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-600 transition-all">
+                            class="p-2.5 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm">
                       <span class="material-symbols-outlined text-[18px]">do_not_disturb_on</span>
                     </button>
                   </div>
@@ -822,6 +935,76 @@ onMounted(() => {
                       class="flex-2 px-10 py-4 bg-amber-500 text-[10px] font-black text-white uppercase rounded-2xl shadow-lg shadow-amber-500/20 hover:bg-amber-600 transition-all">
                 {{ isEditingAct ? 'Guardar Cambios' : 'Crear Actividad' }}
               </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ══════════════════════════════════════════════ -->
+    <!--  MODAL COORDINADORES (ADMIN GESTION)           -->
+    <!-- ══════════════════════════════════════════════ -->
+    <Teleport to="body">
+      <div v-if="showModalCoordinadores" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
+        <div class="bg-white dark:bg-[#0d0d14] w-full max-w-2xl rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden animate-in zoom-in duration-300">
+          <div class="p-8">
+            <div class="flex justify-between items-center mb-8">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center">
+                  <span class="material-symbols-outlined text-white text-[20px]">manage_accounts</span>
+                </div>
+                <div>
+                  <h2 class="text-xl font-black text-slate-800 dark:text-white uppercase italic leading-tight">Responsables del Evento</h2>
+                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{{ eventoParaCoordinadores?.nombre }}</p>
+                </div>
+              </div>
+              <button @click="showModalCoordinadores = false" class="text-slate-400 hover:text-red-600 transition-colors">
+                <span class="material-symbols-outlined text-[28px]">close</span>
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <!-- Actuales -->
+              <div class="space-y-4">
+                <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <span class="material-symbols-outlined text-sm">groups</span> Responsables Actuales
+                </h3>
+                <div v-if="cargandoCoordinadores" class="py-10 flex justify-center"><div class="w-6 h-6 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin"></div></div>
+                <div v-else-if="coordinadoresActuales.length === 0" class="py-10 text-center border-2 border-dashed border-slate-100 rounded-2xl text-[10px] font-bold text-slate-300 uppercase">Sin responsables asignados</div>
+                <div v-else class="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                  <div v-for="c in coordinadoresActuales" :key="c.id" class="flex items-center justify-between p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/5">
+                    <div class="flex items-center gap-3">
+                      <div class="w-8 h-8 rounded-full bg-slate-200 dark:bg-gray-700 flex items-center justify-center text-[10px] font-black text-slate-500">
+                        {{ c.usuario?.persona?.nombres?.charAt(0) }}{{ c.usuario?.persona?.primer_apellido?.charAt(0) }}
+                      </div>
+                      <div>
+                        <p class="text-[10px] font-black text-slate-800 dark:text-white uppercase">{{ c.usuario?.persona?.nombres }} {{ c.usuario?.persona?.primer_apellido }}</p>
+                        <p class="text-[8px] text-slate-400 font-bold uppercase tracking-tighter">{{ c.usuario?.email }}</p>
+                      </div>
+                    </div>
+                    <button @click="quitarCoordinador(c)" class="text-slate-300 hover:text-red-500 transition-colors"><span class="material-symbols-outlined text-lg">remove_circle</span></button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Candidatos -->
+              <div class="space-y-4">
+                <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <span class="material-symbols-outlined text-sm">person_search</span> Asignar Nuevo
+                </h3>
+                <input v-model="queryCandidato" type="text" placeholder="BUSCAR POR NOMBRE O EMAIL..." class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-[10px] font-bold uppercase outline-none focus:border-slate-800/50 transition-all" />
+                <div class="space-y-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                  <div v-for="u in candidatosFiltrados" :key="u.id" @click="asignarCoordinador(u)" class="flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl cursor-pointer transition-colors border border-transparent hover:border-slate-100">
+                    <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-gray-800 flex items-center justify-center text-[10px] font-black text-slate-400 group-hover:bg-white">
+                      <span class="material-symbols-outlined text-sm">person</span>
+                    </div>
+                    <div>
+                      <p class="text-[10px] font-black text-slate-700 dark:text-gray-200 uppercase">{{ u.persona?.nombres }} {{ u.persona?.primer_apellido }}</p>
+                      <p class="text-[8px] text-slate-400">{{ u.email }}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -57,6 +57,12 @@ export class CreateEventoDto {
   @IsInt()
   estado?: number;
 
+  @ApiPropertyOptional({ example: 1, description: 'Fase del evento (1: Planificación, 2: Inscripciones, etc.)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  fase?: number;
+
   @ApiPropertyOptional({ type: 'string', format: 'binary', description: 'Logo/Portada del evento' })
   @IsOptional()
   logo?: any;
@@ -173,4 +179,14 @@ export class CreateEventoDto {
   @IsOptional()
   @IsString()
   visibilidad_al_finalizar?: string;
+
+  @ApiPropertyOptional({ example: '[1, 2, 3]', description: 'IDs de usuarios coordinadores adicionales' })
+  @IsOptional()
+  @IsString()
+  coordinadores_ids?: string;
+
+  @ApiPropertyOptional({ example: '[4, 5, 6]', description: 'IDs de usuarios de logística adicionales' })
+  @IsOptional()
+  @IsString()
+  logistica_ids?: string;
 }

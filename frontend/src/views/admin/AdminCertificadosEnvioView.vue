@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
+import { useRoute } from 'vue-router';
 import { certificadosService } from '@/services/certificados.service';
 import Swal from 'sweetalert2';
+
+const route = useRoute();
 
 interface Certificado {
   id: number;
@@ -23,6 +26,7 @@ interface Certificado {
     evento: {
       nombre: string;
       fase: number;
+      estado: number;
     }
   }
 }
@@ -81,14 +85,17 @@ const toggleSelectAll = (event: any) => {
 const handleSendMasivo = async () => {
   if (selectedIds.value.length === 0) return;
 
-  const problematicos = certificados.value.filter(
-    c => selectedIds.value.includes(c.id) && (c.actividadAcademica?.evento.fase || 0) < 4
-  );
+  const problematicos = certificados.value.filter(c => {
+    if (!selectedIds.value.includes(c.id)) return false;
+    const ev = c.actividadAcademica?.evento;
+    // Consideramos bloqueado si fase < 4 Y estado !== 0 (siendo 0 Finalizado)
+    return (ev?.fase || 0) < 4 && ev?.estado !== 0;
+  });
 
   if (problematicos.length > 0) {
     Swal.fire({
       title: 'Acción Bloqueada',
-      text: `${problematicos.length} certificados pertenecen a eventos aún no finalizados (fase < 4).`,
+      text: `${problematicos.length} certificados pertenecen a eventos aún no finalizados o activos.`,
       icon: 'warning',
       confirmButtonColor: '#0f172a',
     });
@@ -154,8 +161,9 @@ const handleReintentarFallidos = async () => {
 
 // ── Reintento individual ──────────────────────────────────────
 const reintentarUno = async (cert: Certificado) => {
-  if ((cert.actividadAcademica?.evento.fase || 0) < 4) {
-    Swal.fire('Atención', 'El evento aún no está en fase "Finalizado".', 'warning');
+  const ev = cert.actividadAcademica?.evento;
+  if ((ev?.fase || 0) < 4 && ev?.estado !== 0) {
+    Swal.fire('Atención', 'El evento asociado aún no está finalizado.', 'warning');
     return;
   }
   try {
@@ -226,7 +234,12 @@ const verError = (log: string) => {
   });
 };
 
-onMounted(fetchCertificados);
+onMounted(() => {
+  if (route.query.search) {
+    filterEvent.value = String(route.query.search);
+  }
+  fetchCertificados();
+});
 </script>
 
 <template>
@@ -345,7 +358,7 @@ onMounted(fetchCertificados);
               <td class="px-6 py-4">
                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-tighter flex items-center gap-1">
                   {{ cert.actividadAcademica?.evento.nombre }}
-                  <span v-if="(cert.actividadAcademica?.evento.fase || 0) < 4"
+                  <span v-if="(cert.actividadAcademica?.evento.fase || 0) < 4 && cert.actividadAcademica?.evento.estado !== 0"
                         class="text-[8px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-black">
                     No Finalizado
                   </span>

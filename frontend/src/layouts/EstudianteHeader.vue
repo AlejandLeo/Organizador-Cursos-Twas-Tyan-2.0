@@ -367,20 +367,23 @@ onMounted(async () => {
   checkNuevasDesignaciones();
   setInterval(fetchStudentNotifications, 60000);
 
-  // Cargar foto de perfil - Manejo silencioso
+  // Cargar foto de perfil - Manejo silencioso con fetch para evitar error InvalidStateError en inspectores
   try {
-    const photoRes = await api.get('/usuarios/perfil/foto', { 
-      responseType: 'blob'
+    const token = localStorage.getItem('token');
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const photoRes = await fetch(`${baseUrl}/usuarios/perfil/foto`, {
+      headers: { 'Authorization': `Bearer ${token}` }
     });
     
-    if (photoRes.status === 200) {
-      // Si el backend envió 'NONE', es que no hay foto
-      const text = await photoRes.data.text();
+    if (photoRes.ok) {
+      const blob = await photoRes.blob();
+      // Si el backend envió 'NONE', es que no hay foto (lo manejamos como texto)
+      const text = await blob.text();
       if (text === 'NONE') {
         profilePhotoUrl.value = '';
       } else {
         if (profilePhotoUrl.value) URL.revokeObjectURL(profilePhotoUrl.value);
-        profilePhotoUrl.value = URL.createObjectURL(photoRes.data);
+        profilePhotoUrl.value = URL.createObjectURL(blob);
       }
     } else {
       profilePhotoUrl.value = '';

@@ -122,6 +122,11 @@ const router = createRouter({
           component: () => import('../views/admin/AdminGestionView.vue'),
         },
         {
+          path: 'actividades',
+          name: 'admin-actividades',
+          component: () => import('../views/admin/AdminActividadesView.vue'),
+        },
+        {
           path: 'eventos',
           name: 'admin-eventos',
           component: () => import('../views/eventos/GestionEventoMaster.vue'),
