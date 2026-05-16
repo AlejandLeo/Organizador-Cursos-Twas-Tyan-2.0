@@ -8,8 +8,8 @@ import Swal from 'sweetalert2';
 
 const authStore = useAuthStore();
 const historialStore = useAdminHistorialStore();
-const usuarios = ref<any[]>([]);
 const isLoading = ref(true);
+const usuarios = ref<any[]>([]);
 const filtroTexto = ref('');
 const filtroRol = ref('');
 

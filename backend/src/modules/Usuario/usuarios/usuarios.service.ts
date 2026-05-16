@@ -626,6 +626,7 @@ export class UsuariosService {
 
       await queryRunner.commitTransaction();
 
+<<<<<<< HEAD
       // Enviar correo de bienvenida (Opcional)
       let correoEnviado = false;
       if (dto.notificar !== false) {
@@ -634,6 +635,15 @@ export class UsuariosService {
         } catch (mailError) {
           this.logger.error(`Error enviando correo de bienvenida a ponente ${dto.email}: ${mailError.message}`);
         }
+=======
+      // Enviar correo de bienvenida al ponente con sus credenciales (No-bloqueante)
+      let correoEnviado = false;
+      try {
+        const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
+        correoEnviado = await this.enviarBienvenidaPersonalizada(dto.email, nombreCompleto, dto.password);
+      } catch (mailError) {
+        this.logger.error(`Error enviando correo de bienvenida a ponente ${dto.email}: ${mailError.message}`);
+>>>>>>> ba9255c45525f0d13cc726801e273abb8daa4315
       }
 
       const perfil = await this.getPerfil(usuarioGuardado.id);
@@ -1263,7 +1273,10 @@ export class UsuariosService {
     id: number,
     accion: 'aprobar' | 'rechazar',
     motivo?: string,
+<<<<<<< HEAD
     notificar: boolean = true,
+=======
+>>>>>>> ba9255c45525f0d13cc726801e273abb8daa4315
   ): Promise<{ mensaje: string; correoEnviado: boolean }> {
     const usuario = await this.usuarioRepository.findOne({
       where: { id },
@@ -1289,6 +1302,7 @@ export class UsuariosService {
           requiere_cambio_password: false
         });
 
+<<<<<<< HEAD
         let correoEnviado = false;
         if (notificar) {
           try {
@@ -1298,6 +1312,17 @@ export class UsuariosService {
           } catch (mailError) {
             this.logger.error(`Error enviando correo de aprobación a ${usuario.email}: ${mailError.message}`);
           }
+=======
+        const nombreCompleto = usuario.persona
+          ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
+          : 'Usuario';
+
+        let correoEnviado = false;
+        try {
+          correoEnviado = await this.enviarBienvenidaPersonalizada(usuario.email, nombreCompleto, 'La elegida en su registro');
+        } catch (mailError) {
+          this.logger.error(`Error enviando correo de aprobación a ${usuario.email}: ${mailError.message}`);
+>>>>>>> ba9255c45525f0d13cc726801e273abb8daa4315
         }
         return { mensaje: 'Solicitud aprobada.', correoEnviado };
       }
@@ -1308,6 +1333,7 @@ export class UsuariosService {
           ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
           : 'Usuario';
         let correoEnviado = false;
+<<<<<<< HEAD
         if (notificar) {
           try {
             await this.mailService.sendAccountReactivationEmail(usuario.email, nombreCompleto);
@@ -1315,6 +1341,13 @@ export class UsuariosService {
           } catch (mailError) {
             this.logger.error(`Error enviando correo de reactivación a ${usuario.email}: ${mailError.message}`);
           }
+=======
+        try {
+          await this.mailService.sendAccountReactivationEmail(usuario.email, nombreCompleto);
+          correoEnviado = true;
+        } catch (mailError) {
+          this.logger.error(`Error enviando correo de reactivación a ${usuario.email}: ${mailError.message}`);
+>>>>>>> ba9255c45525f0d13cc726801e273abb8daa4315
         }
         return { mensaje: 'Cuenta reactivada.', correoEnviado };
       }
@@ -1327,6 +1360,7 @@ export class UsuariosService {
         : 'Usuario';
 
       let correoEnviado = false;
+<<<<<<< HEAD
       if (notificar) {
         try {
           await this.mailService.sendAccountRejectionEmail(
@@ -1339,6 +1373,19 @@ export class UsuariosService {
           this.logger.error(`Error enviando correo de rechazo a ${usuario.email}: ${mailError.message}`);
         }
       }
+=======
+      try {
+        await this.mailService.sendAccountRejectionEmail(
+          usuario.email,
+          nombreCompleto,
+          motivo || 'La solicitud de registro no cumple con los criterios de validación.'
+        );
+        correoEnviado = true;
+      } catch (mailError) {
+        this.logger.error(`Error enviando correo de rechazo a ${usuario.email}: ${mailError.message}`);
+      }
+
+>>>>>>> ba9255c45525f0d13cc726801e273abb8daa4315
       return { mensaje: 'Solicitud rechazada.', correoEnviado };
     }
   }
@@ -1487,11 +1534,19 @@ export class UsuariosService {
    * Envía un correo de bienvenida personalizado usando la configuración del sistema.
    * Utiliza la cola de correos para escalabilidad.
    */
+<<<<<<< HEAD
   private async enviarBienvenidaPersonalizada(email: string, nombres: string, apellidos: string, passwordTemp: string) {
     try {
       await this.mailQueueService.renderAndEnqueue(
         email, 
         { nombre: nombres, apellidos, email, password: passwordTemp },
+=======
+  private async enviarBienvenidaPersonalizada(email: string, nombre: string, passwordTemp: string) {
+    try {
+      await this.mailQueueService.renderAndEnqueue(
+        email, 
+        { nombre, email, password: passwordTemp },
+>>>>>>> ba9255c45525f0d13cc726801e273abb8daa4315
         undefined, // No templateId for now (uses default)
         'WELCOME'
       );

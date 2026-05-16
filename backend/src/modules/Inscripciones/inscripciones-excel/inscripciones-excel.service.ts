@@ -69,7 +69,7 @@ export class InscripcionesExcelService {
     private readonly mailService: MailService,
     private readonly mailTemplateService: MailTemplateService,
     private readonly mailQueueService: MailQueueService,
-  ) {}
+  ) { }
 
   // ══════════════════════════════════════════════════════════════════════════
   //  ESCENARIO 1 — Registro masivo de usuarios desde Excel
@@ -138,7 +138,7 @@ export class InscripcionesExcelService {
 
           const nombres = String(fila['nombres'] || '').trim();
           const primerApellido = String(fila['primer_apellido'] || '').trim();
-          
+
           const persona = queryRunner.manager.create(Persona, {
             nombres: nombres || undefined,
             primer_apellido: primerApellido || undefined,
@@ -266,7 +266,7 @@ export class InscripcionesExcelService {
 
           if (!usuario) {
             if (!crearUsuarios) throw new Error(`Usuario "${email}" no encontrado. Activa "Registrar usuarios nuevos".`);
-            
+
             passwordTemporal = String(fila['password'] || fila['documento_identidad'] || 'Usuario123!').trim();
             const hash = await bcrypt.hash(passwordTemporal, 10);
             usuario = queryRunner.manager.create(Usuario, { email, password: hash, estado: 1, requiere_cambio_password: true });
@@ -414,7 +414,7 @@ export class InscripcionesExcelService {
 
           if (!usuario) {
             if (!crearUsuarios) throw new Error(`Ponente "${email}" no encontrado. Activa el registro automático.`);
-            
+
             passwordTemporal = String(fila['password'] || fila['documento_identidad'] || 'Ponente123!').trim();
             const hash = await bcrypt.hash(passwordTemporal, 10);
             usuario = queryRunner.manager.create(Usuario, { email, password: hash, estado: 1, requiere_cambio_password: true });

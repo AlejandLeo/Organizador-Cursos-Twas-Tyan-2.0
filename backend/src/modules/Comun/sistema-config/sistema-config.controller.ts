@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { Controller, Get, Patch, Body, UseGuards, Param } from '@nestjs/common';
+=======
+import { Controller, Get, Patch, Body, UseGuards } from '@nestjs/common';
+>>>>>>> ba9255c45525f0d13cc726801e273abb8daa4315
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SistemaConfigService } from './sistema-config.service';
 import { JwtAuthGuard } from '../../Seguridad/auth/jwt-auth.guard';
@@ -30,6 +34,7 @@ export class SistemaConfigController {
     return { mensaje: 'Configuración actualizada correctamente.' };
   }
 
+<<<<<<< HEAD
   @Get('key/:clave')
   @ApiOperation({ summary: 'Obtener el valor de una configuración por su clave' })
   @Roles('Super Usuario', 'Coordinador')
@@ -40,10 +45,14 @@ export class SistemaConfigController {
 
   @Get('mail-stats')
   @Roles('Super Usuario')
+=======
+  @Get('mail-stats')
+>>>>>>> ba9255c45525f0d13cc726801e273abb8daa4315
   @ApiOperation({ summary: 'Obtener estadísticas de la cola de correos' })
   async getMailStats() {
     return this.mailQueueService.getStats();
   }
+<<<<<<< HEAD
 
   @Get('mail-audit')
   @Roles('Super Usuario')
@@ -53,4 +62,6 @@ export class SistemaConfigController {
   ) {
     return this.mailQueueService.getAuditoria();
   }
+=======
+>>>>>>> ba9255c45525f0d13cc726801e273abb8daa4315
 }
