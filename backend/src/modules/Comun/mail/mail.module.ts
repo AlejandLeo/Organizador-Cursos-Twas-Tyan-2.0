@@ -29,7 +29,7 @@ import { MailTemplateController } from './mail-template.controller';
             pass: config.get('MAIL_PASS'),
           },
           tls: {
-            rejectUnauthorized: false,
+            rejectUnauthorized: false, // Permite certificados auto-firmados
           },
         },
         defaults: {

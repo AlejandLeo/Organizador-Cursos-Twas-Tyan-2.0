@@ -14,6 +14,9 @@ const route = useRoute();
 const eventoStore = useEventoStore();
 const authStore = useAuthStore();
 
+// Determinar si estamos en el panel de administración
+const isAdminContext = computed(() => route.path.startsWith('/admin'));
+
 const openDetalleCurso = (courseId: any, extraQuery = {}) => {
   const isAdminContext = route.path.startsWith('/admin');
   const routeName = isAdminContext ? 'admin-gestion-eventos-detalle' : 'coordinador-gestion-eventos-detalle';
@@ -51,14 +54,12 @@ const editEventoId = ref<number | null>(null);
 const currentStep = ref(1);
 const totalSteps = 7;
 const slideDir = ref<'forward' | 'backward'>('forward');
-const isAdminContext = computed(() => {
-  return route.path.startsWith('/admin') || authStore.id_rol === 1;
-});
+const isSuperAdminTheme = computed(() => authStore.esSuperUsuario);
 
-const themeColor = computed(() => isAdminContext.value ? 'red' : 'blue');
-const themeBg = computed(() => isAdminContext.value ? 'bg-red-600' : 'bg-blue-600');
-const themeShadow = computed(() => isAdminContext.value ? 'shadow-red-500/20' : 'shadow-blue-500/20');
-const themeHover = computed(() => isAdminContext.value ? 'hover:bg-red-700' : 'hover:bg-blue-700');
+const themeColor = computed(() => isSuperAdminTheme.value ? 'red' : 'blue');
+const themeBg = computed(() => isSuperAdminTheme.value ? 'bg-red-600' : 'bg-blue-600');
+const themeShadow = computed(() => isSuperAdminTheme.value ? 'shadow-red-500/20' : 'shadow-blue-500/20');
+const themeHover = computed(() => isSuperAdminTheme.value ? 'hover:bg-red-700' : 'hover:bg-blue-700');
 
 const previewTransition = computed(() =>
     slideDir.value === 'forward' ? 'preview-slide-forward' : 'preview-slide-backward'
@@ -146,7 +147,7 @@ const confirmarCancelar = () => {
         cancelButtonText: 'No, seguir editando'
     }).then((result) => {
         if (result.isConfirmed) {
-            if (isAdminContext.value) {
+            if (isSuperAdminTheme.value) {
                 router.push({ name: 'admin-gestion' });
             } else {
                 isCreatingEvento.value = false;

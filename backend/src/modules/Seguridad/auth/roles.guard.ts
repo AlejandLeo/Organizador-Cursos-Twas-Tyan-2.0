@@ -22,8 +22,13 @@ export class RolesGuard implements CanActivate {
     // 3. Obtener el usuario del request (inyectado por el JwtAuthGuard)
     const { user } = context.switchToHttp().getRequest();
 
-    // 4. Verificar si el usuario tiene al menos uno de los roles requeridos
-    // El payload del JWT ya contiene el array con los nombres de los roles.
-    return requiredRoles.some((role) => user.roles?.includes(role));
+    // 4. EL PASE MAESTRO: Si es Super Usuario, tiene acceso total a todo
+    if (user.roles?.includes('Super Usuario')) {
+      return true;
+    }
+
+    // 5. Verificar si el usuario tiene al menos uno de los roles requeridos
+    const userRolesNormalized = (user.roles || []).map((r: string) => r.toLowerCase());
+    return requiredRoles.some((role) => userRolesNormalized.includes(role.toLowerCase()));
   }
 }

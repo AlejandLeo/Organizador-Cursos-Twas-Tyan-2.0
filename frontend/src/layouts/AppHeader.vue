@@ -17,16 +17,38 @@ const versionActual = computed(() => {
   const current = eventoStore.versionesDisponibles.find(v => v.id === eventoStore.selectedEventoId);
   return current ? current.edicion : 'Sin Versión';
 });
-const notifications = ref({
+interface CoordinatorActivity {
+  id: number;
+  nombre: string;
+  eventoNombre: string;
+  count: number;
+}
+
+interface CoordinatorNotifications {
+  total: number;
+  accounts: number;
+  activities: CoordinatorActivity[];
+}
+
+interface StudentNotification {
+  id: string | number;
+  prioridad: 'alta' | 'media' | 'baja';
+  tipo: 'success' | 'warning' | 'info' | 'error';
+  titulo: string;
+  mensaje: string;
+  fecha: string | Date;
+}
+
+const notifications = ref<CoordinatorNotifications>({
   total: 0,
   accounts: 0,
-  activities: [] as any[]
+  activities: []
 })
 const showNotifications = ref(false)
-const studentNotifications = ref([] as any[])
+const studentNotifications = ref<StudentNotification[]>([])
 const showStudentNotifications = ref(false)
 const isProfileOpen = ref(false)
-const autoCloseTimer = ref<any>(null);
+const autoCloseTimer = ref<ReturnType<typeof setTimeout> | null>(null);
 
 const startAutoClose = () => {
   if (autoCloseTimer.value) clearTimeout(autoCloseTimer.value);
@@ -96,9 +118,8 @@ const fetchStudentNotifications = async () => {
   console.log('--- ATTEMPTING TO FETCH STUDENT NOTIFICATIONS');
   try {
     const res = await api.get('/usuarios/alertas/estudiante');
-    console.log('--- STUDENT NOTIFICATIONS RECEIVED:', res.data);
     const dismissed = JSON.parse(localStorage.getItem('dismissedNotifications') || '[]');
-    studentNotifications.value = res.data.filter((n: any) => !dismissed.includes(n.id));
+    studentNotifications.value = res.data.filter((n: StudentNotification) => !dismissed.includes(n.id));
   } catch (error) {
     console.error('Error fetching student notifications', error);
   }
@@ -161,6 +182,15 @@ const goToProfile = () => {
 
 <template>
   <header class="fixed top-0 left-0 right-0 h-[75px] bg-white dark:bg-gray-900 border-b border-slate-200 dark:border-gray-800 z-[100] px-4 md:px-8 flex items-center justify-between shadow-sm transition-all duration-300">       
+    <!-- Aviso de Servidor Offline -->
+    <div v-if="!uiStore.isServerOnline" 
+         class="fixed top-0 left-0 right-0 h-1 bg-red-500 animate-pulse z-[200]"></div>
+    <div v-if="!uiStore.isServerOnline" 
+         class="fixed top-2 left-1/2 -translate-x-1/2 bg-red-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg z-[200] flex items-center gap-2 border border-red-400">
+      <span class="material-symbols-outlined text-sm">wifi_off</span>
+      Sin Conexión con el Servidor
+    </div>
+
     <div class="flex items-center flex-1 space-x-4 md:space-x-6">
       
       <!-- Botón Menú Móvil -->

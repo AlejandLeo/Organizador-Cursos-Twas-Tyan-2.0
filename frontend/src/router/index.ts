@@ -109,7 +109,7 @@ const router = createRouter({
         {
           path: '',
           name: 'admin-dashboard',
-          component: () => import('../views/admin/AdminDashboardView.vue'),
+          component: () => import('../views/admin/SmartDashboard.vue'),
         },
         {
           path: 'historial',
@@ -191,6 +191,11 @@ const router = createRouter({
           name: 'admin-mail-templates',
           component: () => import('../views/admin/AdminMailTemplatesView.vue'),
         },
+        {
+          path: 'perfil',
+          name: 'admin-perfil',
+          component: () => import('../views/estudiante/EstudiantePerfilView.vue'),
+        },
       ]
     },
     // ─── RUTAS COORDINADOR ────────────────────────────────────────────────────
@@ -210,7 +215,7 @@ const router = createRouter({
         {
           path: 'datos',
           name: 'ponente-datos',
-          component: () => import('../views/ponente/PonenteDatosView.vue'),
+          component: () => import('../views/estudiante/EstudiantePerfilView.vue'),
         },
         {
           path: 'eventos',
@@ -356,8 +361,13 @@ router.beforeEach(async (to) => {
     const isPonente = userRoles.includes('Ponente');
     const isLogistica = userRoles.includes('Logística');
 
-    if (to.path.startsWith('/admin') && !isSuperAdmin) {
-      return isCoordinador ? '/coordinador' : isLogistica ? '/logistica' : isPonente ? '/ponente' : '/estudiante';
+    const restrictedRoutes = ['admin-usuarios', 'admin-inscripciones-excel', 'admin-historial', 'admin-configuracion'];
+    if (restrictedRoutes.includes(to.name as string) && !isSuperAdmin) {
+      return '/admin';
+    }
+
+    if (to.path.startsWith('/admin') && !isSuperAdmin && !isCoordinador) {
+      return isLogistica ? '/logistica' : isPonente ? '/ponente' : '/estudiante';
     }
 
     if (to.path.startsWith('/coordinador') && !isCoordinador && !isSuperAdmin) {
