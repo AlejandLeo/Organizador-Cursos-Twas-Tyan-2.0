@@ -15,6 +15,8 @@ import { Rol } from '../../Usuario/roles/entities/rol.entity';
 import { UsuarioRol } from '../../Usuario/usuarios-roles/entities/usuario-rol.entity';
 import { Inscripcion } from '../inscripciones/entities/inscripcion.entity';
 import { ActividadAcademica } from '../../Academico/actividades-academicas/entities/actividad-academica.entity';
+import { Imparticion } from '../../Academico/imparticiones/entities/imparticion.entity';
+import { Evento } from '../../Academico/eventos/entities/evento.entity';
 import { MailService } from '../../Comun/mail/mail.service';
 
 // ─── Tipos de resultado ───────────────────────────────────────────────────────
@@ -22,7 +24,7 @@ import { MailService } from '../../Comun/mail/mail.service';
 export interface ResultadoFila {
   fila: number;
   email?: string;
-  estado: 'creado' | 'inscrito' | 'omitido' | 'error';
+  estado: 'creado' | 'inscrito' | 'asignado' | 'omitido' | 'error';
   mensaje: string;
   correoEnviado?: boolean;
   correoAdvertencia?: string;
@@ -32,6 +34,7 @@ export interface ResultadoImportacion {
   total: number;
   creados?: number;
   inscritos?: number;
+  asignados?: number;
   omitidos: number;
   errores: number;
   advertenciasCorreo: number;
@@ -40,6 +43,7 @@ export interface ResultadoImportacion {
 
 // ─── Constante de rol por defecto ─────────────────────────────────────────────
 const ROL_ESTUDIANTE_ID = 4;
+const ROL_PONENTE_ID = 5;
 
 @Injectable()
 export class InscripcionesExcelService {
@@ -609,6 +613,174 @@ export class InscripcionesExcelService {
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Inscripción Masiva');
+    return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  Gestión de Ponentes
+  // ══════════════════════════════════════════════════════════════════════════
+
+  async asignacionMasivaPonentes(
+    fileBuffer: Buffer,
+    notificar = false,
+    idEvento?: number,
+    modo: 'verificar' | 'guardar' = 'guardar',
+    crearUsuarios = false
+  ): Promise<ResultadoImportacion> {
+    const filas = this.parsearExcel(fileBuffer);
+    if (filas.length === 0) throw new BadRequestException('El archivo Excel está vacío.');
+
+    const detalle: ResultadoFila[] = [];
+    let asignados = 0;
+    let creados = 0;
+    let omitidos = 0;
+    let errores = 0;
+    let advertenciasCorreo = 0;
+    const actividadCache = new Map<string, ActividadAcademica | null>();
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      for (let i = 0; i < filas.length; i++) {
+        const fila = filas[i];
+        const numFila = i + 2;
+        const email = String(fila['email'] || '').trim().toLowerCase();
+        const nombreActividad = String(fila['nombre_actividad_academica'] || '').trim();
+
+        if (!email || !nombreActividad) {
+          detalle.push({ fila: numFila, estado: 'error', mensaje: 'Email o nombre de actividad vacío.' });
+          errores++;
+          continue;
+        }
+
+        const savepointName = `row_pon_${i}`;
+        await queryRunner.query(`SAVEPOINT ${savepointName}`);
+
+        try {
+          // 1. Buscar o Crear usuario
+          let usuario = await queryRunner.manager.findOne(Usuario, {
+            where: { email },
+            relations: ['persona', 'usuariosRoles', 'usuariosRoles.rol'],
+          });
+
+          let fueCreado = false;
+          let passwordTemporal = '';
+
+          if (!usuario) {
+            if (!crearUsuarios) throw new Error(`Ponente "${email}" no encontrado. Activa el registro automático.`);
+            
+            passwordTemporal = String(fila['password'] || fila['documento_identidad'] || 'Ponente123!').trim();
+            const hash = await bcrypt.hash(passwordTemporal, 10);
+
+            usuario = queryRunner.manager.create(Usuario, {
+              email,
+              password: hash,
+              estado: 1,
+              requiere_cambio_password: true,
+            });
+            const usuarioGuardado = await queryRunner.manager.save(usuario);
+
+            const persona = queryRunner.manager.create(Persona, {
+              nombres: String(fila['nombres'] || '').trim() || 'Ponente',
+              primer_apellido: String(fila['primer_apellido'] || '').trim() || 'Nuevo',
+              segundo_apellido: String(fila['segundo_apellido'] || '').trim() || undefined,
+              documento_identidad: String(fila['documento_identidad'] || '').trim() || undefined,
+              usuario: usuarioGuardado,
+            });
+            await queryRunner.manager.save(persona);
+
+            const rol = await queryRunner.manager.findOne(Rol, { where: { id: ROL_PONENTE_ID } });
+            if (rol) {
+              await queryRunner.manager.save(queryRunner.manager.create(UsuarioRol, {
+                usuario: usuarioGuardado,
+                rol,
+                estado: 1,
+              }));
+            }
+            usuario = { ...usuarioGuardado, persona };
+            fueCreado = true;
+          } else {
+            // Validar rol ponente (2)
+            const tieneRolPonente = usuario.usuariosRoles?.some(ur => ur.rol?.id === ROL_PONENTE_ID);
+            if (!tieneRolPonente) throw new Error(`El usuario existe pero no tiene el rol de "Ponente".`);
+          }
+
+          // 2. Actividad
+          if (!idEvento) throw new Error('Evento no seleccionado.');
+          const cacheKey = `ev_${idEvento}_${nombreActividad.toLowerCase()}`;
+          let actividad = actividadCache.get(cacheKey);
+          if (actividad === undefined) {
+            actividad = await queryRunner.manager.findOne(ActividadAcademica, {
+              where: { nombre: ILike(nombreActividad), evento: { id: idEvento } },
+              relations: ['evento'],
+            });
+            actividadCache.set(cacheKey, actividad);
+          }
+
+          if (!actividad) throw new Error(`Actividad "${nombreActividad}" no encontrada en el evento.`);
+
+          // 3. Duplicado
+          const existente = await queryRunner.manager.findOne(Imparticion, {
+            where: { usuario: { id: usuario.id }, actividadAcademica: { id: actividad.id } }
+          });
+
+          if (existente) {
+            detalle.push({ fila: numFila, email, estado: 'omitido', mensaje: 'Ya está asignado como ponente a esta actividad.' });
+            omitidos++;
+            await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+            continue;
+          }
+
+          // 4. Asignar
+          const imparticion = queryRunner.manager.create(Imparticion, {
+            usuario,
+            actividadAcademica: actividad,
+            evento: actividad.evento,
+          });
+          await queryRunner.manager.save(imparticion);
+
+          detalle.push({
+            fila: numFila,
+            email,
+            estado: modo === 'verificar' ? 'omitido' : (fueCreado ? 'creado' : 'asignado'),
+            mensaje: modo === 'verificar' ? 'Válido para asignación.' : 'Asignado correctamente.',
+          });
+
+          if (fueCreado) creados++;
+          asignados++;
+
+        } catch (error) {
+          await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          detalle.push({ fila: numFila, email, estado: 'error', mensaje: error.message });
+          errores++;
+        }
+      }
+
+      if (modo === 'verificar' || errores > 0) {
+        await queryRunner.rollbackTransaction();
+      } else {
+        await queryRunner.commitTransaction();
+      }
+    } catch (e) {
+      await queryRunner.rollbackTransaction();
+      throw e;
+    } finally {
+      await queryRunner.release();
+    }
+
+    return { total: filas.length, asignados, creados, omitidos, errores, advertenciasCorreo, detalle };
+  }
+
+  generarPlantillaPonentes(): Buffer {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['email', 'nombre_actividad_academica', 'nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad'],
+      ['ponente_ejemplo@correo.com', 'Taller de IA', 'Maria', 'Gomez', 'Lopez', '87654321'],
+    ]);
+    ws['!cols'] = [{ wch: 30 }, { wch: 35 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 15 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Asignación de Ponentes');
     return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
   }
 

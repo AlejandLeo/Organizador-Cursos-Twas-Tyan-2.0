@@ -8,7 +8,7 @@ import * as XLSX from 'xlsx';
 const route = useRoute();
 
 // --- Estado de la vista ---
-const activeTab = ref<'usuarios' | 'inscripciones'>('usuarios');
+const activeTab = ref<'usuarios' | 'inscripciones' | 'ponentes'>('usuarios');
 const isUploading = ref(false);
 const notificar = ref(true);
 const crearUsuarios = ref(false);
@@ -86,9 +86,19 @@ const clearFile = () => {
 };
 
 const descargarPlantilla = async () => {
-  const endpoint = activeTab.value === 'usuarios' 
-    ? '/admin/inscripciones-excel/plantilla-usuarios' 
-    : '/admin/inscripciones-excel/plantilla-inscripciones';
+  let endpoint = '';
+  let filename = '';
+
+  if (activeTab.value === 'usuarios') {
+    endpoint = '/admin/inscripciones-excel/plantilla-usuarios';
+    filename = 'plantilla_usuarios.xlsx';
+  } else if (activeTab.value === 'inscripciones') {
+    endpoint = '/admin/inscripciones-excel/plantilla-inscripciones';
+    filename = 'plantilla_inscripciones.xlsx';
+  } else {
+    endpoint = '/admin/inscripciones-excel/plantilla-ponentes';
+    filename = 'plantilla_ponentes.xlsx';
+  }
   
   try {
     const token = localStorage.getItem('token');
@@ -124,7 +134,7 @@ const descargarPlantilla = async () => {
 const importar = async (modo: 'verificar' | 'guardar') => {
   if (!selectedFile.value) return;
 
-  if (activeTab.value === 'inscripciones' && !selectedEventoId.value) {
+  if ((activeTab.value === 'inscripciones' || activeTab.value === 'ponentes') && !selectedEventoId.value) {
     Swal.fire('Atención', 'Debes seleccionar al menos un evento para continuar.', 'warning');
     return;
   }
@@ -135,14 +145,19 @@ const importar = async (modo: 'verificar' | 'guardar') => {
   formData.append('notificar', String(notificar.value));
   formData.append('crear_usuarios', String(crearUsuarios.value));
   
-  if (activeTab.value === 'inscripciones' && selectedEventoId.value) {
+  if ((activeTab.value === 'inscripciones' || activeTab.value === 'ponentes') && selectedEventoId.value) {
     formData.append('id_evento', selectedEventoId.value);
   }
   formData.append('modo', modo);
 
-  const endpoint = activeTab.value === 'usuarios' 
-    ? '/admin/inscripciones-excel/registro-masivo' 
-    : '/admin/inscripciones-excel/inscripcion-masiva';
+  let endpoint = '';
+  if (activeTab.value === 'usuarios') {
+    endpoint = '/admin/inscripciones-excel/registro-masivo';
+  } else if (activeTab.value === 'inscripciones') {
+    endpoint = '/admin/inscripciones-excel/inscripcion-masiva';
+  } else {
+    endpoint = '/admin/inscripciones-excel/asignacion-ponentes';
+  }
 
   try {
     const response = await api.post(endpoint, formData, {
@@ -232,6 +247,13 @@ const getStatusIcon = (status: string) => {
         >
           Inscripción a Evento
         </button>
+        <button 
+          @click="activeTab = 'ponentes'; clearFile()"
+          :class="[activeTab === 'ponentes' ? 'bg-white dark:bg-white/10 shadow-sm text-umsa-blue dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300']"
+          class="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300"
+        >
+          Asignación de Ponentes
+        </button>
       </div>
     </div>
 
@@ -256,11 +278,11 @@ const getStatusIcon = (status: string) => {
             </button>
           </div>
 
-          <!-- Selectores de Evento/Actividad (Solo para Inscripciones) -->
-          <div v-if="activeTab === 'inscripciones'" class="mb-8 p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 space-y-4 animate-in slide-in-from-top-4 duration-500">
+          <!-- Selectores de Evento (Para Inscripciones y Ponentes) -->
+          <div v-if="activeTab === 'inscripciones' || activeTab === 'ponentes'" class="mb-8 p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 space-y-4 animate-in slide-in-from-top-4 duration-500">
             <p class="text-[10px] font-black text-umsa-blue uppercase tracking-widest flex items-center gap-2 mb-2">
               <span class="material-symbols-outlined text-sm">target</span>
-              Destino de Inscripción
+              Destino de {{ activeTab === 'inscripciones' ? 'Inscripción' : 'Asignación' }}
             </p>
             <div class="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
               <div class="flex items-start gap-2">
@@ -287,7 +309,7 @@ const getStatusIcon = (status: string) => {
                 </select>
               </div>
             </div>
-            <p v-if="!selectedEventoId" class="text-[9px] text-amber-600 font-bold italic pl-2">※ Debes elegir un evento para realizar las inscripciones.</p>
+            <p v-if="!selectedEventoId" class="text-[9px] text-amber-600 font-bold italic pl-2">※ Debes elegir un evento para realizar el proceso.</p>
             <p v-else class="text-[9px] text-slate-500 font-bold italic pl-2">※ Se usarán los nombres de las actividades académicas definidos en el archivo Excel dentro del evento seleccionado.</p>
           </div>
 
@@ -458,6 +480,11 @@ const getStatusIcon = (status: string) => {
             <div v-if="activeTab === 'inscripciones'" class="flex items-center justify-between p-4 bg-emerald-500/20 rounded-2xl border border-emerald-500/20">
               <span class="text-sm font-medium text-emerald-100">Inscritos</span>
               <span class="text-xl font-black text-emerald-400">{{ results.inscritos }}</span>
+            </div>
+
+            <div v-if="activeTab === 'ponentes'" class="flex items-center justify-between p-4 bg-emerald-500/20 rounded-2xl border border-emerald-500/20">
+              <span class="text-sm font-medium text-emerald-100">Ponentes Asignados</span>
+              <span class="text-xl font-black text-emerald-400">{{ results.asignados }}</span>
             </div>
 
             <div class="flex items-center justify-between p-4 bg-amber-500/20 rounded-2xl border border-amber-500/20">

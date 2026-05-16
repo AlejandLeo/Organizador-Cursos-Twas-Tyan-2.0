@@ -134,4 +134,38 @@ export class InscripcionesExcelController {
     });
     res.end(buffer);
   }
+
+  @Roles('Coordinador', 'Super Usuario')
+  @Post('asignacion-ponentes')
+  @ApiOperation({ summary: 'Asignar ponentes masivamente desde Excel' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async asignacionPonentes(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('id_evento') idEvento: string,
+    @Body('modo') modo?: 'verificar' | 'guardar',
+    @Body('crear_usuarios') crearUsuarios?: string,
+  ) {
+    if (!file) throw new BadRequestException('Debe adjuntar un archivo Excel.');
+    return this.service.asignacionMasivaPonentes(
+      file.buffer,
+      false,
+      Number(idEvento),
+      modo || 'guardar',
+      crearUsuarios === 'true'
+    );
+  }
+
+  @Roles('Coordinador', 'Super Usuario')
+  @Get('plantilla-ponentes')
+  @ApiOperation({ summary: 'Descargar plantilla Excel para asignación de ponentes' })
+  descargarPlantillaPonentes(@Res() res: express.Response) {
+    const buffer = this.service.generarPlantillaPonentes();
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename="plantilla_asignacion_ponentes.xlsx"',
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
+  }
 }
