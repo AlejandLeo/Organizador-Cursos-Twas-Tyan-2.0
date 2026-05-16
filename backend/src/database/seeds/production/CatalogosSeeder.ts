@@ -11,6 +11,12 @@ export default class CatalogosSeeder implements Seeder {
       { id: 2, descripcion: 'Maestría', abreviacion: 'Mtro.' },
       { id: 3, descripcion: 'Doctorado', abreviacion: 'Dr.' },
       { id: 4, descripcion: 'Posdoctorado', abreviacion: 'Ph.D.' },
+      { id: 5, descripcion: 'Bachillerato', abreviacion: 'Bach.' },
+      { id: 6, descripcion: 'Técnico', abreviacion: 'Téc.' },
+      { id: 7, descripcion: 'Técnico Superior Universitario', abreviacion: 'TSU' },
+      { id: 8, descripcion: 'Especialidad', abreviacion: 'Esp.' },
+      { id: 9, descripcion: 'Ingeniería', abreviacion: 'Ing.' },
+      { id: 10, descripcion: 'Pasante', abreviacion: 'Pas.' },
     ];
 
     for (const g of grados) {

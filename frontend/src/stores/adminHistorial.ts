@@ -9,9 +9,12 @@ interface RegistroHistorial {
   usuario: string;
   entidad_id?: string;
   entidad_nombre?: string;
+  entidadNombre?: string;
   cambios?: { campo: string; antes: any; despues: any }[];
   metadatos?: any;
   fecha_creacion: string;
+  timestamp?: string;
+  leido?: boolean;
 }
 
 interface PaginatedResponse {
@@ -36,6 +39,13 @@ export const useAdminHistorialStore = defineStore('adminHistorial', {
 
   getters: {
     totalPendientes: (state) => state._pendientes,
+    porModulo: (state) => {
+      const counts: Record<string, number> = {};
+      state.registros.forEach((r) => {
+        counts[r.modulo] = (counts[r.modulo] || 0) + 1;
+      });
+      return counts;
+    },
   },
 
   actions: {

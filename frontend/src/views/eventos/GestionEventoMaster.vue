@@ -52,7 +52,7 @@ const currentStep = ref(1);
 const totalSteps = 7;
 const slideDir = ref<'forward' | 'backward'>('forward');
 const isAdminContext = computed(() => {
-  return route.path.startsWith('/admin') || authStore.user?.id_rol === 1;
+  return route.path.startsWith('/admin') || authStore.id_rol === 1;
 });
 
 const themeColor = computed(() => isAdminContext.value ? 'red' : 'blue');
@@ -121,7 +121,10 @@ const formEvento = ref({
   contacto_donde: '',
   contacto_telefono: '',
   contacto_email: '',
-  auspicios: [] as { nombre: string; link: string }[]
+  auspicios: [] as { nombre: string; link: string }[],
+  coordinadores_ids: [] as number[],
+  logistica_ids: [] as number[],
+  fase: 1, // 1: Planificación, 2: Inscripciones, 3: Ejecución, 4: Finalizado, 5: Archivado
 });
 
 const formatDate = (dateStr: string) => {
@@ -180,7 +183,10 @@ const resetFormEvento = () => {
         contacto_email: '',
         auspicios: [],
         prioridad: '3',
-        visibilidad_al_finalizar: 'visible'
+        visibilidad_al_finalizar: 'visible',
+        coordinadores_ids: [] as number[],
+        logistica_ids: [] as number[],
+        fase: 1
     };
 };
 
@@ -220,7 +226,7 @@ const guardarInfoCertificado = async () => {
     }
     try {
         await api.post('/info-certificados', {
-            evento_id: editEventoId.value,
+            id_evento: editEventoId.value,
             tipo: tipoCertificado.value,
             cabecera: infoCertificado.value.cabecera,
             tenor: infoCertificado.value.tenor
@@ -275,18 +281,22 @@ const registrarPonenteQuick = async () => {
 
 const fetchPonentesYGrados = async () => {
     try {
-        const [resP, resC, resG] = await Promise.all([
+        const [resP, resC] = await Promise.all([
             api.get('/usuarios?rol=Ponente&limit=100'),
-            api.get('/usuarios?rol=Coordinador&limit=100'),
-            api.get('/grados-academicos')
+            api.get('/usuarios?rol=Coordinador,Logística&limit=100'),
         ]);
+        const resG = await api.get('/grados-academicos');
+        
         const mapUser = (u: any, role: string) => {
             const persona = u.persona || {};
             const gaObj = u.afiliaciones?.[0]?.gradoAcademico || {};
             const prefijo = gaObj.abreviacion ? `${gaObj.abreviacion}. ` : '';
             return { ...u, roleLabel: role, displayName: `${prefijo}${persona.nombres || ''} ${persona.primer_apellido || ''}`.trim() };
         };
-        ponentesDB.value = [...(resP.data?.data || resP.data || []).map((u:any) => mapUser(u, 'Ponente')), ...(resC.data?.data || resC.data || []).map((u:any) => mapUser(u, 'Coordinador'))];
+        ponentesDB.value = [
+            ...(resP.data?.data || resP.data || []).map((u:any) => mapUser(u, 'Ponente')), 
+            ...(resC.data?.data || resC.data || []).map((u:any) => mapUser(u, 'Coordinador')),
+        ];
         gradosAcademicosDB.value = resG.data?.data || resG.data || [];
     } catch (e) { console.error(e); }
 };
@@ -446,6 +456,7 @@ const handleSaveEvento = async () => {
         formData.append('ubicacion', formEvento.value.ubicacion);
         formData.append('direccion', formEvento.value.direccion);
         formData.append('estado', formEvento.value.estado.toString());
+        formData.append('fase', formEvento.value.fase.toString());
         formData.append('google_maps_link', formEvento.value.google_maps_link);
         formData.append('sobre_evento_1', formEvento.value.sobre_evento_1);
         formData.append('sobre_evento_2', formEvento.value.sobre_evento_2);
@@ -464,6 +475,10 @@ const handleSaveEvento = async () => {
         formData.append('nombre_2', formEvento.value.nombre_2 || '');
         formData.append('prioridad', formEvento.value.prioridad || '3');
         formData.append('visibilidad_al_finalizar', formEvento.value.visibilidad_al_finalizar || 'visible');
+
+        // Personal (Coordinadores y Logística)
+        formData.append('coordinadores_ids', JSON.stringify(formEvento.value.coordinadores_ids));
+        formData.append('logistica_ids', JSON.stringify(formEvento.value.logistica_ids));
 
         // Contacto y Auspicios
         formData.append('telefono', formEvento.value.contacto_telefono || '');
@@ -567,7 +582,13 @@ const editarEvento = (evento: any) => {
         contacto_email: evento.email || '',
         auspicios: [],
         prioridad: evento.prioridad || '3',
-        visibilidad_al_finalizar: evento.visibilidad_al_finalizar || 'visible'
+        visibilidad_al_finalizar: evento.visibilidad_al_finalizar || 'visible',
+        fase: evento.fase || 1,
+        // Filtramos para pre-seleccionar los usuarios que son Coordinadores o Logística
+        coordinadores_ids: (evento.coordinaciones || [])
+          .filter((c: any) => c.usuario?.usuariosRoles?.some((ur: any) => ur.rol?.id === 2 || ur.rol?.id === 6 || ur.rol?.nombre_rol === 'Logística'))
+          .map((c: any) => c.usuario.id),
+        logistica_ids: (evento.coordinaciones || []).filter((c: any) => c.usuario?.usuariosRoles?.some((ur: any) => ur.rol?.id === 3)).map((c: any) => c.usuario.id)
     };
 
     if (evento.organizadores) {
@@ -581,6 +602,40 @@ const editarEvento = (evento: any) => {
     logoPreview.value = evento.logo;
     fondoPreview.value = evento.imagen_fondo;
     isCreatingEvento.value = true;
+};
+
+// --- GESTIÓN DE PERSONAL ---
+const usuariosCoordinadores = ref<any[]>([]);
+const usuariosLogistica = ref<any[]>([]);
+
+const fetchUsuariosPersonal = async () => {
+    try {
+        // Traer tanto a Coordinadores como Logística
+        const res = await api.get('/usuarios?rol=Coordinador,Logística&limit=100');
+        const data = res.data.data || res.data || [];
+        
+        // Separar por rol: 2 = Coordinador, 3 = Logística
+        usuariosCoordinadores.value = data.filter((u: any) => 
+            u.usuariosRoles?.some((ur: any) => Number(ur.rol?.id) === 2)
+        );
+        usuariosLogistica.value = data.filter((u: any) => 
+            u.usuariosRoles?.some((ur: any) => Number(ur.rol?.id) === 3)
+        );
+    } catch (err) {
+        console.error("Error fetching personnel:", err);
+    }
+};
+
+const toggleCoordinador = (id: number) => {
+    const idx = formEvento.value.coordinadores_ids.indexOf(id);
+    if (idx === -1) formEvento.value.coordinadores_ids.push(id);
+    else formEvento.value.coordinadores_ids.splice(idx, 1);
+};
+
+const toggleLogistica = (id: number) => {
+    const idx = formEvento.value.logistica_ids.indexOf(id);
+    if (idx === -1) formEvento.value.logistica_ids.push(id);
+    else formEvento.value.logistica_ids.splice(idx, 1);
 };
 
 const inhabilitarEvento = async (id: number, nombre: string) => {
@@ -1002,6 +1057,7 @@ onMounted(async () => {
     await Promise.all([
         fetchEventos(),
         fetchPonentesYGrados(),
+        fetchUsuariosPersonal(),
         eventoStore.fetchEventosInfo()
     ]);
 
@@ -1906,6 +1962,37 @@ const changeStep = (delta: number) => {
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- SECCIÓN E: ESTADO Y FASE -->
+                        <div class="p-6 bg-white dark:bg-gray-950 rounded-3xl border-2 border-red-50 dark:border-red-900/20 shadow-sm space-y-6">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-red-600 text-sm">settings_suggest</span>
+                                <h5 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Gestión del Ciclo de Vida del Evento</h5>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Estado General</label>
+                                    <select v-model="formEvento.estado" class="w-full bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-black uppercase transition-all focus:ring-2 focus:ring-red-500/20">
+                                        <option :value="2">Planificación</option>
+                                        <option :value="1">Activo / Público</option>
+                                        <option :value="3">Borrador</option>
+                                        <option :value="0">Concluido / Cerrado</option>
+                                    </select>
+                                    <p class="text-[8px] text-slate-400 mt-2 italic font-bold">Controla la visibilidad y permisos globales.</p>
+                                </div>
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Fase Operativa</label>
+                                    <select v-model="formEvento.fase" class="w-full bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-black uppercase transition-all focus:ring-2 focus:ring-red-500/20">
+                                        <option :value="1">1. Planificación</option>
+                                        <option :value="2">2. Inscripciones</option>
+                                        <option :value="3">3. Ejecución</option>
+                                        <option :value="4">4. Finalizado (Emisión de Certificados)</option>
+                                        <option :value="5">5. Archivado</option>
+                                    </select>
+                                    <p class="text-[8px] text-slate-400 mt-2 italic font-bold">Determina qué acciones (inscripción, certificados) están permitidas.</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- PASO 2: NARRATIVA -->
@@ -1986,32 +2073,70 @@ const changeStep = (delta: number) => {
                         </div>
                     </div>
 
-                    <!-- PASO 4: DIRECTORIO -->
-                    <div v-if="currentStep === 4" class="space-y-6">
+                    <!-- PASO 4: DIRECTORIO / PERSONAL -->
+                    <div v-if="currentStep === 4" class="space-y-8 animate-in slide-in-from-right-4 duration-500">
                         <div class="flex items-center justify-between border-b border-slate-100 dark:border-gray-800 pb-4 mb-6">
                             <div class="flex items-center gap-3">
-                                <span class="material-symbols-outlined text-emerald-600">group</span>
-                                <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase italic">Paso 4: Directorio del Evento</h4>
+                                <span class="material-symbols-outlined text-umsa-blue">badge</span>
+                                <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase italic">Paso 4: Directorio y Personal del Evento</h4>
                             </div>
-                            <button @click.prevent="showRegistroRapidoPonente = true" class="text-[9px] font-black text-emerald-600 bg-emerald-50 dark:bg-gray-800 px-3 py-1 rounded-lg">REGISTRAR EXTRA</button>
-                        </div>
-                        
-                        <div class="bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 p-4 rounded-2xl border border-blue-100 dark:border-blue-800 flex gap-3 text-xs mb-4">
-                            <span class="material-symbols-outlined text-xl">info</span>
-                            <p><strong>Nota:</strong> Los ponentes o expositores del evento se agregarán <strong>automáticamente</strong> desde las actividades del evento (Cursos, Talleres). Aquí puedes visualizar el directorio o agregar personal adicional manualmente (ej. coordinador general).</p>
+                            <button @click="fetchUsuariosPersonal" type="button" class="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-umsa-blue rounded-lg text-[9px] font-black uppercase tracking-widest border border-blue-100 dark:border-blue-800 hover:bg-umsa-blue hover:text-white transition-all">
+                                <span class="material-symbols-outlined text-[12px] align-middle mr-1">refresh</span>
+                                Actualizar Usuarios
+                            </button>
                         </div>
 
-                        <div class="space-y-4">
-                            <div class="relative">
-                                <input v-model="filtroPonente" type="text" placeholder="Buscar personal adicional..." class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 pl-10 text-xs font-bold" />
-                                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                        <!-- SECCIÓN COORDINADORES -->
+                        <div>
+                            <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-4 flex items-center gap-2">
+                                <span class="material-symbols-outlined text-sm">groups</span> Asignar Coordinadores
+                            </label>
+                            <div v-if="usuariosCoordinadores.length === 0" class="p-8 text-center bg-slate-50 dark:bg-gray-800/50 rounded-2xl border-2 border-dashed border-slate-200 dark:border-gray-700">
+                                <p class="text-[10px] font-bold text-slate-400 uppercase">No se encontraron usuarios con rol de Coordinador o Logística</p>
                             </div>
-                            <div class="bg-slate-50 dark:bg-gray-950 border-2 border-slate-100 dark:border-gray-800 rounded-2xl p-4 max-h-[300px] overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3 thin-scrollbar">
-                                <div v-for="pn in ponentesFiltrados" :key="pn.id" class="flex items-center gap-3 p-4 bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-xl group">
-                                    <span class="material-symbols-outlined text-emerald-500 text-lg">person</span>
-                                    <div class="flex flex-col min-w-0">
-                                        <span class="text-[10px] font-black text-primary-dark dark:text-gray-200 truncate">{{ pn.displayName }}</span>
-                                        <span class="text-[8px] font-bold uppercase tracking-widest text-emerald-500">{{ pn.roleLabel }}</span>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto thin-scrollbar pr-2">
+                                <div v-for="user in usuariosCoordinadores" :key="user.id" 
+                                     @click="toggleCoordinador(user.id)"
+                                     :class="[formEvento.coordinadores_ids.includes(user.id) ? 'border-umsa-blue bg-blue-50 dark:bg-blue-900/20' : 'border-slate-100 dark:border-gray-800 bg-white dark:bg-gray-900']"
+                                     class="p-4 border-2 rounded-2xl cursor-pointer transition-all flex items-center gap-4 group shadow-sm hover:shadow-md">
+                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center transition-colors"
+                                         :class="formEvento.coordinadores_ids.includes(user.id) ? 'bg-umsa-blue text-white' : 'bg-slate-100 dark:bg-gray-800 text-slate-400 group-hover:bg-blue-100'">
+                                        <span class="material-symbols-outlined">{{ formEvento.coordinadores_ids.includes(user.id) ? 'check_circle' : 'person' }}</span>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-xs font-black text-slate-700 dark:text-gray-200 uppercase truncate">{{ user.persona?.nombres }} {{ user.persona?.primer_apellido }}</p>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-[7px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-umsa-blue">Coordinador</span>
+                                            <p class="text-[9px] font-bold text-slate-400 truncate">{{ user.email }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SECCIÓN LOGÍSTICA -->
+                        <div class="mt-8">
+                            <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-4 flex items-center gap-2">
+                                <span class="material-symbols-outlined text-sm">support_agent</span> Personal de Logística
+                            </label>
+                            <div v-if="usuariosLogistica.length === 0" class="p-8 text-center bg-slate-50 dark:bg-gray-800/50 rounded-2xl border-2 border-dashed border-slate-200 dark:border-gray-700">
+                                <p class="text-[10px] font-bold text-slate-400 uppercase">No se encontraron usuarios con rol de Logística</p>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto thin-scrollbar pr-2">
+                                <div v-for="user in usuariosLogistica" :key="user.id" 
+                                     @click="toggleLogistica(user.id)"
+                                     :class="[formEvento.logistica_ids.includes(user.id) ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-100 dark:border-gray-800 bg-white dark:bg-gray-900']"
+                                     class="p-4 border-2 rounded-2xl cursor-pointer transition-all flex items-center gap-4 group shadow-sm hover:shadow-md">
+                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center transition-colors"
+                                         :class="formEvento.logistica_ids.includes(user.id) ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-gray-800 text-slate-400 group-hover:bg-emerald-100'">
+                                        <span class="material-symbols-outlined">{{ formEvento.logistica_ids.includes(user.id) ? 'check_circle' : 'engineering' }}</span>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-xs font-black text-slate-700 dark:text-gray-200 uppercase truncate">{{ user.persona?.nombres }} {{ user.persona?.primer_apellido }}</p>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-[7px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600">Logística</span>
+                                            <p class="text-[9px] font-bold text-slate-400 truncate">{{ user.email }}</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

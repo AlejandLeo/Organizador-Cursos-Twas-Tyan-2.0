@@ -44,6 +44,11 @@ const router = createRouter({
           component: () => import('../views/coordinador/CoordinadorSolicitudesView.vue'),
         },
         {
+          path: 'inscripciones-excel',
+          name: 'coordinador-inscripciones-excel',
+          component: () => import('../views/inscripciones/InscripcionesExcelView.vue'),
+        },
+        {
           path: 'gestion-eventos/:id',
           name: 'coordinador-gestion-eventos-detalle',
           component: () => import('../views/actividades/ActividadDetalleView.vue'),
@@ -117,6 +122,11 @@ const router = createRouter({
           component: () => import('../views/admin/AdminGestionView.vue'),
         },
         {
+          path: 'actividades',
+          name: 'admin-actividades',
+          component: () => import('../views/admin/AdminActividadesView.vue'),
+        },
+        {
           path: 'eventos',
           name: 'admin-eventos',
           component: () => import('../views/eventos/GestionEventoMaster.vue'),
@@ -170,6 +180,21 @@ const router = createRouter({
           path: 'soporte',
           name: 'admin-soporte',
           component: () => import('../views/admin/AdminSoporteView.vue'),
+        },
+        {
+          path: 'inscripciones-excel',
+          name: 'admin-inscripciones-excel',
+          component: () => import('../views/inscripciones/InscripcionesExcelView.vue'),
+        },
+        {
+          path: 'configuracion',
+          name: 'admin-configuracion',
+          component: () => import('../views/admin/AdminConfiguracionView.vue'),
+        },
+        {
+          path: 'mail-templates',
+          name: 'admin-mail-templates',
+          component: () => import('../views/admin/AdminMailTemplatesView.vue'),
         },
       ]
     },

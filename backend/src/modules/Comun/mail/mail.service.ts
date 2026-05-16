@@ -72,7 +72,8 @@ export class MailService {
       // Solo logueamos el error — NO lo relanzamos para que los flujos de negocio
       // (aprobación, rechazo) no fallen por un problema de correo
       this.logger.error(`Error enviando correo a ${to}: ${error.message}`, error.stack);
-      return null; // Retorna null en lugar de lanzar excepción
+      // Re-lanzamos para que el llamador sepa que falló (específicamente en flujos que lo requieren)
+      throw error;
     }
   }
 
@@ -226,6 +227,24 @@ export class MailService {
         name, 
         role: roleName,
         loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
+      },
+    );
+  }
+
+  /**
+   * Notifica cambios detallados en los roles del usuario.
+   */
+  async sendRoleUpdateEmail(to: string, name: string, addedRoles: string[], removedRoles: string[]) {
+    return this.sendMail(
+      to,
+      'Actualización de Permisos en la Plataforma',
+      'role-update',
+      { 
+        name, 
+        addedRoles, 
+        removedRoles,
+        loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+        currentYear: new Date().getFullYear()
       },
     );
   }

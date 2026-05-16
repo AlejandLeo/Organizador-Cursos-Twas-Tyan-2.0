@@ -27,7 +27,7 @@
         <div v-else-if="error" class="text-red-500 text-center flex flex-col items-center">
           <svg class="w-16 h-16 mb-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
           <p class="text-lg font-medium">{{ error }}</p>
-          <button @click="fetchQr" class="mt-6 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">Reintentar</button>
+          <button @click="fetchQrAndSessionDetails" class="mt-6 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">Reintentar</button>
         </div>
 
         <div v-else class="flex flex-col items-center">

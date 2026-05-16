@@ -6,11 +6,17 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
 import { MailService } from './mail.service';
 import { MailLog } from './entities/mail-log.entity';
+import { MailQueue } from './entities/mail-queue.entity';
+import { MailQueueService } from './mail-queue.service';
+
+import { MailTemplate } from './entities/mail-template.entity';
+import { MailTemplateService } from './mail-template.service';
+import { MailTemplateController } from './mail-template.controller';
 
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([MailLog]),
+    TypeOrmModule.forFeature([MailLog, MailQueue, MailTemplate]),
     
     MailerModule.forRootAsync({
       useFactory: async (config: ConfigService) => ({
@@ -23,7 +29,7 @@ import { MailLog } from './entities/mail-log.entity';
             pass: config.get('MAIL_PASS'),
           },
           tls: {
-            rejectUnauthorized: false, // Permite certificados auto-firmados
+            rejectUnauthorized: false,
           },
         },
         defaults: {
@@ -40,8 +46,9 @@ import { MailLog } from './entities/mail-log.entity';
       inject: [ConfigService],
     }),
   ],
-  providers: [MailService],
-  exports: [MailService],
+  providers: [MailService, MailQueueService, MailTemplateService],
+  controllers: [MailTemplateController],
+  exports: [MailService, MailQueueService, MailTemplateService],
 })
 export class MailModule {}
 

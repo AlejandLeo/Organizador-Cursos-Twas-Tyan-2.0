@@ -14,6 +14,7 @@ export interface Usuario {
   roles?: Rol[];
   usuariosRoles?: any[];
   afiliaciones?: Afiliacion[];
+  requiere_cambio_password?: boolean;
 }
 
 export interface Persona {
@@ -64,6 +65,12 @@ export interface Certificado {
   id_info_certificado: number;
   id_actividad_academica: number;
   id_usuario: number;
+  estado_envio?: string;
+  fecha_ultimo_envio?: string | null;
+  log_error_envio?: string | null;
+  reintentos?: number;
+  actividadAcademica?: any;
+  usuario?: any;
 }
 
 export interface Evento {

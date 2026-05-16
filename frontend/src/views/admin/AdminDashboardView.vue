@@ -57,7 +57,7 @@ const statCards = computed(() => [
 // --- Otros datos ---
 const accionesHoy = computed(() => {
   const hoy = new Date().toDateString();
-  return historialStore.registros.filter(r => new Date(r.timestamp).toDateString() === hoy).length;
+  return historialStore.registros.filter(r => new Date(r.fecha_creacion).toDateString() === hoy).length;
 });
 
 // --- Fetch data ---
@@ -156,9 +156,9 @@ onMounted(async () => {
                   <div v-if="!log.leido" class="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></div>
                 </div>
                 <p class="text-xs font-black text-slate-700 dark:text-slate-300 truncate">{{ log.descripcion }}</p>
-                <p v-if="log.entidadNombre" class="text-[9px] text-red-600 dark:text-red-400 font-bold italic truncate mt-0.5">→ {{ log.entidadNombre }}</p>
+                <p v-if="log.entidad_nombre" class="text-[9px] text-red-600 dark:text-red-400 font-bold italic truncate mt-0.5">→ {{ log.entidad_nombre }}</p>
               </div>
-              <p class="text-[9px] font-black text-slate-400 dark:text-slate-600 shrink-0 italic">{{ formatRelativo(log.timestamp) }}</p>
+              <p class="text-[9px] font-black text-slate-400 dark:text-slate-600 shrink-0 italic">{{ formatRelativo(log.fecha_creacion) }}</p>
             </div>
           </div>
         </div>

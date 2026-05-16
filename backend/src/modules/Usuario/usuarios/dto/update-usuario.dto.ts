@@ -12,4 +12,7 @@ export class UpdateUsuarioDto {
 
   @IsOptional()
   estado?: number;
+
+  @IsOptional()
+  requiere_cambio_password?: boolean;
 }

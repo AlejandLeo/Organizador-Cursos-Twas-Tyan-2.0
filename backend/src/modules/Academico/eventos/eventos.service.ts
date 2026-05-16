@@ -187,7 +187,10 @@ export class EventosService {
       relations: [
         'actividades',
         'actividades.modalidades',
-        'actividades.inscripciones'
+        'actividades.inscripciones',
+        'coordinaciones',
+        'coordinaciones.usuario',
+        'coordinaciones.usuario.persona'
       ],
       order: { prioridad: 'ASC', fecha_creacion: 'DESC' },
       skip: (page - 1) * limit,
@@ -218,7 +221,8 @@ export class EventosService {
     imagenFondo?: Express.Multer.File,
     usuario?: any,
   ) {
-    const data: Partial<Evento> = { ...dto } as any;
+    const { coordinadores_ids, logistica_ids, ...restoDto } = dto;
+    const data: Partial<Evento> = { ...restoDto } as any;
     if (dto.prioridad) data.prioridad = parseInt(dto.prioridad, 10);
     if (imagenPortada) data.logo = imagenPortada.filename;
     if (imagenFondo) data.imagen_fondo = imagenFondo.filename;
@@ -228,13 +232,16 @@ export class EventosService {
 
     // Asignación automática de coordinación si el creador es un usuario identificado
     if (usuario && usuario.id) {
-      const coordinacionRepo = this.eventoRepository.manager.getRepository('CoordinacionEvento');
+      const coordinacionRepo = this.dataSource.getRepository('CoordinacionEvento');
       await coordinacionRepo.save({
         usuario: { id: usuario.id },
         evento: { id: guardado.id },
         estado: 1
       });
     }
+
+    // Procesar personal adicional
+    await this.sincronizarPersonalInterno(guardado.id, coordinadores_ids, logistica_ids);
 
     return {
       ...guardado,
@@ -261,7 +268,8 @@ export class EventosService {
     const evento = await this.eventoRepository.findOneBy({ id });
     if (!evento) throw new NotFoundException(`Evento ${id} no encontrado.`);
 
-    const data: Partial<Evento> = { ...dto } as any;
+    const { coordinadores_ids, logistica_ids, ...restoDto } = dto;
+    const data: Partial<Evento> = { ...restoDto } as any;
     if (dto.prioridad) data.prioridad = parseInt(dto.prioridad as any, 10);
 
     if (imagenPortada) {
@@ -281,12 +289,61 @@ export class EventosService {
     }
 
     await this.eventoRepository.update(id, data);
+
+    // Sincronizar personal
+    await this.sincronizarPersonalInterno(id, coordinadores_ids, logistica_ids);
+
     const actualizado = await this.eventoRepository.findOneBy({ id });
     return {
       ...actualizado,
       logo: this.formatImageUrl(actualizado!.logo, 'logo'),
       imagen_fondo: this.formatImageUrl(actualizado!.imagen_fondo, 'fondos'),
     };
+  }
+
+  /**
+   * Sincroniza el personal (coordinadores y logística) de un evento.
+   * Recibe strings JSON de IDs (por ser multipart).
+   */
+  private async sincronizarPersonalInterno(eventoId: number, coordsJson?: string, logisticaJson?: string) {
+    const coordinacionRepo = this.dataSource.getRepository('CoordinacionEvento');
+    const imparticionRepo = this.dataSource.getRepository('Imparticion');
+
+    const parseIds = (json?: string): number[] => {
+      if (!json) return [];
+      try {
+        const parsed = JSON.parse(json);
+        return Array.isArray(parsed) ? parsed.map(id => Number(id)) : [];
+      } catch {
+        return [];
+      }
+    };
+
+    const coordIds = parseIds(coordsJson);
+    const logIds = parseIds(logisticaJson);
+
+    // Unificamos a todos en coordinacion_eventos para que tengan permisos de gestión
+    const todosLosIds = Array.from(new Set([...coordIds, ...logIds]));
+
+    if (todosLosIds.length > 0) {
+      for (const uid of todosLosIds) {
+        // Verificar si ya está asignado
+        const existe = await coordinacionRepo.findOne({
+          where: { evento: { id: eventoId }, usuario: { id: uid } }
+        });
+
+        if (!existe) {
+          await coordinacionRepo.save({
+            evento: { id: eventoId },
+            usuario: { id: uid },
+            estado: 1
+          });
+        }
+      }
+    }
+
+    // También podemos registrar en imparticiones para personal de logística si se desea
+    // Pero por ahora, con coordinacion_eventos es suficiente para el control de acceso.
   }
 
   async removeAdmin(id: number, usuario?: any) {
