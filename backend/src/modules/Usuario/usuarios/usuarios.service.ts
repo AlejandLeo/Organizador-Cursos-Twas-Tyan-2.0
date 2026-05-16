@@ -254,18 +254,16 @@ export class UsuariosService {
    * @param soloActivos  Si es true (por defecto) filtra por estado = 1.
    *                     Pasar false para administración interna.
    */
-  findAll(soloActivos = true): Promise<Usuario[]> {
-    return this.usuarioRepository.find({
+  async findAll(soloActivos = true): Promise<Usuario[]> {
+    const usuarios = await this.usuarioRepository.find({
       where: soloActivos ? { estado: 1 } : undefined,
       relations: ['persona', 'usuariosRoles', 'usuariosRoles.rol'],
-      select: {
-        id: true,
-        email: true,
-        estado: true,
-        fecha_creacion: true,
-        fecha_actualizacion: true,
-        // password nunca se devuelve en listados
-      },
+    });
+
+    // Eliminamos el password de la respuesta por seguridad
+    return usuarios.map(u => {
+      delete (u as any).password;
+      return u;
     });
   }
 
@@ -451,12 +449,18 @@ export class UsuariosService {
     }
 
     const total = await qb.getCount();
-
     qb.skip((page - 1) * limit).take(limit);
+    qb.orderBy('u.id', 'DESC'); // Ordenar por ID descendente por defecto
 
     const data = await qb.getMany();
 
-    return { data, total, page: Number(page), limit: Number(limit) };
+    // Seguridad: ocultar passwords
+    const finalData = data.map(u => {
+      delete (u as any).password;
+      return u;
+    });
+
+    return { data: finalData, total, page: Number(page), limit: Number(limit) };
   }
 
   // ══════════════════════════════════════════════════════════

@@ -42,9 +42,12 @@ const fetchUsuarios = async () => {
   try {
     isLoading.value = true;
     const res = await usuariosService.getAll({ soloActivos: 'false' });
+    console.log('AdminUsuariosView: Datos recibidos:', res.data);
     const data = (res.data as any)?.data ?? res.data;
     usuarios.value = Array.isArray(data) ? data : [];
-  } catch {
+    console.log(`AdminUsuariosView: ${usuarios.value.length} usuarios cargados.`);
+  } catch (error) {
+    console.error('Error fetching usuarios:', error);
     Swal.fire('Error', 'No se pudo cargar la lista de usuarios', 'error');
   } finally {
     isLoading.value = false;
@@ -52,16 +55,21 @@ const fetchUsuarios = async () => {
 };
 
 const usuariosFiltrados = computed(() => {
-  return usuarios.value.filter(u => {
+  const list = [...usuarios.value].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
+  
+  return list.filter(u => {
     const nombresFull = `${u.persona?.nombres ?? ''} ${u.persona?.primer_apellido ?? ''}`.toLowerCase();
     const coincideTexto =
+      !filtroTexto.value ||
       nombresFull.includes(filtroTexto.value.toLowerCase()) ||
       (u.email ?? '').toLowerCase().includes(filtroTexto.value.toLowerCase());
+      
     const coincideRol =
       !filtroRol.value ||
       u.usuariosRoles?.some((ur: any) => ur.rol?.id === Number(filtroRol.value));
+      
     return coincideTexto && coincideRol;
-  }).sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
+  });
 });
 
 // ── Paginación ─────────────────────────────────────────────────────────────
@@ -281,8 +289,11 @@ onMounted(fetchUsuarios);
             <span class="material-symbols-outlined text-white text-[22px]">manage_accounts</span>
           </div>
           <div>
-            <p class="text-[10px] font-black text-red-600 dark:text-red-500 uppercase tracking-widest leading-none">Gestión Global</p>
-            <h1 class="text-2xl font-black text-slate-800 dark:text-white tracking-tight uppercase italic">Control de Usuarios</h1>
+            <p class="text-[10px] font-black text-red-600 dark:text-red-500 uppercase tracking-widest leading-none">Administración</p>
+            <h1 class="text-2xl font-black text-slate-800 dark:text-white tracking-tight uppercase italic">Directorio de Usuarios</h1>
+            <p v-if="!isLoading" class="text-[9px] font-bold text-slate-500 mt-1 uppercase tracking-tighter">
+              Total: {{ usuarios.length }} | Filtrados: {{ usuariosFiltrados.length }}
+            </p>
           </div>
         </div>
         <p class="text-slate-500 text-sm ml-1">Crea, administra y asigna roles desde un solo lugar</p>

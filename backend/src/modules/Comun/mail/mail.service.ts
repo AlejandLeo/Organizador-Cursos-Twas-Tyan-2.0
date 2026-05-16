@@ -72,7 +72,8 @@ export class MailService {
       // Solo logueamos el error — NO lo relanzamos para que los flujos de negocio
       // (aprobación, rechazo) no fallen por un problema de correo
       this.logger.error(`Error enviando correo a ${to}: ${error.message}`, error.stack);
-      return null; // Retorna null en lugar de lanzar excepción
+      // Re-lanzamos para que el llamador sepa que falló (específicamente en flujos que lo requieren)
+      throw error;
     }
   }
 

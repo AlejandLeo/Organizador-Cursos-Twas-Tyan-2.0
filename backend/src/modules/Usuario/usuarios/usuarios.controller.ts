@@ -17,6 +17,7 @@ import {
   Res,
   BadRequestException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FileInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express';
@@ -41,6 +42,7 @@ import { Roles } from '../../Seguridad/auth/roles.decorator';
 @ApiTags('Usuarios')
 @Controller('usuarios')
 export class UsuariosController {
+  private readonly logger = new Logger(UsuariosController.name);
   constructor(private readonly usuariosService: UsuariosService) { }
 
   @UseGuards(JwtAuthGuard)
@@ -406,6 +408,7 @@ export class UsuariosController {
       return this.usuariosService.findConFiltros(filtros);
     }
     const filtrar = filtros.soloActivos !== 'false';
+    this.logger.log(`Listando usuarios (findAll) - soloActivos: ${filtrar}`);
     return this.usuariosService.findAll(filtrar);
   }
 

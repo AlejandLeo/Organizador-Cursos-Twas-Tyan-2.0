@@ -85,12 +85,7 @@ const isActive = (name: string) => route.name === name;
 
       <!-- Eventos -->
       <button @click="navigate('admin-eventos')"
-        :class="[
-          isActive('admin-eventos') || 
-          (isActive('admin-gestion-eventos') && (route.query.edit || route.query.create))
-          ? 'bg-red-600 text-white shadow-md' 
-          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'
-        ]"
+        :class="[isActive('admin-eventos') ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5']"
         class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold">
         <div class="flex items-center gap-3">
           <span class="material-symbols-outlined text-[20px]">corporate_fare</span>
@@ -100,13 +95,7 @@ const isActive = (name: string) => route.name === name;
 
       <!-- Actividades -->
       <button @click="navigate('admin-actividades')"
-        :class="[
-          isActive('admin-actividades') || 
-          isActive('admin-gestion-eventos-detalle') || 
-          (isActive('admin-gestion-eventos') && (route.query.newAct || route.query.editAct))
-          ? 'bg-red-600 text-white shadow-md' 
-          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'
-        ]"
+        :class="[isActive('admin-actividades') ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5']"
         class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold mt-1">
         <div class="flex items-center gap-3">
           <span class="material-symbols-outlined text-[20px]">school</span>
@@ -124,7 +113,17 @@ const isActive = (name: string) => route.name === name;
         </div>
       </button>
 
-      <!-- Gestión General -->
+      <!-- Tickets de Soporte -->
+      <button @click="navigate('admin-soporte')"
+        :class="[isActive('admin-soporte') ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5']"
+        class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold mt-1">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-[20px]">support_agent</span>
+          <span class="text-[11px] uppercase tracking-wider">Soporte</span>
+        </div>
+      </button>
+
+      <!-- Gestión General (Dashboard Unificado) -->
       <button @click="navigate('admin-gestion')"
         :class="[isActive('admin-gestion') ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5']"
         class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold mt-1">
@@ -156,17 +155,6 @@ const isActive = (name: string) => route.name === name;
           <span class="text-[11px] uppercase tracking-wider">Importar Excel</span>
         </div>
         <span class="text-[9px] font-black text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Nuevo</span>
-      </button>
-
-      <!-- Tickets de Soporte -->
-      <button @click="navigate('admin-soporte')"
-        :class="[isActive('admin-soporte') ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5']"
-        class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold mt-1">
-        <div class="flex items-center gap-3">
-          <span class="material-symbols-outlined text-[20px]">support_agent</span>
-          <span class="text-[11px] uppercase tracking-wider">Tickets de Soporte</span>
-        </div>
-        <span class="material-symbols-outlined text-[16px] opacity-0 group-hover:opacity-100 transition-opacity">chevron_right</span>
       </button>
 
     </nav>
