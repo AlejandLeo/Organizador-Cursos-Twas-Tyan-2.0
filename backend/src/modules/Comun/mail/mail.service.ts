@@ -49,15 +49,28 @@ export class MailService {
     const log = await this.mailLogRepository.save(logEntry);
 
     try {
-      const options: any = { to, subject, attachments };
-      if (template) {
-        options.template = template;
-        options.context = context;
-      } else {
-        options.text = text || '';
-      }
+      let info: any;
 
-      const info = await this.mailerService.sendMail(options);
+      if (template) {
+        // Ruta con plantilla Handlebars — usa mailerService normalmente
+        info = await this.mailerService.sendMail({
+          to,
+          subject,
+          template,
+          context,
+          attachments,
+        });
+      } else {
+        // Ruta con HTML pre-renderizado — saltamos el HandlebarsAdapter
+        // porque está registrado como plugin de nodemailer y falla con template=undefined
+        const transporter = (this.mailerService as any).transporter;
+        info = await transporter.sendMail({
+          to,
+          subject,
+          html: text || '',
+          attachments,
+        });
+      }
 
       // 3. Éxito: Actualizar log
       await this.mailLogRepository.update(log.id, {

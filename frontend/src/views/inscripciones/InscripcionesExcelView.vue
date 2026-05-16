@@ -47,63 +47,60 @@ const fetchPlantillas = async () => {
 };
 
 const openPreviewTemplate = async () => {
-  let subject = '';
-  let body = '';
-  
-  if (selectedTemplateId.value) {
-    const t = plantillas.value.find(p => String(p.id) === selectedTemplateId.value);
-    if (!t) return;
-    subject = t.asunto;
-    body = t.cuerpo;
-  } else {
-    // Si no hay seleccionada, traemos la de sistema (base)
+  previewTemplateHtml.value = '';
+
+  if (!selectedTemplateId.value) {
+    // --- Plantilla por defecto: admission.hbs renderizado en el backend ---
     try {
-      const tipo = activeTab.value === 'usuarios' ? 'WELCOME' : 'ENROLLMENT';
-      const keySubject = tipo === 'WELCOME' ? 'WELCOME_MESSAGE_SUBJECT' : 'ENROLLMENT_MESSAGE_SUBJECT';
-      const keyBody = tipo === 'WELCOME' ? 'WELCOME_MESSAGE_BODY' : 'ENROLLMENT_MESSAGE_BODY';
-      
-      const resSubject = await api.get(`/admin/sistema-config/key/${keySubject}`);
-      const resBody = await api.get(`/admin/sistema-config/key/${keyBody}`);
-      
-      subject = resSubject.data?.valor || 'Notificación de Sistema';
-      body = resBody.data?.valor || 'Hola {{nombre}}, tienes una nueva notificación.';
+      const res = await api.get('/admin/mail-templates/default-preview');
+      previewTemplateHtml.value = res.data?.html || '<p>No se pudo cargar la plantilla.</p>';
     } catch (e) {
-      subject = 'Bienvenida';
-      body = 'Hola {{nombre}}, bienvenido al sistema.';
+      console.error('Error al cargar previsualización por defecto:', e);
+      previewTemplateHtml.value = '<p style="color:red">Error al cargar la plantilla por defecto.</p>';
     }
+    showPreviewModal.value = true;
+    return;
   }
 
-  // Renderizado para previsualización
-  const resLayout = await api.get('/admin/sistema-config/key/MAIL_MASTER_LAYOUT');
-  const resUrl = await api.get('/admin/sistema-config/key/SYSTEM_URL');
-  
-  const masterLayout = resLayout.data?.valor || '<html><body>{{{content}}}</body></html>';
-  const systemUrl = resUrl.data?.valor || window.location.origin;
-  
-  let contentHtml = body.replace(/\n/g, '<br>');
-  
-  // Reemplazo de variables
-  const context = {
-    nombre: 'Juan Perez',
-    email: 'ejemplo@correo.com',
-    password: '********',
-    actividad: 'Curso de Especialización',
-    evento: 'Congreso Internacional 2026',
-    url_sistema: systemUrl,
-    year: new Date().getFullYear()
-  };
+  // --- Plantilla personalizada de la BD ---
+  const t = plantillas.value.find(p => String(p.id) === selectedTemplateId.value);
+  if (!t) return;
 
-  Object.keys(context).forEach(key => {
-    const regex = new RegExp(`{{${key}}}`, 'g');
-    contentHtml = contentHtml.replace(regex, String((context as any)[key]));
-  });
+  try {
+    const resLayout = await api.get('/admin/configuracion/key/MAIL_MASTER_LAYOUT');
+    const resUrl    = await api.get('/admin/configuracion/key/SYSTEM_URL');
 
-  previewTemplateHtml.value = masterLayout
-    .replace('{{{content}}}', contentHtml)
-    .replace('{{year}}', context.year.toString());
-    
+    const masterLayout = resLayout.data?.valor || '<html><body>{{{content}}}</body></html>';
+    const systemUrl    = resUrl.data?.valor    || window.location.origin;
+
+    const context: Record<string, string | number> = {
+      nombre:      'Juan Pérez',
+      name:        'Juan Pérez',
+      email:       'ejemplo@correo.com',
+      password:    'Contraseña123',
+      actividad:   'Curso de Especialización',
+      evento:      'Congreso Internacional 2026',
+      url_sistema: systemUrl,
+      loginUrl:    systemUrl,
+      year:        new Date().getFullYear(),
+    };
+
+    let contentHtml = (t.cuerpo || '').replace(/\n/g, '<br>');
+    Object.keys(context).forEach(key => {
+      contentHtml = contentHtml.replace(new RegExp(`{{${key}}}`, 'g'), String(context[key]));
+    });
+
+    previewTemplateHtml.value = masterLayout
+      .replace('{{{content}}}', contentHtml)
+      .replace('{{year}}', String(new Date().getFullYear()));
+  } catch (e) {
+    console.error('Error rendering preview:', e);
+    previewTemplateHtml.value = '<p style="color:red">Error al renderizar la previsualización.</p>';
+  }
+
   showPreviewModal.value = true;
 };
+
 
 const fetchEventos = async () => {
   try {
@@ -271,8 +268,8 @@ const importar = async (modo: 'verificar' | 'guardar') => {
         : 'Verificación exitosa. Todos los datos son válidos. Ahora puedes Guardar.';
     } else {
       textMsg = hasMailWarnings 
-        ? `Se procesaron y guardaron los datos, pero hubo ${response.data.advertenciasCorreo} errores al enviar correos.` 
-        : 'Se han procesado y guardado los datos correctamente.';
+        ? `Se procesaron y guardaron los datos, pero hubo ${response.data.advertenciasCorreo} errores al encolar los correos.` 
+        : 'Se han procesado y guardado los datos correctamente. Los correos han sido encolados para su envío.';
     }
 
     Swal.fire({
@@ -367,11 +364,12 @@ const getStatusIcon = (status: string) => {
             </h2>
             <div class="flex items-center gap-4">
               <!-- Selector Integrado en Header -->
-              <div class="flex items-center gap-2 bg-slate-50 dark:bg-white/5 px-3 py-1.5 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
+              <!-- Selector de plantilla: solo para Registro de Usuarios -->
+              <div v-if="activeTab === 'usuarios'" class="flex items-center gap-2 bg-slate-50 dark:bg-white/5 px-3 py-1.5 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
                 <span class="material-symbols-outlined text-slate-400 text-sm">mail</span>
                 <select v-model="selectedTemplateId"
                         class="bg-transparent text-[11px] font-bold text-slate-600 dark:text-slate-300 outline-none cursor-pointer min-w-[140px]">
-                  <option value="">Plantilla por Defecto</option>
+                  <option value="">Plantilla por Defecto (admission)</option>
                   <option v-for="p in plantillas" :key="p.id" :value="String(p.id)">{{ p.nombre }}</option>
                 </select>
                 <div class="w-px h-4 bg-slate-200 dark:bg-white/10 mx-1"></div>
@@ -627,9 +625,9 @@ const getStatusIcon = (status: string) => {
                   </td>
                   <td class="px-4 py-4 text-slate-500 text-[11px] leading-snug">{{ item.mensaje }}</td>
                   <td class="px-4 py-4">
-                    <div v-if="item.correoEnviado" class="text-emerald-500 flex items-center gap-1">
-                      <span class="material-symbols-outlined text-[16px]">mail</span>
-                      <span class="font-bold">Enviado</span>
+                    <div v-if="item.correoEnviado" class="text-blue-500 flex items-center gap-1" title="El correo fue puesto en cola para su envío">
+                      <span class="material-symbols-outlined text-[16px]">schedule_send</span>
+                      <span class="font-bold">Encolado</span>
                     </div>
                     <div v-else-if="item.correoAdvertencia" class="text-amber-500 group relative">
                       <span class="material-symbols-outlined text-[16px]">mail_lock</span>

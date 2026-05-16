@@ -1,4 +1,4 @@
-import { IsEmail, IsInt, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsInt, IsNotEmpty, IsOptional, IsString, MinLength, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
@@ -64,5 +64,10 @@ export class CrearPonenteDto {
   @IsOptional()
   @IsInt()
   id_rol?: number;
+
+  @ApiPropertyOptional({ example: true, description: 'Si se debe enviar correo de bienvenida' })
+  @IsOptional()
+  @IsBoolean()
+  notificar?: boolean;
 }
 

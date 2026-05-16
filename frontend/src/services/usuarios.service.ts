@@ -22,6 +22,7 @@ export const usuariosService = {
     segundo_apellido?: string;
     documento_identidad?: string;
     id_rol: number;
+    notificar?: boolean;
   }) {
     return api.post<Usuario>('/usuarios/ponente', data);
   },
