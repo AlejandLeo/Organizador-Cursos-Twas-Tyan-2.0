@@ -17,6 +17,8 @@ const isCreating = ref(false);
 const isGestionandoRoles = ref(false);
 const usuarioSeleccionado = ref<any>(null);
 const rolesCargando = ref(false);
+const rolesTemp = ref<number[]>([]);
+const notificarRoles = ref(true);
 
 // IDs de roles (deben coincidir con la BD)
 const ROLE_IDS = { COORDINADOR: 2, LOGISTICA: 3, ESTUDIANTE: 4, PONENTE: 5 };
@@ -150,33 +152,40 @@ const handleSaveUsuario = async () => {
 // ── Gestión de Múltiples Roles ─────────────────────────────────────────────
 const abrirGestionRoles = (user: any) => {
   usuarioSeleccionado.value = user;
+  rolesTemp.value = user.usuariosRoles?.map((ur: any) => ur.rol?.id) || [];
+  notificarRoles.value = true;
   isGestionandoRoles.value = true;
 };
 
-const hasRole = (u: any, roleId: number) => {
-  return u.usuariosRoles?.some((ur: any) => ur.rol?.id === roleId);
+const toggleRolLocal = (rolId: number) => {
+  if (rolesTemp.value.includes(rolId)) {
+    rolesTemp.value = rolesTemp.value.filter(id => id !== rolId);
+  } else {
+    rolesTemp.value.push(rolId);
+  }
 };
 
-const toggleRol = async (rolId: number, nombreRol: string) => {
+const guardarRoles = async () => {
   const u = usuarioSeleccionado.value;
   if (!u || rolesCargando.value) return;
 
-  const activo = hasRole(u, rolId);
   rolesCargando.value = true;
   try {
-    if (activo) {
-      await usuariosService.quitarRol(u.id, rolId);
-      historialStore.registrar('usuario', 'editar', `Quitó rol ${nombreRol} de ${u.email}`, { entidadId: u.id });
+    const res = await usuariosService.actualizarRolesBulk(u.id, rolesTemp.value, notificarRoles.value);
+    const data = res.data as any;
+    
+    if (data.correoEnviado) {
+      Swal.fire('¡Éxito!', 'Roles actualizados y notificación enviada al usuario.', 'success');
+    } else if (notificarRoles.value) {
+      Swal.fire('Actualizado', 'Roles actualizados, pero hubo un problema al enviar el correo.', 'warning');
     } else {
-      await usuariosService.asignarRol(u.id, rolId);
-      historialStore.registrar('usuario', 'editar', `Asignó rol ${nombreRol} a ${u.email}`, { entidadId: u.id });
+      Swal.fire('¡Éxito!', 'Roles actualizados correctamente.', 'success');
     }
-    // Refrescar datos localmente o recargar lista
+
+    isGestionandoRoles.value = false;
     await fetchUsuarios();
-    // Actualizar usuarioSeleccionado para reflejar cambios en el modal
-    usuarioSeleccionado.value = usuarios.value.find(usr => usr.id === u.id);
   } catch (error: any) {
-    Swal.fire('Error', error.response?.data?.message || 'No se pudo actualizar el rol.', 'error');
+    Swal.fire('Error', error.response?.data?.message || 'No se pudo actualizar los roles.', 'error');
   } finally {
     rolesCargando.value = false;
   }
@@ -531,32 +540,41 @@ onMounted(fetchUsuarios);
           </div>
 
           <!-- Lista de Roles -->
-          <div class="space-y-2 mb-8">
+          <div class="space-y-2 mb-6">
             <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-3">Roles asignados al sistema</p>
             
             <div v-for="rol in rolesDisponibles" :key="rol.id"
-                 @click="toggleRol(rol.id, rol.nombre)"
+                 @click="toggleRolLocal(rol.id)"
                  :class="[
-                   hasRole(usuarioSeleccionado, rol.id) 
-                    ? 'border-sky-500 bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-300' 
-                    : 'border-slate-100 dark:border-white/5 bg-white dark:bg-white/3 text-slate-400 hover:border-sky-200'
+                   rolesTemp.includes(rol.id) 
+                    ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300' 
+                    : 'border-slate-100 dark:border-white/5 bg-white dark:bg-white/3 text-slate-400 hover:border-red-200'
                  ]"
                  class="flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all group">
               <div class="flex items-center gap-3">
                 <span class="material-symbols-outlined text-[20px]" 
-                      :class="hasRole(usuarioSeleccionado, rol.id) ? 'text-sky-500' : 'text-slate-300'">
-                  {{ hasRole(usuarioSeleccionado, rol.id) ? 'check_circle' : 'radio_button_unchecked' }}
+                      :class="rolesTemp.includes(rol.id) ? 'text-red-500' : 'text-slate-300'">
+                  {{ rolesTemp.includes(rol.id) ? 'check_circle' : 'radio_button_unchecked' }}
                 </span>
                 <span class="text-xs font-black uppercase tracking-wide">{{ rol.nombre }}</span>
               </div>
-              <div v-if="rolesCargando" class="w-4 h-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
             </div>
           </div>
 
+          <!-- Opción de Notificación -->
+          <div class="flex items-center gap-3 p-4 bg-slate-50 dark:bg-white/5 rounded-2xl mb-8 border border-slate-100 dark:border-white/5">
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" v-model="notificarRoles" class="sr-only peer">
+              <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-white/10 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-red-600"></div>
+            </label>
+            <span class="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-tight">Notificar cambios por correo</span>
+          </div>
+
           <div class="flex gap-3">
-            <button @click="isGestionandoRoles = false" 
-                    class="flex-1 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-xl hover:-translate-y-1 transition-all">
-              Listo, Guardar
+            <button @click="guardarRoles" :disabled="rolesCargando"
+                    class="flex-1 py-4 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-xl hover:-translate-y-1 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+              <span v-if="rolesCargando" class="material-symbols-outlined animate-spin text-[16px]">refresh</span>
+              Listo, Guardar Cambios
             </button>
           </div>
         </div>

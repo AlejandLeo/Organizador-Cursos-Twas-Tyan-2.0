@@ -84,4 +84,11 @@ export const usuariosService = {
     const response = await api.post('/usuarios/activar-ponente', { ci, password });
     return response.data;
   },
+
+  actualizarRolesBulk(usuarioId: number, rolIds: number[], notificar = true) {
+    return api.patch<{ mensaje: string; correoEnviado: boolean }>(`/usuarios/${usuarioId}/roles`, {
+      rolIds,
+      notificar
+    });
+  },
 };

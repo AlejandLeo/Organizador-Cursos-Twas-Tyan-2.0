@@ -429,6 +429,27 @@ export class UsuariosController {
    * GET /usuarios/:id
    * Busca un usuario por ID. Incluye persona + roles asignados.
    */
+  /**
+   * PATCH /usuarios/:id/roles
+   * Actualización masiva de roles de un usuario con opción de notificación.
+   */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Super Usuario', 'Coordinador')
+  @ApiBearerAuth()
+  @Patch(':id/roles')
+  @ApiOperation({ summary: 'Actualización masiva de roles de un usuario' })
+  async updateRolesBulk(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('rolIds') rolIds: number[],
+    @Body('notificar') notificar?: boolean,
+  ) {
+    return this.usuariosService.actualizarRolesBulk(id, rolIds, notificar ?? true);
+  }
+
+  /**
+   * GET /usuarios/:id
+   * Busca un usuario por ID. Incluye persona + roles asignados.
+   */
   @Get(':id')
   @ApiOperation({ summary: 'Obtener un usuario por ID' })
   findOne(@Param('id', ParseIntPipe) id: number) {

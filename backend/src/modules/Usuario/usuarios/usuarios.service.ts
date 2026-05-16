@@ -381,6 +381,96 @@ export class UsuariosService {
   }
 
   /**
+   * Actualiza los roles de un usuario de forma masiva y notifica por correo si se solicita.
+   */
+  async actualizarRolesBulk(id: number, nuevosRolIds: number[], notificar = true) {
+    const usuario = await this.usuarioRepository.findOne({
+      where: { id },
+      relations: ['persona', 'usuariosRoles', 'usuariosRoles.rol'],
+    });
+
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
+
+    const rolesActuales = usuario.usuariosRoles || [];
+    const idsActuales = rolesActuales.map(ur => ur.rol.id);
+
+    const idsParaAnadir = nuevosRolIds.filter(id => !idsActuales.includes(id));
+    const idsParaQuitar = idsActuales.filter(id => !nuevosRolIds.includes(id));
+
+    if (idsParaAnadir.length === 0 && idsParaQuitar.length === 0) {
+      return { mensaje: 'No se detectaron cambios en los roles.' };
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const rolesAnadidosNombres: string[] = [];
+      const rolesQuitadosNombres: string[] = [];
+
+      // 1. Quitar roles
+      if (idsParaQuitar.length > 0) {
+        for (const idRol of idsParaQuitar) {
+          const ur = rolesActuales.find(r => r.rol.id === idRol);
+          if (ur) {
+            rolesQuitadosNombres.push(ur.rol.nombre_rol);
+            await queryRunner.manager.delete(UsuarioRol, ur.id);
+          }
+        }
+      }
+
+      // 2. Añadir roles
+      if (idsParaAnadir.length > 0) {
+        const rolesNuevos = await queryRunner.manager.findByIds(Rol, idsParaAnadir);
+        for (const rol of rolesNuevos) {
+          rolesAnadidosNombres.push(rol.nombre_rol);
+          const ur = queryRunner.manager.create(UsuarioRol, {
+            usuario: { id } as Usuario,
+            rol: rol,
+            estado: 1,
+          });
+          await queryRunner.manager.save(ur);
+        }
+      }
+
+      await queryRunner.commitTransaction();
+
+      // 3. Notificar si se solicita
+      let correoEnviado = false;
+      if (notificar) {
+        const nombreCompleto = usuario.persona
+          ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
+          : 'Usuario';
+        
+        try {
+          await this.mailService.sendRoleUpdateEmail(
+            usuario.email,
+            nombreCompleto,
+            rolesAnadidosNombres,
+            rolesQuitadosNombres
+          );
+          correoEnviado = true;
+        } catch (mailError) {
+          this.logger.error(`Error enviando notificación de roles a ${usuario.email}: ${mailError.message}`);
+        }
+      }
+
+      return { 
+        mensaje: 'Roles actualizados correctamente.', 
+        correoEnviado,
+        cambios: { anadidos: rolesAnadidosNombres, quitados: rolesQuitadosNombres }
+      };
+
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
    * Habilita un usuario (estado = 1).
    * Uso del coordinador para reactivar accesos sin cambiar contraseñas.
    */

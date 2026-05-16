@@ -230,4 +230,22 @@ export class MailService {
       },
     );
   }
+
+  /**
+   * Notifica cambios detallados en los roles del usuario.
+   */
+  async sendRoleUpdateEmail(to: string, name: string, addedRoles: string[], removedRoles: string[]) {
+    return this.sendMail(
+      to,
+      'Actualización de Permisos en la Plataforma',
+      'role-update',
+      { 
+        name, 
+        addedRoles, 
+        removedRoles,
+        loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+        currentYear: new Date().getFullYear()
+      },
+    );
+  }
 }
