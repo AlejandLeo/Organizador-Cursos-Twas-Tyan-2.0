@@ -31,10 +31,17 @@ const handleUpdatePassword = async () => {
       requiere_cambio_password: false 
     });
     
-    await Swal.fire('¡Éxito!', 'Tu contraseña ha sido actualizada. Ya puedes usar el sistema.', 'success');
+    // Actualizar estado local PRIMERO para que el overlay desaparezca
     if (authStore.user) {
       authStore.user.requiere_cambio_password = false;
     }
+
+    await Swal.fire({
+      title: '¡Éxito!',
+      text: 'Tu contraseña ha sido actualizada. Ya puedes usar el sistema.',
+      icon: 'success',
+      confirmButtonColor: '#d97706'
+    });
   } catch (error: any) {
     let msg = error.response?.data?.message || 'No se pudo actualizar la contraseña.';
     if (Array.isArray(msg)) msg = msg.join(' | ');
@@ -51,7 +58,7 @@ const handleLogout = () => {
 </script>
 
 <template>
-  <div v-if="showOverlay" class="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/95 backdrop-blur-md p-4">
+  <div v-if="showOverlay" class="fixed inset-0 z-[1050] flex items-center justify-center bg-slate-900/95 backdrop-blur-md p-4">
     <div class="bg-white dark:bg-[#0d0d14] w-full max-w-md rounded-[2.5rem] shadow-2xl border border-white/10 overflow-hidden animate-in zoom-in duration-500">
       <div class="p-8 md:p-10 text-center">
         
