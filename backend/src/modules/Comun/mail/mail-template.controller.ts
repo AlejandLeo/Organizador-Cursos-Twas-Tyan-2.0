@@ -30,7 +30,8 @@ export class MailTemplateController {
     let html = fs.readFileSync(templatePath, 'utf-8');
 
     const sampleContext: Record<string, string> = {
-      name: 'Juan Pérez',
+      nombre: 'Juan',
+      apellidos: 'Pérez',
       email: 'ejemplo@correo.com',
       password: 'Contraseña123',
       loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173',

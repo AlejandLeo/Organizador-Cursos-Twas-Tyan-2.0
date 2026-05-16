@@ -447,7 +447,7 @@ const getStatusIcon = (status: string) => {
           <div class="space-y-2">
             <label class="text-[11px] font-black text-slate-400 uppercase ml-2 tracking-widest flex items-center justify-between">
               Cuerpo del Mensaje (HTML)
-              <span class="text-[9px] normal-case font-normal text-slate-400 italic">
+              <span class="text-[9px] normal-case font-normal text-slate-400 italic" v-pre>
                 Variables: <code>{{nombre}}</code> <code>{{email}}</code> <code>{{password}}</code> <code>{{loginUrl}}</code> <code>{{actividad}}</code>
               </span>
             </label>

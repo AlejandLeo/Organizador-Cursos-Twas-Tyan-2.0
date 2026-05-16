@@ -199,18 +199,27 @@ const eliminarFisico = async (userId: number) => {
 
 const aprobarCuenta = async (id: number) => {
     try {
-        const { isConfirmed } = await Swal.fire({
+        const { isConfirmed, value } = await Swal.fire({
             title: '¿Aprobar Cuenta?',
-            text: 'El usuario podrá iniciar sesión en la plataforma.',
+            html: `
+              <p>El usuario podrá iniciar sesión en la plataforma.</p>
+              <div class="flex items-center justify-center gap-2 mt-4">
+                <input type="checkbox" id="swal-notificar" checked class="w-4 h-4 cursor-pointer">
+                <label for="swal-notificar" class="text-sm cursor-pointer">Notificar por correo electrónico</label>
+              </div>
+            `,
             icon: 'question',
             showCancelButton: true,
             confirmButtonText: 'Aprobar',
-            cancelButtonText: 'Cancelar'
+            cancelButtonText: 'Cancelar',
+            preConfirm: () => {
+              return { notificar: (document.getElementById('swal-notificar') as HTMLInputElement).checked };
+            }
         });
 
         if (!isConfirmed) return;
 
-        const res = await api.patch(`/usuarios/${id}/solicitud/aprobar`);
+        const res = await api.patch(`/usuarios/${id}/solicitud/aprobar`, { notificar: value.notificar });
         const data = res.data as any;
         if (data.correoEnviado) {
             Swal.fire({ icon: 'success', title: 'Cuenta Aprobada', text: 'El usuario ya puede acceder al sistema y su correo fue encolado.', timer: 2000, showConfirmButton: false });

@@ -85,6 +85,7 @@ const formUsuario = ref({
   segundo_apellido: '',
   documento_identidad: '',
   id_rol: ROLE_IDS.COORDINADOR,
+  notificar: true
 });
 
 const fetchUsuarios = async () => {
@@ -151,7 +152,7 @@ const isSavingForm = ref(false);
 const handleSaveUsuario = async () => {
   if (isSavingForm.value) return;
   
-  const { email, password, nombres, primer_apellido, id_rol } = formUsuario.value;
+  const { email, password, nombres, primer_apellido, id_rol, notificar } = formUsuario.value;
   if (!email || !password || !nombres || !primer_apellido) {
     return Swal.fire('Campos requeridos', 'Complete todos los campos obligatorios.', 'warning');
   }
@@ -166,6 +167,7 @@ const handleSaveUsuario = async () => {
       segundo_apellido: formUsuario.value.segundo_apellido || undefined,
       documento_identidad: formUsuario.value.documento_identidad || undefined,
       id_rol,
+      notificar,
     });
     
     const resData = res.data as any;
@@ -184,7 +186,7 @@ const handleSaveUsuario = async () => {
     }
     
     isCreating.value = false;
-    formUsuario.value = { email: '', password: '', nombres: '', primer_apellido: '', segundo_apellido: '', documento_identidad: '', id_rol: ROLE_IDS.COORDINADOR };
+    formUsuario.value = { email: '', password: '', nombres: '', primer_apellido: '', segundo_apellido: '', documento_identidad: '', id_rol: ROLE_IDS.COORDINADOR, notificar: true };
     await fetchUsuarios();
     currentPage.value = 1;
   } catch (error: any) {
@@ -558,6 +560,19 @@ onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
               <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Contraseña Temporal *</label>
               <input v-model="formUsuario.password" type="password" placeholder="••••••••"
                      class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-red-600/50" />
+            </div>
+
+            <!-- Notificar checkbox -->
+            <div class="col-span-1 md:col-span-2 pt-2 border-t border-slate-100 dark:border-white/5">
+              <div class="flex items-center gap-2 cursor-pointer w-fit" @click="formUsuario.notificar = !formUsuario.notificar">
+                <div :class="formUsuario.notificar ? 'bg-red-600 border-red-600' : 'bg-transparent border-slate-300 dark:border-slate-600'" 
+                     class="w-5 h-5 rounded border flex items-center justify-center transition-colors">
+                  <span v-if="formUsuario.notificar" class="material-symbols-outlined text-white text-[14px] font-bold">check</span>
+                </div>
+                <span class="text-[11px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors select-none">
+                  Enviar correo con credenciales de acceso
+                </span>
+              </div>
             </div>
           </div>
           <!-- Botones -->
