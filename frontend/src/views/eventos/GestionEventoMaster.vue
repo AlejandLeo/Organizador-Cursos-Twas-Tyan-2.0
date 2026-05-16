@@ -611,9 +611,16 @@ const usuariosLogistica = ref<any[]>([]);
 const fetchUsuariosPersonal = async () => {
     try {
         // Traer tanto a Coordinadores como Logística
-        const resCoords = await api.get('/usuarios?rol=Coordinador,Logística&limit=100');
-        usuariosCoordinadores.value = resCoords.data.data || resCoords.data || [];
-        usuariosLogistica.value = []; // A definir si se necesita separar
+        const res = await api.get('/usuarios?rol=Coordinador,Logística&limit=100');
+        const data = res.data.data || res.data || [];
+        
+        // Separar por rol: 2 = Coordinador, 3 = Logística
+        usuariosCoordinadores.value = data.filter((u: any) => 
+            u.usuariosRoles?.some((ur: any) => Number(ur.rol?.id) === 2)
+        );
+        usuariosLogistica.value = data.filter((u: any) => 
+            u.usuariosRoles?.some((ur: any) => Number(ur.rol?.id) === 3)
+        );
     } catch (err) {
         console.error("Error fetching personnel:", err);
     }
@@ -2098,7 +2105,10 @@ const changeStep = (delta: number) => {
                                     </div>
                                     <div class="flex-1 min-w-0">
                                         <p class="text-xs font-black text-slate-700 dark:text-gray-200 uppercase truncate">{{ user.persona?.nombres }} {{ user.persona?.primer_apellido }}</p>
-                                        <p class="text-[9px] font-bold text-slate-400 truncate">{{ user.email }}</p>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-[7px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-umsa-blue">Coordinador</span>
+                                            <p class="text-[9px] font-bold text-slate-400 truncate">{{ user.email }}</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -2123,7 +2133,10 @@ const changeStep = (delta: number) => {
                                     </div>
                                     <div class="flex-1 min-w-0">
                                         <p class="text-xs font-black text-slate-700 dark:text-gray-200 uppercase truncate">{{ user.persona?.nombres }} {{ user.persona?.primer_apellido }}</p>
-                                        <p class="text-[9px] font-bold text-slate-400 truncate">{{ user.email }}</p>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-[7px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600">Logística</span>
+                                            <p class="text-[9px] font-bold text-slate-400 truncate">{{ user.email }}</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

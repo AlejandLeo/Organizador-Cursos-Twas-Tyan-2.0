@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useAdminHistorialStore } from '@/stores/adminHistorial';
 import { usuariosService } from '@/services/usuarios.service';
@@ -68,16 +68,18 @@ const usuariosFiltrados = computed(() => {
 const currentPage = ref(1);
 const itemsPerPage = ref(10);
 
-const totalPages = computed(() => Math.ceil(usuariosFiltrados.value.length / itemsPerPage.value));
+const totalPages = computed(() => {
+  const total = Math.ceil(usuariosFiltrados.value.length / itemsPerPage.value);
+  return total > 0 ? total : 1;
+});
 
 const paginatedUsuarios = computed(() => {
   const start = (currentPage.value - 1) * itemsPerPage.value;
   return usuariosFiltrados.value.slice(start, start + itemsPerPage.value);
 });
 
-// Reiniciar a la página 1 si cambian los filtros
-import { watch } from 'vue';
-watch([filtroTexto, filtroRol, itemsPerPage], () => {
+// Reiniciar a la página 1 si cambian los filtros o la data
+watch([filtroTexto, filtroRol, itemsPerPage, usuarios], () => {
   currentPage.value = 1;
 });
 

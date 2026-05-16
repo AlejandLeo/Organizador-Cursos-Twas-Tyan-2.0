@@ -146,13 +146,24 @@ const fetchCoordinadores = async (eventoId: number) => {
   }
 };
 
+const getRoleName = (u: any) => {
+  const roles = u?.usuariosRoles?.map((ur: any) => (ur.rol?.nombre_rol || '').toLowerCase()) || [];
+  if (roles.some((r: string) => r.includes('coordinador'))) return 'Coordinador';
+  if (roles.some((r: string) => r.includes('logistica'))) return 'Logística';
+  return roles[0] || 'Usuario';
+};
+
 const fetchCandidatos = async () => {
   try {
     const res = await usuariosService.getAll({ soloActivos: 'true' });
     const allUsers = (res.data as any)?.data ?? res.data;
     candidatosCoordinadores.value = allUsers.filter((u: any) => {
-      const isAlreadyAssigned = coordinadoresActuales.value.some(c => c.usuario?.id === u.id);
-      return !isAlreadyAssigned;
+      // Filtrar solo Coordinadores (2) y Logística (3)
+      const roles = u.usuariosRoles?.map((ur: any) => Number(ur.rol?.id)) || [];
+      const hasValidRole = roles.includes(2) || roles.includes(3);
+      
+      const isAlreadyAssigned = coordinadoresActuales.value.some(c => Number(c.usuario?.id) === Number(u.id));
+      return hasValidRole && !isAlreadyAssigned;
     });
   } catch (err) {
     console.error('Error fetching candidatos', err);
@@ -978,7 +989,12 @@ onMounted(() => {
                         {{ c.usuario?.persona?.nombres?.charAt(0) }}{{ c.usuario?.persona?.primer_apellido?.charAt(0) }}
                       </div>
                       <div>
-                        <p class="text-[10px] font-black text-slate-800 dark:text-white uppercase">{{ c.usuario?.persona?.nombres }} {{ c.usuario?.persona?.primer_apellido }}</p>
+                        <div class="flex items-center gap-2">
+                          <p class="text-[10px] font-black text-slate-800 dark:text-white uppercase">{{ c.usuario?.persona?.nombres }} {{ c.usuario?.persona?.primer_apellido }}</p>
+                          <span class="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-white/10 text-[8px] font-black text-slate-500 uppercase">
+                            {{ getRoleName(c.usuario) }}
+                          </span>
+                        </div>
                         <p class="text-[8px] text-slate-400 font-bold uppercase tracking-tighter">{{ c.usuario?.email }}</p>
                       </div>
                     </div>
@@ -999,7 +1015,12 @@ onMounted(() => {
                       <span class="material-symbols-outlined text-sm">person</span>
                     </div>
                     <div>
-                      <p class="text-[10px] font-black text-slate-700 dark:text-gray-200 uppercase">{{ u.persona?.nombres }} {{ u.persona?.primer_apellido }}</p>
+                      <div class="flex items-center gap-2">
+                        <p class="text-[10px] font-black text-slate-700 dark:text-gray-200 uppercase">{{ u.persona?.nombres }} {{ u.persona?.primer_apellido }}</p>
+                        <span class="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/20 text-[7px] font-black text-blue-600 uppercase border border-blue-100 dark:border-blue-800/30">
+                          {{ getRoleName(u) }}
+                        </span>
+                      </div>
                       <p class="text-[8px] text-slate-400">{{ u.email }}</p>
                     </div>
                   </div>

@@ -43,10 +43,10 @@ const fetchCandidatos = async () => {
     const allUsers = (res.data as any)?.data ?? res.data;
     candidatosCoordinadores.value = allUsers.filter((u: any) => {
       // Filtrar solo Coordinadores (2) y Logística (3)
-      const roles = u.usuariosRoles?.map((ur: any) => ur.rol?.id) || [];
+      const roles = u.usuariosRoles?.map((ur: any) => Number(ur.rol?.id)) || [];
       const hasValidRole = roles.includes(2) || roles.includes(3);
       
-      const isAlreadyAssigned = coordinadoresActuales.value.some(c => c.usuario?.id === u.id);
+      const isAlreadyAssigned = coordinadoresActuales.value.some(c => Number(c.usuario?.id) === Number(u.id));
       return hasValidRole && !isAlreadyAssigned;
     });
   } catch (err) {
@@ -55,9 +55,9 @@ const fetchCandidatos = async () => {
 };
 
 const getRoleName = (u: any) => {
-  const roles = u?.usuariosRoles?.map((ur: any) => ur.rol?.nombre_rol) || [];
-  if (roles.includes('Coordinador')) return 'Coordinador';
-  if (roles.includes('Logística')) return 'Logística';
+  const roles = u?.usuariosRoles?.map((ur: any) => (ur.rol?.nombre_rol || '').toLowerCase()) || [];
+  if (roles.some((r: string) => r.includes('coordinador'))) return 'Coordinador';
+  if (roles.some((r: string) => r.includes('logistica'))) return 'Logística';
   return roles[0] || 'Usuario';
 };
 
@@ -69,13 +69,30 @@ const abrirCoordinadores = async (evento: any) => {
 };
 
 const asignarCoordinador = async (usuario: any) => {
+  console.log('--- ASIGNANDO RESPONSABLE ---');
+  console.log('Evento ID:', eventoParaCoordinadores.value?.id);
+  console.log('Usuario ID:', usuario.id);
+  
+  if (!eventoParaCoordinadores.value?.id) {
+    Swal.fire('Error', 'No se ha seleccionado un evento válido.', 'error');
+    return;
+  }
+
   try {
     await coordinacionesService.asignar(eventoParaCoordinadores.value.id, usuario.id);
-    Swal.fire('¡Éxito!', `Se ha asignado a ${usuario.persona?.nombres} como responsable.`, 'success');
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: 'success',
+      title: 'Responsable asignado',
+      timer: 2000,
+      showConfirmButton: false
+    });
     await fetchCoordinadores(eventoParaCoordinadores.value.id);
     await fetchCandidatos();
-  } catch (err) {
-    Swal.fire('Error', 'No se pudo asignar.', 'error');
+  } catch (err: any) {
+    console.error('Error en asignarCoordinador:', err);
+    Swal.fire('Error', err.response?.data?.message || 'No se pudo asignar.', 'error');
   }
 };
 
