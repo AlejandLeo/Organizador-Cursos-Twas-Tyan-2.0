@@ -32,6 +32,9 @@ import { join } from 'path';
 import { MailService } from '../../Comun/mail/mail.service';
 import { QrService } from '../../Seguridad/qr/qr.service';
 
+import { SistemaConfigService } from '../../Comun/sistema-config/sistema-config.service';
+import { MailQueueService } from '../../Comun/mail/mail-queue.service';
+
 @Injectable()
 export class UsuariosService {
   private readonly logger = new Logger(UsuariosService.name);
@@ -43,7 +46,9 @@ export class UsuariosService {
     private readonly personaRepository: Repository<Persona>,
     private readonly dataSource: DataSource,
     private readonly mailService: MailService,
+    private readonly mailQueueService: MailQueueService,
     private readonly qrService: QrService,
+    private readonly configService: SistemaConfigService,
   ) { }
 
   // ══════════════════════════════════════════════════════════
@@ -625,8 +630,7 @@ export class UsuariosService {
       let correoEnviado = false;
       try {
         const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
-        await this.mailService.sendAccountApprovalEmail(dto.email, nombreCompleto, dto.password);
-        correoEnviado = true;
+        correoEnviado = await this.enviarBienvenidaPersonalizada(dto.email, nombreCompleto, dto.password);
       } catch (mailError) {
         this.logger.error(`Error enviando correo de bienvenida a ponente ${dto.email}: ${mailError.message}`);
       }
@@ -1289,8 +1293,7 @@ export class UsuariosService {
 
         let correoEnviado = false;
         try {
-          await this.mailService.sendAccountApprovalEmail(usuario.email, nombreCompleto, 'La elegida en su registro');
-          correoEnviado = true;
+          correoEnviado = await this.enviarBienvenidaPersonalizada(usuario.email, nombreCompleto, 'La elegida en su registro');
         } catch (mailError) {
           this.logger.error(`Error enviando correo de aprobación a ${usuario.email}: ${mailError.message}`);
         }
@@ -1472,6 +1475,33 @@ export class UsuariosService {
       throw error;
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  /**
+   * Envía un correo de bienvenida personalizado usando la configuración del sistema.
+   * Utiliza la cola de correos para escalabilidad.
+   */
+  private async enviarBienvenidaPersonalizada(email: string, nombre: string, passwordTemp: string) {
+    try {
+      const subjectTemplate = await this.configService.getConfig('WELCOME_MESSAGE_SUBJECT');
+      const bodyTemplate = await this.configService.getConfig('WELCOME_MESSAGE_BODY');
+
+      // Reemplazar variables
+      const subject = subjectTemplate.replace(/{{nombre}}/g, nombre).replace(/{{email}}/g, email);
+      let body = bodyTemplate
+        .replace(/{{nombre}}/g, nombre)
+        .replace(/{{email}}/g, email)
+        .replace(/{{password}}/g, passwordTemp);
+      
+      // Convertir saltos de línea a <br> si es HTML
+      body = body.replace(/\n/g, '<br>');
+
+      await this.mailQueueService.enqueue(email, subject, body);
+      return true;
+    } catch (error) {
+      this.logger.error(`Error al encolar bienvenida personalizada para ${email}: ${error.message}`);
+      return false;
     }
   }
 }

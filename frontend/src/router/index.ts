@@ -186,6 +186,11 @@ const router = createRouter({
           name: 'admin-inscripciones-excel',
           component: () => import('../views/inscripciones/InscripcionesExcelView.vue'),
         },
+        {
+          path: 'configuracion',
+          name: 'admin-configuracion',
+          component: () => import('../views/admin/AdminConfiguracionView.vue'),
+        },
       ]
     },
     // ─── RUTAS COORDINADOR ────────────────────────────────────────────────────
