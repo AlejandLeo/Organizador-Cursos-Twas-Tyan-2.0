@@ -1,10 +1,6 @@
-<<<<<<< HEAD
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
-=======
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
->>>>>>> ba9255c45525f0d13cc726801e273abb8daa4315
 import { MailTemplateService } from './mail-template.service';
 import { MailTemplateType } from './entities/mail-template.entity';
 import { JwtAuthGuard } from '../../Seguridad/auth/jwt-auth.guard';
@@ -17,7 +13,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('admin/mail-templates')
 export class MailTemplateController {
-  constructor(private readonly mailTemplateService: MailTemplateService) {}
+  constructor(private readonly mailTemplateService: MailTemplateService) { }
 
   @Get()
   @Roles('Super Usuario')
@@ -26,7 +22,6 @@ export class MailTemplateController {
     return this.mailTemplateService.findAll();
   }
 
-<<<<<<< HEAD
   @Get('default-preview')
   @Roles('Super Usuario')
   @ApiOperation({ summary: 'Devuelve el HTML de admission.hbs con datos de muestra para previsualización' })
@@ -49,8 +44,6 @@ export class MailTemplateController {
     return { html };
   }
 
-=======
->>>>>>> ba9255c45525f0d13cc726801e273abb8daa4315
   @Get('tipo/:tipo')
   @ApiOperation({ summary: 'Listar plantillas por tipo (WELCOME, ENROLLMENT, etc)' })
   findByTipo(@Param('tipo') tipo: MailTemplateType) {
