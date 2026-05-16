@@ -302,13 +302,17 @@ export class UsuariosController {
   // ══════════════════════════════════════════════════════════
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('Ponente') // Restringido opcionalmente, o a todos los que requieran
+  @Roles('Ponente', 'Coordinador', 'Super Usuario', 'Admin', 'Administrador')
   @ApiBearerAuth()
   @Post('perfil/upload-firma')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: './uploads/firmas',
+        destination: (_req, _file, cb) => {
+          const p = join(process.cwd(), 'uploads', 'firmas');
+          if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
+          cb(null, p);
+        },
         filename: (req: any, file, cb) => {
           const ext = extname(file.originalname).toLowerCase();
           cb(null, `${uuidv4()}${ext}`);
@@ -318,7 +322,7 @@ export class UsuariosController {
         if (file.mimetype === 'image/png') {
           cb(null, true);
         } else {
-          cb(new Error('Extension válida para firma: PNG'), false);
+          cb(new Error('Extensión válida para firma: PNG'), false);
         }
       },
     }),

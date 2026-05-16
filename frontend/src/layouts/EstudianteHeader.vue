@@ -68,171 +68,21 @@ const toggleDark = () => {
 };
 
 const cambiarAPonente = async () => {
-  const persona = authStore.user?.persona as any;
-  const yaConfigurado = !!persona?.ponente_configurado;
-
-  if (yaConfigurado) {
-    // CASO A: YA ESTÁ ACTIVADO -> Validar contraseña para entrar
-    const { value: passwordCorrecta } = await Swal.fire({
-      title: 'Validar Acceso Ponente',
-      html: `
-        <p class="text-sm text-slate-500 mb-4">Por seguridad, ingrese su contraseña para acceder al portal.</p>
-        <div class="relative flex items-center">
-          <input id="swal-input-password-verify" type="password" class="swal2-input w-full pr-12" style="margin: 0;" placeholder="Contraseña...">
-          <button id="toggle-pass" type="button" class="absolute right-4 text-slate-400 hover:text-slate-600 transition-colors" style="top: 50%; transform: translateY(-50%); z-index: 10;">
-            <span class="material-symbols-outlined">visibility</span>
-          </button>
-        </div>
-      `,
-      showCancelButton: true,
-      confirmButtonText: 'Ingresar',
-      cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#2563eb',
-      showLoaderOnConfirm: true,
-      didOpen: () => {
-        const input = document.getElementById('swal-input-password-verify') as HTMLInputElement;
-        const toggle = document.getElementById('toggle-pass');
-        toggle?.addEventListener('click', () => {
-          input.type = input.type === 'password' ? 'text' : 'password';
-          toggle.innerHTML = `<span class="material-symbols-outlined">${input.type === 'password' ? 'visibility' : 'visibility_off'}</span>`;
-        });
-      },
-      preConfirm: async () => {
-        const password = (document.getElementById('swal-input-password-verify') as HTMLInputElement).value;
-        if (!password) { Swal.showValidationMessage('Debe ingresar su contraseña.'); return false; }
-        
-        try {
-          // Validamos la contraseña específicamente para el portal ponente
-          const response = await api.post('/auth/login', { 
-            email: authStore.user?.email, 
-            password: password,
-            portal: 'Ponente'
-          });
-          
-          // Si el login fue exitoso pero no es la clave de ponente, rechazar
-          if (response.data.rolSugerido !== 'Ponente') {
-            Swal.showValidationMessage('Esta es su clave de estudiante. Use su clave de ponente.');
-            return false;
-          }
-          
-          return true;
-        } catch (error) {
-          Swal.showValidationMessage('Contraseña incorrecta para el portal docente.');
-        }
-      }
-    });
-
-    if (passwordCorrecta) {
-      authStore.cambiarRolActivo('Ponente');
-      router.push('/ponente');
-    }
-    return;
-  }
-
-
-  // CASO B: NO ESTÁ ACTIVADO -> Flujo de Activación (CI + Nueva Password)
-  const { value: ciValido } = await Swal.fire({
-    title: 'Activar Acceso Ponente',
-    html: `
-      <p class="text-sm text-slate-500 mb-4">Paso 1: Valide su identidad con su <b>Documento de Identidad</b> registrado.</p>
-      <div class="relative flex items-center">
-        <input id="swal-input-ci" type="password" class="swal2-input w-full pr-12" style="margin: 0;" placeholder="Número de documento...">
-        <button id="toggle-ci" type="button" class="absolute right-4 text-slate-400 hover:text-slate-600 transition-colors" style="top: 50%; transform: translateY(-50%); z-index: 10;">
-          <span class="material-symbols-outlined">visibility</span>
-        </button>
-      </div>
-    `,
+  // Confirmación simple para cambiar al portal de ponente
+  const result = await Swal.fire({
+    title: 'Cambiar de Portal',
+    text: '¿Está seguro que desea acceder al Portal de Ponente?',
+    icon: 'question',
     showCancelButton: true,
-    confirmButtonText: 'Siguiente',
+    confirmButtonText: 'Sí, cambiar',
     cancelButtonText: 'Cancelar',
     confirmButtonColor: '#2563eb',
-    showLoaderOnConfirm: true,
-    didOpen: () => {
-      const input = document.getElementById('swal-input-ci') as HTMLInputElement;
-      const toggle = document.getElementById('toggle-ci');
-      toggle?.addEventListener('click', () => {
-        input.type = input.type === 'password' ? 'text' : 'password';
-        toggle.innerHTML = `<span class="material-symbols-outlined">${input.type === 'password' ? 'visibility' : 'visibility_off'}</span>`;
-      });
-    },
-    preConfirm: async () => {
-      const ci = (document.getElementById('swal-input-ci') as HTMLInputElement).value;
-      if (!ci) { Swal.showValidationMessage('Debe ingresar su documento.'); return false; }
-      try {
-        await usuariosService.verificarRespaldo(ci);
-        return ci;
-      } catch (error: any) {
-        Swal.showValidationMessage(error?.response?.data?.message || 'Documento incorrecto.');
-      }
-    }
+    cancelButtonColor: '#64748b',
+    reverseButtons: true
   });
 
-  if (!ciValido) return;
-
-  const { value: passwordConfigurada } = await Swal.fire({
-    title: 'Configurar Acceso Ponente',
-    html: `
-      <p class="text-sm text-slate-500 mb-4">Paso 2: Establezca su contraseña de acceso para el portal de ponente.</p>
-      <div class="space-y-4">
-        <div class="relative flex items-center">
-          <input id="swal-input-pass" type="password" class="swal2-input w-full pr-12" style="margin: 0;" placeholder="Nueva contraseña...">
-          <button id="toggle-p1" type="button" class="absolute right-4 text-slate-400 hover:text-slate-600 transition-colors" style="top: 50%; transform: translateY(-50%); z-index: 10;">
-            <span class="material-symbols-outlined">visibility</span>
-          </button>
-        </div>
-        <div class="relative flex items-center">
-          <input id="swal-input-pass-conf" type="password" class="swal2-input w-full pr-12" style="margin: 0;" placeholder="Confirmar contraseña...">
-          <button id="toggle-p2" type="button" class="absolute right-4 text-slate-400 hover:text-slate-600 transition-colors" style="top: 50%; transform: translateY(-50%); z-index: 10;">
-            <span class="material-symbols-outlined">visibility</span>
-          </button>
-        </div>
-      </div>
-    `,
-    showCancelButton: true,
-    confirmButtonText: 'Activar mi Portal',
-    cancelButtonText: 'Cancelar',
-    confirmButtonColor: '#059669',
-    showLoaderOnConfirm: true,
-    didOpen: () => {
-      const setupToggle = (inputId: string, toggleId: string) => {
-        const input = document.getElementById(inputId) as HTMLInputElement;
-        const toggle = document.getElementById(toggleId);
-        toggle?.addEventListener('click', () => {
-          input.type = input.type === 'password' ? 'text' : 'password';
-          toggle.innerHTML = `<span class="material-symbols-outlined">${input.type === 'password' ? 'visibility' : 'visibility_off'}</span>`;
-        });
-      };
-      setupToggle('swal-input-pass', 'toggle-p1');
-      setupToggle('swal-input-pass-conf', 'toggle-p2');
-    },
-    preConfirm: async () => {
-      const pass1 = (document.getElementById('swal-input-pass') as HTMLInputElement).value;
-      const pass2 = (document.getElementById('swal-input-pass-conf') as HTMLInputElement).value;
-      
-      if (!pass1 || !pass2) { Swal.showValidationMessage('Ambos campos son obligatorios.'); return false; }
-      if (pass1 !== pass2) { Swal.showValidationMessage('Las contraseñas no coinciden.'); return false; }
-
-      try {
-        await usuariosService.activarPonente(ciValido, pass1);
-        return true;
-      } catch (error: any) {
-        Swal.showValidationMessage('Error al activar el portal. Verifique su conexión.');
-      }
-    }
-  });
-
-  if (passwordConfigurada) {
+  if (result.isConfirmed) {
     authStore.cambiarRolActivo('Ponente');
-    if (authStore.user && authStore.user.persona) {
-      authStore.user.persona.ponente_configurado = true;
-    }
-    await Swal.fire({
-      icon: 'success',
-      title: '¡Portal Activado!',
-      text: 'Su acceso ha sido configurado correctamente.',
-      timer: 2000,
-      showConfirmButton: false
-    });
     router.push('/ponente');
   }
 };
@@ -383,7 +233,7 @@ onMounted(async () => {
         profilePhotoUrl.value = '';
       } else {
         if (profilePhotoUrl.value) URL.revokeObjectURL(profilePhotoUrl.value);
-        profilePhotoUrl.value = URL.createObjectURL(photoRes.data);
+        profilePhotoUrl.value = URL.createObjectURL(blob);
       }
     } else {
       profilePhotoUrl.value = '';

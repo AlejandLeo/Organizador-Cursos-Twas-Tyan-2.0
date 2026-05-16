@@ -69,11 +69,11 @@ export class MailService {
       this.logger.log(`Correo enviado correctamente a ${to}. [${countToday + 1}/${limit}] MessageId: ${info.messageId}`);
       return info;
     } catch (error) {
-      // Solo logueamos el error — NO lo relanzamos para que los flujos de negocio
-      // (aprobación, rechazo) no fallen por un problema de correo
+      // Logueamos el error para auditoría
       this.logger.error(`Error enviando correo a ${to}: ${error.message}`, error.stack);
-      // Re-lanzamos para que el llamador sepa que falló (específicamente en flujos que lo requieren)
-      throw error;
+      // NO relanzamos el error para evitar que los flujos de negocio (inscripciones, roles)
+      // se rompan por un problema de conexión con el proveedor de correo.
+      return null;
     }
   }
 

@@ -61,7 +61,7 @@ export const useAuthStore = defineStore('auth', () => {
    * Modificado: Ahora prioriza el portal de estudiante por defecto para usuarios mixtos.
    */
   function getRutaInicio(): string {
-    if (esSuperUsuario.value) return '/admin';
+    if (esSuperUsuario.value || userRoles.value.includes('Coordinador')) return '/admin';
     const roles = userRoles.value;
     const persona = user.value?.persona as any;
 

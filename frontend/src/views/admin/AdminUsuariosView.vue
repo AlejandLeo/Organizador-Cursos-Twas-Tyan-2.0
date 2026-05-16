@@ -21,9 +21,10 @@ const rolesTemp = ref<number[]>([]);
 const notificarRoles = ref(true);
 
 // IDs de roles (deben coincidir con la BD)
-const ROLE_IDS = { COORDINADOR: 2, LOGISTICA: 3, ESTUDIANTE: 4, PONENTE: 5 };
+const ROLE_IDS = { SUPER_USUARIO: 1, COORDINADOR: 2, LOGISTICA: 3, ESTUDIANTE: 4, PONENTE: 5 };
 
 const rolesDisponibles = [
+  { id: ROLE_IDS.SUPER_USUARIO, nombre: 'Super Usuario' },
   { id: ROLE_IDS.COORDINADOR, nombre: 'Coordinador' },
   { id: ROLE_IDS.LOGISTICA,    nombre: 'Logística' },
   { id: ROLE_IDS.PONENTE,     nombre: 'Ponente' },
@@ -97,6 +98,12 @@ const getRoles = (u: any): string[] =>
   u.usuariosRoles?.map((ur: any) => ur.rol?.nombre_rol).filter(Boolean) ?? [];
 
 const tienePonente = (u: any) => getRoles(u).includes('Ponente');
+
+const cleanCI = (ci: string) => {
+  if (!ci) return 'N/A';
+  // Eliminar prefijos comunes que vienen del backend por error o diseño antiguo
+  return ci.replace(/Carnet de Identidad:|Otro Documento Válido:|Documento de Identidad:|CI:/gi, '').trim();
+};
 
 // ── Crear usuario ──────────────────────────────────────────────────────────
 const isSavingForm = ref(false);
@@ -366,17 +373,21 @@ onMounted(fetchUsuarios);
                 </div>
               </td>
               <td class="px-6 py-4">
-                <span class="text-[10px] font-mono text-slate-500 dark:text-slate-400">
-                  {{ user.persona?.documento_identidad || 'N/A' }}
+                <span class="text-xs font-black font-mono text-slate-600 dark:text-slate-300">
+                  {{ cleanCI(user.persona?.documento_identidad) }}
                 </span>
               </td>
               <td class="px-6 py-4">
                 <div class="flex gap-1 flex-wrap">
                   <span v-for="nombre in getRoles(user)" :key="nombre"
-                        :class="nombre === 'Ponente' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200 dark:border-blue-800' : 
-                                nombre === 'Logística' ? 'bg-teal-100 text-teal-600 dark:bg-teal-900/20 dark:text-teal-400 border-teal-200 dark:border-teal-800' :
-                                'bg-slate-100 dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10'"
-                        class="px-2 py-0.5 rounded border text-[9px] font-black uppercase">
+                        :class="[
+                          nombre === 'Super Usuario' ? 'bg-red-600 text-white border-red-700 shadow-sm' :
+                          nombre === 'Coordinador' ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800' :
+                          nombre === 'Ponente' ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800' :
+                          nombre === 'Logística' ? 'bg-teal-100 text-teal-700 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-800' :
+                          'bg-slate-100 text-slate-600 border-slate-200 dark:bg-white/5 dark:text-slate-400 dark:border-white/10'
+                        ]"
+                        class="px-2 py-0.5 rounded border text-[9px] font-black uppercase tracking-wider">
                     {{ nombre }}
                   </span>
                   <span v-if="getRoles(user).length === 0" class="text-[9px] text-slate-400 italic">Sin rol</span>

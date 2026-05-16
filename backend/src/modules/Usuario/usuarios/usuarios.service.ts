@@ -680,48 +680,45 @@ export class UsuariosService {
 
       let contextoRol = '';
 
-      // Lógica de Validación Priorizada:
-      // Si el DTO indica un portal (ej: 'Ponente'), intentamos validar esa clave PRIMERO.
+      // Lógica de Validación Unificada:
+      const passwordValida = await bcrypt.compare(loginDto.password, usuario.password);
 
-      if (loginDto.portal === 'Ponente' && usuario.password_ponente && usuario.password_ponente.length > 10) {
-        const passPonenteValido = await bcrypt.compare(loginDto.password, usuario.password_ponente);
-        if (passPonenteValido) {
-          contextoRol = 'Ponente';
-        }
-      }
-
-      // Si no se validó arriba (porque no era ponente o la clave no coincidió), probamos la principal
-      if (!contextoRol) {
-        const passPrincipalValida = usuario.password
-          ? await bcrypt.compare(loginDto.password, usuario.password)
-          : false;
-
-        if (passPrincipalValida) {
-          contextoRol = 'Estudiante';
-
-          const esCoordinador = usuario.usuariosRoles?.some((ur: any) =>
-            ur.rol?.id === 2 || ur.rol?.nombre_rol === 'Coordinador'
-          );
-          if (esCoordinador) contextoRol = 'Coordinador';
-
-          const esAdmin = usuario.usuariosRoles?.some((ur: any) =>
-            ur.rol?.id === 1 || ur.rol?.nombre_rol === 'Super Usuario'
-          );
-          if (esAdmin) contextoRol = 'Admin';
-        }
-      }
-
-      // Fallback final: si aún no tenemos rol y no probamos la de ponente antes, probarla ahora
-      if (!contextoRol && loginDto.portal !== 'Ponente' && usuario.password_ponente && usuario.password_ponente.length > 10) {
-        const passPonenteValido = await bcrypt.compare(loginDto.password, usuario.password_ponente);
-        if (passPonenteValido) {
-          contextoRol = 'Ponente';
-        }
-      }
-
-      if (!contextoRol) {
+      if (!passwordValida) {
         throw new UnauthorizedException('Credenciales incorrectas.');
       }
+
+      // ── AUTORREPARACIÓN DE ROL ADMIN ──────────────────────────────────────
+      // Si es la cuenta maestra, aseguramos que tenga el ROL 1 (Super Usuario)
+      if (usuario.email === 'admin@tyan.org') {
+        const tieneRolAdmin = usuario.usuariosRoles?.some((ur: any) => ur.rol?.id === 1);
+        if (!tieneRolAdmin) {
+          console.log('[SECURITY] Detectada cuenta admin@tyan.org sin Rol 1. Reparando...');
+          try {
+            const usuarioRolRepo = this.usuarioRepository.manager.getRepository('UsuarioRol');
+            await usuarioRolRepo.save({ usuario: { id: usuario.id }, rol: { id: 1 } });
+            // Recargar usuario para que el resto de la lógica vea el nuevo rol
+            const usuarioActualizado = await this.usuarioRepository.findOne({
+              where: { id: usuario.id },
+              relations: ['persona', 'usuariosRoles', 'usuariosRoles.rol'],
+            });
+            if (usuarioActualizado) {
+              usuario.usuariosRoles = usuarioActualizado.usuariosRoles;
+            }
+          } catch (e) {
+            console.error('[SECURITY ERROR] No se pudo autorreparar rol admin:', e);
+          }
+        }
+      }
+
+      // Determinamos el Portal/Rol Sugerido por jerarquía:
+      // Super Usuario > Coordinador > Ponente > Estudiante
+      contextoRol = 'Estudiante';
+
+      const roles = usuario.usuariosRoles?.map((ur: any) => ur.rol?.nombre_rol) || [];
+
+      if (roles.includes('Ponente')) contextoRol = 'Ponente';
+      if (roles.includes('Coordinador')) contextoRol = 'Coordinador';
+      if (roles.includes('Super Usuario')) contextoRol = 'Admin';
 
       // Eliminamos passwords antes de devolver
       const { password, password_ponente, ...usuarioSinPassword } = usuario;
@@ -905,8 +902,7 @@ export class UsuariosService {
       } catch (mailError) {
         this.logger.error(`Error enviando correo de bienvenida a ${dto.email}: ${mailError.message}`);
       }
-      }
-
+      
       // Devolvemos el perfil cargado (usando el método existente)
       const perfil = await this.getPerfil(usuarioGuardado.id);
       return { ...perfil, correoEnviado };

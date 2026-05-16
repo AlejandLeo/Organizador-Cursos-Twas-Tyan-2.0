@@ -204,7 +204,7 @@ onMounted(async () => {
         profilePhotoUrl.value = '';
       } else {
         if (profilePhotoUrl.value) URL.revokeObjectURL(profilePhotoUrl.value);
-        profilePhotoUrl.value = URL.createObjectURL(photoRes.data);
+        profilePhotoUrl.value = URL.createObjectURL(blob);
       }
     } else {
       profilePhotoUrl.value = '';

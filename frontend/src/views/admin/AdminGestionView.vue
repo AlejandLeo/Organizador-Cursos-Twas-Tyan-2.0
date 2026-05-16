@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useAdminHistorialStore } from '@/stores/adminHistorial';
 import api, { getImageUrl } from '@/services/api';
@@ -8,13 +8,26 @@ import { coordinacionesService } from '@/services/coordinaciones.service';
 import { usuariosService } from '@/services/usuarios.service';
 import Swal from 'sweetalert2';
 
+const usuariosDetalle = ref<any[]>([]);
+const fetchUsuariosPersonal = async () => {
+  try {
+    const res = await api.get('/admin/usuarios');
+    usuariosDetalle.value = res.data?.map((u: any) => ({
+      ...u,
+      nombre: u.persona ? `${u.persona.nombres} ${u.persona.primer_apellido}` : u.email,
+      rol: u.usuariosRoles?.[0]?.rol?.nombre_rol || 'Usuario'
+    })) || [];
+  } catch (e) { console.error(e); }
+};
+
 const router = useRouter();
+const route = useRoute();
 
 const authStore = useAuthStore();
 const historialStore = useAdminHistorialStore();
 
 // ─── Estado Global ─────────────────────────────────────────
-const tabActivo = ref<'eventos' | 'actividades' | 'solicitudes' | 'soporte'>('eventos');
+const tabActivo = ref<'eventos' | 'actividades' | 'solicitudes' | 'soporte' | 'reportes'>('eventos');
 const isLoading = ref(false);
 const filtroTexto = ref('');
 const filtroEstado = ref('');
@@ -415,7 +428,135 @@ onMounted(() => {
   fetchActividades(); 
   fetchSolicitudes();
   fetchTickets();
+  fetchUsuariosPersonal();
+
+  // Manejar navegación directa por Tabs (vía Query Params)
+  if (route.query.tab) {
+    const tab = route.query.tab as any;
+    if (['eventos', 'actividades', 'solicitudes', 'soporte', 'reportes'].includes(tab)) {
+      tabActivo.value = tab;
+    }
+  }
 });
+
+// ─── LÓGICA DE REPORTES SEGMENTADOS ──────────────────────────
+const generarReporteGeneral = async (categoria: string, formato: 'excel' | 'pdf') => {
+  if (formato === 'pdf') {
+    await exportarPDFSegmentado(categoria);
+  } else {
+    exportarExcelSegmentado(categoria);
+  }
+};
+
+const exportarExcelSegmentado = (categoria: string) => {
+  const titles: Record<string, string> = {
+    eventos: 'REPORTE_EVENTOS_SGEA',
+    actividades: 'REPORTE_ACTIVIDADES_SGEA',
+    usuarios: 'DIRECTORIO_USUARIOS_SGEA',
+    auditoria: 'BITACORA_AUDITORIA_SGEA'
+  };
+  
+  const fileName = `${titles[categoria] || 'Reporte'}_${new Date().toISOString().slice(0, 10)}.xls`;
+  let contentHtml = '';
+
+  if (categoria === 'eventos') {
+    contentHtml = `
+      <tr><td colspan="5" style="background-color: #003B71; color: white; font-weight: bold; font-size: 16pt; text-align: center;">REPORTE DE EVENTOS INSTITUCIONALES</td></tr>
+      <tr style="background-color: #f1f5f9; font-weight: bold;"><td>ID</td><td>Nombre del Evento</td><td>Gestión</td><td>Modalidad</td><td>Estado</td></tr>
+      ${eventos.value.map(e => `<tr><td>${e.id}</td><td>${e.nombre}</td><td>${e.gestion}</td><td>${e.modalidad || 'Presencial'}</td><td>${e.estado === 1 ? 'Activo' : 'Planificación'}</td></tr>`).join('')}
+    `;
+  } else if (categoria === 'actividades') {
+    contentHtml = `
+      <tr><td colspan="5" style="background-color: #f59e0b; color: white; font-weight: bold; font-size: 16pt; text-align: center;">REPORTE DE ACTIVIDADES ACADÉMICAS</td></tr>
+      <tr style="background-color: #fef3c7; font-weight: bold;"><td>ID</td><td>Actividad</td><td>Tipo</td><td>Horas</td><td>Fecha</td></tr>
+      ${actividades.value.map(a => `<tr><td>${a.id}</td><td>${a.nombre}</td><td>${a.tipo}</td><td>${a.horas_academicas || 0}</td><td>${a.fecha_inicio || '—'}</td></tr>`).join('')}
+    `;
+  } else if (categoria === 'usuarios') {
+    contentHtml = `
+      <tr><td colspan="4" style="background-color: #10b981; color: white; font-weight: bold; font-size: 16pt; text-align: center;">DIRECTORIO DE USUARIOS</td></tr>
+      <tr style="background-color: #ecfdf5; font-weight: bold;"><td>Nombre</td><td>Email</td><td>Rol</td><td>Fecha Registro</td></tr>
+      ${usuariosDetalle.value.map(u => `<tr><td>${u.nombre || u.persona?.nombre}</td><td>${u.email}</td><td>${u.rol}</td><td>${u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}</td></tr>`).join('')}
+    `;
+  } else if (categoria === 'auditoria') {
+    contentHtml = `
+      <tr><td colspan="5" style="background-color: #e11d48; color: white; font-weight: bold; font-size: 16pt; text-align: center;">BITÁCORA DE AUDITORÍA</td></tr>
+      <tr style="background-color: #fff1f2; font-weight: bold;"><td>Fecha</td><td>Módulo</td><td>Acción</td><td>Descripción</td><td>Usuario</td></tr>
+      ${historialStore.registros.map(r => `<tr><td>${new Date(r.fecha_creacion).toLocaleString()}</td><td>${r.modulo}</td><td>${r.accion}</td><td>${r.descripcion}</td><td>${r.usuario}</td></tr>`).join('')}
+    `;
+  }
+
+  const html = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+    <head><meta charset="utf-8"><style>td { border: 1px solid #cbd5e1; font-family: sans-serif; font-size: 10pt; }</style></head>
+    <body><table>${contentHtml}</table></body></html>
+  `;
+
+  const blob = new Blob(['\uFEFF', html], { type: 'application/vnd.ms-excel' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  window.URL.revokeObjectURL(url);
+  Swal.fire({ icon: 'success', title: 'Excel Generado', text: `Se exportó el reporte de ${categoria}.`, confirmButtonColor: '#10b981' });
+};
+
+const exportarPDFSegmentado = async (categoria: string) => {
+  try {
+    const { default: jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
+    const doc = new jsPDF();
+    
+    const colors: Record<string, [number, number, number]> = {
+      eventos: [0, 59, 113],
+      actividades: [245, 158, 11],
+      usuarios: [16, 185, 129],
+      auditoria: [225, 29, 72]
+    };
+
+    doc.setFillColor(...(colors[categoria] || [0, 112, 180]));
+    doc.rect(0, 0, 210, 40, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`REPORTE: ${categoria.toUpperCase()}`, 105, 25, { align: 'center' });
+    
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(10);
+    doc.text(`Generado el: ${new Date().toLocaleString()}`, 105, 50, { align: 'center' });
+
+    let body: any[][] = [];
+    let head: any[][] = [];
+
+    if (categoria === 'eventos') {
+      head = [['ID', 'NOMBRE', 'GESTIÓN', 'MODALIDAD', 'ESTADO']];
+      body = eventos.value.map(e => [e.id, e.nombre, e.gestion, e.modalidad || 'Presencial', e.estado === 1 ? 'Activo' : 'Planificación']);
+    } else if (categoria === 'actividades') {
+      head = [['ID', 'ACTIVIDAD', 'TIPO', 'HORAS', 'FECHA']];
+      body = actividades.value.map(a => [a.id, a.nombre, a.tipo, a.horas_academicas || 0, a.fecha_inicio || '—']);
+    } else if (categoria === 'usuarios') {
+      head = [['NOMBRE', 'EMAIL', 'ROL', 'REGISTRO']];
+      body = usuariosDetalle.value.map(u => [u.nombre || u.persona?.nombre, u.email, u.rol, u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—']);
+    } else if (categoria === 'auditoria') {
+      head = [['FECHA', 'MÓDULO', 'ACCIÓN', 'DESCRIPCIÓN', 'USUARIO']];
+      body = historialStore.registros.map(r => [new Date(r.fecha_creacion).toLocaleDateString(), r.modulo, r.accion, r.descripcion, r.usuario]);
+    }
+
+    autoTable(doc, {
+      head,
+      body,
+      startY: 60,
+      theme: 'grid',
+      headStyles: { fillColor: colors[categoria], textColor: 255, fontStyle: 'bold' },
+      styles: { fontSize: 8, cellPadding: 3 }
+    });
+
+    doc.save(`Reporte_${categoria.toUpperCase()}_${new Date().toISOString().slice(0, 10)}.pdf`);
+    Swal.fire({ icon: 'success', title: 'PDF Generado', text: `El reporte de ${categoria} está listo.`, confirmButtonColor: '#e11d48' });
+  } catch (e) {
+    Swal.fire('Error', 'No se pudo generar el PDF.', 'error');
+  }
+};
 </script>
 
 <template>
@@ -867,161 +1008,258 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- ══════════════════════════════════════════════ -->
-    <!--  MODAL ACTIVIDAD                               -->
-    <!-- ══════════════════════════════════════════════ -->
-    <Teleport to="body">
-      <div v-if="showModalAct" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
-        <div class="bg-white dark:bg-[#0d0d14] w-full max-w-xl rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-2xl overflow-auto max-h-[92vh] animate-in zoom-in duration-300">
-          <div class="p-8">
-            <div class="flex justify-between items-center mb-8">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center">
-                  <span class="material-symbols-outlined text-white text-[20px]">school</span>
-                </div>
-                <h2 class="text-xl font-black text-slate-800 dark:text-white uppercase italic">
-                  {{ isEditingAct ? 'Editar Actividad' : 'Nueva Actividad' }}
-                </h2>
-              </div>
-              <button @click="showModalAct = false" class="text-slate-400 hover:text-red-600 transition-colors">
-                <span class="material-symbols-outlined text-[28px]">close</span>
-              </button>
+
+
+
+    <!-- TAB: REPORTES (NUEVO APARTADO) -->
+    <div v-if="tabActivo === 'reportes'" class="animate-in slide-in-from-bottom-4 duration-500">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- Tarjeta: Reportes de Eventos -->
+        <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-8 shadow-sm group hover:shadow-xl hover:shadow-blue-500/5 transition-all">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="w-14 h-14 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+              <span class="material-symbols-outlined text-3xl">corporate_fare</span>
             </div>
-
-            <div class="space-y-4">
-              <div class="space-y-1">
-                <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Evento al que pertenece</label>
-                <select v-model="formActividad.id_evento"
-                        class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-amber-500/50">
-                  <option value="">Seleccionar evento padre...</option>
-                  <option v-for="ev in eventos" :key="ev.id" :value="ev.id">{{ ev.nombre }}</option>
-                </select>
-              </div>
-
-              <div class="grid grid-cols-2 gap-4">
-                <div class="space-y-1 col-span-2">
-                  <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre de la Actividad</label>
-                  <input v-model="formActividad.nombre" type="text"
-                         class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-amber-500/50 transition-all" />
-                </div>
-                <div class="space-y-1">
-                  <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Tipo</label>
-                  <select v-model="formActividad.tipo"
-                          class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-amber-500/50">
-                    <option v-for="t in tiposActividad" :key="t" :value="t">{{ t }}</option>
-                  </select>
-                </div>
-                <div class="space-y-1">
-                  <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Duración (horas)</label>
-                  <input v-model="formActividad.horas" type="number" min="1"
-                         class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-amber-500/50 transition-all" />
-                </div>
-              </div>
-
-              <div class="space-y-1">
-                <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Descripción</label>
-                <textarea v-model="formActividad.descripcion" rows="3"
-                          class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-amber-500/50 resize-none transition-all"></textarea>
-              </div>
-
-              <div class="grid grid-cols-2 gap-4">
-                <div class="space-y-1">
-                  <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Fecha Inicio</label>
-                  <input v-model="formActividad.fecha_inicio" type="date"
-                         class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-amber-500/50 transition-all" />
-                </div>
-                <div class="space-y-1">
-                  <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Fecha Fin</label>
-                  <input v-model="formActividad.fecha_fin" type="date"
-                         class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-amber-500/50 transition-all" />
-                </div>
-              </div>
+            <div>
+              <h3 class="text-lg font-black text-slate-800 dark:text-white uppercase italic">Reportes de Eventos</h3>
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Información técnica y logística</p>
             </div>
+          </div>
+          <p class="text-xs text-slate-500 dark:text-gray-400 mb-8 leading-relaxed">Genera informes detallados sobre los eventos institucionales, incluyendo fechas, modalidades y estados actuales de planificación.</p>
+          <div class="flex gap-3">
+            <button @click="generarReporteGeneral('eventos', 'excel')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
+              <span class="material-symbols-outlined text-sm">grid_on</span> EXCEL
+            </button>
+            <button @click="generarReporteGeneral('eventos', 'pdf')" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2">
+              <span class="material-symbols-outlined text-sm">picture_as_pdf</span> PDF
+            </button>
+          </div>
+        </div>
 
-            <div class="mt-8 flex gap-3">
-              <button @click="showModalAct = false"
-                      class="flex-1 py-4 bg-slate-100 dark:bg-white/5 text-[10px] font-black text-slate-500 uppercase rounded-2xl hover:bg-slate-200 transition-all">Cancelar</button>
-              <button @click="guardarActividad()"
-                      class="flex-2 px-10 py-4 bg-amber-500 text-[10px] font-black text-white uppercase rounded-2xl shadow-lg shadow-amber-500/20 hover:bg-amber-600 transition-all">
-                {{ isEditingAct ? 'Guardar Cambios' : 'Crear Actividad' }}
-              </button>
+        <!-- Tarjeta: Reportes de Actividades -->
+        <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-8 shadow-sm group hover:shadow-xl hover:shadow-amber-500/5 transition-all">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400">
+              <span class="material-symbols-outlined text-3xl">school</span>
             </div>
+            <div>
+              <h3 class="text-lg font-black text-slate-800 dark:text-white uppercase italic">Reportes Académicos</h3>
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cursos, talleres y seminarios</p>
+            </div>
+          </div>
+          <p class="text-xs text-slate-500 dark:text-gray-400 mb-8 leading-relaxed">Exporta el listado completo de actividades académicas con su carga horaria, eventos asociados y fechas de ejecución.</p>
+          <div class="flex gap-3">
+            <button @click="generarReporteGeneral('actividades', 'excel')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
+              <span class="material-symbols-outlined text-sm">grid_on</span> EXCEL
+            </button>
+            <button @click="generarReporteGeneral('actividades', 'pdf')" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2">
+              <span class="material-symbols-outlined text-sm">picture_as_pdf</span> PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- Tarjeta: Reportes de Usuarios -->
+        <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-8 shadow-sm group hover:shadow-xl hover:shadow-emerald-500/5 transition-all">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+              <span class="material-symbols-outlined text-3xl">group</span>
+            </div>
+            <div>
+              <h3 class="text-lg font-black text-slate-800 dark:text-white uppercase italic">Directorio de Personal</h3>
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Estudiantes, Ponentes y Staff</p>
+            </div>
+          </div>
+          <p class="text-xs text-slate-500 dark:text-gray-400 mb-8 leading-relaxed">Informe consolidado de todos los usuarios registrados en el sistema, categorizados por su rol institucional y fecha de alta.</p>
+          <div class="flex gap-3">
+            <button @click="generarReporteGeneral('usuarios', 'excel')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
+              <span class="material-symbols-outlined text-sm">grid_on</span> EXCEL
+            </button>
+            <button @click="generarReporteGeneral('usuarios', 'pdf')" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2">
+              <span class="material-symbols-outlined text-sm">picture_as_pdf</span> PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- Tarjeta: Bitácora de Auditoría -->
+        <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-8 shadow-sm group hover:shadow-xl hover:shadow-rose-500/5 transition-all">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="w-14 h-14 rounded-2xl bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center text-rose-600 dark:text-rose-400">
+              <span class="material-symbols-outlined text-3xl">history</span>
+            </div>
+            <div>
+              <h3 class="text-lg font-black text-slate-800 dark:text-white uppercase italic">Historial de Auditoría</h3>
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Registro de acciones y cambios</p>
+            </div>
+          </div>
+          <p class="text-xs text-slate-500 dark:text-gray-400 mb-8 leading-relaxed">Reporte detallado de todas las transacciones y modificaciones realizadas por el personal administrativo en el sistema.</p>
+          <div class="flex gap-3">
+            <button @click="generarReporteGeneral('auditoria', 'excel')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
+              <span class="material-symbols-outlined text-sm">grid_on</span> EXCEL
+            </button>
+            <button @click="generarReporteGeneral('auditoria', 'pdf')" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2">
+              <span class="material-symbols-outlined text-sm">picture_as_pdf</span> PDF
+            </button>
           </div>
         </div>
       </div>
-    </Teleport>
+    </div>
 
     <!-- ══════════════════════════════════════════════ -->
-    <!--  MODAL COORDINADORES (ADMIN GESTION)           -->
+    <!--  MODALES (TELEPORT)                            -->
     <!-- ══════════════════════════════════════════════ -->
-    <Teleport to="body">
-      <div v-if="showModalCoordinadores" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
-        <div class="bg-white dark:bg-[#0d0d14] w-full max-w-2xl rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-          <div class="p-8">
-            <div class="flex justify-between items-center mb-8">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center">
-                  <span class="material-symbols-outlined text-white text-[20px]">manage_accounts</span>
-                </div>
-                <div>
-                  <h2 class="text-xl font-black text-slate-800 dark:text-white uppercase italic leading-tight">Responsables del Evento</h2>
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{{ eventoParaCoordinadores?.nombre }}</p>
-                </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!--  MODALES (TELEPORT)                            -->
+  <!-- ══════════════════════════════════════════════ -->
+  <Teleport to="body">
+    <!-- MODAL ACTIVIDAD -->
+    <div v-if="showModalAct" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
+      <div class="bg-white dark:bg-[#0d0d14] w-full max-w-xl rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-2xl overflow-auto max-h-[92vh] animate-in zoom-in duration-300">
+        <div class="p-8">
+          <div class="flex justify-between items-center mb-8">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center">
+                <span class="material-symbols-outlined text-white text-[20px]">school</span>
               </div>
-              <button @click="showModalCoordinadores = false" class="text-slate-400 hover:text-red-600 transition-colors">
-                <span class="material-symbols-outlined text-[28px]">close</span>
-              </button>
+              <h2 class="text-xl font-black text-slate-800 dark:text-white uppercase italic">
+                {{ isEditingAct ? 'Editar Actividad' : 'Nueva Actividad' }}
+              </h2>
+            </div>
+            <button @click="showModalAct = false" class="text-slate-400 hover:text-red-600 transition-colors">
+              <span class="material-symbols-outlined text-[28px]">close</span>
+            </button>
+          </div>
+
+          <div class="space-y-4">
+            <div class="space-y-1">
+              <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Evento al que pertenece</label>
+              <select v-model="formActividad.id_evento"
+                      class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-amber-500/50">
+                <option value="">Seleccionar evento padre...</option>
+                <option v-for="ev in eventos" :key="ev.id" :value="ev.id">{{ ev.nombre }}</option>
+              </select>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <!-- Actuales -->
-              <div class="space-y-4">
-                <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                  <span class="material-symbols-outlined text-sm">groups</span> Responsables Actuales
-                </h3>
-                <div v-if="cargandoCoordinadores" class="py-10 flex justify-center"><div class="w-6 h-6 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin"></div></div>
-                <div v-else-if="coordinadoresActuales.length === 0" class="py-10 text-center border-2 border-dashed border-slate-100 rounded-2xl text-[10px] font-bold text-slate-300 uppercase">Sin responsables asignados</div>
-                <div v-else class="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                  <div v-for="c in coordinadoresActuales" :key="c.id" class="flex items-center justify-between p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/5">
-                    <div class="flex items-center gap-3">
-                      <div class="w-8 h-8 rounded-full bg-slate-200 dark:bg-gray-700 flex items-center justify-center text-[10px] font-black text-slate-500">
-                        {{ c.usuario?.persona?.nombres?.charAt(0) }}{{ c.usuario?.persona?.primer_apellido?.charAt(0) }}
-                      </div>
-                      <div>
-                        <div class="flex items-center gap-2">
-                          <p class="text-[10px] font-black text-slate-800 dark:text-white uppercase">{{ c.usuario?.persona?.nombres }} {{ c.usuario?.persona?.primer_apellido }}</p>
-                          <span class="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-white/10 text-[8px] font-black text-slate-500 uppercase">
-                            {{ getRoleName(c.usuario) }}
-                          </span>
-                        </div>
-                        <p class="text-[8px] text-slate-400 font-bold uppercase tracking-tighter">{{ c.usuario?.email }}</p>
-                      </div>
-                    </div>
-                    <button @click="quitarCoordinador(c)" class="text-slate-300 hover:text-red-500 transition-colors"><span class="material-symbols-outlined text-lg">remove_circle</span></button>
-                  </div>
-                </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="space-y-1 col-span-2">
+                <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre de la Actividad</label>
+                <input v-model="formActividad.nombre" type="text"
+                       class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-amber-500/50 transition-all" />
               </div>
+              <div class="space-y-1">
+                <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Tipo</label>
+                <select v-model="formActividad.tipo"
+                        class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-amber-500/50">
+                  <option v-for="t in tiposActividad" :key="t" :value="t">{{ t }}</option>
+                </select>
+              </div>
+              <div class="space-y-1">
+                <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Duración (horas)</label>
+                <input v-model="formActividad.horas" type="number" min="1"
+                       class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-amber-500/50 transition-all" />
+              </div>
+            </div>
 
-              <!-- Candidatos -->
-              <div class="space-y-4">
-                <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                  <span class="material-symbols-outlined text-sm">person_search</span> Asignar Nuevo
-                </h3>
-                <input v-model="queryCandidato" type="text" placeholder="BUSCAR POR NOMBRE O EMAIL..." class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-[10px] font-bold uppercase outline-none focus:border-slate-800/50 transition-all" />
-                <div class="space-y-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-                  <div v-for="u in candidatosFiltrados" :key="u.id" @click="asignarCoordinador(u)" class="flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl cursor-pointer transition-colors border border-transparent hover:border-slate-100">
-                    <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-gray-800 flex items-center justify-center text-[10px] font-black text-slate-400 group-hover:bg-white">
-                      <span class="material-symbols-outlined text-sm">person</span>
+            <div class="space-y-1">
+              <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Descripción</label>
+              <textarea v-model="formActividad.descripcion" rows="3"
+                        class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-amber-500/50 resize-none transition-all"></textarea>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div class="space-y-1">
+                <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Fecha Inicio</label>
+                <input v-model="formActividad.fecha_inicio" type="date"
+                       class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-amber-500/50 transition-all" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Fecha Fin</label>
+                <input v-model="formActividad.fecha_fin" type="date"
+                       class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-amber-500/50 transition-all" />
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-8 flex gap-3">
+            <button @click="showModalAct = false"
+                    class="flex-1 py-4 bg-slate-100 dark:bg-white/5 text-[10px] font-black text-slate-500 uppercase rounded-2xl hover:bg-slate-200 transition-all">Cancelar</button>
+            <button @click="guardarActividad()"
+                    class="flex-2 px-10 py-4 bg-amber-500 text-[10px] font-black text-white uppercase rounded-2xl shadow-lg shadow-amber-500/20 hover:bg-amber-600 transition-all">
+              {{ isEditingAct ? 'Guardar Cambios' : 'Crear Actividad' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL COORDINADORES -->
+    <div v-if="showModalCoordinadores" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
+      <div class="bg-white dark:bg-[#0d0d14] w-full max-w-2xl rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden animate-in zoom-in duration-300">
+        <div class="p-8">
+          <div class="flex justify-between items-center mb-8">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center">
+                <span class="material-symbols-outlined text-white text-[20px]">manage_accounts</span>
+              </div>
+              <div>
+                <h2 class="text-xl font-black text-slate-800 dark:text-white uppercase italic leading-tight">Responsables del Evento</h2>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{{ eventoParaCoordinadores?.nombre }}</p>
+              </div>
+            </div>
+            <button @click="showModalCoordinadores = false" class="text-slate-400 hover:text-red-600 transition-colors">
+              <span class="material-symbols-outlined text-[28px]">close</span>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Actuales -->
+            <div class="space-y-4">
+              <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <span class="material-symbols-outlined text-sm">groups</span> Responsables Actuales
+              </h3>
+              <div v-if="cargandoCoordinadores" class="py-10 flex justify-center"><div class="w-6 h-6 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin"></div></div>
+              <div v-else-if="coordinadoresActuales.length === 0" class="py-10 text-center border-2 border-dashed border-slate-100 rounded-2xl text-[10px] font-bold text-slate-300 uppercase">Sin responsables asignados</div>
+              <div v-else class="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                <div v-for="c in coordinadoresActuales" :key="c.id" class="flex items-center justify-between p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/5">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-slate-200 dark:bg-gray-700 flex items-center justify-center text-[10px] font-black text-slate-500">
+                      {{ c.usuario?.persona?.nombres?.charAt(0) }}{{ c.usuario?.persona?.primer_apellido?.charAt(0) }}
                     </div>
                     <div>
                       <div class="flex items-center gap-2">
-                        <p class="text-[10px] font-black text-slate-700 dark:text-gray-200 uppercase">{{ u.persona?.nombres }} {{ u.persona?.primer_apellido }}</p>
-                        <span class="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/20 text-[7px] font-black text-blue-600 uppercase border border-blue-100 dark:border-blue-800/30">
-                          {{ getRoleName(u) }}
+                        <p class="text-[10px] font-black text-slate-800 dark:text-white uppercase">{{ c.usuario?.persona?.nombres }} {{ c.usuario?.persona?.primer_apellido }}</p>
+                        <span class="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-white/10 text-[8px] font-black text-slate-500 uppercase">
+                          {{ getRoleName(c.usuario) }}
                         </span>
                       </div>
-                      <p class="text-[8px] text-slate-400">{{ u.email }}</p>
+                      <p class="text-[8px] text-slate-400 font-bold uppercase tracking-tighter">{{ c.usuario?.email }}</p>
                     </div>
+                  </div>
+                  <button @click="quitarCoordinador(c)" class="text-slate-300 hover:text-red-500 transition-colors"><span class="material-symbols-outlined text-lg">remove_circle</span></button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Candidatos -->
+            <div class="space-y-4">
+              <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <span class="material-symbols-outlined text-sm">person_search</span> Asignar Nuevo
+              </h3>
+              <input v-model="queryCandidato" type="text" placeholder="BUSCAR POR NOMBRE O EMAIL..." class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-[10px] font-bold uppercase outline-none focus:border-slate-800/50 transition-all" />
+              <div class="space-y-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                <div v-for="u in candidatosFiltrados" :key="u.id" @click="asignarCoordinador(u)" class="flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl cursor-pointer transition-colors border border-transparent hover:border-slate-100">
+                  <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-gray-800 flex items-center justify-center text-[10px] font-black text-slate-400 group-hover:bg-white">
+                    <span class="material-symbols-outlined text-sm">person</span>
+                  </div>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <p class="text-[10px] font-black text-slate-700 dark:text-gray-200 uppercase">{{ u.persona?.nombres }} {{ u.persona?.primer_apellido }}</p>
+                      <span class="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/20 text-[7px] font-black text-blue-600 uppercase border border-blue-100 dark:border-blue-800/30">
+                        {{ getRoleName(u) }}
+                      </span>
+                    </div>
+                    <p class="text-[8px] text-slate-400">{{ u.email }}</p>
                   </div>
                 </div>
               </div>
@@ -1029,13 +1267,15 @@ onMounted(() => {
           </div>
         </div>
       </div>
-    </Teleport>
-
-
-  </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
 .custom-scrollbar::-webkit-scrollbar { width: 4px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
