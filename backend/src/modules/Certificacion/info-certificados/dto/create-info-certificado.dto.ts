@@ -30,6 +30,12 @@ export class CreateInfoCertificadoDto {
   @IsInt()
   tipo?: number;
 
+  @ApiPropertyOptional({ example: 0, description: 'Indicador de Excelencia (0: Participación, 1: Excelencia)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  es_excelencia?: number;
+
   @ApiPropertyOptional({ description: 'JSON con configuracion visual' })
   @IsOptional()
   configuracion?: any;

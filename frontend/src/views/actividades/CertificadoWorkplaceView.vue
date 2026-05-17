@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api, { getImageUrl } from '@/services/api'
 import Swal from 'sweetalert2'
@@ -7,7 +7,27 @@ import Swal from 'sweetalert2'
 const route = useRoute()
 const router = useRouter()
 const eventoId = route.params.id
-const tipoCertificado = route.query.tipo || 1
+const tipoCertificado = ref<number>(Number(route.query.tipo || 1))
+const esExcelencia = ref<number>(route.query.es_excelencia !== undefined ? Number(route.query.es_excelencia) : 0)
+
+const showPreviewModal = ref(false)
+
+const resolvePreviewVariables = (text: string) => {
+    if (!text) return ''
+    return text
+        .replace(/{NOMBRE_ESTUDIANTE}/g, 'Lic. Alejandro Leonardo Nogales')
+        .replace(/{PRIMER_APELLIDO}/g, 'Nogales')
+        .replace(/{SEGUNDO_APELLIDO}/g, 'Ticona')
+        .replace(/{NOMBRE_CURSO}/g, 'Congreso Internacional de Biofertilizantes')
+        .replace(/{EVENTO}/g, 'Congreso Internacional de Biofertilizantes')
+        .replace(/{ACTIVIDAD}/g, 'Taller Avanzado de Suelos')
+        .replace(/{CODIGO_CERTIFICADO}/g, 'CERT-TWAS-TYAN-2026-9842')
+}
+
+const resolvePreviewTenor = (text: string) => {
+    if (!text) return '[ TENOR PENDIENTE ]'
+    return resolvePreviewVariables(text)
+}
 
 interface ElementoLienzo {
   id: string
@@ -33,7 +53,11 @@ const selectedElementData = ref<ElementoLienzo | null>(null)
 const fetchData = async () => {
     try {
         if (eventoId) {
-            const infoRes = await api.get(`/info-certificados/evento/${eventoId}?tipo=${tipoCertificado}`)
+            let url = `/info-certificados/evento/${eventoId}?tipo=${tipoCertificado.value}`
+            if (Number(tipoCertificado.value) === 4) {
+                url += `&es_excelencia=${esExcelencia.value}`
+            }
+            const infoRes = await api.get(url)
             if (infoRes.data && infoRes.data.length > 0) {
                 infoCertificado.value = infoRes.data[0]
                 if (infoCertificado.value.configuracion) {
@@ -44,16 +68,39 @@ const fetchData = async () => {
                     } catch(e) {
                         elementosLienzo.value = []
                     }
+                } else {
+                    elementosLienzo.value = []
                 }
+            } else {
+                infoCertificado.value = {
+                    cabecera: '',
+                    tenor: '',
+                    estado: 1
+                }
+                elementosLienzo.value = []
             }
         }
     } catch (error) {
         console.error('Error fetching data', error)
+        infoCertificado.value = {
+            cabecera: '',
+            tenor: '',
+            estado: 1
+        }
+        elementosLienzo.value = []
     }
 }
 
 onMounted(() => {
     fetchData()
+})
+
+watch([tipoCertificado, esExcelencia], async () => {
+    elementoSeleccionado.value = null
+    selectedElementData.value = null
+    elementosLienzo.value = []
+    infoCertificado.value = null
+    await fetchData()
 })
 
 const triggerUpload = () => {
@@ -242,13 +289,17 @@ const guardarDiseno = async () => {
     if (!infoCertificado.value) return Swal.fire('Atención', 'Primero debes guardar la cabecera en el paso 7.', 'warning')
     try {
         Swal.fire({ title: 'Guardando diseño...', didOpen: () => Swal.showLoading() })
-        await api.post('/info-certificados', {
+        const payload: any = {
             id_evento: Number(eventoId),
-            tipo: Number(tipoCertificado),
+            tipo: Number(tipoCertificado.value),
             cabecera: infoCertificado.value.cabecera,
             tenor: infoCertificado.value.tenor,
             configuracion: elementosLienzo.value
-        })
+        }
+        if (Number(tipoCertificado.value) === 4) {
+            payload.es_excelencia = esExcelencia.value
+        }
+        await api.post('/info-certificados', payload)
         Swal.fire('Éxito', 'Diseño guardado correctamente.', 'success')
     } catch (error) {
         console.error(error)
@@ -272,8 +323,38 @@ const guardarDiseno = async () => {
         </div>
       </div>
 
+      <!-- Selector dinámico de Rol y Excelencia (Centro del Topbar) -->
+      <div class="hidden md:flex items-center gap-3 bg-slate-50 dark:bg-gray-800 px-4 py-1.5 rounded-2xl border border-slate-200 dark:border-gray-700">
+        <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Plantilla:</span>
+        <select v-model="tipoCertificado" class="bg-white dark:bg-gray-950 border border-slate-200 dark:border-gray-750 rounded-lg py-1 px-3 font-bold text-xs text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none cursor-pointer">
+            <option :value="1">Logística</option>
+            <option :value="2">Expositor</option>
+            <option :value="3">Organizador</option>
+            <option :value="4">Asistente</option>
+        </select>
+        
+        <div v-if="Number(tipoCertificado) === 4" class="flex gap-1 p-0.5 bg-slate-200 dark:bg-gray-950 rounded-lg border border-slate-350 dark:border-gray-900">
+            <button 
+                @click.prevent="esExcelencia = 0"
+                :class="Number(esExcelencia) === 0 ? 'bg-primary-dark text-white shadow-sm font-black' : 'text-slate-500 hover:bg-slate-300 dark:hover:bg-gray-850 font-bold'"
+                class="py-1 px-2.5 rounded-md text-[8px] uppercase tracking-wider transition-all flex items-center gap-1"
+            >
+                <span class="material-symbols-outlined text-[12px]">military_tech</span>
+                Participación
+            </button>
+            <button 
+                @click.prevent="esExcelencia = 1"
+                :class="Number(esExcelencia) === 1 ? 'bg-umsa-gold text-white shadow-sm font-black' : 'text-slate-500 hover:bg-slate-300 dark:hover:bg-gray-850 font-bold'"
+                class="py-1 px-2.5 rounded-md text-[8px] uppercase tracking-wider transition-all flex items-center gap-1"
+            >
+                <span class="material-symbols-outlined text-[12px]">workspace_premium</span>
+                Excelencia
+            </button>
+        </div>
+      </div>
+
       <div class="flex items-center gap-3">
-        <button class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-slate-500 dark:text-gray-300 text-[10px] font-black uppercase tracking-widest hover:border-umsa-gold shadow-sm transition-all flex items-center gap-2">
+        <button @click="showPreviewModal = true" class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-slate-500 dark:text-gray-300 text-[10px] font-black uppercase tracking-widest hover:border-umsa-gold shadow-sm transition-all flex items-center gap-2">
             <span class="material-symbols-outlined text-[14px]">visibility</span> Previsualizar
         </button>
         <button @click="guardarDiseno" class="px-6 py-2.5 rounded-xl bg-primary-dark text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 shadow-lg hover:shadow-emerald-500/20 transition-all flex items-center gap-2">
@@ -525,6 +606,79 @@ const guardarDiseno = async () => {
                 </div>
             </div>
         </aside>
+    </div>
+
+    <!-- Modal de Previsualización -->
+    <div v-if="showPreviewModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div class="bg-white dark:bg-gray-900 rounded-[2.5rem] w-full max-w-[1080px] p-8 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-100 dark:border-gray-800 animate-in zoom-in-95 duration-300">
+            <div class="flex justify-between items-center mb-6 shrink-0">
+                <div>
+                    <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic tracking-tighter flex items-center gap-2">
+                      <span class="material-symbols-outlined text-umsa-gold text-2xl">workspace_premium</span>
+                      Previsualización de Alta Fidelidad
+                    </h3>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Simulación real del certificado generado en PDF</p>
+                </div>
+                <button @click="showPreviewModal = false" class="w-10 h-10 rounded-full bg-slate-50 dark:bg-gray-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-400 hover:text-red-500 flex items-center justify-center transition-colors">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            
+            <div class="flex-1 overflow-auto flex items-center justify-center p-4 bg-slate-100 dark:bg-gray-955 rounded-3xl border border-slate-200 dark:border-gray-800 relative select-none animate-in fade-in duration-300">
+                <!-- Certificado Previsualizado (Aspect A4) -->
+                <div class="w-full max-w-[960px] aspect-[1.414/1] bg-white shadow-2xl border border-slate-300 relative flex items-center justify-center bg-cover bg-center overflow-hidden rounded-xl"
+                     :style="{ 
+                        backgroundImage: infoCertificado?.fondo_url ? `url(${getImageUrl('fondos', infoCertificado.fondo_url)})` : undefined,
+                     }">
+                     
+                    <!-- Elementos Dinámicos Sustituidos -->
+                    <div v-for="el in elementosLienzo" :key="'prev-' + el.id"
+                         class="absolute flex items-center justify-center text-center select-none"
+                         :style="{ 
+                            left: `${el.x}%`, top: `${el.y}%`, 
+                            fontSize: el.tipo !== 'qr' && el.tipo !== 'firma' ? `${el.fontSize * 0.9}px` : undefined, 
+                            color: el.color, fontFamily: el.fontFamily,
+                            width: el.width ? `${el.width * 0.9}px` : 'auto',
+                            height: el.height ? `${el.height * 0.9}px` : 'auto'
+                         }">
+                         
+                         <!-- Si es Cabecera -->
+                         <div v-if="el.tipo === 'cabecera'" class="font-black uppercase leading-tight">
+                            {{ infoCertificado?.cabecera || '[ CABECERA ]' }}
+                         </div>
+                         
+                         <!-- Si es Tenor -->
+                         <div v-else-if="el.tipo === 'tenor'" class="leading-relaxed italic whitespace-pre-line">
+                            {{ resolvePreviewTenor(infoCertificado?.tenor) }}
+                         </div>
+                         
+                         <!-- Si es Texto Genérico -->
+                         <div v-else-if="el.tipo === 'texto'" class="font-bold leading-normal">
+                            {{ resolvePreviewVariables(el.valor) }}
+                         </div>
+                         
+                         <!-- Si es QR -->
+                         <div v-else-if="el.tipo === 'qr'" class="w-full h-full border-2 border-slate-900 bg-white flex items-center justify-center rounded-xl p-2 shrink-0">
+                            <span class="material-symbols-outlined text-[60px] text-slate-800 select-none">qr_code_2</span>
+                         </div>
+                         
+                         <!-- Si es Firma -->
+                         <div v-else-if="el.tipo === 'firma'" class="w-full h-full flex flex-col items-center justify-center p-2 relative shrink-0">
+                            <div class="h-10 w-32 border-b border-dashed border-slate-400 mb-1 flex items-center justify-center select-none">
+                                <span class="font-serif italic text-slate-400 text-xs select-none font-medium">Firma Autorizada</span>
+                            </div>
+                            <span class="text-[8px] font-black uppercase text-slate-500 select-none">COORDINADOR GENERAL</span>
+                         </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-6 flex justify-end shrink-0">
+                <button @click="showPreviewModal = false" class="px-6 py-3 bg-primary-dark hover:bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg active:scale-95">
+                    Cerrar Vista Previa
+                </button>
+            </div>
+        </div>
     </div>
 
   </div>

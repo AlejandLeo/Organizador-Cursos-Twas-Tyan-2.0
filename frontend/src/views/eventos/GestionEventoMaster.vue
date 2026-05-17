@@ -192,6 +192,7 @@ const resetFormEvento = () => {
 };
 
 const tipoCertificado = ref<number>(1);
+const esExcelencia = ref<number>(0);
 const infoCertificado = ref<any>({
     cabecera: '',
     tenor: '',
@@ -201,7 +202,11 @@ const infoCertificado = ref<any>({
 const fetchInfoCertificado = async () => {
     if (!editEventoId.value) return;
     try {
-        const res = await api.get(`/info-certificados/evento/${editEventoId.value}?tipo=${tipoCertificado.value}`);
+        let url = `/info-certificados/evento/${editEventoId.value}?tipo=${tipoCertificado.value}`;
+        if (tipoCertificado.value === 4) {
+            url += `&es_excelencia=${esExcelencia.value}`;
+        }
+        const res = await api.get(url);
         if (res.data && res.data.length > 0) {
             infoCertificado.value = res.data[0];
         } else {
@@ -216,7 +221,7 @@ const fetchInfoCertificado = async () => {
     }
 };
 
-watch(tipoCertificado, () => {
+watch([tipoCertificado, esExcelencia], () => {
     fetchInfoCertificado();
 });
 
@@ -226,12 +231,16 @@ const guardarInfoCertificado = async () => {
         return;
     }
     try {
-        await api.post('/info-certificados', {
+        const payload: any = {
             id_evento: editEventoId.value,
             tipo: tipoCertificado.value,
             cabecera: infoCertificado.value.cabecera,
             tenor: infoCertificado.value.tenor
-        });
+        };
+        if (tipoCertificado.value === 4) {
+            payload.es_excelencia = esExcelencia.value;
+        }
+        await api.post('/info-certificados', payload);
         Swal.fire({
             toast: true,
             position: 'top-end',
@@ -2246,6 +2255,28 @@ const changeStep = (delta: number) => {
                                         <option :value="4">Asistente</option>
                                     </select>
                                 </div>
+
+                                <!-- Tabs de Modalidad para Asistente (Participación vs Excelencia) -->
+                                <Transition name="fade">
+                                    <div v-if="tipoCertificado === 4" class="flex gap-2 p-1 bg-slate-100 dark:bg-gray-900/60 rounded-xl border border-slate-200 dark:border-gray-800">
+                                        <button 
+                                            @click.prevent="esExcelencia = 0"
+                                            :class="esExcelencia === 0 ? 'bg-primary-dark dark:bg-slate-700 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-gray-800'"
+                                            class="flex-1 py-2 px-3 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
+                                        >
+                                            <span class="material-symbols-outlined text-[13px]">military_tech</span>
+                                            Participación (Regular)
+                                        </button>
+                                        <button 
+                                            @click.prevent="esExcelencia = 1"
+                                            :class="esExcelencia === 1 ? 'bg-umsa-gold text-white shadow-md' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-gray-800'"
+                                            class="flex-1 py-2 px-3 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
+                                        >
+                                            <span class="material-symbols-outlined text-[13px]">workspace_premium</span>
+                                            Excelencia Académica
+                                        </button>
+                                    </div>
+                                </Transition>
                                 
                                 <div>
                                     <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Cabecera del Certificado</label>
@@ -2270,7 +2301,7 @@ const changeStep = (delta: number) => {
                                     <p class="text-[10px] text-slate-500 dark:text-gray-400 max-w-[200px] mx-auto mb-6">
                                         Abre el Workplace para subir tu imagen de fondo y colocar dinámicamente el nombre, firmas, cabecera y tenor.
                                     </p>
-                                    <router-link v-if="editEventoId" :to="{ name: 'coordinador-certificado-workplace-evento', params: { id: editEventoId }, query: { tipo: tipoCertificado } }" class="bg-umsa-gold hover:bg-yellow-600 text-white font-black px-6 py-3 rounded-xl text-[10px] uppercase tracking-widest shadow-lg inline-flex items-center gap-2 transition-all mx-auto">
+                                    <router-link v-if="editEventoId" :to="{ name: 'coordinador-certificado-workplace-evento', params: { id: editEventoId }, query: { tipo: tipoCertificado, ...(tipoCertificado === 4 ? { es_excelencia: esExcelencia } : {}) } }" class="bg-umsa-gold hover:bg-yellow-600 text-white font-black px-6 py-3 rounded-xl text-[10px] uppercase tracking-widest shadow-lg inline-flex items-center gap-2 transition-all mx-auto">
                                       <span class="material-symbols-outlined text-[16px]">open_in_new</span>
                                       Abrir Workplace
                                     </router-link>
