@@ -36,6 +36,11 @@ const currentStep = ref(1);
 const totalSteps = 6;
 const nextStep = () => { if (currentStep.value < totalSteps) currentStep.value++; };
 const prevStep = () => { if (currentStep.value > 1) currentStep.value--; };
+const irAlPaso = (step: number) => {
+    if (step >= 1) {
+        currentStep.value = step;
+    }
+};
 const filtroBusqueda = ref('');
 
 const ponentesDB = ref<any[]>([]);
@@ -1131,48 +1136,53 @@ const habilitarActividad = async (id: number, nombre: string) => {
               <div class="absolute top-1/2 left-0 w-full h-0.5 bg-slate-200 dark:bg-gray-800 -z-10 -translate-y-1/2"></div>
               
               <!-- Step 1 -->
-              <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
+              <div @click="irAlPaso(1)" class="flex flex-col items-center bg-white dark:bg-gray-950 px-4 cursor-pointer select-none hover:opacity-80 transition-all">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
-                       :class="currentStep === 1 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(188,156,49,0.4)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
-                      <span class="material-symbols-outlined text-xl">demography</span>
+                       :class="currentStep === 1 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(188,156,49,0.4)] dark:bg-blue-600' : (currentStep > 1 ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700')">
+                      <span v-if="currentStep > 1" class="material-symbols-outlined text-xl">check</span>
+                      <span v-else class="material-symbols-outlined text-xl">demography</span>
                   </div>
-                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 1 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Diseño</span>
+                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 1 ? 'text-primary-dark dark:text-white' : (currentStep > 1 ? 'text-emerald-500 dark:text-emerald-400 font-black' : 'text-slate-400 dark:text-gray-500')">Diseño</span>
               </div>
               
               <!-- Step 2 -->
-              <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
+              <div @click="irAlPaso(2)" class="flex flex-col items-center bg-white dark:bg-gray-950 px-4 cursor-pointer select-none hover:opacity-80 transition-all">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
-                       :class="currentStep >= 2 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
-                      <span class="material-symbols-outlined text-xl">verified</span>
+                       :class="currentStep === 2 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)] dark:bg-blue-600' : (currentStep > 2 ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700')">
+                      <span v-if="currentStep > 2" class="material-symbols-outlined text-xl">check</span>
+                      <span v-else class="material-symbols-outlined text-xl">verified</span>
                   </div>
-                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 2 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Aprobación</span>
+                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 2 ? 'text-primary-dark dark:text-white' : (currentStep > 2 ? 'text-emerald-500 dark:text-emerald-400 font-black' : 'text-slate-400 dark:text-gray-500')">Aprobación</span>
               </div>
 
               <!-- Step 3 -->
-              <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
+              <div @click="irAlPaso(3)" class="flex flex-col items-center bg-white dark:bg-gray-950 px-4 cursor-pointer select-none hover:opacity-80 transition-all">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
-                       :class="currentStep >= 3 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
-                      <span class="material-symbols-outlined text-xl">schedule</span>
+                       :class="currentStep === 3 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)] dark:bg-blue-600' : (currentStep > 3 ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700')">
+                      <span v-if="currentStep > 3" class="material-symbols-outlined text-xl">check</span>
+                      <span v-else class="material-symbols-outlined text-xl">schedule</span>
                   </div>
-                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 3 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Horarios</span>
+                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 3 ? 'text-primary-dark dark:text-white' : (currentStep > 3 ? 'text-emerald-500 dark:text-emerald-400 font-black' : 'text-slate-400 dark:text-gray-500')">Horarios</span>
               </div>
 
               <!-- Step 4 -->
-              <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
+              <div @click="irAlPaso(4)" class="flex flex-col items-center bg-white dark:bg-gray-950 px-4 cursor-pointer select-none hover:opacity-80 transition-all">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
-                       :class="currentStep >= 4 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
-                      <span class="material-symbols-outlined text-xl">person_add_alt</span>
+                       :class="currentStep === 4 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)] dark:bg-blue-600' : (currentStep > 4 ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700')">
+                      <span v-if="currentStep > 4" class="material-symbols-outlined text-xl">check</span>
+                      <span v-else class="material-symbols-outlined text-xl">person_add_alt</span>
                   </div>
-                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 4 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Requisitos</span>
+                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 4 ? 'text-primary-dark dark:text-white' : (currentStep > 4 ? 'text-emerald-500 dark:text-emerald-400 font-black' : 'text-slate-400 dark:text-gray-500')">Requisitos</span>
               </div>
 
               <!-- Step 5 -->
-              <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
+              <div @click="irAlPaso(5)" class="flex flex-col items-center bg-white dark:bg-gray-950 px-4 cursor-pointer select-none hover:opacity-80 transition-all">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
-                       :class="currentStep === 5 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(188,156,49,0.4)] dark:bg-blue-600' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
-                      <span class="material-symbols-outlined text-xl">check_circle</span>
+                       :class="currentStep === 5 ? 'bg-primary-dark text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(188,156,49,0.4)] dark:bg-blue-600' : (currentStep > 5 ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700')">
+                      <span v-if="currentStep > 5" class="material-symbols-outlined text-xl">check</span>
+                      <span v-else class="material-symbols-outlined text-xl">check_circle</span>
                   </div>
-                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 5 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Resumen</span>
+                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 5 ? 'text-primary-dark dark:text-white' : (currentStep > 5 ? 'text-emerald-500 dark:text-emerald-400 font-black' : 'text-slate-400 dark:text-gray-500')">Resumen</span>
               </div>
           </div>
       </div>
@@ -1587,7 +1597,9 @@ const habilitarActividad = async (id: number, nombre: string) => {
 
         <!-- BARRA DE NAVEGACIÓN DEL WIZARD (PASOS) -->
         <div class="bg-slate-50 dark:bg-gray-800/50 border-b border-slate-100 dark:border-gray-800 px-8 py-4 flex items-center justify-between overflow-x-auto thin-scrollbar">
-            <div v-for="step in totalSteps" :key="step" class="flex items-center gap-2 shrink-0">
+            <div v-for="step in totalSteps" :key="step" 
+                 @click="irAlPaso(step)"
+                 class="flex items-center gap-2 shrink-0 cursor-pointer hover:opacity-80 transition-all select-none">
                 <div :class="[
                     currentStep === step ? 'bg-umsa-blue text-white ring-4 ring-blue-100 dark:ring-blue-900/30' : 
                     (currentStep > step ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-gray-700 text-slate-500'),

@@ -32,6 +32,7 @@ const addAfiliacion = () => {
   formData.value.afiliaciones.push({
     institucion: '',
     id_grado_academico: null,
+    id_grado_administrativo: null,
     tipo_afiliacion: '',
     area_tematica: '',
     disciplina_cientifica: ''
@@ -58,6 +59,18 @@ const loadGradosAcademicos = async () => {
   }
 };
 
+// Lista dinámica de grados/cargos administrativos
+const gradosAdministrativos = ref<any[]>([]);
+
+const loadGradosAdministrativos = async () => {
+  try {
+    const res = await api.get('/admin/grados-administrativos');
+    gradosAdministrativos.value = res.data || [];
+  } catch (err) {
+    console.error('Error fetching grados administrativos', err);
+  }
+};
+
 const isCompleted = ref(false);
 
 const loadProfile = async () => {
@@ -78,6 +91,7 @@ const loadProfile = async () => {
         id: af.id,
         institucion: af.institucion,
         id_grado_academico: af.id_grado_academico,
+        id_grado_administrativo: af.id_grado_administrativo,
         tipo_afiliacion: af.tipo_afiliacion,
         area_tematica: af.area_tematica,
         disciplina_cientifica: af.disciplina_cientifica
@@ -395,6 +409,7 @@ const cambiarContrasena = () => {
 onMounted(() => {
   loadProfile();
   loadGradosAcademicos();
+  loadGradosAdministrativos();
 });
 </script>
 
@@ -571,8 +586,8 @@ onMounted(() => {
                   <span class="material-symbols-outlined text-sm">close</span>
                 </button>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div class="md:col-span-2">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div class="md:col-span-3">
                     <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Institución / Universidad</label>
                     <input v-model="af.institucion" type="text" :disabled="isCompleted && !!af.id" placeholder="Ej. Universidad Mayor de San Andrés" class="w-full py-2 px-3 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none disabled:bg-slate-50 dark:disabled:bg-gray-800" />
                   </div>
@@ -581,6 +596,13 @@ onMounted(() => {
                     <select v-model="af.id_grado_academico" :disabled="isCompleted && !!af.id" class="w-full py-2 px-3 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none text-slate-700 dark:text-gray-200 disabled:bg-slate-50 dark:disabled:bg-gray-800">
                       <option :value="null">Seleccionar Grado</option>
                       <option v-for="grado in gradosAcademicos" :key="grado.id" :value="grado.id">{{ grado.descripcion }}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Grado / Cargo Administrativo</label>
+                    <select v-model="af.id_grado_administrativo" :disabled="isCompleted && !!af.id" class="w-full py-2 px-3 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none text-slate-700 dark:text-gray-200 disabled:bg-slate-50 dark:disabled:bg-gray-800">
+                      <option :value="null">Ninguno</option>
+                      <option v-for="adm in gradosAdministrativos" :key="adm.id" :value="adm.id">{{ adm.nombre }} ({{ adm.abreviatura }})</option>
                     </select>
                   </div>
                   <div>

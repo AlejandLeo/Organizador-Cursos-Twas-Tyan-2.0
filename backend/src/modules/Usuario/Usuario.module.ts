@@ -5,6 +5,7 @@ import { RolesModule } from './roles/roles.module';
 import { UsuariosRolesModule } from './usuarios-roles/usuarios-roles.module';
 import { AfiliacionesModule } from './afiliaciones/afiliaciones.module';
 import { GradosAcademicosModule } from './grados-academicos/grados-academicos.module';
+import { GradosAdministrativosModule } from './grados-administrativos/grados-administrativos.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { GradosAcademicosModule } from './grados-academicos/grados-academicos.mo
     UsuariosRolesModule,
     AfiliacionesModule,
     GradosAcademicosModule,
+    GradosAdministrativosModule,
   ],
   exports: [
     UsuariosModule,
@@ -22,6 +24,7 @@ import { GradosAcademicosModule } from './grados-academicos/grados-academicos.mo
     UsuariosRolesModule,
     AfiliacionesModule,
     GradosAcademicosModule,
+    GradosAdministrativosModule,
   ],
 })
 export class UsuarioModule {}

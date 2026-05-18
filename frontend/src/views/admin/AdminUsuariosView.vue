@@ -311,7 +311,7 @@ const eliminarProgramada = async (user: any) => {
 
   try {
     await usuariosService.delete(user.id, notificar);
-    Swal.fire('Programado', 'La cuenta se eliminará definitivamente en 30 días.', 'success');
+    Swal.fire('Programado', 'La cuenta se eliminara definitivamente en 30 días.', 'success');
     fetchUsuarios();
   } catch (err: any) {
     Swal.fire('Error', err.response?.data?.message || 'No se pudo programar la eliminación.', 'error');
@@ -337,6 +337,69 @@ const eliminarInmediata = async (user: any) => {
     fetchUsuarios();
   } catch (err: any) {
     Swal.fire('Error', err.response?.data?.message || 'No se pudo realizar la eliminación.', 'error');
+  }
+};
+
+// ── Reportes ───────────────────────────────────────────────────────────────
+const exportarExcel = () => {
+  const contentHtml = `
+    <tr><td colspan="4" style="background-color: #10b981; color: white; font-weight: bold; font-size: 16pt; text-align: center;">DIRECTORIO DE USUARIOS</td></tr>
+    <tr style="background-color: #ecfdf5; font-weight: bold;"><td>Nombre</td><td>Email</td><td>Roles</td><td>Estado</td></tr>
+    ${usuariosFiltrados.value.map(u => `<tr><td>${u.persona?.nombres || ''} ${u.persona?.primer_apellido || ''}</td><td>${u.email}</td><td>${getRoles(u).join(', ')}</td><td>${u.estado === 1 ? 'Activo' : 'Inactivo'}</td></tr>`).join('')}
+  `;
+  const html = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+    <head><meta charset="utf-8"><style>td { border: 1px solid #cbd5e1; font-family: sans-serif; font-size: 10pt; }</style></head>
+    <body><table>${contentHtml}</table></body></html>
+  `;
+  const blob = new Blob(['\uFEFF', html], { type: 'application/vnd.ms-excel' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Reporte_Usuarios_${new Date().toISOString().slice(0, 10)}.xls`;
+  a.click();
+  window.URL.revokeObjectURL(url);
+  Swal.fire({ toast: true, icon: 'success', title: 'Excel Generado', timer: 2000, showConfirmButton: false });
+};
+
+const exportarPDF = async () => {
+  try {
+    const { default: jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
+    const doc = new jsPDF();
+    
+    doc.setFillColor(16, 185, 129); // emerald-500
+    doc.rect(0, 0, 210, 40, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DIRECTORIO DE USUARIOS', 105, 25, { align: 'center' });
+    
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(10);
+    doc.text(`Generado el: ${new Date().toLocaleString()}`, 105, 50, { align: 'center' });
+
+    const head = [['NOMBRE', 'EMAIL', 'ROLES', 'ESTADO']];
+    const body = usuariosFiltrados.value.map(u => [
+      `${u.persona?.nombres || ''} ${u.persona?.primer_apellido || ''}`, 
+      u.email, 
+      getRoles(u).join(', '),
+      u.estado === 1 ? 'Activo' : 'Inactivo'
+    ]);
+
+    autoTable(doc, {
+      head,
+      body,
+      startY: 60,
+      theme: 'grid',
+      headStyles: { fillColor: [16, 185, 129], textColor: 255, fontStyle: 'bold' },
+      styles: { fontSize: 8, cellPadding: 3 }
+    });
+
+    doc.save(`Reporte_Usuarios_${new Date().toISOString().slice(0, 10)}.pdf`);
+    Swal.fire({ toast: true, icon: 'success', title: 'PDF Generado', timer: 2000, showConfirmButton: false });
+  } catch (e) {
+    Swal.fire('Error', 'No se pudo generar el PDF.', 'error');
   }
 };
 
@@ -397,6 +460,15 @@ onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
           <option value="">Todos los roles</option>
           <option v-for="rol in rolesDisponibles" :key="rol.id" :value="rol.id">{{ rol.nombre }}</option>
         </select>
+        
+        <div class="flex items-center gap-2 ml-auto">
+          <button @click="exportarExcel" title="Exportar a Excel" class="bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1 transition-all">
+            <span class="material-symbols-outlined text-[16px]">grid_on</span> Excel
+          </button>
+          <button @click="exportarPDF" title="Exportar a PDF" class="bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1 transition-all">
+            <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span> PDF
+          </button>
+        </div>
       </div>
     </div>
 

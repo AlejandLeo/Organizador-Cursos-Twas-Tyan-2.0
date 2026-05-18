@@ -2,6 +2,7 @@
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useUIStore } from '@/stores/ui';
+import { computed } from 'vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -10,10 +11,16 @@ const uiStore = useUIStore();
 
 const menuItems = [
   { name: 'Inicio', icon: 'dashboard', path: '/logistica' },
-  { name: 'Asistencias (QR)', icon: 'qr_code_scanner', path: '/logistica/asistencia' },
-  { name: 'Eventos', icon: 'event', path: '/logistica/eventos' },
-  { name: 'Usuarios', icon: 'person_search', path: '/logistica/usuarios' },
+  { name: 'Asistencias (QR/PIN)', icon: 'qr_code_scanner', path: '/logistica/asistencia' },
+  { name: 'Eventos Asignados', icon: 'event', path: '/logistica/eventos' },
+  { name: 'Mis Certificados', icon: 'workspace_premium', path: '/logistica/certificados' },
 ];
+
+const userName = computed(() => {
+  const p = (authStore.user as any)?.persona;
+  if (p) return `${p.nombres || ''} ${p.primer_apellido || ''}`.trim();
+  return (authStore.user as any)?.email || 'Usuario';
+});
 
 const handleLogout = () => {
   authStore.logout();
@@ -32,8 +39,8 @@ const handleLogout = () => {
           <span class="material-symbols-outlined text-[28px]">support_agent</span>
         </div>
         <div>
-          <p class="text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest leading-none">Usuario</p>
-          <h2 class="text-sm font-black text-slate-800 dark:text-white mt-1">Logística</h2>
+          <p class="text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest leading-none">Personal de Apoyo</p>
+          <h2 class="text-sm font-black text-slate-800 dark:text-white mt-1 leading-tight">{{ userName }}</h2>
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { RouterView, useRouter } from 'vue-router';
+import { RouterView, useRouter, useRoute } from 'vue-router';
 import AdminSidebar from '@/layouts/AdminSidebar.vue';
 import { useUIStore } from '@/stores/ui';
 import { useAuthStore } from '@/stores/auth';
@@ -9,6 +9,7 @@ import api from '@/services/api';
 const uiStore = useUIStore();
 const authStore = useAuthStore();
 const router = useRouter();
+const route = useRoute();
 
 const isSuperAdminTheme = computed(() => authStore.esSuperUsuario);
 const themeBorder = computed(() => isSuperAdminTheme.value ? 'dark:border-red-900/30' : 'dark:border-blue-900/30');
@@ -234,19 +235,20 @@ onUnmounted(() => {
       </div>
     </header>
 
-    <AdminSidebar />
+    <AdminSidebar v-if="!route.meta.hideSidebar" />
 
     <!-- Mobile overlay -->
-    <div v-if="uiStore.isMobile && uiStore.isSidebarOpen"
+    <div v-if="uiStore.isMobile && uiStore.isSidebarOpen && !route.meta.hideSidebar"
          @click="uiStore.closeSidebar()"
          class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[40] animate-in fade-in duration-300">
     </div>
 
     <main :class="[
-            uiStore.isSidebarOpen && !uiStore.isMobile ? 'ml-72' : 'ml-0',
-            'transition-all duration-300 p-4 md:p-10 pt-[88px] md:pt-[92px] min-h-screen relative'
+            uiStore.isSidebarOpen && !uiStore.isMobile && !route.meta.hideSidebar ? 'ml-72' : 'ml-0',
+            route.meta.fullWidth ? 'p-0 pt-[72px]' : 'p-4 md:p-10 pt-[88px] md:pt-[92px]',
+            'transition-all duration-300 min-h-screen relative'
           ]">
-      <div class="max-w-7xl mx-auto">
+      <div :class="route.meta.fullWidth ? 'w-full flex-grow' : 'max-w-7xl mx-auto'">
         <RouterView />
       </div>
     </main>

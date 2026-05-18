@@ -52,6 +52,17 @@ npm run dev
 
 ---
 
+## Novedades y Funcionalidades Premium Recientes (SGEA)
+
+El sistema ha sido repotenciado con una suite de herramientas avanzadas diseñadas para ofrecer una experiencia premium e institucional:
+
+*   **Rebranding Institucional (SGEA)**: Migración completa de identidad de marca del antiguo nombre "TYAN" a la denominación oficial **SGEA (Sistema de Gestión de Eventos y Actividades)** en todas las cabeceras, layouts y pantallas.
+*   **Motor de Certificación PDF 100% Dinámico**: Rediseño completo en [certificados-envio.service.ts](./backend/src/modules/Certificacion/certificados/certificados-envio.service.ts) para procesar plantillas en alta resolución A4, códigos QR con validación en línea y estampados automáticos de firmas de coordinadores y ponentes.
+*   **Workplace Canvas Interactivo (Zoom & Scroll Smooth)**: Renovación total del lienzo en [CertificadoWorkplaceView.vue](./frontend/src/views/actividades/CertificadoWorkplaceView.vue) mediante un contenedor de escala física dinámica. Permite zoom suave de 100% a 200% y desplazamiento ultra fluido y nativo en 360 grados sin lag de coordenadas.
+*   **Renderizado Resiliente de Firmas**: Las firmas de ponentes y coordinadores cuentan con un sistema de degradación agradable en caso de ausencia de imagen, ocultando placeholders rotos y mostrando firmas vectoriales impecables con sus grados académicos (`Ph.D.`, `M.Sc.`, `Lic.`, etc.) y cargos administrativos.
+
+---
+
 ## Tecnologias
 
 El proyecto utiliza una arquitectura moderna de desacoplamiento entre cliente y servidor:

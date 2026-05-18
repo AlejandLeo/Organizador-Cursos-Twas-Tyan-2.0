@@ -76,10 +76,17 @@ const prevStep = () => {
         currentStep.value--;
     }
 };
+const irAlPaso = (step: number) => {
+    if (step >= 1 && step <= totalSteps) {
+        slideDir.value = step > currentStep.value ? 'forward' : 'backward';
+        currentStep.value = step;
+    }
+};
 const filtroBusqueda = ref('');
 
 const ponentesDB = ref<any[]>([]);
 const gradosAcademicosDB = ref<any[]>([]);
+const gradosAdministrativosDB = ref<any[]>([]);
 const logoPreview = ref<string | null>(null);
 const fondoPreview = ref<string | null>(null);
 const showRegistroRapidoPonente = ref(false);
@@ -163,6 +170,12 @@ const ponentesFiltrados = computed(() => {
 });
 
 const resetFormEvento = () => {
+    editEventoId.value = null;
+    infoCertificado.value = {
+        cabecera: '',
+        tenor: '',
+        estado: 1
+    };
     formEvento.value = {
         nombre: '', descripcion: '', gestion: new Date().getFullYear().toString(),
         fecha_inicio: '', fecha_fin: '', ubicacion: '', direccion: '',
@@ -187,6 +200,7 @@ const resetFormEvento = () => {
         visibilidad_al_finalizar: 'visible',
         coordinadores_ids: [] as number[],
         logistica_ids: [] as number[],
+        coordinadores_grados: {} as Record<number, number>,
         fase: 1
     };
 };
@@ -220,6 +234,12 @@ watch(tipoCertificado, () => {
     fetchInfoCertificado();
 });
 
+watch([currentStep, editEventoId], () => {
+    if (currentStep.value === 7 && editEventoId.value) {
+        fetchInfoCertificado();
+    }
+}, { immediate: true });
+
 const guardarInfoCertificado = async () => {
     if (!editEventoId.value) {
         Swal.fire('Atención', 'Primero debes guardar/crear el evento antes de configurar los certificados.', 'warning');
@@ -229,8 +249,8 @@ const guardarInfoCertificado = async () => {
         await api.post('/info-certificados', {
             id_evento: editEventoId.value,
             tipo: tipoCertificado.value,
-            cabecera: infoCertificado.value.cabecera,
-            tenor: infoCertificado.value.tenor
+            cabecera: infoCertificado.value?.cabecera || '',
+            tenor: infoCertificado.value?.tenor || ''
         });
         Swal.fire({
             toast: true,
@@ -280,13 +300,16 @@ const registrarPonenteQuick = async () => {
     } catch (e) { Swal.fire('Error', 'No se pudo registrar', 'error'); }
 };
 
+
+
 const fetchPonentesYGrados = async () => {
     try {
-        const [resP, resC] = await Promise.all([
+        const [resP, resC, resG, resAdmin] = await Promise.all([
             api.get('/usuarios?rol=Ponente&limit=100'),
             api.get('/usuarios?rol=Coordinador,Logística&limit=100'),
+            api.get('/grados-academicos'),
+            api.get('/admin/grados-administrativos'),
         ]);
-        const resG = await api.get('/grados-academicos');
         
         const mapUser = (u: any, role: string) => {
             const persona = u.persona || {};
@@ -299,6 +322,7 @@ const fetchPonentesYGrados = async () => {
             ...(resC.data?.data || resC.data || []).map((u:any) => mapUser(u, 'Coordinador')),
         ];
         gradosAcademicosDB.value = resG.data?.data || resG.data || [];
+        gradosAdministrativosDB.value = resAdmin.data?.data || resAdmin.data || [];
     } catch (e) { console.error(e); }
 };
 
@@ -480,6 +504,7 @@ const handleSaveEvento = async () => {
         // Personal (Coordinadores y Logística)
         formData.append('coordinadores_ids', JSON.stringify(formEvento.value.coordinadores_ids));
         formData.append('logistica_ids', JSON.stringify(formEvento.value.logistica_ids));
+        formData.append('coordinadores_grados', JSON.stringify(formEvento.value.coordinadores_grados));
 
         // Contacto y Auspicios
         formData.append('telefono', formEvento.value.contacto_telefono || '');
@@ -589,7 +614,11 @@ const editarEvento = (evento: any) => {
         coordinadores_ids: (evento.coordinaciones || [])
           .filter((c: any) => c.usuario?.usuariosRoles?.some((ur: any) => ur.rol?.id === 2 || ur.rol?.id === 6 || ur.rol?.nombre_rol === 'Logística'))
           .map((c: any) => c.usuario.id),
-        logistica_ids: (evento.coordinaciones || []).filter((c: any) => c.usuario?.usuariosRoles?.some((ur: any) => ur.rol?.id === 3)).map((c: any) => c.usuario.id)
+        logistica_ids: (evento.coordinaciones || []).filter((c: any) => c.usuario?.usuariosRoles?.some((ur: any) => ur.rol?.id === 3)).map((c: any) => c.usuario.id),
+        coordinadores_grados: (evento.coordinaciones || []).reduce((acc: any, c: any) => {
+            if (c.gradoAdministrativo) acc[c.usuario.id] = c.gradoAdministrativo.id;
+            return acc;
+        }, {})
     };
 
     if (evento.organizadores) {
@@ -1062,12 +1091,15 @@ onMounted(async () => {
         eventoStore.fetchEventosInfo()
     ]);
 
-    // Manejar edición desde Query Params (viniendo desde AdminGestionView)
+    // Manejar edición desde Query Params (viniendo desde AdminGestionView o Workplace)
     if (route.query.edit) {
         const evId = Number(route.query.edit);
         const ev = eventosPublicados.value.find(e => e.id === evId);
         if (ev) {
             editarEvento(ev);
+            if (route.query.step) {
+                currentStep.value = Number(route.query.step);
+            }
         }
     }
 
@@ -1328,44 +1360,59 @@ const changeStep = (delta: number) => {
           <div class="flex items-center justify-between relative">
               <div class="absolute top-1/2 left-0 w-full h-0.5 bg-slate-200 dark:bg-gray-800 -z-10 -translate-y-1/2"></div>
               
-              <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
+              <!-- Step 1 -->
+              <div @click="irAlPaso(1)" class="flex flex-col items-center bg-white dark:bg-gray-950 px-4 cursor-pointer select-none hover:opacity-80 transition-all">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
-                       :class="currentStep === 1 ? [themeBg, 'text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(188,156,49,0.4)]'] : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
-                      <span class="material-symbols-outlined text-xl">demography</span>
+                       :class="currentStep === 1 ? [themeBg, 'text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(188,156,49,0.4)]'] : 
+                              (currentStep > 1 ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700')">
+                      <span v-if="currentStep > 1" class="material-symbols-outlined text-xl">check</span>
+                      <span v-else class="material-symbols-outlined text-xl">demography</span>
                   </div>
-                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 1 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Diseño</span>
+                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 1 ? 'text-primary-dark dark:text-white' : (currentStep > 1 ? 'text-emerald-500 dark:text-emerald-400 font-black' : 'text-slate-400 dark:text-gray-500')">Diseño</span>
               </div>
               
-              <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
+              <!-- Step 2 -->
+              <div @click="irAlPaso(2)" class="flex flex-col items-center bg-white dark:bg-gray-950 px-4 cursor-pointer select-none hover:opacity-80 transition-all">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
-                       :class="currentStep >= 2 ? [themeBg, 'text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)]'] : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
-                      <span class="material-symbols-outlined text-xl">verified</span>
+                       :class="currentStep === 2 ? [themeBg, 'text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)]'] : 
+                              (currentStep > 2 ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700')">
+                      <span v-if="currentStep > 2" class="material-symbols-outlined text-xl">check</span>
+                      <span v-else class="material-symbols-outlined text-xl">verified</span>
                   </div>
-                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 2 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Aprobación</span>
+                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 2 ? 'text-primary-dark dark:text-white' : (currentStep > 2 ? 'text-emerald-500 dark:text-emerald-400 font-black' : 'text-slate-400 dark:text-gray-500')">Aprobación</span>
               </div>
 
-              <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
+              <!-- Step 3 -->
+              <div @click="irAlPaso(3)" class="flex flex-col items-center bg-white dark:bg-gray-950 px-4 cursor-pointer select-none hover:opacity-80 transition-all">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
-                       :class="currentStep >= 3 ? [themeBg, 'text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)]'] : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
-                      <span class="material-symbols-outlined text-xl">schedule</span>
+                       :class="currentStep === 3 ? [themeBg, 'text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)]'] : 
+                              (currentStep > 3 ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700')">
+                      <span v-if="currentStep > 3" class="material-symbols-outlined text-xl">check</span>
+                      <span v-else class="material-symbols-outlined text-xl">schedule</span>
                   </div>
-                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 3 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Horarios</span>
+                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 3 ? 'text-primary-dark dark:text-white' : (currentStep > 3 ? 'text-emerald-500 dark:text-emerald-400 font-black' : 'text-slate-400 dark:text-gray-500')">Horarios</span>
               </div>
 
-              <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
+              <!-- Step 4 -->
+              <div @click="irAlPaso(4)" class="flex flex-col items-center bg-white dark:bg-gray-950 px-4 cursor-pointer select-none hover:opacity-80 transition-all">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
-                       :class="currentStep >= 4 ? [themeBg, 'text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)]'] : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
-                      <span class="material-symbols-outlined text-xl">person_add_alt</span>
+                       :class="currentStep === 4 ? [themeBg, 'text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(37,99,235,0.2)]'] : 
+                              (currentStep > 4 ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700')">
+                      <span v-if="currentStep > 4" class="material-symbols-outlined text-xl">check</span>
+                      <span v-else class="material-symbols-outlined text-xl">person_add_alt</span>
                   </div>
-                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 4 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Requisitos</span>
+                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 4 ? 'text-primary-dark dark:text-white' : (currentStep > 4 ? 'text-emerald-500 dark:text-emerald-400 font-black' : 'text-slate-400 dark:text-gray-500')">Requisitos</span>
               </div>
 
-              <div class="flex flex-col items-center bg-white dark:bg-gray-950 px-4">
+              <!-- Step 5 -->
+              <div @click="irAlPaso(5)" class="flex flex-col items-center bg-white dark:bg-gray-950 px-4 cursor-pointer select-none hover:opacity-80 transition-all">
                   <div class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500"
-                       :class="currentStep === 5 ? [themeBg, 'text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(188,156,49,0.4)]'] : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700'">
-                      <span class="material-symbols-outlined text-xl">check_circle</span>
+                       :class="currentStep === 5 ? [themeBg, 'text-white border-umsa-gold scale-110 shadow-[0_0_15px_rgba(188,156,49,0.4)]'] : 
+                              (currentStep > 5 ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg' : 'bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-500 border-slate-200 dark:border-gray-700')">
+                      <span v-if="currentStep > 5" class="material-symbols-outlined text-xl">check</span>
+                      <span v-else class="material-symbols-outlined text-xl">check_circle</span>
                   </div>
-                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 5 ? 'text-primary-dark dark:text-white' : 'text-slate-400 dark:text-gray-500'">Resumen</span>
+                  <span class="text-[10px] font-black uppercase mt-3" :class="currentStep === 5 ? 'text-primary-dark dark:text-white' : (currentStep > 5 ? 'text-emerald-500 dark:text-emerald-400 font-black' : 'text-slate-400 dark:text-gray-500')">Resumen</span>
               </div>
           </div>
       </div>
@@ -1773,7 +1820,9 @@ const changeStep = (delta: number) => {
         </div>
 
         <div class="bg-slate-50 dark:bg-gray-800/50 border-b border-slate-100 dark:border-gray-800 px-8 py-4 flex items-center justify-between overflow-x-auto thin-scrollbar">
-            <div v-for="step in totalSteps" :key="step" class="flex items-center gap-2 shrink-0">
+            <div v-for="step in totalSteps" :key="step" 
+                 @click="irAlPaso(step)"
+                 class="flex items-center gap-2 shrink-0 cursor-pointer hover:opacity-80 transition-all select-none">
                 <div :class="[
                     currentStep === step ? [themeBg, 'text-white ring-4', isAdminContext ? 'ring-red-100 dark:ring-red-900/30' : 'ring-blue-100 dark:ring-blue-900/30'] : 
                     (currentStep > step ? (isAdminContext ? 'bg-red-800 text-white' : 'bg-emerald-500 text-white') : 'bg-slate-200 dark:bg-gray-700 text-slate-500'),
@@ -2095,21 +2144,31 @@ const changeStep = (delta: number) => {
                             <div v-if="usuariosCoordinadores.length === 0" class="p-8 text-center bg-slate-50 dark:bg-gray-800/50 rounded-2xl border-2 border-dashed border-slate-200 dark:border-gray-700">
                                 <p class="text-[10px] font-bold text-slate-400 uppercase">No se encontraron usuarios con rol de Coordinador o Logística</p>
                             </div>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto thin-scrollbar pr-2">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[350px] overflow-y-auto thin-scrollbar pr-2">
                                 <div v-for="user in usuariosCoordinadores" :key="user.id" 
                                      @click="toggleCoordinador(user.id)"
                                      :class="[formEvento.coordinadores_ids.includes(user.id) ? 'border-umsa-blue bg-blue-50 dark:bg-blue-900/20' : 'border-slate-100 dark:border-gray-800 bg-white dark:bg-gray-900']"
-                                     class="p-4 border-2 rounded-2xl cursor-pointer transition-all flex items-center gap-4 group shadow-sm hover:shadow-md">
-                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center transition-colors"
-                                         :class="formEvento.coordinadores_ids.includes(user.id) ? 'bg-umsa-blue text-white' : 'bg-slate-100 dark:bg-gray-800 text-slate-400 group-hover:bg-blue-100'">
-                                        <span class="material-symbols-outlined">{{ formEvento.coordinadores_ids.includes(user.id) ? 'check_circle' : 'person' }}</span>
-                                    </div>
-                                    <div class="flex-1 min-w-0">
-                                        <p class="text-xs font-black text-slate-700 dark:text-gray-200 uppercase truncate">{{ user.persona?.nombres }} {{ user.persona?.primer_apellido }}</p>
-                                        <div class="flex items-center gap-2">
-                                            <span class="text-[7px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-umsa-blue">Coordinador</span>
-                                            <p class="text-[9px] font-bold text-slate-400 truncate">{{ user.email }}</p>
+                                     class="p-4 border-2 rounded-2xl cursor-pointer transition-all flex flex-col gap-3 group shadow-sm hover:shadow-md">
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-10 h-10 rounded-xl flex items-center justify-center transition-colors"
+                                             :class="formEvento.coordinadores_ids.includes(user.id) ? 'bg-umsa-blue text-white' : 'bg-slate-100 dark:bg-gray-800 text-slate-400 group-hover:bg-blue-100'">
+                                            <span class="material-symbols-outlined">{{ formEvento.coordinadores_ids.includes(user.id) ? 'check_circle' : 'person' }}</span>
                                         </div>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-xs font-black text-slate-700 dark:text-gray-200 uppercase truncate">{{ user.persona?.nombres }} {{ user.persona?.primer_apellido }}</p>
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-[7px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-umsa-blue">Coordinador</span>
+                                                <p class="text-[9px] font-bold text-slate-400 truncate">{{ user.email }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- Dropdown de Grado Administrativo -->
+                                    <div v-if="formEvento.coordinadores_ids.includes(user.id)" class="pt-2 border-t border-blue-200 dark:border-blue-800" @click.stop>
+                                        <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Grado para Firmas</label>
+                                        <select v-model="formEvento.coordinadores_grados[user.id]" class="w-full bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-700 rounded-lg px-2 py-1.5 text-xs font-bold text-primary-dark dark:text-gray-200 transition-all focus:ring-1 focus:ring-blue-500">
+                                            <option :value="null">Ninguno / Por defecto</option>
+                                            <option v-for="g in gradosAdministrativosDB" :key="g.id" :value="g.id">{{ g.nombre }} {{ g.abreviatura ? `(${g.abreviatura})` : '' }}</option>
+                                        </select>
                                     </div>
                                 </div>
                             </div>
@@ -2224,9 +2283,6 @@ const changeStep = (delta: number) => {
                                 <span class="material-symbols-outlined text-umsa-gold">workspace_premium</span>
                                 <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase italic">Paso 7: Plantillas de Certificados</h4>
                             </div>
-                            <button @click.prevent="guardarInfoCertificado" class="bg-primary-dark text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg hover:shadow-xl hover:bg-emerald-500 hover:-translate-y-0.5 transition-all flex items-center gap-2">
-                                <span class="material-symbols-outlined text-[14px]">save</span> Guardar Tenor
-                            </button>
                         </div>
                         
                         <div class="bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 p-4 rounded-2xl border border-blue-100 dark:border-blue-800 flex gap-3 text-xs mb-4">
@@ -2257,6 +2313,12 @@ const changeStep = (delta: number) => {
                                     <textarea v-model="infoCertificado.tenor" rows="4" placeholder="Ej: Por haber participado en..." class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-xs text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none transition-all"></textarea>
                                     <p class="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 mt-2 italic">Variables dinámicas: {NOMBRE_ESTUDIANTE}, {ACTIVIDAD}</p>
                                 </div>
+
+                                <div class="pt-2 flex justify-start">
+                                    <button @click.prevent="guardarInfoCertificado" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 w-full md:w-auto">
+                                        <span class="material-symbols-outlined text-base">save</span> Guardar Cabecera y Tenor
+                                    </button>
+                                </div>
                             </div>
 
                             <!-- Acceso al Lienzo / Workplace -->
@@ -2270,7 +2332,7 @@ const changeStep = (delta: number) => {
                                     <p class="text-[10px] text-slate-500 dark:text-gray-400 max-w-[200px] mx-auto mb-6">
                                         Abre el Workplace para subir tu imagen de fondo y colocar dinámicamente el nombre, firmas, cabecera y tenor.
                                     </p>
-                                    <router-link v-if="editEventoId" :to="{ name: 'coordinador-certificado-workplace-evento', params: { id: editEventoId }, query: { tipo: tipoCertificado } }" class="bg-umsa-gold hover:bg-yellow-600 text-white font-black px-6 py-3 rounded-xl text-[10px] uppercase tracking-widest shadow-lg inline-flex items-center gap-2 transition-all mx-auto">
+                                    <router-link v-if="editEventoId" :to="{ name: isAdminContext ? 'admin-certificado-workplace-evento' : 'coordinador-certificado-workplace-evento', params: { id: editEventoId }, query: { tipo: tipoCertificado } }" class="bg-umsa-gold hover:bg-yellow-600 text-white font-black px-6 py-3 rounded-xl text-[10px] uppercase tracking-widest shadow-lg inline-flex items-center gap-2 transition-all mx-auto">
                                       <span class="material-symbols-outlined text-[16px]">open_in_new</span>
                                       Abrir Workplace
                                     </router-link>
@@ -2668,8 +2730,8 @@ const changeStep = (delta: number) => {
                                     
                                     <div class="relative z-10 w-full flex flex-col items-center">
                                         <!-- Cabecera -->
-                                        <h3 :class="!infoCertificado.cabecera ? 'text-slate-300 italic' : 'text-primary-dark'" class="text-[12px] font-black uppercase mb-3 text-center leading-tight transition-colors">
-                                            {{ infoCertificado.cabecera || '[ CABECERA PENDIENTE ]' }}
+                                        <h3 :class="!infoCertificado?.cabecera ? 'text-slate-300 italic' : 'text-primary-dark'" class="text-[12px] font-black uppercase mb-3 text-center leading-tight transition-colors">
+                                            {{ infoCertificado?.cabecera || '[ CABECERA PENDIENTE ]' }}
                                         </h3>
                                         
                                         <!-- Separador -->
@@ -2677,8 +2739,8 @@ const changeStep = (delta: number) => {
                                         
                                         <!-- Tenor -->
                                         <div class="min-h-[60px] flex items-center justify-center px-2 mb-6">
-                                            <p v-if="infoCertificado.tenor" class="text-[8px] text-slate-600 text-center leading-relaxed italic">
-                                                {{ infoCertificado.tenor }}
+                                            <p v-if="infoCertificado?.tenor" class="text-[8px] text-slate-600 text-center leading-relaxed italic">
+                                                {{ infoCertificado?.tenor }}
                                             </p>
                                             <div v-else class="flex flex-col items-center opacity-30 gap-1">
                                                 <span class="material-symbols-outlined text-lg">edit_note</span>

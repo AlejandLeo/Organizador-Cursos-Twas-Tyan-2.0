@@ -11,12 +11,13 @@ import Swal from 'sweetalert2';
 const usuariosDetalle = ref<any[]>([]);
 const fetchUsuariosPersonal = async () => {
   try {
-    const res = await api.get('/admin/usuarios');
-    usuariosDetalle.value = res.data?.map((u: any) => ({
+    const res = await usuariosService.getAll({ soloActivos: 'false', limit: 1000 } as any);
+    const rawUsers = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+    usuariosDetalle.value = rawUsers.map((u: any) => ({
       ...u,
       nombre: u.persona ? `${u.persona.nombres} ${u.persona.primer_apellido}` : u.email,
       rol: u.usuariosRoles?.[0]?.rol?.nombre_rol || 'Usuario'
-    })) || [];
+    }));
   } catch (e) { console.error(e); }
 };
 
@@ -27,7 +28,7 @@ const authStore = useAuthStore();
 const historialStore = useAdminHistorialStore();
 
 // ─── Estado Global ─────────────────────────────────────────
-const tabActivo = ref<'eventos' | 'actividades' | 'solicitudes' | 'soporte' | 'reportes'>('eventos');
+const tabActivo = ref<'eventos' | 'actividades' | 'solicitudes' | 'soporte'>('eventos');
 const isLoading = ref(false);
 const filtroTexto = ref('');
 const filtroEstado = ref('');
@@ -433,7 +434,7 @@ onMounted(() => {
   // Manejar navegación directa por Tabs (vía Query Params)
   if (route.query.tab) {
     const tab = route.query.tab as any;
-    if (['eventos', 'actividades', 'solicitudes', 'soporte', 'reportes'].includes(tab)) {
+    if (['eventos', 'actividades', 'solicitudes', 'soporte'].includes(tab)) {
       tabActivo.value = tab;
     }
   }
@@ -646,6 +647,25 @@ const exportarPDFSegmentado = async (categoria: string) => {
             <button v-if="filtroEstado || filtroTexto" @click="limpiarFiltros"
                     class="px-3 py-1.5 text-[9px] font-black uppercase rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all border border-red-100">
               Limpiar Filtros
+            </button>
+          </div>
+          <div class="flex items-center gap-2 ml-auto">
+            <button @click="generarReporteGeneral('eventos', 'excel')" title="Reporte Excel de Eventos" class="bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1 transition-all">
+              <span class="material-symbols-outlined text-[16px]">grid_on</span> Excel
+            </button>
+            <button @click="generarReporteGeneral('eventos', 'pdf')" title="Reporte PDF de Eventos" class="bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1 transition-all">
+              <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span> PDF
+            </button>
+          </div>
+        </template>
+
+        <template v-if="tabActivo === 'actividades'">
+          <div class="flex items-center gap-2 ml-auto">
+            <button @click="generarReporteGeneral('actividades', 'excel')" title="Reporte Excel de Actividades" class="bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1 transition-all">
+              <span class="material-symbols-outlined text-[16px]">grid_on</span> Excel
+            </button>
+            <button @click="generarReporteGeneral('actividades', 'pdf')" title="Reporte PDF de Actividades" class="bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1 transition-all">
+              <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span> PDF
             </button>
           </div>
         </template>
@@ -1011,98 +1031,7 @@ const exportarPDFSegmentado = async (categoria: string) => {
 
 
 
-    <!-- TAB: REPORTES (NUEVO APARTADO) -->
-    <div v-if="tabActivo === 'reportes'" class="animate-in slide-in-from-bottom-4 duration-500">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <!-- Tarjeta: Reportes de Eventos -->
-        <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-8 shadow-sm group hover:shadow-xl hover:shadow-blue-500/5 transition-all">
-          <div class="flex items-center gap-4 mb-6">
-            <div class="w-14 h-14 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
-              <span class="material-symbols-outlined text-3xl">corporate_fare</span>
-            </div>
-            <div>
-              <h3 class="text-lg font-black text-slate-800 dark:text-white uppercase italic">Reportes de Eventos</h3>
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Información técnica y logística</p>
-            </div>
-          </div>
-          <p class="text-xs text-slate-500 dark:text-gray-400 mb-8 leading-relaxed">Genera informes detallados sobre los eventos institucionales, incluyendo fechas, modalidades y estados actuales de planificación.</p>
-          <div class="flex gap-3">
-            <button @click="generarReporteGeneral('eventos', 'excel')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
-              <span class="material-symbols-outlined text-sm">grid_on</span> EXCEL
-            </button>
-            <button @click="generarReporteGeneral('eventos', 'pdf')" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2">
-              <span class="material-symbols-outlined text-sm">picture_as_pdf</span> PDF
-            </button>
-          </div>
-        </div>
 
-        <!-- Tarjeta: Reportes de Actividades -->
-        <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-8 shadow-sm group hover:shadow-xl hover:shadow-amber-500/5 transition-all">
-          <div class="flex items-center gap-4 mb-6">
-            <div class="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400">
-              <span class="material-symbols-outlined text-3xl">school</span>
-            </div>
-            <div>
-              <h3 class="text-lg font-black text-slate-800 dark:text-white uppercase italic">Reportes Académicos</h3>
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cursos, talleres y seminarios</p>
-            </div>
-          </div>
-          <p class="text-xs text-slate-500 dark:text-gray-400 mb-8 leading-relaxed">Exporta el listado completo de actividades académicas con su carga horaria, eventos asociados y fechas de ejecución.</p>
-          <div class="flex gap-3">
-            <button @click="generarReporteGeneral('actividades', 'excel')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
-              <span class="material-symbols-outlined text-sm">grid_on</span> EXCEL
-            </button>
-            <button @click="generarReporteGeneral('actividades', 'pdf')" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2">
-              <span class="material-symbols-outlined text-sm">picture_as_pdf</span> PDF
-            </button>
-          </div>
-        </div>
-
-        <!-- Tarjeta: Reportes de Usuarios -->
-        <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-8 shadow-sm group hover:shadow-xl hover:shadow-emerald-500/5 transition-all">
-          <div class="flex items-center gap-4 mb-6">
-            <div class="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-              <span class="material-symbols-outlined text-3xl">group</span>
-            </div>
-            <div>
-              <h3 class="text-lg font-black text-slate-800 dark:text-white uppercase italic">Directorio de Personal</h3>
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Estudiantes, Ponentes y Staff</p>
-            </div>
-          </div>
-          <p class="text-xs text-slate-500 dark:text-gray-400 mb-8 leading-relaxed">Informe consolidado de todos los usuarios registrados en el sistema, categorizados por su rol institucional y fecha de alta.</p>
-          <div class="flex gap-3">
-            <button @click="generarReporteGeneral('usuarios', 'excel')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
-              <span class="material-symbols-outlined text-sm">grid_on</span> EXCEL
-            </button>
-            <button @click="generarReporteGeneral('usuarios', 'pdf')" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2">
-              <span class="material-symbols-outlined text-sm">picture_as_pdf</span> PDF
-            </button>
-          </div>
-        </div>
-
-        <!-- Tarjeta: Bitácora de Auditoría -->
-        <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-8 shadow-sm group hover:shadow-xl hover:shadow-rose-500/5 transition-all">
-          <div class="flex items-center gap-4 mb-6">
-            <div class="w-14 h-14 rounded-2xl bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center text-rose-600 dark:text-rose-400">
-              <span class="material-symbols-outlined text-3xl">history</span>
-            </div>
-            <div>
-              <h3 class="text-lg font-black text-slate-800 dark:text-white uppercase italic">Historial de Auditoría</h3>
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Registro de acciones y cambios</p>
-            </div>
-          </div>
-          <p class="text-xs text-slate-500 dark:text-gray-400 mb-8 leading-relaxed">Reporte detallado de todas las transacciones y modificaciones realizadas por el personal administrativo en el sistema.</p>
-          <div class="flex gap-3">
-            <button @click="generarReporteGeneral('auditoria', 'excel')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
-              <span class="material-symbols-outlined text-sm">grid_on</span> EXCEL
-            </button>
-            <button @click="generarReporteGeneral('auditoria', 'pdf')" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2">
-              <span class="material-symbols-outlined text-sm">picture_as_pdf</span> PDF
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- ══════════════════════════════════════════════ -->
     <!--  MODALES (TELEPORT)                            -->

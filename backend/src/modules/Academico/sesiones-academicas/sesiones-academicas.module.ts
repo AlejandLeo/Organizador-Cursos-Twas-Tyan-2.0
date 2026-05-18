@@ -7,9 +7,10 @@ import { SesionesAcademicasPonenteController } from './sesiones-academicas-ponen
 import { SesionesAcademicasLogisticaController } from './sesiones-academicas-logistica.controller';
 import { SesionesAcademicasAdminController } from './sesiones-academicas-admin.controller';
 import { SesionAcademica } from './entities/sesion-academica.entity';
+import { CoordinacionEvento } from '../coordinaciones/entities/coordinacion.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([SesionAcademica])],
+  imports: [TypeOrmModule.forFeature([SesionAcademica, CoordinacionEvento])],
   controllers: [
     SesionesAcademicasController,
     SesionesAcademicasMeController,

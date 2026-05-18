@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { Usuario } from '../../../Usuario/usuarios/entities/usuario.entity';
 import { GradoAcademico } from '../../../Usuario/grados-academicos/entities/grado-academico.entity';
+import { GradoAdministrativo } from '../../../Usuario/grados-administrativos/entities/grado-administrativo.entity';
 
 /**
  * AFILIACIONES — datos institucionales/académicos del usuario.
@@ -43,6 +44,13 @@ export class Afiliacion {
   @ManyToOne(() => GradoAcademico, (ga) => ga.afiliaciones, { nullable: true })
   @JoinColumn({ name: 'id_grado_academico' })
   gradoAcademico: GradoAcademico;
+
+  @Column({ name: 'id_grado_administrativo', nullable: true })
+  id_grado_administrativo: number;
+
+  @ManyToOne(() => GradoAdministrativo, { nullable: true })
+  @JoinColumn({ name: 'id_grado_administrativo' })
+  gradoAdministrativo: GradoAdministrativo;
 
   /** Muchas afiliaciones pueden pertenecer al mismo usuario. */
   @ManyToOne(() => Usuario, (usuario) => usuario.afiliaciones)

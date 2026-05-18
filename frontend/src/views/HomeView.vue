@@ -379,31 +379,44 @@ const abrirMapa = (url: string) => {
         </div>
         <h2 class="text-4xl md:text-6xl font-black text-center text-primary-dark dark:text-white mb-20 uppercase tracking-tighter italic"><span class="text-umsa-blue dark:text-blue-400">Directorio</span> Expositor</h2>
 
-        <div v-if="eventoSeleccionado?.ponentes?.length" class="grid grid-cols-1 md:grid-cols-2 gap-0 overflow-hidden w-full lg:min-w-[600px] border-t border-slate-100 dark:border-gray-800">
-            <div v-for="(spk, i) in eventoSeleccionado.ponentes" :key="i" class="group flex flex-col md:flex-row min-h-[300px] border-b border-r border-slate-100 dark:border-gray-800 relative cursor-pointer">
-              
-              <!-- Imagen de fondo Netflix style -->
-              <div class="absolute inset-0 md:relative md:w-2/5 overflow-hidden">
-                 <img v-if="spk.img" :src="spk.img" class="w-full h-full object-cover absolute inset-0 filter grayscale group-hover:grayscale-0 group-hover:scale-110 transition-all duration-1000 z-0" onerror="this.src='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&q=80'; this.onerror=null" />
-               
-               <div class="absolute bottom-0 left-0 right-0 p-6 z-20 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500 bg-gradient-to-t from-black via-black/80 to-transparent">
-                  <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/90 text-white border border-emerald-400/50 text-[9px] font-black uppercase tracking-widest rounded-lg backdrop-blur-md">
-                     <span class="material-symbols-outlined text-[12px]">location_on</span> {{ spk.country }}
-                  </span>
-               </div>
+        <div v-if="eventoSeleccionado?.ponentes?.length" class="w-full relative">
+            <!-- Contenedor Deslizable Horizontal -->
+            <div class="flex flex-row gap-6 overflow-x-auto pb-8 pt-4 px-4 scroll-smooth snap-x snap-mandatory thin-scrollbar whitespace-nowrap">
+                <div v-for="(spk, i) in eventoSeleccionado.ponentes" :key="i" class="inline-block flex-shrink-0 w-[280px] bg-slate-50 dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-[2rem] overflow-hidden shadow-md hover:shadow-2xl hover:-translate-y-2 hover:border-umsa-blue/30 transition-all duration-300 flex flex-col group relative snap-start">
+                  
+                  <!-- Contenedor de Imagen de Expositor -->
+                  <div class="relative h-[320px] w-full overflow-hidden bg-slate-100 dark:bg-gray-800">
+                     <!-- Floating Badge País / Correo -->
+                     <div class="absolute top-4 right-4 z-20">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-black/60 dark:bg-black/80 backdrop-blur-md text-white border border-white/10 text-[9px] font-black uppercase tracking-widest rounded-lg">
+                           <span class="material-symbols-outlined text-[12px] text-emerald-400">location_on</span> {{ spk.country || 'Expositor' }}
+                        </span>
+                     </div>
+                     
+                     <!-- Foto de Expositor -->
+                     <img v-if="spk.img" :src="spk.img" class="w-full h-full object-cover filter grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700 z-0" onerror="this.src='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&q=80'; this.onerror=null" />
+                     
+                     <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent z-10"></div>
+                  </div>
+                  
+                  <!-- Información Detallada -->
+                  <div class="p-6 flex flex-col flex-1 relative bg-white dark:bg-gray-900 border-t border-slate-50 dark:border-gray-800/50 whitespace-normal">
+                     <span class="text-[8px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest block mb-2">{{ spk.topic || 'Conferencia / Expositor' }}</span>
+                     <h4 class="text-sm font-black text-primary-dark dark:text-white leading-snug uppercase tracking-tight line-clamp-2 min-h-[44px] group-hover:text-umsa-blue dark:group-hover:text-blue-400 transition-colors">{{ spk.name }}</h4>
+                     
+                     <!-- Línea decorativa estilo Premium -->
+                     <div class="w-8 h-1 bg-slate-200 dark:bg-gray-800 group-hover:bg-umsa-blue transition-colors duration-500 mt-4 rounded-full"></div>
+                  </div>
+                </div>
             </div>
             
-            <div class="p-6 md:p-8 flex-1 flex flex-col bg-white dark:bg-gray-900 relative">
-               <h4 class="text-xl font-black text-primary-dark dark:text-white mb-4 leading-tight uppercase font-serif italic">{{ spk.name }}</h4>
-               <p class="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mt-auto tracking-wide group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors line-clamp-3">
-                 "{{ spk.topic }}"
-               </p>
-               <!-- Linea decorativa card Netflix -->
-               <div class="absolute left-0 bottom-0 top-0 w-1 bg-transparent group-hover:bg-umsa-blue transition-colors duration-500"></div>
+            <!-- Indicador visual e instrucciones para el usuario -->
+            <div class="flex items-center justify-center gap-2 mt-4 text-[9px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest">
+                <span>Desliza horizontalmente para explorar los {{ eventoSeleccionado.ponentes.length }} expositores</span>
+                <span class="material-symbols-outlined animate-bounce-horizontal text-xs">trending_flat</span>
             </div>
-          </div>
         </div>
-        <div v-else class="text-center py-10 opacity-70">
+        <div v-else class="text-center py-20 opacity-70">
            <span class="material-symbols-outlined text-6xl text-slate-300 dark:text-gray-600 mb-4">groups</span>
            <p class="text-lg font-black text-slate-400 uppercase tracking-widest">Ponentes por confirmar</p>
         </div>
@@ -481,6 +494,33 @@ html {
 @media (min-width: 768px) {
   :deep(.google-maps-container iframe) {
     border-radius: 2.5rem;
+  }
+}
+
+.thin-scrollbar::-webkit-scrollbar {
+  height: 6px;
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.2);
+  border-radius: 9999px;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.4);
+}
+
+.animate-bounce-horizontal {
+  animation: bounceHorizontal 1.5s infinite;
+}
+
+@keyframes bounceHorizontal {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(6px);
   }
 }
 </style>
