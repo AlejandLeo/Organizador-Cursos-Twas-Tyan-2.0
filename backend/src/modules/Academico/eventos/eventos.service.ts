@@ -190,7 +190,8 @@ export class EventosService {
         'actividades.inscripciones',
         'coordinaciones',
         'coordinaciones.usuario',
-        'coordinaciones.usuario.persona'
+        'coordinaciones.usuario.persona',
+        'coordinaciones.gradoAdministrativo'
       ],
       order: { prioridad: 'ASC', fecha_creacion: 'DESC' },
       skip: (page - 1) * limit,
@@ -221,7 +222,7 @@ export class EventosService {
     imagenFondo?: Express.Multer.File,
     usuario?: any,
   ) {
-    const { coordinadores_ids, logistica_ids, ...restoDto } = dto;
+    const { coordinadores_ids, logistica_ids, coordinadores_grados, ...restoDto } = dto as any;
     const data: Partial<Evento> = { ...restoDto } as any;
     if (dto.prioridad) data.prioridad = parseInt(dto.prioridad, 10);
     if (imagenPortada) data.logo = imagenPortada.filename;
@@ -241,7 +242,7 @@ export class EventosService {
     }
 
     // Procesar personal adicional
-    await this.sincronizarPersonalInterno(guardado.id, coordinadores_ids, logistica_ids);
+    await this.sincronizarPersonalInterno(guardado.id, coordinadores_ids, logistica_ids, coordinadores_grados);
 
     return {
       ...guardado,
@@ -268,7 +269,7 @@ export class EventosService {
     const evento = await this.eventoRepository.findOneBy({ id });
     if (!evento) throw new NotFoundException(`Evento ${id} no encontrado.`);
 
-    const { coordinadores_ids, logistica_ids, ...restoDto } = dto;
+    const { coordinadores_ids, logistica_ids, coordinadores_grados, ...restoDto } = dto as any;
     const data: Partial<Evento> = { ...restoDto } as any;
     if (dto.prioridad) data.prioridad = parseInt(dto.prioridad as any, 10);
 
@@ -291,7 +292,7 @@ export class EventosService {
     await this.eventoRepository.update(id, data);
 
     // Sincronizar personal
-    await this.sincronizarPersonalInterno(id, coordinadores_ids, logistica_ids);
+    await this.sincronizarPersonalInterno(id, coordinadores_ids, logistica_ids, coordinadores_grados);
 
     const actualizado = await this.eventoRepository.findOneBy({ id });
     return {
@@ -305,9 +306,8 @@ export class EventosService {
    * Sincroniza el personal (coordinadores y logística) de un evento.
    * Recibe strings JSON de IDs (por ser multipart).
    */
-  private async sincronizarPersonalInterno(eventoId: number, coordsJson?: string, logisticaJson?: string) {
+  private async sincronizarPersonalInterno(eventoId: number, coordsJson?: string, logisticaJson?: string, coordinadoresGradosJson?: string) {
     const coordinacionRepo = this.dataSource.getRepository('CoordinacionEvento');
-    const imparticionRepo = this.dataSource.getRepository('Imparticion');
 
     const parseIds = (json?: string): number[] => {
       if (!json) return [];
@@ -319,6 +319,15 @@ export class EventosService {
       }
     };
 
+    let coordinadoresGrados: Record<number, number> = {};
+    if (coordinadoresGradosJson) {
+      try {
+        coordinadoresGrados = JSON.parse(coordinadoresGradosJson);
+      } catch (e) {
+        coordinadoresGrados = {};
+      }
+    }
+
     const coordIds = parseIds(coordsJson);
     const logIds = parseIds(logisticaJson);
 
@@ -329,21 +338,30 @@ export class EventosService {
       for (const uid of todosLosIds) {
         // Verificar si ya está asignado
         const existe = await coordinacionRepo.findOne({
-          where: { evento: { id: eventoId }, usuario: { id: uid } }
+          where: { evento: { id: eventoId }, usuario: { id: uid } },
+          relations: ['gradoAdministrativo']
         });
+
+        const gradoId = coordinadoresGrados[uid] || null;
 
         if (!existe) {
           await coordinacionRepo.save({
             evento: { id: eventoId },
             usuario: { id: uid },
-            estado: 1
+            estado: 1,
+            gradoAdministrativo: gradoId ? { id: gradoId } : null
           });
+        } else {
+          // Actualizar grado administrativo si cambió
+          const currentGradoId = (existe as any).gradoAdministrativo?.id || null;
+          if (currentGradoId !== gradoId) {
+            await coordinacionRepo.update(existe.id, {
+              gradoAdministrativo: gradoId ? { id: gradoId } : null
+            });
+          }
         }
       }
     }
-
-    // También podemos registrar en imparticiones para personal de logística si se desea
-    // Pero por ahora, con coordinacion_eventos es suficiente para el control de acceso.
   }
 
   async removeAdmin(id: number, usuario?: any) {

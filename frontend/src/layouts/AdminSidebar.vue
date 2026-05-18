@@ -100,12 +100,12 @@ const themeBorder = authStore.esSuperUsuario ? 'border-red-100 dark:border-red-9
           </div>
         </button>
 
-        <button @click="router.push({ name: 'admin-gestion', query: { tab: 'reportes' } }); uiStore.closeSidebar();"
-          :class="[route.query.tab === 'reportes' ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/10']"
+        <button @click="navigate('admin-certificados-envio')"
+          :class="[isActive('admin-certificados-envio') ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/10']"
           class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold">
           <div class="flex items-center gap-3">
-            <span class="material-symbols-outlined text-[20px]">summarize</span>
-            <span class="text-[11px] uppercase tracking-wider">Reportes Sistema</span>
+            <span class="material-symbols-outlined text-[20px]">workspace_premium</span>
+            <span class="text-[11px] uppercase tracking-wider">Certificados</span>
           </div>
         </button>
       </template>
@@ -155,21 +155,21 @@ const themeBorder = authStore.esSuperUsuario ? 'border-red-100 dark:border-red-9
           </div>
         </button>
 
+        <button @click="navigate('admin-grados-administrativos')"
+          :class="[isActive('admin-grados-administrativos') ? `bg-red-600 text-white shadow-md` : `text-slate-600 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/10`]"
+          class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold">
+          <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-[20px]">badge</span>
+            <span class="text-[11px] uppercase tracking-wider">Grados Administrativos</span>
+          </div>
+        </button>
+
         <button @click="navigate('admin-inscripciones-excel')"
           :class="[isActive('admin-inscripciones-excel') ? `bg-red-600 text-white shadow-md` : `text-slate-600 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/10`]"
           class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold">
           <div class="flex items-center gap-3">
             <span class="material-symbols-outlined text-[20px]">upload_file</span>
             <span class="text-[11px] uppercase tracking-wider">Carga Masiva (Excel)</span>
-          </div>
-        </button>
-
-        <button @click="navigate('admin-mail-templates')"
-          :class="[isActive('admin-mail-templates') ? `bg-red-600 text-white shadow-md` : `text-slate-600 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/10`]"
-          class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold mt-1">
-          <div class="flex items-center gap-3">
-            <span class="material-symbols-outlined text-[20px]">mail</span>
-            <span class="text-[11px] uppercase tracking-wider">Correos y Auditoría</span>
           </div>
         </button>
       </template>

@@ -9,9 +9,14 @@ import { CertificadosAdminController } from './certificados-admin.controller';
 import { Certificado } from './entities/certificado.entity';
 import { CertificadosEnvioService } from './certificados-envio.service';
 import { CertificadosQueueService } from './certificados-queue.service';
+import { Inscripcion } from '../../Inscripciones/inscripciones/entities/inscripcion.entity';
+import { Imparticion } from '../../Academico/imparticiones/entities/imparticion.entity';
+import { CoordinacionEvento } from '../../Academico/coordinaciones/entities/coordinacion.entity';
+import { MailLog } from '../../Comun/mail/entities/mail-log.entity';
+import { MailQueue } from '../../Comun/mail/entities/mail-queue.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Certificado])],
+  imports: [TypeOrmModule.forFeature([Certificado, Inscripcion, Imparticion, CoordinacionEvento, MailLog, MailQueue])],
   controllers: [
     CertificadosController,
     CertificadosMeController,

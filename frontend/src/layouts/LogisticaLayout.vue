@@ -2,8 +2,17 @@
 import { RouterView } from 'vue-router';
 import LogisticaSidebar from '@/layouts/LogisticaSidebar.vue';
 import { useUIStore } from '@/stores/ui';
+import { useAuthStore } from '@/stores/auth';
+import { computed } from 'vue';
 
 const uiStore = useUIStore();
+const authStore = useAuthStore();
+
+const userName = computed(() => {
+  const p = (authStore.user as any)?.persona;
+  if (p) return `${p.nombres || ''} ${p.primer_apellido || ''}`.trim();
+  return 'Logística';
+});
 </script>
 
 <template>
@@ -19,8 +28,8 @@ const uiStore = useUIStore();
             <span class="material-symbols-outlined text-white text-[16px]">support_agent</span>
           </div>
           <div class="hidden sm:block">
-            <p class="text-[10px] font-black text-teal-600 dark:text-teal-500 uppercase tracking-widest leading-none">Sistema SGEA</p>
-            <h1 class="text-sm font-black text-slate-800 dark:text-white leading-tight">Panel de Logística</h1>
+            <p class="text-[10px] font-black text-teal-600 dark:text-teal-500 uppercase tracking-widest leading-none">Panel de Logística</p>
+            <h1 class="text-sm font-black text-slate-800 dark:text-white leading-tight">{{ userName }}</h1>
           </div>
         </div>
       </div>

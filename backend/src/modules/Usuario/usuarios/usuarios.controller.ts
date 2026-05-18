@@ -363,6 +363,17 @@ export class UsuariosController {
     }
   }
 
+  @Get(':id/firma-publica')
+  @ApiOperation({ summary: 'Obtener la firma digital (Pública para renderizado en certificados)' })
+  async getFirmaPublica(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
+    const filePath = await (this.usuariosService as any).obtenerRutaFirmaLocal(id);
+    if (filePath) {
+      res.sendFile(filePath);
+    } else {
+      res.status(HttpStatus.NOT_FOUND).send('No digital signature');
+    }
+  }
+
   /**
    * PATCH /usuarios/:id/password
    * Cambia la contraseña verificando la contraseña actual.

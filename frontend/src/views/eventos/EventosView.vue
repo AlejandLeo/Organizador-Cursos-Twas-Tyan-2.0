@@ -176,6 +176,11 @@ const totalSteps = 6;
 
 const nextStep = () => { if (currentStep.value < totalSteps) currentStep.value++; };
 const prevStep = () => { if (currentStep.value > 1) currentStep.value--; };
+const irAlPaso = (step: number) => {
+    if (step >= 1 && step <= totalSteps) {
+        currentStep.value = step;
+    }
+};
 
 const logoPreview = ref<string | null>(null);
 const fondoPreview = ref<string | null>(null);
@@ -543,7 +548,9 @@ const editarGestion = (gestion: any) => {
         
         <!-- BARRA DE NAVEGACIÓN DEL WIZARD (PASOS) -->
         <div class="bg-slate-50 dark:bg-gray-800/50 border-b border-slate-100 dark:border-gray-800 px-8 py-4 flex items-center justify-between overflow-x-auto thin-scrollbar">
-            <div v-for="step in totalSteps" :key="step" class="flex items-center gap-2 shrink-0">
+            <div v-for="step in totalSteps" :key="step" 
+                 @click="irAlPaso(step)"
+                 class="flex items-center gap-2 shrink-0 cursor-pointer hover:opacity-80 transition-all select-none">
                 <div :class="[
                     currentStep === step ? 'bg-umsa-blue text-white ring-4 ring-blue-100 dark:ring-blue-900/30' : 
                     (currentStep > step ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-gray-700 text-slate-500'),

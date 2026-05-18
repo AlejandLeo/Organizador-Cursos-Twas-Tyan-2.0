@@ -12,6 +12,7 @@ import { RolesModule } from './modules/Usuario/roles/roles.module';
 import { UsuariosRolesModule } from './modules/Usuario/usuarios-roles/usuarios-roles.module';
 import { AfiliacionesModule } from './modules/Usuario/afiliaciones/afiliaciones.module';
 import { GradosAcademicosModule } from './modules/Usuario/grados-academicos/grados-academicos.module';
+import { GradosAdministrativosModule } from './modules/Usuario/grados-administrativos/grados-administrativos.module';
 
 // --- Eventos y Actividades ---
 import { EventosModule } from './modules/Academico/eventos/eventos.module';
@@ -77,6 +78,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     UsuariosRolesModule,
     AfiliacionesModule,
     GradosAcademicosModule,
+    GradosAdministrativosModule,
 
     // --- Eventos y Actividades ---
     EventosModule,

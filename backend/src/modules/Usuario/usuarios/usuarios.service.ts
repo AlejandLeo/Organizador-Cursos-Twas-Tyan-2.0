@@ -104,11 +104,13 @@ export class UsuariosService {
     }
 
     // 2. Manejo de Afiliaciones (Un solo objeto por compatibilidad con dev)
-    const { institucion, id_grado_academico, tipo_afiliacion, area_tematica, disciplina_cientifica } = data;
+    const afData = (data.afiliaciones && data.afiliaciones.length > 0) ? data.afiliaciones[0] : data;
+    const { institucion, id_grado_academico, id_grado_administrativo, tipo_afiliacion, area_tematica, disciplina_cientifica } = afData;
 
     if (
       institucion !== undefined ||
       id_grado_academico !== undefined ||
+      id_grado_administrativo !== undefined ||
       tipo_afiliacion !== undefined ||
       area_tematica !== undefined ||
       disciplina_cientifica !== undefined
@@ -122,6 +124,7 @@ export class UsuariosService {
         if (!(isCompleted && af.institucion)) {
           if (institucion !== undefined) af.institucion = institucion;
           if (id_grado_academico !== undefined) af.id_grado_academico = id_grado_academico;
+          if (id_grado_administrativo !== undefined) af.id_grado_administrativo = id_grado_administrativo;
           if (tipo_afiliacion !== undefined) af.tipo_afiliacion = tipo_afiliacion;
           if (area_tematica !== undefined) af.area_tematica = area_tematica;
           if (disciplina_cientifica !== undefined) af.disciplina_cientifica = disciplina_cientifica;
@@ -131,6 +134,7 @@ export class UsuariosService {
         const newAf = afiliacionRepo.create({
           institucion,
           id_grado_academico,
+          id_grado_administrativo,
           tipo_afiliacion,
           area_tematica,
           disciplina_cientifica,
@@ -985,6 +989,7 @@ export class UsuariosService {
         'usuariosRoles.rol',
         'afiliaciones',
         'afiliaciones.gradoAcademico',
+        'afiliaciones.gradoAdministrativo',
         'inscripciones',
         'inscripciones.actividadAcademica',
       ],

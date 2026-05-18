@@ -7,6 +7,9 @@ import Swal from 'sweetalert2';
 
 const route = useRoute();
 
+// ── Tabs ──────────────────────────────────────────────────────
+const activeTab = ref<'trazabilidad' | 'emision'>('trazabilidad');
+
 interface Certificado {
   id: number;
   codigo_certificado: string;
@@ -315,12 +318,141 @@ const verError = (log: string) => {
   });
 };
 
+// ══════════════════════════════════════════════════════════
+//  MAIL TRACE MODAL
+// ══════════════════════════════════════════════════════════
+const showTraceModal = ref(false);
+const traceData = ref<any>(null);
+const traceLoading = ref(false);
+
+const abrirMailTrace = async (certId: number) => {
+  traceLoading.value = true;
+  showTraceModal.value = true;
+  traceData.value = null;
+  try {
+    const res = await certificadosService.getMailTrace(certId);
+    traceData.value = res.data;
+  } catch {
+    Swal.fire('Error', 'No se pudo obtener la traza de envío.', 'error');
+    showTraceModal.value = false;
+  } finally {
+    traceLoading.value = false;
+  }
+};
+
+// ══════════════════════════════════════════════════════════
+//  EMISIÓN MASIVA POR TIPO
+// ══════════════════════════════════════════════════════════
+const emisionTipo = ref(1);
+const emisionEventos = ref<any[]>([]);
+const emisionEventoId = ref<number | null>(null);
+const emisionActividades = ref<any[]>([]);
+const emisionActividadId = ref<number | null>(null);
+const emisionCandidatos = ref<any[]>([]);
+const emisionSelectedIds = ref<number[]>([]);
+const emisionLoading = ref(false);
+const emisionFirma = ref('');
+const emisionInfoCerts = ref<any[]>([]);
+const emisionInfoCertId = ref<number | null>(null);
+
+const tipoLabels: Record<number, string> = { 1: 'Asistentes (Inscripciones)', 2: 'Expositores (Imparticiones)', 3: 'Logística (Apoyo)', 4: 'Docentes' };
+
+const fetchEmisionEventos = async () => {
+  try {
+    const res = await api.get('/eventos');
+    emisionEventos.value = Array.isArray(res.data) ? res.data : res.data.data || [];
+  } catch { emisionEventos.value = []; }
+};
+
+const fetchEmisionActividades = async () => {
+  if (!emisionEventoId.value) { emisionActividades.value = []; return; }
+  try {
+    const res = await api.get(`/admin/eventos/${emisionEventoId.value}/actividades-academicas`);
+    emisionActividades.value = res.data || [];
+    emisionActividadId.value = null;
+    emisionCandidatos.value = [];
+  } catch { emisionActividades.value = []; }
+};
+
+const fetchEmisionInfoCerts = async () => {
+  if (!emisionEventoId.value) return;
+  try {
+    const res = await api.get(`/info-certificados/evento/${emisionEventoId.value}`);
+    emisionInfoCerts.value = Array.isArray(res.data) ? res.data : [];
+  } catch { emisionInfoCerts.value = []; }
+};
+
+const fetchCandidatos = async () => {
+  emisionLoading.value = true;
+  try {
+    const res = await certificadosService.getCandidatos(
+      emisionTipo.value,
+      emisionActividadId.value || undefined,
+      emisionEventoId.value || undefined,
+    );
+    emisionCandidatos.value = res.data?.candidatos || [];
+    emisionSelectedIds.value = [];
+  } catch (error: any) {
+    console.error('Error fetching candidates:', error);
+    const detail = error.response?.data?.message || error.message || 'Error desconocido';
+    Swal.fire('Error', `No se pudieron cargar los candidatos: ${Array.isArray(detail) ? detail.join(', ') : detail}`, 'error');
+    emisionCandidatos.value = [];
+  }
+  emisionLoading.value = false;
+};
+
+const handleEmitirLote = async () => {
+  const sinCert = emisionCandidatos.value.filter(c => emisionSelectedIds.value.includes(c.id) && !c.yaTieneCertificado);
+  if (sinCert.length === 0) {
+    Swal.fire('Atención', 'No hay candidatos seleccionados sin certificado previo.', 'warning');
+    return;
+  }
+  if (!emisionInfoCertId.value) {
+    Swal.fire('Atención', 'Selecciona una plantilla de certificado.', 'warning');
+    return;
+  }
+  const result = await Swal.fire({
+    title: `Emitir ${sinCert.length} certificados?`,
+    text: `Tipo: ${tipoLabels[emisionTipo.value]}`,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Emitir',
+    confirmButtonColor: '#0f172a',
+  });
+  if (!result.isConfirmed) return;
+
+  try {
+    emisionLoading.value = true;
+    const res = await certificadosService.emitirLoteTipo({
+      id_info_certificado: emisionInfoCertId.value,
+      id_actividad_academica: emisionActividadId.value || undefined,
+      id_evento: emisionEventoId.value || undefined,
+      tipo: emisionTipo.value,
+      personasIds: sinCert.map(c => c.id),
+      firma: emisionFirma.value || 'Firma Digital',
+    });
+    Swal.fire('¡Éxito!', res.data.mensaje, 'success');
+    fetchCandidatos();
+    fetchCertificados();
+  } catch (err: any) {
+    Swal.fire('Error', err.response?.data?.message || 'Error al emitir certificados', 'error');
+  } finally {
+    emisionLoading.value = false;
+  }
+};
+
+const toggleEmisionSelectAll = (event: any) => {
+  emisionSelectedIds.value = event.target.checked
+    ? emisionCandidatos.value.filter(c => !c.yaTieneCertificado).map(c => c.id)
+    : [];
+};
+
 onMounted(() => {
   if (route.query.search) {
     filterEvent.value = String(route.query.search);
   }
   fetchCertificados();
-  fetchEventos();
+  fetchEmisionEventos();
 });
 </script>
 
@@ -335,11 +467,11 @@ onMounted(() => {
             <span class="material-symbols-outlined text-white text-[22px]">workspace_premium</span>
           </div>
           <div>
-            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">Módulo de Certificación</p>
-            <h1 class="text-2xl font-black text-slate-800 dark:text-white tracking-tight uppercase italic">Gestión de Envíos SMTP</h1>
+            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">Panel de Control</p>
+            <h1 class="text-2xl font-black text-slate-800 dark:text-white tracking-tight uppercase italic">Certificados</h1>
           </div>
         </div>
-        <p class="text-slate-500 text-sm ml-1">Emisión de certificados, colas de envío asíncronas y auditoría de logs de entrega.</p>
+        <p class="text-slate-500 text-sm ml-1">Emisión, envío y trazabilidad de certificados del sistema.</p>
       </div>
 
       <div class="flex items-center gap-2 flex-wrap justify-end">
@@ -373,43 +505,28 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- TABS PREMIUM LAYOUT -->
-    <div class="flex border-b border-slate-200 dark:border-gray-800 mb-6">
-      <button @click="activeTab = 'certificados'" 
-              :class="activeTab === 'certificados' ? 'border-slate-800 text-slate-800 dark:border-white dark:text-white font-black' : 'border-transparent text-slate-400 hover:text-slate-600'" 
-              class="py-3.5 px-6 border-b-2 text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2">
-        <span class="material-symbols-outlined text-[16px]">workspace_premium</span>
-        Trazabilidad de Certificados
+    <!-- TAB NAVIGATION -->
+    <div class="flex gap-2">
+      <button @click="activeTab = 'trazabilidad'" :class="activeTab === 'trazabilidad' ? 'bg-slate-800 text-white shadow-lg shadow-slate-900/20' : 'bg-white dark:bg-gray-900 text-slate-500 border border-slate-200 dark:border-gray-800 hover:bg-slate-50'" class="flex items-center gap-2 px-5 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all">
+        <span class="material-symbols-outlined text-sm">mail</span>
+        Trazabilidad y Envío
       </button>
-      <button @click="activeTab = 'auditoria'; fetchAuditoria()" 
-              :class="activeTab === 'auditoria' ? 'border-slate-800 text-slate-800 dark:border-white dark:text-white font-black' : 'border-transparent text-slate-400 hover:text-slate-600'" 
-              class="py-3.5 px-6 border-b-2 text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2">
-        <span class="material-symbols-outlined text-[16px]">mail</span>
-        Historial y Auditoría de Correos
+      <button @click="activeTab = 'emision'" :class="activeTab === 'emision' ? 'bg-slate-800 text-white shadow-lg shadow-slate-900/20' : 'bg-white dark:bg-gray-900 text-slate-500 border border-slate-200 dark:border-gray-800 hover:bg-slate-50'" class="flex items-center gap-2 px-5 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all">
+        <span class="material-symbols-outlined text-sm">add_circle</span>
+        Emisión Masiva
       </button>
     </div>
 
-    <!-- ──────────────────────────────────────────────────────────── -->
-    <!-- CONTENIDO PESTAÑA 1: TRAZABILIDAD DE CERTIFICADOS -->
-    <!-- ──────────────────────────────────────────────────────────── -->
-    <div v-if="activeTab === 'certificados'" class="space-y-6">
-      
-      <!-- MOTOR INTELIGENTE & FILTRO EVENTO -->
-      <div class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div class="flex-1 min-w-[280px]">
-          <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Motor de Certificación por Evento</label>
-          <select v-model="selectedEventId" class="w-full px-4 py-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl text-xs font-bold uppercase outline-none cursor-pointer">
-            <option :value="null">-- Todos los Eventos --</option>
-            <option v-for="ev in listEventos" :key="ev.id" :value="ev.id">{{ ev.nombre }}</option>
-          </select>
-        </div>
+    <!-- TAB: TRAZABILIDAD -->
+    <div v-if="activeTab === 'trazabilidad'" class="space-y-6 animate-in fade-in duration-300">
 
-        <div v-if="selectedEventId" class="flex-shrink-0">
-          <button @click="handleEnviarTodoElEvento" :disabled="isSendingEvent"
-                  class="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-md">
-            <span class="material-symbols-outlined text-[18px]">{{ isSendingEvent ? 'sync' : 'auto_awesome' }}</span>
-            {{ isSendingEvent ? 'Procesando...' : 'Enviar Todo el Evento' }}
-          </button>
+    <!-- FILTROS -->
+    <div class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
+      <div class="flex flex-wrap items-center gap-4">
+        <div class="flex-1 min-w-[250px] relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[20px]">search</span>
+          <input v-model="filterEvent" type="text" placeholder="Buscar por evento o actividad..."
+                 class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-slate-400 transition-all" />
         </div>
       </div>
 
@@ -512,49 +629,63 @@ onMounted(() => {
                   <span class="text-[10px] font-mono text-slate-500">
                     {{ cert.fecha_ultimo_envio ? new Date(cert.fecha_ultimo_envio).toLocaleString('es-BO') : '—' }}
                   </span>
-                </td>
+                </div>
+              </td>
 
-                <!-- Acciones -->
-                <td class="px-6 py-4">
-                  <div class="flex items-center justify-end gap-1">
-                    <!-- Ver error -->
-                    <button v-if="cert.estado_envio === 'error'"
-                            @click="verError(cert.log_error_envio || '')"
-                            title="Ver detalle del error"
-                            class="p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 text-rose-400 transition-all">
-                      <span class="material-symbols-outlined text-[18px]">bug_report</span>
-                    </button>
+              <!-- Último intento -->
+              <td class="px-6 py-4">
+                <span class="text-[10px] font-mono text-slate-500">
+                  {{ cert.fecha_ultimo_envio ? new Date(cert.fecha_ultimo_envio).toLocaleString('es-BO') : '—' }}
+                </span>
+              </td>
 
-                    <!-- Editar email -->
-                    <button @click="abrirEditarEmail(cert)"
-                            title="Editar email del usuario"
-                            class="p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-400 hover:text-blue-600 transition-all">
-                      <span class="material-symbols-outlined text-[18px]">edit</span>
-                    </button>
+              <!-- Acciones -->
+              <td class="px-6 py-4">
+                <div class="flex items-center justify-end gap-1">
+                  <!-- Validar envío / Trazabilidad -->
+                  <button @click="abrirMailTrace(cert.id)"
+                          title="Ver traza de envío"
+                          class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-all">
+                    <span class="material-symbols-outlined text-[18px]">history</span>
+                  </button>
 
-                    <!-- Reintentar individual -->
-                    <button @click="reintentarUno(cert)"
-                            :title="cert.estado_envio === 'enviado' ? 'Ya enviado' : 'Reintentar envío'"
-                            :class="cert.estado_envio === 'enviado'
-                              ? 'text-slate-300 dark:text-slate-600 cursor-default'
-                              : 'hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-400 hover:text-slate-800'"
-                            class="p-2 rounded-lg transition-all">
-                      <span class="material-symbols-outlined text-[18px]">
-                        {{ cert.estado_envio === 'enviado' ? 'done_all' : 'send' }}
-                      </span>
-                    </button>
-                  </div>
-                </td>
-              </tr>
+                  <!-- Ver error -->
+                  <button v-if="cert.estado_envio === 'error'"
+                          @click="verError(cert.log_error_envio || '')"
+                          title="Ver detalle del error"
+                          class="p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 text-rose-400 transition-all">
+                    <span class="material-symbols-outlined text-[18px]">bug_report</span>
+                  </button>
 
-              <tr v-if="filteredCertificados.length === 0">
-                <td colspan="6" class="py-20 text-center text-slate-400 italic text-sm">
-                  No se encontraron certificados para los filtros aplicados.
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                  <!-- Editar email -->
+                  <button @click="abrirEditarEmail(cert)"
+                          title="Editar email del usuario"
+                          class="p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-400 hover:text-blue-600 transition-all">
+                    <span class="material-symbols-outlined text-[18px]">edit</span>
+                  </button>
+
+                  <!-- Reintentar individual -->
+                  <button @click="reintentarUno(cert)"
+                          :title="cert.estado_envio === 'enviado' ? 'Ya enviado' : 'Reintentar envío'"
+                          :class="cert.estado_envio === 'enviado'
+                            ? 'text-slate-300 dark:text-slate-600 cursor-default'
+                            : 'hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-400 hover:text-slate-800'"
+                          class="p-2 rounded-lg transition-all">
+                    <span class="material-symbols-outlined text-[18px]">
+                      {{ cert.estado_envio === 'enviado' ? 'done_all' : 'send' }}
+                    </span>
+                  </button>
+                </div>
+              </td>
+            </tr>
+
+            <tr v-if="filteredCertificados.length === 0">
+              <td colspan="6" class="py-20 text-center text-slate-400 italic text-sm">
+                No se encontraron certificados para los filtros aplicados.
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
     </div>
@@ -783,6 +914,178 @@ onMounted(() => {
                 <span v-if="isSavingEmail" class="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
                 {{ isSavingEmail ? 'Guardando...' : 'Guardar Email' }}
               </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    </div> <!-- end trazabilidad tab -->
+
+    <!-- TAB: EMISIÓN MASIVA -->
+    <div v-if="activeTab === 'emision'" class="space-y-6 animate-in fade-in duration-300">
+      <div class="bg-white dark:bg-gray-900 rounded-3xl border border-slate-200 dark:border-gray-800 shadow-sm p-6 space-y-6">
+        <h3 class="text-sm font-black uppercase text-slate-800 dark:text-white flex items-center gap-2">
+          <span class="material-symbols-outlined text-amber-500">add_circle</span>
+          Generar Certificados por Tipo de Rol
+        </h3>
+
+        <!-- Tipo selector -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <button v-for="(label, key) in tipoLabels" :key="key" @click="emisionTipo = Number(key); emisionCandidatos = []; emisionSelectedIds = []"
+            :class="emisionTipo === Number(key) ? 'bg-slate-800 text-white shadow-lg' : 'bg-slate-100 dark:bg-gray-800 text-slate-500 hover:bg-slate-200'"
+            class="px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all text-center">
+            {{ label }}
+          </button>
+        </div>
+
+        <!-- Evento + Actividad -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="text-[10px] font-black uppercase text-slate-400 mb-1 block">Evento</label>
+            <select v-model="emisionEventoId" @change="fetchEmisionActividades(); fetchEmisionInfoCerts()" class="w-full bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-500">
+              <option :value="null">Seleccionar evento...</option>
+              <option v-for="e in emisionEventos" :key="e.id" :value="e.id">{{ e.nombre || e.nombre_evento }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[10px] font-black uppercase text-slate-400 mb-1 block">Actividad</label>
+            <select v-model="emisionActividadId" class="w-full bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-500">
+              <option :value="null">{{ emisionTipo === 3 ? 'No aplica (por evento)' : 'Seleccionar...' }}</option>
+              <option v-for="a in emisionActividades" :key="a.id" :value="a.id">{{ a.nombre }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[10px] font-black uppercase text-slate-400 mb-1 block">Plantilla Certificado</label>
+            <select v-model="emisionInfoCertId" class="w-full bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-500">
+              <option :value="null">Seleccionar plantilla...</option>
+              <option v-for="ic in emisionInfoCerts" :key="ic.id" :value="ic.id">{{ ic.cabecera || `Plantilla #${ic.id}` }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <input v-model="emisionFirma" type="text" placeholder="Firma (ej: Firma del Director)" class="flex-1 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-500" />
+          <button @click="fetchCandidatos" :disabled="emisionLoading" class="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 transition-all disabled:opacity-50">
+            <span class="material-symbols-outlined text-sm">search</span>
+            Buscar Candidatos
+          </button>
+        </div>
+      </div>
+
+      <!-- Candidatos table -->
+      <div v-if="emisionCandidatos.length > 0" class="bg-white dark:bg-gray-900 rounded-3xl border border-slate-200 dark:border-gray-800 shadow-sm overflow-hidden">
+        <div class="p-5 border-b border-slate-100 dark:border-gray-800 flex items-center justify-between">
+          <p class="text-sm font-black text-slate-800 dark:text-white uppercase">{{ emisionCandidatos.length }} candidatos encontrados</p>
+          <button @click="handleEmitirLote" :disabled="emisionSelectedIds.length === 0 || emisionLoading" class="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all disabled:opacity-50">
+            <span class="material-symbols-outlined text-sm">{{ emisionLoading ? 'progress_activity' : 'workspace_premium' }}</span>
+            Emitir Seleccionados ({{ emisionSelectedIds.length }})
+          </button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="bg-slate-50 dark:bg-gray-800/50">
+                <th class="p-4 w-12"><input type="checkbox" @change="toggleEmisionSelectAll" class="rounded" /></th>
+                <th class="p-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Usuario</th>
+                <th class="p-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Email</th>
+                <th class="p-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="c in emisionCandidatos" :key="c.id" class="border-t border-slate-100 dark:border-gray-800 hover:bg-slate-50 dark:hover:bg-gray-800/50 transition-colors">
+                <td class="p-4">
+                  <input v-if="!c.yaTieneCertificado" type="checkbox" :value="c.id" v-model="emisionSelectedIds" class="rounded" />
+                  <span v-else class="material-symbols-outlined text-emerald-500 text-sm" title="Ya tiene certificado">check_circle</span>
+                </td>
+                <td class="p-4 text-sm font-bold text-slate-700 dark:text-gray-300">{{ c.nombres }} {{ c.primer_apellido }}</td>
+                <td class="p-4 text-xs font-mono text-slate-500">{{ c.email }}</td>
+                <td class="p-4">
+                  <span v-if="c.yaTieneCertificado" class="text-[9px] font-black uppercase px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 tracking-widest">Emitido</span>
+                  <span v-else class="text-[9px] font-black uppercase px-2 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 tracking-widest">Pendiente</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIL TRACE MODAL -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="showTraceModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" @click.self="showTraceModal = false">
+          <div class="bg-white dark:bg-gray-900 rounded-3xl border border-slate-200 dark:border-gray-800 shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div class="p-6 border-b border-slate-100 dark:border-gray-800 flex items-center justify-between">
+              <div>
+                <h3 class="text-lg font-black text-slate-800 dark:text-white uppercase">Traza de Envío</h3>
+                <p class="text-xs text-slate-400 mt-1">Historial detallado de entrega del certificado.</p>
+              </div>
+              <button @click="showTraceModal = false" class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-gray-800 transition-all">
+                <span class="material-symbols-outlined text-slate-400">close</span>
+              </button>
+            </div>
+
+            <div v-if="traceLoading" class="p-12 text-center">
+              <span class="material-symbols-outlined animate-spin text-3xl text-slate-400">progress_activity</span>
+            </div>
+
+            <div v-else-if="traceData" class="p-6 space-y-6">
+              <!-- Cert status -->
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-slate-50 dark:bg-gray-800 rounded-xl p-4">
+                  <p class="text-[9px] font-black uppercase text-slate-400 tracking-widest">Estado</p>
+                  <p class="text-sm font-black mt-1" :class="traceData.estado_certificado === 'enviado' ? 'text-emerald-600' : traceData.estado_certificado === 'error' ? 'text-rose-600' : 'text-amber-600'">{{ traceData.estado_certificado || 'pendiente' }}</p>
+                </div>
+                <div class="bg-slate-50 dark:bg-gray-800 rounded-xl p-4">
+                  <p class="text-[9px] font-black uppercase text-slate-400 tracking-widest">Reintentos</p>
+                  <p class="text-sm font-black text-slate-700 dark:text-white mt-1">{{ traceData.reintentos || 0 }}</p>
+                </div>
+                <div class="bg-slate-50 dark:bg-gray-800 rounded-xl p-4">
+                  <p class="text-[9px] font-black uppercase text-slate-400 tracking-widest">Destinatario</p>
+                  <p class="text-xs font-mono text-slate-600 mt-1 truncate">{{ traceData.destinatario }}</p>
+                </div>
+                <div class="bg-slate-50 dark:bg-gray-800 rounded-xl p-4">
+                  <p class="text-[9px] font-black uppercase text-slate-400 tracking-widest">Último Envío</p>
+                  <p class="text-xs font-mono text-slate-600 mt-1">{{ traceData.fecha_ultimo_envio ? new Date(traceData.fecha_ultimo_envio).toLocaleString('es-BO') : '—' }}</p>
+                </div>
+              </div>
+
+              <!-- Error log -->
+              <div v-if="traceData.log_error" class="bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800 rounded-xl p-4">
+                <p class="text-[9px] font-black uppercase text-rose-600 tracking-widest mb-1">Error Registrado</p>
+                <pre class="text-xs text-rose-700 dark:text-rose-300 whitespace-pre-wrap break-words">{{ traceData.log_error }}</pre>
+              </div>
+
+              <!-- Mail Logs -->
+              <div>
+                <p class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">Historial de Correos (mail_logs)</p>
+                <div v-if="traceData.logs?.length === 0" class="text-xs text-slate-400 italic">Sin registros en mail_logs.</div>
+                <div v-else class="space-y-2">
+                  <div v-for="log in traceData.logs" :key="log.id" class="bg-slate-50 dark:bg-gray-800 rounded-xl p-3 flex items-center justify-between text-xs">
+                    <div>
+                      <span class="font-black" :class="log.estado === 'enviado' ? 'text-emerald-600' : log.estado === 'fallido' ? 'text-rose-600' : 'text-amber-600'">{{ log.estado }}</span>
+                      <span class="text-slate-400 ml-2">{{ new Date(log.fecha_creacion).toLocaleString('es-BO') }}</span>
+                    </div>
+                    <span v-if="log.message_id" class="font-mono text-[10px] text-slate-400 truncate max-w-[200px]" :title="log.message_id">{{ log.message_id }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Mail Queue -->
+              <div>
+                <p class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">Cola de Envío (mail_queue)</p>
+                <div v-if="traceData.cola?.length === 0" class="text-xs text-slate-400 italic">Sin registros en cola.</div>
+                <div v-else class="space-y-2">
+                  <div v-for="q in traceData.cola" :key="q.id" class="bg-slate-50 dark:bg-gray-800 rounded-xl p-3 flex items-center justify-between text-xs">
+                    <div>
+                      <span class="font-black" :class="q.estado === 'PENDING' ? 'text-blue-600' : q.estado === 'FAILED' ? 'text-rose-600' : 'text-amber-600'">{{ q.estado }}</span>
+                      <span class="text-slate-400 ml-2">Intentos: {{ q.intentos }}</span>
+                    </div>
+                    <span class="text-slate-400">{{ new Date(q.fecha_creacion).toLocaleString('es-BO') }}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -132,6 +132,11 @@ const router = createRouter({
           component: () => import('../views/eventos/GestionEventoMaster.vue'),
         },
         {
+          path: 'grados-administrativos',
+          name: 'admin-grados-administrativos',
+          component: () => import('../views/admin/AdminGradosAdministrativosView.vue'),
+        },
+        {
           path: 'gestion-eventos',
           name: 'admin-gestion-eventos',
           component: () => import('../views/eventos/GestionEventoMaster.vue'),
@@ -145,6 +150,7 @@ const router = createRouter({
           path: 'eventos/:id/certificado/workplace',
           name: 'admin-certificado-workplace-evento',
           component: () => import('../views/actividades/CertificadoWorkplaceView.vue'),
+          meta: { hideSidebar: true, fullWidth: true }
         },
         {
           path: 'solicitudes',
@@ -333,6 +339,11 @@ const router = createRouter({
           path: 'usuarios',
           name: 'logistica-usuarios',
           component: () => import('../views/logistica/LogisticaUsuariosView.vue'),
+        },
+        {
+          path: 'certificados',
+          name: 'logistica-certificados',
+          component: () => import('../views/logistica/LogisticaCertificadosView.vue'),
         }
       ]
     },

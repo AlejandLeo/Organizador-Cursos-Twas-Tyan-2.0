@@ -23,18 +23,20 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => {
     // Si la respuesta llega bien, aseguramos que el estado sea online
-    import('@/stores/ui').then(({ useUIStore }) => {
+    try {
+      const { useUIStore } = require('@/stores/ui');
       const ui = useUIStore();
       if (!ui.isServerOnline) ui.setServerStatus(true);
-    }).catch(() => {});
+    } catch (e) {}
     return response;
   },
   (error) => {
     // Si no hay respuesta del servidor (ERR_CONNECTION_REFUSED, etc)
     if (!error.response || error.code === 'ERR_NETWORK') {
-      import('@/stores/ui').then(({ useUIStore }) => {
+      try {
+        const { useUIStore } = require('@/stores/ui');
         useUIStore().setServerStatus(false);
-      }).catch(() => {});
+      } catch (e) {}
     }
     return Promise.reject(error);
   }

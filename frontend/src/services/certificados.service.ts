@@ -42,4 +42,30 @@ export const certificadosService = {
   editarEmailUsuario(usuarioId: number, email: string) {
     return api.patch(`/usuarios/${usuarioId}`, { email }, { params: { notificar: 'false' } });
   },
+
+  // ── Nuevos endpoints — Panel de Control de Certificados ─────
+
+  /** Obtiene candidatos aptos para certificados según tipo de rol */
+  getCandidatos(tipo: number, idActividad?: number, idEvento?: number) {
+    return api.get('/admin/certificados/candidatos/buscar', {
+      params: { tipo, idActividad, idEvento },
+    });
+  },
+
+  /** Emite certificados masivamente para un tipo de rol específico */
+  emitirLoteTipo(data: {
+    id_info_certificado: number;
+    id_actividad_academica?: number;
+    id_evento?: number;
+    tipo: number;
+    personasIds: number[];
+    firma: string;
+  }) {
+    return api.post('/admin/certificados/emitir-lote-tipo', data);
+  },
+
+  /** Obtiene la traza de envío de un certificado (mail_logs + mail_queue) */
+  getMailTrace(id: number) {
+    return api.get(`/admin/certificados/${id}/mail-trace`);
+  },
 };

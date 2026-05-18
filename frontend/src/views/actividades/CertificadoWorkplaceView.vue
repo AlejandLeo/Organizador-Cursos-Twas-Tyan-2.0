@@ -51,6 +51,7 @@ interface ElementoLienzo {
   fontSize: number
   color: string
   fontFamily: string
+  id_usuario?: number
 }
 
 const infoCertificado = ref<any>(null)
@@ -61,14 +62,18 @@ const elementosLienzo = ref<ElementoLienzo[]>([])
 const elementoSeleccionado = ref<string | null>(null)
 const selectedElementData = ref<ElementoLienzo | null>(null)
 
+const firmantes = ref<any[]>([])
+
 const fetchData = async () => {
     try {
         if (eventoId) {
-            let url = `/info-certificados/evento/${eventoId}?tipo=${tipoCertificado.value}`
-            if (Number(tipoCertificado.value) === 4) {
-                url += `&es_excelencia=${esExcelencia.value}`
-            }
-            const infoRes = await api.get(url)
+            const [infoRes, firmantesRes] = await Promise.all([
+                api.get(`/info-certificados/evento/${eventoId}?tipo=${tipoCertificado}`),
+                api.get(`/admin/certificados/eventos/${eventoId}/firmantes`).catch(() => ({ data: [] }))
+            ]);
+            
+            firmantes.value = firmantesRes.data || [];
+
             if (infoRes.data && infoRes.data.length > 0) {
                 infoCertificado.value = infoRes.data[0]
                 if (infoCertificado.value.configuracion) {
@@ -178,7 +183,11 @@ const onFileChange = async (e: Event) => {
 }
 
 const goBack = () => {
-    router.push({ name: 'coordinador-gestion-eventos', query: { edit: eventoId, step: 7 } })
+    if (route.name === 'admin-certificado-workplace-evento' || route.path.startsWith('/admin')) {
+        router.push({ name: 'admin-gestion-eventos', query: { edit: eventoId, step: 7 } })
+    } else {
+        router.push({ name: 'coordinador-gestion-eventos', query: { edit: eventoId, step: 7 } })
+    }
 }
 
 // === DRAG AND DROP LOGIC ===
@@ -270,6 +279,27 @@ const onDragStartPalette = (e: DragEvent, tipo: string, valor: string) => {
     e.dataTransfer?.setData('application/json', JSON.stringify({ source: 'palette', tipo, valor }))
 }
 
+const onDragStartAutoridad = (e: DragEvent, f: any) => {
+    e.dataTransfer?.setData('application/json', JSON.stringify({ 
+        source: 'palette', 
+        tipo: 'firma_individual', 
+        valor: `${f.grado || ''} ${f.nombre}`.trim(),
+        id_usuario: f.id_usuario 
+    }))
+}
+
+const getFirmanteData = (idUsuario?: number) => {
+    if (!idUsuario) return null
+    return firmantes.value.find(f => f.id_usuario === idUsuario) || null
+}
+
+const getFirmaFullUrl = (firmaUrl: string) => {
+    if (!firmaUrl) return ''
+    if (firmaUrl.startsWith('http')) return firmaUrl
+    const base = api.defaults.baseURL || 'http://localhost:3000'
+    return `${base}${firmaUrl}`
+}
+
 const onDragStartCanvas = (e: DragEvent, id: string) => {
     isDraggingCanvasId.value = id
     e.dataTransfer?.setData('application/json', JSON.stringify({ source: 'canvas', id }))
@@ -311,17 +341,19 @@ const onDropCanvas = (e: DragEvent) => {
     const yPercent = (dropY / canvasRect.height) * 100
 
     if (data.source === 'palette') {
+        const defaultWidth = data.tipo === 'qr' ? 100 : (data.tipo === 'firma' || data.tipo === 'cabecera' || data.tipo === 'tenor' ? 600 : (data.tipo === 'firma_individual' ? 180 : undefined));
         elementosLienzo.value.push({
             id: Date.now().toString(),
             tipo: data.tipo,
             valor: data.valor,
             x: xPercent,
             y: yPercent,
-            width: data.tipo === 'qr' ? 100 : (data.tipo === 'firma' || data.tipo === 'cabecera' || data.tipo === 'tenor' ? 600 : undefined),
+            width: defaultWidth,
             height: data.tipo === 'qr' ? 100 : undefined,
             fontSize: 24,
             color: '#000000',
-            fontFamily: 'Arial'
+            fontFamily: 'Arial',
+            id_usuario: data.id_usuario
         })
     } else if (data.source === 'canvas') {
         const item = elementosLienzo.value.find(el => el.id === data.id)
@@ -604,11 +636,29 @@ const guardarDiseno = async () => {
                         </div>
                     </div>
                 </div>
+
+                <!-- Seccion 4: Firmas de Autoridades -->
+                <div v-if="firmantes.length > 0">
+                    <h3 class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-3">Firmas de Autoridades</h3>
+                    <div class="space-y-2">
+                        <div v-for="f in firmantes" :key="f.id_usuario" 
+                             draggable="true" 
+                             @dragstart="e => onDragStartAutoridad(e, f)" 
+                             class="flex items-center gap-3 p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 hover:border-emerald-500 transition-colors cursor-move group">
+                            <span class="material-symbols-outlined text-emerald-300 text-[14px]">drag_indicator</span>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-[10px] font-black text-emerald-700 dark:text-emerald-300 uppercase truncate leading-tight">{{ f.grado || '' }} {{ f.nombre }}</p>
+                                <p class="text-[8px] font-bold text-slate-500 dark:text-gray-400 truncate leading-none mt-0.5">{{ f.rol || 'Autoridad' }}</p>
+                            </div>
+                            <span class="material-symbols-outlined text-xs text-emerald-400">signature</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </aside>
 
         <!-- Canvas Central -->
-        <main class="flex-1 bg-slate-100 dark:bg-[#0B1120] relative flex items-center justify-center overflow-hidden inner-shadow-workplace">
+        <main class="flex-1 bg-slate-100 dark:bg-[#0B1120] overflow-auto p-6 relative inner-shadow-workplace min-h-0 flex flex-col">
             
             <!-- Controls Overlay (Zoom, etc) -->
             <div class="absolute bottom-8 right-8 flex gap-2 z-20">
@@ -623,131 +673,139 @@ const guardarDiseno = async () => {
                 </button>
             </div>
 
-            <!-- Scrollable Viewport Wrapper -->
-            <div ref="viewportRef" 
-                 @mousedown="onMouseDownViewport" 
-                 @mousemove="onMouseMoveViewport" 
-                 @mouseup="onMouseUpViewport" 
-                 @mouseleave="onMouseLeaveViewport" 
-                 class="w-full h-full flex items-center justify-center overflow-auto p-12 select-none cursor-grab active:cursor-grabbing">
-                <!-- Sizing Layout Box for Zoom (Figma style) -->
-                <div class="relative transition-all duration-200 flex items-center justify-center shrink-0" 
-                     :style="{ 
-                        width: `${1024 * zoomLevel}px`, 
-                        height: `${724 * zoomLevel}px` 
-                     }">
+            <!-- The Document Canvas Scroll Wrapper -->
+            <div class="flex-1 min-h-0 w-full overflow-auto flex items-start justify-center p-6">
+                <!-- Outer scaling container to physically reserve space in parent layout flow -->
+                <div :style="{
+                    width: `${1024 * zoomLevel}px`,
+                    height: `${724 * zoomLevel}px`,
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                }" class="relative flex items-center justify-center shrink-0">
                     
-                    <!-- The Canvas itself -->
-                    <div ref="canvasRef" @dragover.prevent @drop="onDropCanvas" @click.self="deselectElement" class="absolute left-1/2 top-1/2 w-[1024px] h-[724px] bg-white dark:bg-gray-900 shadow-2xl border border-slate-200 dark:border-gray-800 flex items-center justify-center group ring-4 ring-black/5 dark:ring-white/5 overflow-hidden transition-transform duration-200 animate-in fade-in duration-300 shrink-0"
+                    <div ref="canvasRef" @dragover.prevent @drop="onDropCanvas" @click.self="deselectElement" 
+                         class="w-[1024px] h-[724px] bg-white dark:bg-gray-900 shadow-2xl border border-slate-200 dark:border-gray-800 absolute flex items-center justify-center group ring-4 ring-black/5 dark:ring-white/5 bg-cover bg-center overflow-hidden transition-transform duration-200 shrink-0"
                          :style="{ 
                             backgroundImage: infoCertificado?.fondo_url ? `url(${getImageUrl('fondos', infoCertificado.fondo_url)})` : undefined,
-                            backgroundSize: '100% 100%',
-                            backgroundPosition: 'center',
-                            backgroundRepeat: 'no-repeat',
-                            transform: `translate(-50%, -50%) scale(${zoomLevel})`,
+                            transform: `scale(${zoomLevel})`,
                             transformOrigin: 'center center'
                          }">
-                         
-                        <!-- Placeholder when empty -->
-                        <div v-if="!infoCertificado?.fondo_url" class="text-center absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-50 dark:opacity-20">
-                            <span class="material-symbols-outlined text-[80px] text-slate-300 dark:text-gray-600 mb-4">aspect_ratio</span>
-                            <h3 class="text-2xl font-black text-slate-400 dark:text-gray-500 uppercase tracking-tight">Formato A4 Horizontal</h3>
-                            <p class="text-xs text-slate-400 font-bold mt-2 font-mono">1123 x 794 px</p>
+                <!-- Placeholder when empty -->
+                <div v-if="!infoCertificado?.fondo_url" class="text-center absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-50 dark:opacity-20">
+                    <span class="material-symbols-outlined text-[80px] text-slate-300 dark:text-gray-600 mb-4">aspect_ratio</span>
+                    <h3 class="text-2xl font-black text-slate-400 dark:text-gray-500 uppercase tracking-tight">Formato A4 Horizontal</h3>
+                    <p class="text-xs text-slate-400 font-bold mt-2 font-mono">1123 x 794 px</p>
+                </div>
+                
+                <!-- Elementos renderizados -->
+                <div v-for="el in elementosLienzo" :key="el.id"
+                     draggable="true" 
+                     @dragstart="e => onDragStartCanvas(e, el.id)"
+                     @dragend="onDragEndCanvas"
+                     @click.stop="selectElement(el.id)"
+                     class="absolute cursor-move flex items-center justify-center group/el border hover:border-blue-500 transition-colors backdrop-blur-[2px]"
+                     :class="{ 
+                        'border-solid border-umsa-gold ring-2 ring-umsa-gold/30 bg-blue-50/20 dark:bg-white/10': elementoSeleccionado === el.id,
+                        'border-dashed border-slate-300 bg-white/40 dark:bg-black/30': elementoSeleccionado !== el.id,
+                        'w-auto px-4 py-2 rounded-xl': el.tipo === 'texto',
+                        'px-6 py-4 rounded-2xl': el.tipo === 'cabecera' || el.tipo === 'tenor',
+                        'h-[120px] rounded-2xl': el.tipo === 'firma' || el.tipo === 'firma_individual',
+                        'opacity-30': isDraggingCanvasId === el.id
+                     }"
+                     :style="{ 
+                        left: `${el.x}%`, top: `${el.y}%`, 
+                        fontSize: el.tipo !== 'qr' && el.tipo !== 'firma' && el.tipo !== 'firma_individual' ? `${el.fontSize}px` : undefined, 
+                        color: el.color, fontFamily: el.fontFamily,
+                        width: el.width ? `${el.width}px` : 'auto',
+                        height: el.height ? `${el.height}px` : 'auto'
+                     }">
+                    
+                    <div v-if="el.tipo === 'texto'" class="flex items-center gap-2">
+                        <span class="material-symbols-outlined opacity-50" :style="{ fontSize: `${el.fontSize * 0.8}px` }">tag</span>
+                        <span class="font-bold whitespace-nowrap">{{ el.valor }}</span>
+                    </div>
+ 
+                    <div v-if="el.tipo === 'cabecera' || el.tipo === 'tenor'" class="flex flex-col w-full text-center">
+                        <span class="text-[10px] uppercase font-black opacity-50 bg-black/5 rounded px-2 py-0.5 inline-block mx-auto mb-2">{{ el.tipo }}</span>
+                        <span class="font-bold leading-relaxed break-words whitespace-pre-wrap">{{ el.valor }}</span>
+                    </div>
+ 
+                    <span v-if="el.tipo === 'qr'" class="material-symbols-outlined flex items-center justify-center" :style="{ fontSize: `${el.width || 100}px` }">qr_code_2</span>
+                    
+                    <div v-if="el.tipo === 'firma'" class="flex flex-col items-center justify-center w-full h-full relative" :class="{ 'opacity-60': firmantes.length === 0 }">
+                        <div v-if="firmantes.length > 0" class="flex items-end justify-center w-full px-4 gap-8">
+                            <div v-for="f in firmantes" :key="f.id_usuario" class="flex flex-col items-center justify-end w-48 shrink-0">
+                                <img v-if="f.firma_url" :src="getFirmaFullUrl(f.firma_url)" @error="e => e.target.style.display = 'none'" class="h-16 object-contain mb-1 drop-shadow-sm mix-blend-multiply" />
+                                <span v-else class="material-symbols-outlined text-[24px] mb-2 opacity-50">draw</span>
+                                
+                                <div class="w-full border-t border-black pt-1 flex flex-col items-center text-center">
+                                    <p class="text-[10px] font-bold text-black uppercase leading-tight">{{ f.grado || f.grado_abreviacion || '' }} {{ f.nombre || `${f.nombres || ''} ${f.apellidos || ''}` }}</p>
+                                    <p class="text-[8px] font-black text-black uppercase leading-tight tracking-wider opacity-80">{{ f.rol || f.rol_administrativo || f.rol_evento }}</p>
+                                </div>
+                            </div>
                         </div>
-
-                        <!-- Smart Alignment Guides (Horizontal & Vertical Center Snapping) -->
-                        <div v-if="elementoSeleccionado && isNear(selectedElementData?.x, 50, 0.4)" class="absolute top-0 bottom-0 left-1/2 w-[1px] border-l border-dashed border-red-500/80 z-20 pointer-events-none">
-                            <span class="absolute top-2 left-2 bg-red-500 text-white text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest scale-75 origin-top-left shadow-sm">Centro Vertical</span>
+                        <div v-else class="flex items-center justify-between w-full px-8 gap-4">
+                            <div class="flex flex-col items-center flex-1"><span class="material-symbols-outlined text-[24px] mb-2">draw</span><div class="w-full border-t-2 border-dashed border-current pt-1 text-[8px] font-black uppercase text-center">Firma 1</div></div>
+                            <div class="flex flex-col items-center flex-1"><span class="material-symbols-outlined text-[24px] mb-2">draw</span><div class="w-full border-t-2 border-dashed border-current pt-1 text-[8px] font-black uppercase text-center">Firma 2</div></div>
+                            <div class="flex flex-col items-center flex-1"><span class="material-symbols-outlined text-[24px] mb-2">draw</span><div class="w-full border-t-2 border-dashed border-current pt-1 text-[8px] font-black uppercase text-center">Firma 3</div></div>
                         </div>
-                        <div v-if="elementoSeleccionado && isNear(selectedElementData?.y, 50, 0.4)" class="absolute left-0 right-0 top-1/2 h-[1px] border-t border-dashed border-red-500/80 z-20 pointer-events-none">
-                            <span class="absolute left-2 top-2 bg-red-500 text-white text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest scale-75 origin-top-left shadow-sm">Centro Horizontal</span>
-                        </div>
-                        
-                        <!-- Elementos renderizados -->
-                        <div v-for="el in elementosLienzo" :key="el.id"
-                             draggable="true" 
-                             @dragstart="e => onDragStartCanvas(e, el.id)"
-                             @dragend="onDragEndCanvas"
-                             @click.stop="selectElement(el.id)"
-                             class="absolute cursor-move flex items-center justify-center group/el border transition-colors backdrop-blur-[1px]"
-                             :class="{ 
-                                'border-solid border-blue-500 ring-2 ring-blue-500/20 bg-blue-500/5 dark:bg-blue-500/10 z-30': elementoSeleccionado === el.id,
-                                'border-dashed border-slate-350 hover:border-blue-400 bg-white/40 dark:bg-black/30': elementoSeleccionado !== el.id,
-                                'w-auto px-4 py-2 rounded-xl': el.tipo === 'texto',
-                                'px-6 py-4 rounded-2xl': el.tipo === 'cabecera' || el.tipo === 'tenor',
-                                'h-[120px] rounded-2xl': el.tipo === 'firma',
-                                'opacity-30': isDraggingCanvasId === el.id
-                             }"
-                             :style="{ 
-                                left: `${el.x}%`, top: `${el.y}%`, 
-                                fontSize: el.tipo !== 'qr' && el.tipo !== 'firma' ? `${el.fontSize}px` : undefined, 
-                                color: el.color, fontFamily: el.fontFamily,
-                                width: el.width ? `${el.width}px` : 'auto',
-                                height: el.height ? `${el.height}px` : 'auto'
-                             }">
-                             
-                            <!-- Figma Style Bounding Box Corner Handles -->
-                            <template v-if="elementoSeleccionado === el.id">
-                                <div class="absolute -top-1.5 -left-1.5 w-3 h-3 rounded-full bg-white border-2 border-blue-500 z-30 pointer-events-none shadow-sm"></div>
-                                <div class="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full bg-white border-2 border-blue-500 z-30 pointer-events-none shadow-sm"></div>
-                                <div class="absolute -bottom-1.5 -left-1.5 w-3 h-3 rounded-full bg-white border-2 border-blue-500 z-30 pointer-events-none shadow-sm"></div>
-                                <div class="absolute -bottom-1.5 -right-1.5 w-3 h-3 rounded-full bg-white border-2 border-blue-500 z-30 pointer-events-none shadow-sm"></div>
+                        <span v-if="firmantes.length === 0" class="absolute top-2 left-3 text-[10px] uppercase font-black opacity-50 bg-black/5 rounded px-2 py-0.5">Contenedor de Firmas Dinámico</span>
+                    </div>
+ 
+                    <div v-if="el.tipo === 'firma_individual'" class="flex flex-col items-center justify-center w-full h-full relative">
+                        <div class="flex flex-col items-center justify-end w-full shrink-0">
+                            <template v-if="getFirmanteData(el.id_usuario)">
+                                <img v-if="getFirmanteData(el.id_usuario).firma_url" 
+                                     :src="getFirmaFullUrl(getFirmanteData(el.id_usuario).firma_url)" 
+                                     @error="e => e.target.style.display = 'none'" 
+                                     class="h-16 object-contain mb-1 drop-shadow-sm mix-blend-multiply" />
+                                <span v-else class="material-symbols-outlined text-[24px] mb-2 opacity-50">draw</span>
+                                
+                                <div class="w-full border-t border-black pt-1 flex flex-col items-center text-center">
+                                    <p class="text-[9px] font-bold text-black uppercase leading-tight">
+                                        {{ getFirmanteData(el.id_usuario).grado || '' }} {{ getFirmanteData(el.id_usuario).nombre }}
+                                    </p>
+                                    <p class="text-[7px] font-black text-black uppercase leading-tight tracking-wider opacity-80">
+                                        {{ getFirmanteData(el.id_usuario).rol || '' }}
+                                    </p>
+                                </div>
                             </template>
-
-                            <!-- Coordinates Tooltip -->
-                            <div v-if="elementoSeleccionado === el.id" class="absolute -top-7 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[8px] font-black font-mono py-0.5 px-2 rounded-md shadow-md pointer-events-none z-30 whitespace-nowrap uppercase tracking-wider select-none animate-in fade-in slide-in-from-bottom-1 duration-150">
-                                X: {{ el.x.toFixed(1) }}% | Y: {{ el.y.toFixed(1) }}%
-                            </div>
-                            
-                            <div v-if="el.tipo === 'texto'" class="flex items-center gap-2">
-                                <span class="material-symbols-outlined opacity-50" :style="{ fontSize: `${el.fontSize * 0.8}px` }">tag</span>
-                                <span class="font-bold whitespace-nowrap">{{ el.valor }}</span>
-                            </div>
-
-                            <div v-if="el.tipo === 'cabecera' || el.tipo === 'tenor'" class="flex flex-col w-full text-center">
-                                <span class="text-[10px] uppercase font-black opacity-50 bg-black/5 rounded px-2 py-0.5 inline-block mx-auto mb-2">{{ el.tipo }}</span>
-                                <span class="font-bold leading-relaxed break-words whitespace-pre-wrap">{{ el.valor }}</span>
-                            </div>
-
-                            <span v-if="el.tipo === 'qr'" class="material-symbols-outlined flex items-center justify-center" :style="{ fontSize: `${el.width || 100}px` }">qr_code_2</span>
-                            
-                            <div v-if="el.tipo === 'firma'" class="flex flex-col items-center justify-center w-full h-full opacity-60">
-                                <div class="flex items-center justify-between w-full px-8 gap-4">
-                                    <div class="flex flex-col items-center flex-1"><span class="material-symbols-outlined text-[24px] mb-2">draw</span><div class="w-full border-t-2 border-dashed border-current pt-1 text-[8px] font-black uppercase text-center">Firma 1</div></div>
-                                    <div class="flex flex-col items-center flex-1"><span class="material-symbols-outlined text-[24px] mb-2">draw</span><div class="w-full border-t-2 border-dashed border-current pt-1 text-[8px] font-black uppercase text-center">Firma 2</div></div>
-                                    <div class="flex flex-col items-center flex-1"><span class="material-symbols-outlined text-[24px] mb-2">draw</span><div class="w-full border-t-2 border-dashed border-current pt-1 text-[8px] font-black uppercase text-center">Firma 3</div></div>
-                                    <div class="flex flex-col items-center flex-1"><span class="material-symbols-outlined text-[24px] mb-2">draw</span><div class="w-full border-t-2 border-dashed border-current pt-1 text-[8px] font-black uppercase text-center">Firma 4</div></div>
-                                </div>
-                                <span class="absolute top-2 left-3 text-[10px] uppercase font-black opacity-50 bg-black/5 rounded px-2 py-0.5">Contenedor de Firmas Dinámico</span>
-                            </div>
-
-                            <span @click.stop="deleteElement(el.id)" class="material-symbols-outlined text-[12px] absolute -top-3 -right-3 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/el:opacity-100 transition-opacity z-10 hover:bg-red-600 cursor-pointer shadow-lg">close</span>
-
-                            <!-- Resize Handles -->
-                            <template v-if="elementoSeleccionado === el.id">
-                                <!-- Right Handle (Width) -->
-                                <div v-if="el.tipo !== 'qr'" @mousedown.stop="startResize($event, el, 'width')"
-                                     class="absolute top-1/2 -right-1.5 w-3 h-8 -translate-y-1/2 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-ew-resize flex flex-col items-center justify-center gap-[2px] shadow-sm z-20">
-                                    <div class="w-0.5 h-1 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
-                                    <div class="w-0.5 h-1 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
-                                </div>
-
-                                <!-- Bottom Handle (Height) -->
-                                <div v-if="el.tipo !== 'qr'" @mousedown.stop="startResize($event, el, 'height')"
-                                     class="absolute -bottom-1.5 left-1/2 h-3 w-8 -translate-x-1/2 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-ns-resize flex items-center justify-center gap-[2px] shadow-sm z-20">
-                                    <div class="w-1 h-0.5 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
-                                    <div class="w-1 h-0.5 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
-                                </div>
-
-                                <!-- Bottom-Right Corner (Both) -->
-                                <div @mousedown.stop="startResize($event, el, 'both')"
-                                     class="absolute -bottom-1.5 -right-1.5 w-4 h-4 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-nwse-resize shadow-sm z-20 flex items-center justify-center">
-                                    <div class="w-1.5 h-1.5 bg-slate-200 dark:bg-gray-400 rounded-full"></div>
+                            <template v-else>
+                                <span class="material-symbols-outlined text-[24px] mb-2 opacity-50">draw</span>
+                                <div class="w-full border-t border-black pt-1 flex flex-col items-center text-center">
+                                    <p class="text-[9px] font-bold text-black uppercase leading-tight">{{ el.valor }}</p>
+                                    <p class="text-[7px] font-black text-black uppercase leading-tight tracking-wider opacity-80">Autoridad</p>
                                 </div>
                             </template>
                         </div>
                     </div>
+ 
+                    <span @click.stop="deleteElement(el.id)" class="material-symbols-outlined text-[12px] absolute -top-3 -right-3 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/el:opacity-100 transition-opacity z-10 hover:bg-red-600 cursor-pointer shadow-lg">close</span>
+ 
+                    <!-- Resize Handles -->
+                    <template v-if="elementoSeleccionado === el.id">
+                        <!-- Right Handle (Width) -->
+                        <div v-if="el.tipo !== 'qr'" @mousedown.stop="startResize($event, el, 'width')"
+                             class="absolute top-1/2 -right-1.5 w-3 h-8 -translate-y-1/2 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-ew-resize flex flex-col items-center justify-center gap-[2px] shadow-sm z-20">
+                            <div class="w-0.5 h-1 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
+                            <div class="w-0.5 h-1 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
+                        </div>
+ 
+                        <!-- Bottom Handle (Height) -->
+                        <div v-if="el.tipo !== 'qr'" @mousedown.stop="startResize($event, el, 'height')"
+                             class="absolute -bottom-1.5 left-1/2 h-3 w-8 -translate-x-1/2 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-ns-resize flex items-center justify-center gap-[2px] shadow-sm z-20">
+                            <div class="w-1 h-0.5 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
+                            <div class="w-1 h-0.5 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
+                        </div>
+ 
+                        <!-- Bottom-Right Corner (Both) -->
+                        <div @mousedown.stop="startResize($event, el, 'both')"
+                             class="absolute -bottom-1.5 -right-1.5 w-4 h-4 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-nwse-resize shadow-sm z-20 flex items-center justify-center">
+                            <div class="w-1.5 h-1.5 bg-slate-200 dark:bg-gray-400 rounded-full"></div>
+                        </div>
+                    </div>
                 </div>
+            </div>
+            </div>
             </div>
         </main>
         

@@ -1,4 +1,5 @@
 import {
+  Column,
   CreateDateColumn,
   Entity,
   JoinColumn,
@@ -8,6 +9,7 @@ import {
 } from 'typeorm';
 import { Usuario } from '../../../Usuario/usuarios/entities/usuario.entity';
 import { Evento } from '../../../Academico/eventos/entities/evento.entity';
+import { GradoAdministrativo } from '../../../Usuario/grados-administrativos/entities/grado-administrativo.entity';
 
 /**
  * COORDINACION_EVENTOS — quién coordina qué evento.
@@ -32,6 +34,13 @@ export class CoordinacionEvento {
   @ManyToOne(() => Evento, (evento) => evento.coordinaciones)
   @JoinColumn({ name: 'id_evento' })
   evento: Evento;
+
+  @Column({ name: 'id_grado_administrativo', nullable: true })
+  id_grado_administrativo: number;
+
+  @ManyToOne(() => GradoAdministrativo, (ga) => ga.coordinaciones, { nullable: true })
+  @JoinColumn({ name: 'id_grado_administrativo' })
+  gradoAdministrativo: GradoAdministrativo;
 
   @CreateDateColumn({ type: 'timestamptz' })
   fecha_creacion: Date;
