@@ -6,7 +6,7 @@ import { useEventoStore } from '@/stores/eventoStore';
 import { useAdminHistorialStore } from '@/stores/adminHistorial';
 import { useAuthStore } from '@/stores/auth';
 
-import api from '@/services/api';
+import api, { getImageUrl } from '@/services/api';
 import Swal from 'sweetalert2';
 
 const router = useRouter();

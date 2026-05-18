@@ -33,6 +33,11 @@ export const certificadosService = {
     return api.post('/admin/certificados/reintentar-fallidos');
   },
 
+  /** Emite y encola para envío masivo todos los certificados elegibles del evento */
+  enviarPorEvento(eventoId: number) {
+    return api.post(`/admin/certificados/enviar-evento/${eventoId}`);
+  },
+
   /** Actualiza el email de un usuario (corrección rápida desde el panel de envíos) */
   editarEmailUsuario(usuarioId: number, email: string) {
     return api.patch(`/usuarios/${usuarioId}`, { email }, { params: { notificar: 'false' } });
