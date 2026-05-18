@@ -62,6 +62,10 @@ export class Certificado {
   @Column({ type: 'integer', default: 1 })
   estado: number;
 
+  /** 1 = Entregado al correo del usuario | 0 = Generado en DB pero no entregado */
+  @Column({ type: 'integer', default: 0 })
+  emitido: number;
+
   /** Trazabilidad de envío: pendiente | enviado | error */
   @Column({ length: 50, default: 'pendiente' })
   estado_envio: string;

@@ -39,14 +39,14 @@ export class SistemaConfigController {
   }
 
   @Get('mail-stats')
-  @Roles('Super Usuario')
+  @Roles('Super Usuario', 'Coordinador')
   @ApiOperation({ summary: 'Obtener estadísticas de la cola de correos' })
   async getMailStats() {
     return this.mailQueueService.getStats();
   }
 
   @Get('mail-audit')
-  @Roles('Super Usuario')
+  @Roles('Super Usuario', 'Coordinador')
   @ApiOperation({ summary: 'Auditoría unificada de correos: enviados, cancelados y fallidos' })
   async getMailAudit(
     @Param() _: any,

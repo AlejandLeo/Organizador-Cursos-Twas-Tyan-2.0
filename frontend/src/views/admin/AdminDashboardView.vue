@@ -60,7 +60,7 @@ const accionesHoy = computed(() => {
 });
 
 // --- Estado Extendido Maestro ---
-const stats = ref({ eventos: 0, actividades: 0, usuarios: 0, inscripciones: 0, ponentes: 0, estudiantes: 0 });
+const stats = ref({ eventos: 0, actividades: 0, usuarios: 0, inscripciones: 0, ponentes: 0, estudiantes: 0, coordinadores: 0 });
 const usuariosDetalle = ref<any[]>([]);
 const eventosDetalle = ref<any[]>([]);
 const actividadesDetalle = ref<any[]>([]);
@@ -103,9 +103,7 @@ onMounted(async () => {
       stats.value.ponentes = usuariosDetalle.value.filter(u => u.rolNombre === 'Ponente').length;
       stats.value.estudiantes = usuariosDetalle.value.filter(u => u.rolNombre === 'Estudiante').length;
       stats.value.inscripciones = usuariosDetalle.value.filter(u => ['Coordinador', 'Super Usuario', 'Administrador'].includes(u.rolNombre)).length;
-      (stats.value as any).coordinadores = stats.value.inscripciones;
-      stats.value.coordinadores = usuariosDetalle.value.filter(u => ['Coordinador', 'Super Usuario', 'Administrador'].includes(u.rolNombre)).length;
-      stats.value.inscripciones = stats.value.coordinadores;
+      stats.value.coordinadores = stats.value.inscripciones;
     }
   } catch (e) {
     console.error('Error en carga maestra:', e);
@@ -601,6 +599,11 @@ const exportarPDFGlobal = async () => {
                     class="w-full flex items-center gap-3 p-4 bg-slate-50 dark:bg-black/30 border border-slate-200 dark:border-white/5 rounded-2xl hover:border-red-500/50 hover:bg-slate-100 dark:hover:bg-red-900/10 transition-all group text-left">
               <span class="material-symbols-outlined text-slate-400 dark:text-slate-600 group-hover:text-red-600 transition-colors">school</span>
               <span class="text-[10px] font-black text-slate-700 dark:text-slate-400 uppercase tracking-widest">Actividades Académicas</span>
+            </button>
+            <button v-if="authStore.esSuperUsuario" @click="router.push({ name: 'admin-mail-templates' })"
+                    class="w-full flex items-center gap-3 p-4 bg-slate-50 dark:bg-black/30 border border-slate-200 dark:border-white/5 rounded-2xl hover:border-red-500/50 hover:bg-slate-100 dark:hover:bg-red-900/10 transition-all group text-left">
+              <span class="material-symbols-outlined text-slate-400 dark:text-slate-600 group-hover:text-red-600 transition-colors">mail</span>
+              <span class="text-[10px] font-black text-slate-700 dark:text-slate-400 uppercase tracking-widest">Plantillas y Auditoría de Correo</span>
             </button>
           </div>
         </div>

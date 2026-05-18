@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useAdminHistorialStore } from '@/stores/adminHistorial';
@@ -11,12 +11,13 @@ import Swal from 'sweetalert2';
 const usuariosDetalle = ref<any[]>([]);
 const fetchUsuariosPersonal = async () => {
   try {
-    const res = await api.get('/admin/usuarios');
-    usuariosDetalle.value = res.data?.map((u: any) => ({
+    const res = await api.get('/usuarios', { params: { limit: 1000 } });
+    const data = res.data?.data || res.data || [];
+    usuariosDetalle.value = Array.isArray(data) ? data.map((u: any) => ({
       ...u,
       nombre: u.persona ? `${u.persona.nombres} ${u.persona.primer_apellido}` : u.email,
       rol: u.usuariosRoles?.[0]?.rol?.nombre_rol || 'Usuario'
-    })) || [];
+    })) : [];
   } catch (e) { console.error(e); }
 };
 
@@ -437,6 +438,68 @@ onMounted(() => {
       tabActivo.value = tab;
     }
   }
+});
+
+watch(() => route.query.tab, (newTab) => {
+  if (newTab && ['eventos', 'actividades', 'solicitudes', 'soporte', 'reportes'].includes(newTab as string)) {
+    tabActivo.value = newTab as any;
+  } else if (!newTab) {
+    tabActivo.value = 'eventos';
+  }
+});
+
+// ─── ESTADO E INTERFAZ DE PREVISUALIZACIÓN DE REPORTES ──────────
+const subTabReportes = ref<'eventos' | 'actividades' | 'usuarios' | 'auditoria'>('eventos');
+const filtroBusquedaReporte = ref('');
+
+const fetchAuditoriaHistorial = async () => {
+  try {
+    await historialStore.cargar({ limit: 100 });
+  } catch (e) {
+    console.error('Error cargando historial de auditoría:', e);
+  }
+};
+
+watch(subTabReportes, async (newTab) => {
+  if (newTab === 'auditoria') {
+    await fetchAuditoriaHistorial();
+  }
+});
+
+const reportesFiltradosPreview = computed(() => {
+  const q = filtroBusquedaReporte.value.toLowerCase().trim();
+  if (subTabReportes.value === 'eventos') {
+    return (eventos.value || []).filter(e => 
+      !q || 
+      String(e.id).includes(q) || 
+      (e.nombre || '').toLowerCase().includes(q) || 
+      (e.gestion || '').toLowerCase().includes(q) || 
+      (e.modalidad || '').toLowerCase().includes(q)
+    );
+  } else if (subTabReportes.value === 'actividades') {
+    return (actividades.value || []).filter(a => 
+      !q || 
+      String(a.id).includes(q) || 
+      (a.nombre || '').toLowerCase().includes(q) || 
+      (a.tipo || '').toLowerCase().includes(q)
+    );
+  } else if (subTabReportes.value === 'usuarios') {
+    return (usuariosDetalle.value || []).filter(u => 
+      !q || 
+      (u.nombre || u.persona?.nombre || '').toLowerCase().includes(q) || 
+      (u.email || '').toLowerCase().includes(q) || 
+      (u.rol || '').toLowerCase().includes(q)
+    );
+  } else if (subTabReportes.value === 'auditoria') {
+    return (historialStore.registros || []).filter(r => 
+      !q || 
+      (r.modulo || '').toLowerCase().includes(q) || 
+      (r.accion || '').toLowerCase().includes(q) || 
+      (r.descripcion || '').toLowerCase().includes(q) || 
+      (r.usuario || '').toLowerCase().includes(q)
+    );
+  }
+  return [];
 });
 
 // ─── LÓGICA DE REPORTES SEGMENTADOS ──────────────────────────
@@ -1008,100 +1071,209 @@ const exportarPDFSegmentado = async (categoria: string) => {
       </div>
     </div>
 
-
-
-
-    <!-- TAB: REPORTES (NUEVO APARTADO) -->
-    <div v-if="tabActivo === 'reportes'" class="animate-in slide-in-from-bottom-4 duration-500">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <!-- Tarjeta: Reportes de Eventos -->
-        <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-8 shadow-sm group hover:shadow-xl hover:shadow-blue-500/5 transition-all">
-          <div class="flex items-center gap-4 mb-6">
-            <div class="w-14 h-14 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
-              <span class="material-symbols-outlined text-3xl">corporate_fare</span>
-            </div>
-            <div>
-              <h3 class="text-lg font-black text-slate-800 dark:text-white uppercase italic">Reportes de Eventos</h3>
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Información técnica y logística</p>
-            </div>
-          </div>
-          <p class="text-xs text-slate-500 dark:text-gray-400 mb-8 leading-relaxed">Genera informes detallados sobre los eventos institucionales, incluyendo fechas, modalidades y estados actuales de planificación.</p>
-          <div class="flex gap-3">
-            <button @click="generarReporteGeneral('eventos', 'excel')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
-              <span class="material-symbols-outlined text-sm">grid_on</span> EXCEL
-            </button>
-            <button @click="generarReporteGeneral('eventos', 'pdf')" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2">
-              <span class="material-symbols-outlined text-sm">picture_as_pdf</span> PDF
-            </button>
-          </div>
-        </div>
-
-        <!-- Tarjeta: Reportes de Actividades -->
-        <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-8 shadow-sm group hover:shadow-xl hover:shadow-amber-500/5 transition-all">
-          <div class="flex items-center gap-4 mb-6">
-            <div class="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400">
-              <span class="material-symbols-outlined text-3xl">school</span>
-            </div>
-            <div>
-              <h3 class="text-lg font-black text-slate-800 dark:text-white uppercase italic">Reportes Académicos</h3>
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cursos, talleres y seminarios</p>
-            </div>
-          </div>
-          <p class="text-xs text-slate-500 dark:text-gray-400 mb-8 leading-relaxed">Exporta el listado completo de actividades académicas con su carga horaria, eventos asociados y fechas de ejecución.</p>
-          <div class="flex gap-3">
-            <button @click="generarReporteGeneral('actividades', 'excel')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
-              <span class="material-symbols-outlined text-sm">grid_on</span> EXCEL
-            </button>
-            <button @click="generarReporteGeneral('actividades', 'pdf')" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2">
-              <span class="material-symbols-outlined text-sm">picture_as_pdf</span> PDF
-            </button>
-          </div>
-        </div>
-
-        <!-- Tarjeta: Reportes de Usuarios -->
-        <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-8 shadow-sm group hover:shadow-xl hover:shadow-emerald-500/5 transition-all">
-          <div class="flex items-center gap-4 mb-6">
-            <div class="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-              <span class="material-symbols-outlined text-3xl">group</span>
-            </div>
-            <div>
-              <h3 class="text-lg font-black text-slate-800 dark:text-white uppercase italic">Directorio de Personal</h3>
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Estudiantes, Ponentes y Staff</p>
-            </div>
-          </div>
-          <p class="text-xs text-slate-500 dark:text-gray-400 mb-8 leading-relaxed">Informe consolidado de todos los usuarios registrados en el sistema, categorizados por su rol institucional y fecha de alta.</p>
-          <div class="flex gap-3">
-            <button @click="generarReporteGeneral('usuarios', 'excel')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
-              <span class="material-symbols-outlined text-sm">grid_on</span> EXCEL
-            </button>
-            <button @click="generarReporteGeneral('usuarios', 'pdf')" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2">
-              <span class="material-symbols-outlined text-sm">picture_as_pdf</span> PDF
-            </button>
-          </div>
-        </div>
-
-        <!-- Tarjeta: Bitácora de Auditoría -->
-        <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-8 shadow-sm group hover:shadow-xl hover:shadow-rose-500/5 transition-all">
-          <div class="flex items-center gap-4 mb-6">
-            <div class="w-14 h-14 rounded-2xl bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center text-rose-600 dark:text-rose-400">
-              <span class="material-symbols-outlined text-3xl">history</span>
-            </div>
-            <div>
-              <h3 class="text-lg font-black text-slate-800 dark:text-white uppercase italic">Historial de Auditoría</h3>
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Registro de acciones y cambios</p>
-            </div>
-          </div>
-          <p class="text-xs text-slate-500 dark:text-gray-400 mb-8 leading-relaxed">Reporte detallado de todas las transacciones y modificaciones realizadas por el personal administrativo en el sistema.</p>
-          <div class="flex gap-3">
-            <button @click="generarReporteGeneral('auditoria', 'excel')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
-              <span class="material-symbols-outlined text-sm">grid_on</span> EXCEL
-            </button>
-            <button @click="generarReporteGeneral('auditoria', 'pdf')" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2">
-              <span class="material-symbols-outlined text-sm">picture_as_pdf</span> PDF
-            </button>
-          </div>
-        </div>
+    <!-- TAB: REPORTES (NUEVO APARTADO CON PREVIA EN VIVO) -->
+    <div v-if="tabActivo === 'reportes'" class="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+      
+      <!-- Selectores de Reporte (Secondary Tabs) -->
+      <div class="flex flex-wrap bg-slate-100 dark:bg-white/5 p-1.5 rounded-2xl border border-slate-200 dark:border-white/5 gap-1.5 max-w-fit">
+        <button @click="subTabReportes = 'eventos'; filtroBusquedaReporte = ''"
+                :class="subTabReportes === 'eventos' ? 'bg-white dark:bg-red-600 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'"
+                class="flex items-center gap-2 px-5 py-3 rounded-xl text-[10px] font-black uppercase transition-all">
+          <span class="material-symbols-outlined text-[16px]">corporate_fare</span>
+          Eventos
+        </button>
+        <button @click="subTabReportes = 'actividades'; filtroBusquedaReporte = ''"
+                :class="subTabReportes === 'actividades' ? 'bg-white dark:bg-red-600 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'"
+                class="flex items-center gap-2 px-5 py-3 rounded-xl text-[10px] font-black uppercase transition-all">
+          <span class="material-symbols-outlined text-[16px]">school</span>
+          Actividades
+        </button>
+        <button @click="subTabReportes = 'usuarios'; filtroBusquedaReporte = ''"
+                :class="subTabReportes === 'usuarios' ? 'bg-white dark:bg-red-600 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'"
+                class="flex items-center gap-2 px-5 py-3 rounded-xl text-[10px] font-black uppercase transition-all">
+          <span class="material-symbols-outlined text-[16px]">group</span>
+          Usuarios
+        </button>
+        <button @click="subTabReportes = 'auditoria'; filtroBusquedaReporte = ''"
+                :class="subTabReportes === 'auditoria' ? 'bg-white dark:bg-red-600 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'"
+                class="flex items-center gap-2 px-5 py-3 rounded-xl text-[10px] font-black uppercase transition-all">
+          <span class="material-symbols-outlined text-[16px]">history</span>
+          Auditoría
+        </button>
       </div>
+
+      <!-- Live Preview Area -->
+      <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-8 shadow-sm flex flex-col gap-6">
+        
+        <!-- Header del Preview -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-white/5 pb-6">
+          <div class="flex items-center gap-4">
+            <div :class="[
+              subTabReportes === 'eventos' ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-500' : '',
+              subTabReportes === 'actividades' ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-500' : '',
+              subTabReportes === 'usuarios' ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-500' : '',
+              subTabReportes === 'auditoria' ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-500' : ''
+            ]" class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-md">
+              <span class="material-symbols-outlined text-3xl">
+                {{ subTabReportes === 'eventos' ? 'corporate_fare' : subTabReportes === 'actividades' ? 'school' : subTabReportes === 'usuarios' ? 'group' : 'history' }}
+              </span>
+            </div>
+            <div>
+              <h3 class="text-lg font-black text-slate-800 dark:text-white uppercase italic">
+                {{ subTabReportes === 'eventos' ? 'Vista Previa: Reporte de Eventos' : subTabReportes === 'actividades' ? 'Vista Previa: Reporte Académico' : subTabReportes === 'usuarios' ? 'Vista Previa: Directorio de Usuarios' : 'Vista Previa: Bitácora de Auditoría' }}
+              </h3>
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                {{ subTabReportes === 'eventos' ? 'Información de eventos institucionales y estados' : subTabReportes === 'actividades' ? 'Cursos, talleres, seminarios y cargas horarias' : subTabReportes === 'usuarios' ? 'Directorio institucional de personas registradas' : 'Bitácora detallada de transacciones del personal' }}
+              </p>
+            </div>
+          </div>
+          
+          <!-- Botones de Exportar -->
+          <div class="flex items-center gap-2">
+            <button @click="generarReporteGeneral(subTabReportes, 'excel')" 
+                    class="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-600/20 transition-all group">
+              <span class="material-symbols-outlined text-sm group-hover:scale-110 transition-transform">grid_on</span> EXCEL
+            </button>
+            <button @click="generarReporteGeneral(subTabReportes, 'pdf')" 
+                    class="flex items-center gap-2 px-5 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-red-600/20 transition-all group">
+              <span class="material-symbols-outlined text-sm group-hover:rotate-6 transition-transform">picture_as_pdf</span> PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- Buscador y estadísticas del preview -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="relative flex-1 max-w-md">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[18px]">search</span>
+            <input v-model="filtroBusquedaReporte" type="text" placeholder="Filtrar vista previa..."
+                   class="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-xs outline-none focus:border-red-500/50 text-slate-800 dark:text-white transition-all uppercase font-semibold" />
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-white/5 text-[9px] font-black text-slate-500 uppercase tracking-widest border border-slate-200 dark:border-white/10">
+              Total registros en preview: {{ reportesFiltradosPreview.length }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Tabla de Preview Dinámica -->
+        <div class="overflow-x-auto rounded-2xl border border-slate-100 dark:border-white/5">
+          <table class="w-full">
+            
+            <!-- Headers de la Tabla -->
+            <thead class="bg-slate-50 dark:bg-white/5">
+              <tr class="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                <template v-if="subTabReportes === 'eventos'">
+                  <th class="px-5 py-3.5 text-left">ID</th>
+                  <th class="px-5 py-3.5 text-left">Nombre del Evento</th>
+                  <th class="px-5 py-3.5 text-left">Gestión</th>
+                  <th class="px-5 py-3.5 text-left">Modalidad</th>
+                  <th class="px-5 py-3.5 text-center">Estado</th>
+                </template>
+                <template v-else-if="subTabReportes === 'actividades'">
+                  <th class="px-5 py-3.5 text-left">ID</th>
+                  <th class="px-5 py-3.5 text-left">Actividad</th>
+                  <th class="px-5 py-3.5 text-left">Tipo</th>
+                  <th class="px-5 py-3.5 text-center">Horas Académicas</th>
+                  <th class="px-5 py-3.5 text-left">Fecha Inicio</th>
+                </template>
+                <template v-else-if="subTabReportes === 'usuarios'">
+                  <th class="px-5 py-3.5 text-left">Nombre</th>
+                  <th class="px-5 py-3.5 text-left">Email</th>
+                  <th class="px-5 py-3.5 text-center">Rol</th>
+                  <th class="px-5 py-3.5 text-left">Fecha Registro</th>
+                </template>
+                <template v-else-if="subTabReportes === 'auditoria'">
+                  <th class="px-5 py-3.5 text-left">Fecha / Hora</th>
+                  <th class="px-5 py-3.5 text-left">Módulo</th>
+                  <th class="px-5 py-3.5 text-left">Acción</th>
+                  <th class="px-5 py-3.5 text-left">Descripción</th>
+                  <th class="px-5 py-3.5 text-left">Usuario</th>
+                </template>
+              </tr>
+            </thead>
+
+            <!-- Contenido de la Tabla -->
+            <tbody class="divide-y divide-slate-100 dark:divide-white/5">
+              
+              <!-- Si no hay datos -->
+              <tr v-if="reportesFiltradosPreview.length === 0">
+                <td colspan="6" class="px-5 py-12 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">
+                  No se encontraron registros para previsualizar
+                </td>
+              </tr>
+
+              <!-- Render de filas -->
+              <template v-else>
+                <tr v-for="item in reportesFiltradosPreview" :key="item.id || item.email"
+                    class="hover:bg-slate-50 dark:hover:bg-white/3 transition-colors">
+                  
+                  <!-- Columnas de Eventos -->
+                  <template v-if="subTabReportes === 'eventos'">
+                    <td class="px-5 py-3 text-xs font-black text-slate-400">#{{ item.id }}</td>
+                    <td class="px-5 py-3 text-xs font-black text-slate-800 dark:text-white">{{ item.nombre }}</td>
+                    <td class="px-5 py-3 text-xs font-bold text-slate-500">{{ item.gestion }}</td>
+                    <td class="px-5 py-3 text-xs font-bold text-slate-500">{{ item.modalidad || 'Presencial' }}</td>
+                    <td class="px-5 py-3 text-center">
+                      <span :class="item.estado === 1 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400'"
+                            class="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border border-current">
+                        {{ item.estado === 1 ? 'Activo' : 'Planificación' }}
+                      </span>
+                    </td>
+                  </template>
+
+                  <!-- Columnas de Actividades -->
+                  <template v-if="subTabReportes === 'actividades'">
+                    <td class="px-5 py-3 text-xs font-black text-slate-400">#{{ item.id }}</td>
+                    <td class="px-5 py-3 text-xs font-black text-slate-800 dark:text-white">{{ item.nombre }}</td>
+                    <td class="px-5 py-3 text-xs font-bold text-slate-500">{{ item.tipo }}</td>
+                    <td class="px-5 py-3 text-xs font-black text-slate-700 dark:text-slate-300 text-center">{{ item.horas_academicas || item.horas || 0 }} hrs</td>
+                    <td class="px-5 py-3 text-xs font-bold text-slate-500">{{ item.fecha_inicio || '—' }}</td>
+                  </template>
+
+                  <!-- Columnas de Usuarios -->
+                  <template v-if="subTabReportes === 'usuarios'">
+                    <td class="px-5 py-3 text-xs font-black text-slate-800 dark:text-white">{{ item.nombre }}</td>
+                    <td class="px-5 py-3 text-xs font-bold text-slate-500">{{ item.email }}</td>
+                    <td class="px-5 py-3 text-center">
+                      <span class="px-2 py-0.5 rounded bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[8px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">
+                        {{ item.rol }}
+                      </span>
+                    </td>
+                    <td class="px-5 py-3 text-xs font-bold text-slate-400">
+                      {{ item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '—' }}
+                    </td>
+                  </template>
+
+                  <!-- Columnas de Auditoría -->
+                  <template v-if="subTabReportes === 'auditoria'">
+                    <td class="px-5 py-3 text-[10px] font-bold text-slate-400">
+                      {{ item.fecha_creacion ? new Date(item.fecha_creacion).toLocaleString() : '—' }}
+                    </td>
+                    <td class="px-5 py-3 text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider">{{ item.modulo }}</td>
+                    <td class="px-5 py-3">
+                      <span :class="[
+                        item.accion === 'crear' ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20' : '',
+                        item.accion === 'editar' ? 'text-blue-600 bg-blue-50 dark:bg-blue-950/20' : '',
+                        item.accion === 'eliminar' ? 'text-red-600 bg-red-50 dark:bg-red-950/20' : ''
+                      ]" class="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border border-current">
+                        {{ item.accion }}
+                      </span>
+                    </td>
+                    <td class="px-5 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 max-w-sm truncate" :title="item.descripcion">
+                      {{ item.descripcion }}
+                    </td>
+                    <td class="px-5 py-3 text-xs font-bold text-slate-500">{{ item.usuario }}</td>
+                  </template>
+                  
+                </tr>
+              </template>
+              
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
     </div>
 
     <!-- ══════════════════════════════════════════════ -->

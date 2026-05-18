@@ -163,6 +163,15 @@ const themeBorder = authStore.esSuperUsuario ? 'border-red-100 dark:border-red-9
             <span class="text-[11px] uppercase tracking-wider">Carga Masiva (Excel)</span>
           </div>
         </button>
+
+        <button @click="navigate('admin-mail-templates')"
+          :class="[isActive('admin-mail-templates') ? `bg-red-600 text-white shadow-md` : `text-slate-600 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/10`]"
+          class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold mt-1">
+          <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-[20px]">mail</span>
+            <span class="text-[11px] uppercase tracking-wider">Correos y Auditoría</span>
+          </div>
+        </button>
       </template>
 
     </nav>
