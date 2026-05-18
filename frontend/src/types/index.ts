@@ -53,6 +53,7 @@ export interface InfoCertificado {
   cabecera: string;
   tenor: string;
   id_evento: number;
+  es_excelencia?: number;
 }
 
 export interface Certificado {

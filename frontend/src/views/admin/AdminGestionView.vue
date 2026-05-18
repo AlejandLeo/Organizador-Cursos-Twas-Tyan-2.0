@@ -28,7 +28,7 @@ const authStore = useAuthStore();
 const historialStore = useAdminHistorialStore();
 
 // ─── Estado Global ─────────────────────────────────────────
-const tabActivo = ref<'eventos' | 'actividades' | 'solicitudes' | 'soporte'>('eventos');
+const tabActivo = ref<'eventos' | 'actividades' | 'solicitudes' | 'soporte' | 'reportes'>('eventos');
 const isLoading = ref(false);
 const filtroTexto = ref('');
 const filtroEstado = ref('');

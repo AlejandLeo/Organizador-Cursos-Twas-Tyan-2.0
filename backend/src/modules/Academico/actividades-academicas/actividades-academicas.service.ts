@@ -41,11 +41,17 @@ export class ActividadesAcademicasService {
   // ── CRUD básico ────────────────────────────────────────────
 
   async findAll() {
-    const acts = await this.actividadRepository.find({ relations: ['evento', 'inscripciones'] });
-    return acts.map(act => ({
-      ...act,
-      imagen: this.formatImageUrl(act.imagen)
-    }));
+    const acts = await this.actividadRepository.find({ relations: ['evento', 'inscripciones', 'modalidades'] });
+    return acts.map(act => {
+      const firstMod = act.modalidades?.[0];
+      return {
+        ...act,
+        min_nota: firstMod ? firstMod.min_nota : 71,
+        min_asistencia: firstMod ? firstMod.min_asistencia : 80,
+        modalidad: firstMod ? firstMod.tipo : 'Presencial',
+        imagen: this.formatImageUrl(act.imagen)
+      };
+    });
   }
 
   async findOne(id: number) {
@@ -54,8 +60,12 @@ export class ActividadesAcademicasService {
       relations: ['evento', 'modalidades', 'modalidades.sesiones', 'imparticiones', 'imparticiones.usuario', 'imparticiones.usuario.persona'],
     });
     if (!act) throw new NotFoundException(`Actividad ${id} no encontrada.`);
+    const firstMod = act.modalidades?.[0];
     return {
       ...act,
+      min_nota: firstMod ? firstMod.min_nota : 71,
+      min_asistencia: firstMod ? firstMod.min_asistencia : 80,
+      modalidad: firstMod ? firstMod.tipo : 'Presencial',
       imagen: this.formatImageUrl(act.imagen)
     };
   }
@@ -76,11 +86,17 @@ export class ActividadesAcademicasService {
     }
 
     const results = await query.getMany();
-    return results.map(act => ({
-      ...act,
-      estado: Number(act.estado),
-      imagen: this.formatImageUrl(act.imagen)
-    }));
+    return results.map(act => {
+      const firstMod = act.modalidades?.[0];
+      return {
+        ...act,
+        estado: Number(act.estado),
+        min_nota: firstMod ? firstMod.min_nota : 71,
+        min_asistencia: firstMod ? firstMod.min_asistencia : 80,
+        modalidad: firstMod ? firstMod.tipo : 'Presencial',
+        imagen: this.formatImageUrl(act.imagen)
+      };
+    });
   }
 
   /** Crea una actividad asignándola al evento indicado en el DTO */
@@ -88,7 +104,7 @@ export class ActividadesAcademicasService {
     if (usuario) {
       await this.verificarPropiedad(dto.id_evento, usuario);
     }
-    const { id_evento, ...campos } = dto;
+    const { id_evento, modalidad, min_nota, min_asistencia, ...campos } = dto;
     const data: any = {
       ...campos,
       evento: { id: id_evento },
@@ -97,10 +113,14 @@ export class ActividadesAcademicasService {
 
     const actividad = this.actividadRepository.create(data as any) as unknown as ActividadAcademica;
     const saved = await this.actividadRepository.save(actividad);
-    return {
-      ...saved,
-      imagen: this.formatImageUrl(saved.imagen)
-    };
+
+    // Guardar modalidad por defecto
+    await this.dataSource.query(
+      `INSERT INTO curso_modalidades (id_actividad_academica, tipo, min_nota, min_asistencia) VALUES ($1, $2, $3, $4)`,
+      [saved.id, modalidad || 'Presencial', min_nota || 0, min_asistencia || 0]
+    );
+
+    return this.findOne(saved.id);
   }
 
   async actualizar(id: number, dto: UpdateActividadDto, usuario?: any, file?: Express.Multer.File) {

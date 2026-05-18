@@ -73,6 +73,12 @@ export class CertificadosAdminController {
     return resultado;
   }
 
+  @Post('enviar-evento/:eventoId')
+  @ApiOperation({ summary: 'Generar y encolar certificados pendientes de un evento para envío masivo' })
+  enviarEvento(@Param('eventoId', ParseIntPipe) eventoId: number) {
+    return this.queueService.generarYEncolarPorEvento(eventoId);
+  }
+
   /**
    * Encola el reintento de un certificado individual.
    */
