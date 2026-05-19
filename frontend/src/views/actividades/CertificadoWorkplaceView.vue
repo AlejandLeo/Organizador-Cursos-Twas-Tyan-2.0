@@ -300,6 +300,13 @@ const getFirmaFullUrl = (firmaUrl: string) => {
     return `${base}${firmaUrl}`
 }
 
+const handleImageError = (e: Event) => {
+    const target = e.target as HTMLImageElement
+    if (target) {
+        target.style.display = 'none'
+    }
+}
+
 const onDragStartCanvas = (e: DragEvent, id: string) => {
     isDraggingCanvasId.value = id
     e.dataTransfer?.setData('application/json', JSON.stringify({ source: 'canvas', id }))
@@ -734,7 +741,7 @@ const guardarDiseno = async () => {
                     <div v-if="el.tipo === 'firma'" class="flex flex-col items-center justify-center w-full h-full relative" :class="{ 'opacity-60': firmantes.length === 0 }">
                         <div v-if="firmantes.length > 0" class="flex items-end justify-center w-full px-4 gap-8">
                             <div v-for="f in firmantes" :key="f.id_usuario" class="flex flex-col items-center justify-end w-48 shrink-0">
-                                <img v-if="f.firma_url" :src="getFirmaFullUrl(f.firma_url)" @error="e => e.target.style.display = 'none'" class="h-16 object-contain mb-1 drop-shadow-sm mix-blend-multiply" />
+                                <img v-if="f.firma_url" :src="getFirmaFullUrl(f.firma_url)" @error="handleImageError" class="h-16 object-contain mb-1 drop-shadow-sm mix-blend-multiply" />
                                 <span v-else class="material-symbols-outlined text-[24px] mb-2 opacity-50">draw</span>
                                 
                                 <div class="w-full border-t border-black pt-1 flex flex-col items-center text-center">
@@ -756,7 +763,7 @@ const guardarDiseno = async () => {
                             <template v-if="getFirmanteData(el.id_usuario)">
                                 <img v-if="getFirmanteData(el.id_usuario).firma_url" 
                                      :src="getFirmaFullUrl(getFirmanteData(el.id_usuario).firma_url)" 
-                                     @error="e => e.target.style.display = 'none'" 
+                                     @error="handleImageError" 
                                      class="h-16 object-contain mb-1 drop-shadow-sm mix-blend-multiply" />
                                 <span v-else class="material-symbols-outlined text-[24px] mb-2 opacity-50">draw</span>
                                 
@@ -782,26 +789,24 @@ const guardarDiseno = async () => {
                     <span @click.stop="deleteElement(el.id)" class="material-symbols-outlined text-[12px] absolute -top-3 -right-3 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/el:opacity-100 transition-opacity z-10 hover:bg-red-600 cursor-pointer shadow-lg">close</span>
  
                     <!-- Resize Handles -->
-                    <template v-if="elementoSeleccionado === el.id">
-                        <!-- Right Handle (Width) -->
-                        <div v-if="el.tipo !== 'qr'" @mousedown.stop="startResize($event, el, 'width')"
-                             class="absolute top-1/2 -right-1.5 w-3 h-8 -translate-y-1/2 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-ew-resize flex flex-col items-center justify-center gap-[2px] shadow-sm z-20">
-                            <div class="w-0.5 h-1 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
-                            <div class="w-0.5 h-1 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
-                        </div>
- 
-                        <!-- Bottom Handle (Height) -->
-                        <div v-if="el.tipo !== 'qr'" @mousedown.stop="startResize($event, el, 'height')"
-                             class="absolute -bottom-1.5 left-1/2 h-3 w-8 -translate-x-1/2 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-ns-resize flex items-center justify-center gap-[2px] shadow-sm z-20">
-                            <div class="w-1 h-0.5 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
-                            <div class="w-1 h-0.5 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
-                        </div>
- 
-                        <!-- Bottom-Right Corner (Both) -->
-                        <div @mousedown.stop="startResize($event, el, 'both')"
-                             class="absolute -bottom-1.5 -right-1.5 w-4 h-4 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-nwse-resize shadow-sm z-20 flex items-center justify-center">
-                            <div class="w-1.5 h-1.5 bg-slate-200 dark:bg-gray-400 rounded-full"></div>
-                        </div>
+                    <!-- Right Handle (Width) -->
+                    <div v-if="elementoSeleccionado === el.id && el.tipo !== 'qr'" @mousedown.stop="startResize($event, el, 'width')"
+                         class="absolute top-1/2 -right-1.5 w-3 h-8 -translate-y-1/2 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-ew-resize flex flex-col items-center justify-center gap-[2px] shadow-sm z-20">
+                        <div class="w-0.5 h-1 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
+                        <div class="w-0.5 h-1 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
+                    </div>
+
+                    <!-- Bottom Handle (Height) -->
+                    <div v-if="elementoSeleccionado === el.id && el.tipo !== 'qr'" @mousedown.stop="startResize($event, el, 'height')"
+                         class="absolute -bottom-1.5 left-1/2 h-3 w-8 -translate-x-1/2 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-ns-resize flex items-center justify-center gap-[2px] shadow-sm z-20">
+                        <div class="w-1 h-0.5 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
+                        <div class="w-1 h-0.5 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
+                    </div>
+
+                    <!-- Bottom-Right Corner (Both) -->
+                    <div v-if="elementoSeleccionado === el.id" @mousedown.stop="startResize($event, el, 'both')"
+                         class="absolute -bottom-1.5 -right-1.5 w-4 h-4 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-nwse-resize shadow-sm z-20 flex items-center justify-center">
+                        <div class="w-1.5 h-1.5 bg-slate-200 dark:bg-gray-400 rounded-full"></div>
                     </div>
                 </div>
             </div>

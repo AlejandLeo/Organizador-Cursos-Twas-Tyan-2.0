@@ -132,6 +132,7 @@ const formEvento = ref({
   auspicios: [] as { nombre: string; link: string }[],
   coordinadores_ids: [] as number[],
   logistica_ids: [] as number[],
+  coordinadores_grados: {} as Record<number, number>,
   fase: 1, // 1: Planificación, 2: Inscripciones, 3: Ejecución, 4: Finalizado, 5: Archivado
 });
 
@@ -250,13 +251,23 @@ const guardarInfoCertificado = async () => {
         Swal.fire('Atención', 'Primero debes guardar/crear el evento antes de configurar los certificados.', 'warning');
         return;
     }
+    if (tipoCertificado.value === null) {
+        Swal.fire('Atención', 'Debes seleccionar el tipo de certificado (rol) a configurar.', 'warning');
+        return;
+    }
     try {
         const payload: any = {
             id_evento: editEventoId.value,
             tipo: tipoCertificado.value,
             cabecera: infoCertificado.value?.cabecera || '',
             tenor: infoCertificado.value?.tenor || ''
-        });
+        };
+        if (tipoCertificado.value === 4) {
+            payload.es_excelencia = esExcelencia.value;
+        }
+        
+        await api.post('/info-certificados', payload);
+        
         Swal.fire({
             toast: true,
             position: 'top-end',
@@ -270,6 +281,85 @@ const guardarInfoCertificado = async () => {
         console.error(error);
         Swal.fire('Error', 'No se pudo guardar la configuración del certificado', 'error');
     }
+};
+
+// --- LÓGICA DE PREVISUALIZACIÓN RÁPIDA (PASO 7) ---
+const showQuickPreviewModal = ref(false);
+const quickPreviewZoom = ref(1.0);
+const quickPreviewViewportRef = ref<HTMLElement | null>(null);
+const isQuickPreviewPanning = ref(false);
+const quickPreviewStartX = ref(0);
+const quickPreviewStartY = ref(0);
+const quickPreviewScrollLeftStart = ref(0);
+const quickPreviewScrollTopStart = ref(0);
+
+const onMouseDownQuickPreview = (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) return;
+    isQuickPreviewPanning.value = true;
+    quickPreviewStartX.value = e.pageX - (quickPreviewViewportRef.value?.offsetLeft || 0);
+    quickPreviewStartY.value = e.pageY - (quickPreviewViewportRef.value?.offsetTop || 0);
+    quickPreviewScrollLeftStart.value = quickPreviewViewportRef.value?.scrollLeft || 0;
+    quickPreviewScrollTopStart.value = quickPreviewViewportRef.value?.scrollTop || 0;
+};
+
+const onMouseMoveQuickPreview = (e: MouseEvent) => {
+    if (!isQuickPreviewPanning.value || !quickPreviewViewportRef.value) return;
+    e.preventDefault();
+    const x = e.pageX - (quickPreviewViewportRef.value.offsetLeft || 0);
+    const y = e.pageY - (quickPreviewViewportRef.value.offsetTop || 0);
+    const walkX = (x - quickPreviewStartX.value) * 1.5;
+    const walkY = (y - quickPreviewStartY.value) * 1.5;
+    quickPreviewViewportRef.value.scrollLeft = quickPreviewScrollLeftStart.value - walkX;
+    quickPreviewViewportRef.value.scrollTop = quickPreviewScrollTopStart.value - walkY;
+};
+
+const onMouseUpQuickPreview = () => {
+    isQuickPreviewPanning.value = false;
+};
+
+const onMouseLeaveQuickPreview = () => {
+    isQuickPreviewPanning.value = false;
+};
+
+const quickPreviewElements = computed(() => {
+    if (!infoCertificado.value?.configuracion) return [];
+    try {
+        return typeof infoCertificado.value.configuracion === 'string'
+            ? JSON.parse(infoCertificado.value.configuracion)
+            : infoCertificado.value.configuracion;
+    } catch (e) {
+        return [];
+    }
+});
+
+const resolveQuickPreviewVariables = (text: string) => {
+    if (!text) return '';
+    return text
+        .replace(/{NOMBRE_ESTUDIANTE}/g, 'Lic. Alejandro Leonardo Nogales')
+        .replace(/{PRIMER_APELLIDO}/g, 'Nogales')
+        .replace(/{SEGUNDO_APELLIDO}/g, 'Ticona')
+        .replace(/{NOMBRE_CURSO}/g, formEvento.value.nombre || 'Curso de Especialización')
+        .replace(/{EVENTO}/g, formEvento.value.nombre || 'Curso de Especialización')
+        .replace(/{ACTIVIDAD}/g, 'Actividad Académica Base')
+        .replace(/{CODIGO_CERTIFICADO}/g, 'CERT-TWAS-TYAN-2026-9842')
+        .replace(/{GESTION}/g, formEvento.value.gestion || '2026')
+        .replace(/{ROL}/g, tipoCertificado.value === 1 ? 'Logística' : tipoCertificado.value === 2 ? 'Expositor' : tipoCertificado.value === 3 ? 'Organizador' : 'Asistente')
+        .replace(/{CI_USUARIO}/g, '1234567 LP')
+        .replace(/{CARGA_HORARIA}/g, '40 horas académicas')
+        .replace(/{FECHA_EMISION}/g, '17 de Mayo de 2026')
+        .replace(/{NOTA_FINAL}/g, '95');
+};
+
+const resolveQuickPreviewTenor = (text: string) => {
+    if (!text) return '[ TENOR PENDIENTE ]';
+    return resolveQuickPreviewVariables(text);
+};
+
+const abrirVistaPreviaRapida = () => {
+    if (!infoCertificado.value) return;
+    quickPreviewZoom.value = 1.0;
+    showQuickPreviewModal.value = true;
 };
 
 const agregarDiaEvento = () => {

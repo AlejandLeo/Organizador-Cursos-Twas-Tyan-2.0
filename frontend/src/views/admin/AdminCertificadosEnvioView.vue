@@ -8,7 +8,7 @@ import Swal from 'sweetalert2';
 const route = useRoute();
 
 // ── Tabs ──────────────────────────────────────────────────────
-const activeTab = ref<'trazabilidad' | 'emision'>('trazabilidad');
+const activeTab = ref<'trazabilidad' | 'emision' | 'auditoria'>('trazabilidad');
 
 interface Certificado {
   id: number;
@@ -41,7 +41,6 @@ interface Certificado {
 const certificados = ref<Certificado[]>([]);
 const listEventos = ref<any[]>([]);
 const selectedEventId = ref<number | null>(null);
-const activeTab = ref<'certificados' | 'auditoria'>('certificados');
 
 const isLoading = ref(true);
 const isSending = ref(false);
@@ -476,13 +475,13 @@ onMounted(() => {
 
       <div class="flex items-center gap-2 flex-wrap justify-end">
         <!-- Refrescar -->
-        <button @click="activeTab === 'certificados' ? fetchCertificados() : fetchAuditoria()"
+        <button @click="activeTab === 'trazabilidad' ? fetchCertificados() : fetchAuditoria()"
                 class="p-3 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl text-slate-600 dark:text-gray-400 hover:bg-slate-50 transition-all shadow-sm"
                 title="Refrescar vista actual">
           <span class="material-symbols-outlined" :class="{'animate-spin': isLoading || isStatsLoading}">refresh</span>
         </button>
 
-        <template v-if="activeTab === 'certificados'">
+        <template v-if="activeTab === 'trazabilidad'">
           <!-- Reintentar TODOS los fallidos -->
           <button @click="handleReintentarFallidos"
                   :disabled="totalFallidos === 0 || isRetryingAll"
@@ -515,20 +514,15 @@ onMounted(() => {
         <span class="material-symbols-outlined text-sm">add_circle</span>
         Emisión Masiva
       </button>
+      <button @click="activeTab = 'auditoria'; fetchAuditoria()" :class="activeTab === 'auditoria' ? 'bg-slate-800 text-white shadow-lg shadow-slate-900/20' : 'bg-white dark:bg-gray-900 text-slate-500 border border-slate-200 dark:border-gray-800 hover:bg-slate-50'" class="flex items-center gap-2 px-5 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all">
+        <span class="material-symbols-outlined text-sm">analytics</span>
+        Auditoría SMTP
+      </button>
     </div>
 
     <!-- TAB: TRAZABILIDAD -->
     <div v-if="activeTab === 'trazabilidad'" class="space-y-6 animate-in fade-in duration-300">
 
-    <!-- FILTROS -->
-    <div class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-      <div class="flex flex-wrap items-center gap-4">
-        <div class="flex-1 min-w-[250px] relative">
-          <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[20px]">search</span>
-          <input v-model="filterEvent" type="text" placeholder="Buscar por evento o actividad..."
-                 class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-slate-400 transition-all" />
-        </div>
-      </div>
 
       <!-- FILTROS DE BÚSQUEDA LIBRE -->
       <div class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
@@ -629,15 +623,7 @@ onMounted(() => {
                   <span class="text-[10px] font-mono text-slate-500">
                     {{ cert.fecha_ultimo_envio ? new Date(cert.fecha_ultimo_envio).toLocaleString('es-BO') : '—' }}
                   </span>
-                </div>
-              </td>
-
-              <!-- Último intento -->
-              <td class="px-6 py-4">
-                <span class="text-[10px] font-mono text-slate-500">
-                  {{ cert.fecha_ultimo_envio ? new Date(cert.fecha_ultimo_envio).toLocaleString('es-BO') : '—' }}
-                </span>
-              </td>
+                </td>
 
               <!-- Acciones -->
               <td class="px-6 py-4">
@@ -689,11 +675,12 @@ onMounted(() => {
       </div>
 
     </div>
+    </div> <!-- end trazabilidad tab -->
 
     <!-- ──────────────────────────────────────────────────────────── -->
     <!-- CONTENIDO PESTAÑA 2: AUDITORÍA SMTP DE CORREOS -->
     <!-- ──────────────────────────────────────────────────────────── -->
-    <div v-else class="space-y-6">
+    <div v-else-if="activeTab === 'auditoria'" class="space-y-6">
 
       <div v-if="isStatsLoading" class="flex justify-center items-center py-20">
         <span class="material-symbols-outlined animate-spin text-3xl text-slate-400">progress_activity</span>
@@ -856,74 +843,9 @@ onMounted(() => {
 
     </div>
 
-    <!-- MODAL: Editar Email -->
-    <Teleport to="body">
-      <Transition name="modal-fade">
-        <div v-if="showEmailModal"
-             class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-             @click.self="cerrarEditarEmail">
-          <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-
-            <!-- Header modal -->
-            <div class="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100 dark:border-gray-800">
-              <div class="flex items-center gap-3">
-                <div class="w-9 h-9 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
-                  <span class="material-symbols-outlined text-blue-600 text-[20px]">edit</span>
-                </div>
-                <div>
-                  <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Corrección rápida</p>
-                  <h2 class="text-base font-black text-slate-800 dark:text-white">Editar Email del Usuario</h2>
-                </div>
-              </div>
-              <button @click="cerrarEditarEmail"
-                      class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-400 transition-all">
-                <span class="material-symbols-outlined">close</span>
-              </button>
-            </div>
-
-            <!-- Body modal -->
-            <div class="px-6 py-5">
-              <p class="text-sm text-slate-500 mb-4">
-                Corrija el correo electrónico de
-                <strong class="text-slate-800 dark:text-white">
-                  {{ emailModalCert?.usuario?.persona?.nombres }} {{ emailModalCert?.usuario?.persona?.primer_apellido }}
-                </strong>
-                y luego reintente el envío.
-              </p>
-
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Nuevo Email</label>
-              <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[20px]">mail</span>
-                <input v-model="emailModalValue"
-                       type="email"
-                       placeholder="correo@ejemplo.com"
-                       @keyup.enter="guardarEmail"
-                       class="w-full pl-10 pr-4 py-3 border border-slate-200 dark:border-gray-700 rounded-xl text-sm bg-slate-50 dark:bg-gray-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30 transition-all" />
-              </div>
-            </div>
-
-            <!-- Footer modal -->
-            <div class="flex gap-3 px-6 pb-6">
-              <button @click="cerrarEditarEmail"
-                      class="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-gray-700 text-sm font-bold text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-800 transition-all">
-                Cancelar
-              </button>
-              <button @click="guardarEmail"
-                      :disabled="isSavingEmail"
-                      class="flex-1 py-2.5 rounded-xl bg-slate-800 text-white text-sm font-black hover:bg-slate-900 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
-                <span v-if="isSavingEmail" class="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
-                {{ isSavingEmail ? 'Guardando...' : 'Guardar Email' }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-
-    </div> <!-- end trazabilidad tab -->
 
     <!-- TAB: EMISIÓN MASIVA -->
-    <div v-if="activeTab === 'emision'" class="space-y-6 animate-in fade-in duration-300">
+    <div v-else-if="activeTab === 'emision'" class="space-y-6 animate-in fade-in duration-300">
       <div class="bg-white dark:bg-gray-900 rounded-3xl border border-slate-200 dark:border-gray-800 shadow-sm p-6 space-y-6">
         <h3 class="text-sm font-black uppercase text-slate-800 dark:text-white flex items-center gap-2">
           <span class="material-symbols-outlined text-amber-500">add_circle</span>
@@ -1086,6 +1008,70 @@ onMounted(() => {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- MODAL: Editar Email -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="showEmailModal"
+             class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+             @click.self="cerrarEditarEmail">
+          <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+
+            <!-- Header modal -->
+            <div class="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100 dark:border-gray-800">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
+                  <span class="material-symbols-outlined text-blue-600 text-[20px]">edit</span>
+                </div>
+                <div>
+                  <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Corrección rápida</p>
+                  <h2 class="text-base font-black text-slate-800 dark:text-white">Editar Email del Usuario</h2>
+                </div>
+              </div>
+              <button @click="cerrarEditarEmail"
+                      class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-400 transition-all">
+                <span class="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <!-- Body modal -->
+            <div class="px-6 py-5">
+              <p class="text-sm text-slate-500 mb-4">
+                Corrija el correo electrónico de
+                <strong class="text-slate-800 dark:text-white">
+                  {{ emailModalCert?.usuario?.persona?.nombres }} {{ emailModalCert?.usuario?.persona?.primer_apellido }}
+                </strong>
+                y luego reintente el envío.
+              </p>
+
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Nuevo Email</label>
+              <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[20px]">mail</span>
+                <input v-model="emailModalValue"
+                       type="email"
+                       placeholder="correo@ejemplo.com"
+                       @keyup.enter="guardarEmail"
+                       class="w-full pl-10 pr-4 py-3 border border-slate-200 dark:border-gray-700 rounded-xl text-sm bg-slate-50 dark:bg-gray-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30 transition-all" />
+              </div>
+            </div>
+
+            <!-- Footer modal -->
+            <div class="flex gap-3 px-6 pb-6">
+              <button @click="cerrarEditarEmail"
+                      class="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-gray-700 text-sm font-bold text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-800 transition-all">
+                Cancelar
+              </button>
+              <button @click="guardarEmail"
+                      :disabled="isSavingEmail"
+                      class="flex-1 py-2.5 rounded-xl bg-slate-800 text-white text-sm font-black hover:bg-slate-900 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
+                <span v-if="isSavingEmail" class="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+                {{ isSavingEmail ? 'Guardando...' : 'Guardar Email' }}
+              </button>
             </div>
           </div>
         </div>

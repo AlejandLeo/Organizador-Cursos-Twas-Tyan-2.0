@@ -60,7 +60,7 @@ const accionesHoy = computed(() => {
 });
 
 // --- Estado Extendido Maestro ---
-const stats = ref({ eventos: 0, actividades: 0, usuarios: 0, inscripciones: 0, ponentes: 0, estudiantes: 0 });
+const stats = ref({ eventos: 0, actividades: 0, usuarios: 0, inscripciones: 0, ponentes: 0, estudiantes: 0, coordinadores: 0 });
 const usuariosDetalle = ref<any[]>([]);
 const eventosDetalle = ref<any[]>([]);
 const actividadesDetalle = ref<any[]>([]);
