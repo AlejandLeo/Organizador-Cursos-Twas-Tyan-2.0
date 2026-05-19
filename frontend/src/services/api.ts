@@ -1,5 +1,7 @@
 import axios from 'axios';
 
+import { useUIStore } from '@/stores/ui';
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000', // Ajusta según tu backend
   headers: {
@@ -24,7 +26,6 @@ api.interceptors.response.use(
   (response) => {
     // Si la respuesta llega bien, aseguramos que el estado sea online
     try {
-      const { useUIStore } = require('@/stores/ui');
       const ui = useUIStore();
       if (!ui.isServerOnline) ui.setServerStatus(true);
     } catch (e) {}
@@ -34,7 +35,6 @@ api.interceptors.response.use(
     // Si no hay respuesta del servidor (ERR_CONNECTION_REFUSED, etc)
     if (!error.response || error.code === 'ERR_NETWORK') {
       try {
-        const { useUIStore } = require('@/stores/ui');
         useUIStore().setServerStatus(false);
       } catch (e) {}
     }
