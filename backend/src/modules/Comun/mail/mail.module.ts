@@ -26,7 +26,7 @@ import { MailTemplateController } from './mail-template.controller';
           secure: config.get('MAIL_PORT') === '465',
           auth: {
             user: config.get('MAIL_USER'),
-            pass: config.get('MAIL_PASS'),
+            pass: config.get('MAIL_PASSWORD'),
           },
           tls: {
             rejectUnauthorized: false, // Permite certificados auto-firmados
