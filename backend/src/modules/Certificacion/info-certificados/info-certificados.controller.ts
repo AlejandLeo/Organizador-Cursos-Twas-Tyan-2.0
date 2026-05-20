@@ -80,11 +80,17 @@ export class InfoCertificadosController {
   @Get('evento/:eventoId')
   @ApiOperation({ summary: 'Listar configuraciones por evento (Coordinador)' })
   @ApiQuery({ name: 'tipo', required: false })
+  @ApiQuery({ name: 'es_excelencia', required: false })
   findByEvento(
     @Param('eventoId', ParseIntPipe) eventoId: number,
     @Query('tipo') tipo?: string,
+    @Query('es_excelencia') esExcelencia?: string,
   ) {
-    return this.service.findByEvento(eventoId, tipo ? Number(tipo) : undefined);
+    return this.service.findByEvento(
+      eventoId,
+      tipo ? Number(tipo) : undefined,
+      esExcelencia !== undefined ? Number(esExcelencia) : undefined,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

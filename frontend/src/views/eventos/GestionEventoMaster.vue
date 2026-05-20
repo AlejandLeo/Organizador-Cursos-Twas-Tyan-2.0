@@ -6,7 +6,7 @@ import { useEventoStore } from '@/stores/eventoStore';
 import { useAdminHistorialStore } from '@/stores/adminHistorial';
 import { useAuthStore } from '@/stores/auth';
 
-import api from '@/services/api';
+import api, { getImageUrl } from '@/services/api';
 import Swal from 'sweetalert2';
 
 const router = useRouter();
@@ -132,6 +132,7 @@ const formEvento = ref({
   auspicios: [] as { nombre: string; link: string }[],
   coordinadores_ids: [] as number[],
   logistica_ids: [] as number[],
+  coordinadores_grados: {} as Record<number, number>,
   fase: 1, // 1: Planificación, 2: Inscripciones, 3: Ejecución, 4: Finalizado, 5: Archivado
 });
 
@@ -205,7 +206,8 @@ const resetFormEvento = () => {
     };
 };
 
-const tipoCertificado = ref<number>(1);
+const tipoCertificado = ref<number | null>(null);
+const esExcelencia = ref<number>(0);
 const infoCertificado = ref<any>({
     cabecera: '',
     tenor: '',
@@ -213,9 +215,13 @@ const infoCertificado = ref<any>({
 });
 
 const fetchInfoCertificado = async () => {
-    if (!editEventoId.value) return;
+    if (!editEventoId.value || tipoCertificado.value === null) return;
     try {
-        const res = await api.get(`/info-certificados/evento/${editEventoId.value}?tipo=${tipoCertificado.value}`);
+        let url = `/info-certificados/evento/${editEventoId.value}?tipo=${tipoCertificado.value}`;
+        if (tipoCertificado.value === 4) {
+            url += `&es_excelencia=${esExcelencia.value}`;
+        }
+        const res = await api.get(url);
         if (res.data && res.data.length > 0) {
             infoCertificado.value = res.data[0];
         } else {
@@ -230,7 +236,7 @@ const fetchInfoCertificado = async () => {
     }
 };
 
-watch(tipoCertificado, () => {
+watch([tipoCertificado, esExcelencia], () => {
     fetchInfoCertificado();
 });
 
@@ -245,13 +251,23 @@ const guardarInfoCertificado = async () => {
         Swal.fire('Atención', 'Primero debes guardar/crear el evento antes de configurar los certificados.', 'warning');
         return;
     }
+    if (tipoCertificado.value === null) {
+        Swal.fire('Atención', 'Debes seleccionar el tipo de certificado (rol) a configurar.', 'warning');
+        return;
+    }
     try {
-        await api.post('/info-certificados', {
+        const payload: any = {
             id_evento: editEventoId.value,
             tipo: tipoCertificado.value,
             cabecera: infoCertificado.value?.cabecera || '',
             tenor: infoCertificado.value?.tenor || ''
-        });
+        };
+        if (tipoCertificado.value === 4) {
+            payload.es_excelencia = esExcelencia.value;
+        }
+        
+        await api.post('/info-certificados', payload);
+        
         Swal.fire({
             toast: true,
             position: 'top-end',
@@ -265,6 +281,85 @@ const guardarInfoCertificado = async () => {
         console.error(error);
         Swal.fire('Error', 'No se pudo guardar la configuración del certificado', 'error');
     }
+};
+
+// --- LÓGICA DE PREVISUALIZACIÓN RÁPIDA (PASO 7) ---
+const showQuickPreviewModal = ref(false);
+const quickPreviewZoom = ref(1.0);
+const quickPreviewViewportRef = ref<HTMLElement | null>(null);
+const isQuickPreviewPanning = ref(false);
+const quickPreviewStartX = ref(0);
+const quickPreviewStartY = ref(0);
+const quickPreviewScrollLeftStart = ref(0);
+const quickPreviewScrollTopStart = ref(0);
+
+const onMouseDownQuickPreview = (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) return;
+    isQuickPreviewPanning.value = true;
+    quickPreviewStartX.value = e.pageX - (quickPreviewViewportRef.value?.offsetLeft || 0);
+    quickPreviewStartY.value = e.pageY - (quickPreviewViewportRef.value?.offsetTop || 0);
+    quickPreviewScrollLeftStart.value = quickPreviewViewportRef.value?.scrollLeft || 0;
+    quickPreviewScrollTopStart.value = quickPreviewViewportRef.value?.scrollTop || 0;
+};
+
+const onMouseMoveQuickPreview = (e: MouseEvent) => {
+    if (!isQuickPreviewPanning.value || !quickPreviewViewportRef.value) return;
+    e.preventDefault();
+    const x = e.pageX - (quickPreviewViewportRef.value.offsetLeft || 0);
+    const y = e.pageY - (quickPreviewViewportRef.value.offsetTop || 0);
+    const walkX = (x - quickPreviewStartX.value) * 1.5;
+    const walkY = (y - quickPreviewStartY.value) * 1.5;
+    quickPreviewViewportRef.value.scrollLeft = quickPreviewScrollLeftStart.value - walkX;
+    quickPreviewViewportRef.value.scrollTop = quickPreviewScrollTopStart.value - walkY;
+};
+
+const onMouseUpQuickPreview = () => {
+    isQuickPreviewPanning.value = false;
+};
+
+const onMouseLeaveQuickPreview = () => {
+    isQuickPreviewPanning.value = false;
+};
+
+const quickPreviewElements = computed(() => {
+    if (!infoCertificado.value?.configuracion) return [];
+    try {
+        return typeof infoCertificado.value.configuracion === 'string'
+            ? JSON.parse(infoCertificado.value.configuracion)
+            : infoCertificado.value.configuracion;
+    } catch (e) {
+        return [];
+    }
+});
+
+const resolveQuickPreviewVariables = (text: string) => {
+    if (!text) return '';
+    return text
+        .replace(/{NOMBRE_ESTUDIANTE}/g, 'Lic. Alejandro Leonardo Nogales')
+        .replace(/{PRIMER_APELLIDO}/g, 'Nogales')
+        .replace(/{SEGUNDO_APELLIDO}/g, 'Ticona')
+        .replace(/{NOMBRE_CURSO}/g, formEvento.value.nombre || 'Curso de Especialización')
+        .replace(/{EVENTO}/g, formEvento.value.nombre || 'Curso de Especialización')
+        .replace(/{ACTIVIDAD}/g, 'Actividad Académica Base')
+        .replace(/{CODIGO_CERTIFICADO}/g, 'CERT-TWAS-TYAN-2026-9842')
+        .replace(/{GESTION}/g, formEvento.value.gestion || '2026')
+        .replace(/{ROL}/g, tipoCertificado.value === 1 ? 'Logística' : tipoCertificado.value === 2 ? 'Expositor' : tipoCertificado.value === 3 ? 'Organizador' : 'Asistente')
+        .replace(/{CI_USUARIO}/g, '1234567 LP')
+        .replace(/{CARGA_HORARIA}/g, '40 horas académicas')
+        .replace(/{FECHA_EMISION}/g, '17 de Mayo de 2026')
+        .replace(/{NOTA_FINAL}/g, '95');
+};
+
+const resolveQuickPreviewTenor = (text: string) => {
+    if (!text) return '[ TENOR PENDIENTE ]';
+    return resolveQuickPreviewVariables(text);
+};
+
+const abrirVistaPreviaRapida = () => {
+    if (!infoCertificado.value) return;
+    quickPreviewZoom.value = 1.0;
+    showQuickPreviewModal.value = true;
 };
 
 const agregarDiaEvento = () => {
@@ -2290,28 +2385,29 @@ const changeStep = (delta: number) => {
                             <p><strong>Configuración Centralizada:</strong> Los diseños y plantillas de certificados se configuran aquí a nivel del evento para mantener una estética unificada. Configura primero el rol (tipo de asistente) y su tenor, luego abre el "Workplace" para subir tu fondo y acomodar las variables (nombres, fechas, firmas).</p>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <!-- Datos Base -->
-                            <div class="space-y-5">
-                                <div>
-                                    <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Configurar para (Rol)</label>
-                                    <select v-model="tipoCertificado" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-xs text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none transition-all cursor-pointer">
-                                        <option :value="1">Logística</option>
-                                        <option :value="2">Expositor</option>
-                                        <option :value="3">Organizador</option>
-                                        <option :value="4">Asistente</option>
-                                    </select>
-                                </div>
-                                
-                                <div>
-                                    <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Cabecera del Certificado</label>
-                                    <input v-model="infoCertificado.cabecera" type="text" placeholder="Ej: Certificado de Asistencia" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-xs text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none transition-all">
+                        <!-- Selector de Rol (Configuración General de la Plantilla) -->
+                        <div class="space-y-6">
+                            <div>
+                                <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Configurar para (Rol)</label>
+                                <select v-model="tipoCertificado" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3.5 px-5 font-bold text-xs text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none transition-all cursor-pointer shadow-sm">
+                                    <option :value="null" disabled>-- Selecciona un Rol para Configurar Certificado --</option>
+                                    <option :value="1">Logística</option>
+                                    <option :value="2">Expositor</option>
+                                    <option :value="3">Organizador</option>
+                                    <option :value="4">Asistente</option>
+                                </select>
+                            </div>
+
+                            <!-- Tarjeta de presentación si no hay rol seleccionado -->
+                            <div v-if="tipoCertificado === null" class="p-12 text-center bg-slate-50 dark:bg-gray-900/40 rounded-[2rem] border-2 border-dashed border-slate-200 dark:border-gray-800 flex flex-col items-center justify-center min-h-[300px] animate-in fade-in duration-300">
+                                <div class="w-20 h-20 rounded-full bg-white dark:bg-gray-800 border border-slate-100 dark:border-gray-700 flex items-center justify-center mb-4 shadow-sm text-umsa-gold">
+                                    <span class="material-symbols-outlined text-[40px]">workspace_premium</span>
                                 </div>
 
-                                <div>
-                                    <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Leyenda Principal (Tenor)</label>
-                                    <textarea v-model="infoCertificado.tenor" rows="4" placeholder="Ej: Por haber participado en..." class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-xs text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none transition-all"></textarea>
-                                    <p class="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 mt-2 italic">Variables dinámicas: {NOMBRE_ESTUDIANTE}, {ACTIVIDAD}</p>
+                                <div class="pt-2 flex justify-start">
+                                    <button @click.prevent="guardarInfoCertificado" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 w-full md:w-auto">
+                                        <span class="material-symbols-outlined text-base">save</span> Guardar Cabecera y Tenor
+                                    </button>
                                 </div>
 
                                 <div class="pt-2 flex justify-start">
@@ -2321,12 +2417,35 @@ const changeStep = (delta: number) => {
                                 </div>
                             </div>
 
-                            <!-- Acceso al Lienzo / Workplace -->
-                            <!-- Acceso al Lienzo / Workplace -->
-                            <div class="flex flex-col space-y-6">
-                                <div class="p-6 bg-slate-50 dark:bg-gray-900 border-2 border-dashed border-slate-200 dark:border-gray-700 rounded-[2rem] text-center relative overflow-hidden group">
-                                    <div class="w-20 h-20 rounded-full bg-white dark:bg-gray-800 border border-slate-100 dark:border-gray-700 flex items-center justify-center mx-auto mb-4 shadow-sm group-hover:scale-110 transition-transform">
-                                      <span class="material-symbols-outlined text-[40px] text-umsa-gold">design_services</span>
+                            <!-- Layout del Diseñador en 2 columnas al seleccionar rol -->
+                            <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in duration-300">
+                                <!-- Datos Base -->
+                                <div class="space-y-5">
+                                    <!-- Tabs de Modalidad para Asistente (Participación vs Excelencia) -->
+                                    <Transition name="fade">
+                                        <div v-if="tipoCertificado === 4" class="flex gap-2 p-1 bg-slate-100 dark:bg-gray-900/60 rounded-xl border border-slate-200 dark:border-gray-800">
+                                            <button 
+                                                @click.prevent="esExcelencia = 0"
+                                                :class="esExcelencia === 0 ? 'bg-primary-dark dark:bg-slate-700 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-gray-800'"
+                                                class="flex-1 py-2 px-3 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
+                                            >
+                                                <span class="material-symbols-outlined text-[13px]">military_tech</span>
+                                                Participación (Regular)
+                                            </button>
+                                            <button 
+                                                @click.prevent="esExcelencia = 1"
+                                                :class="esExcelencia === 1 ? 'bg-umsa-gold text-white shadow-md' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-gray-800'"
+                                                class="flex-1 py-2 px-3 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
+                                            >
+                                                <span class="material-symbols-outlined text-[13px]">workspace_premium</span>
+                                                Excelencia Académica
+                                            </button>
+                                        </div>
+                                    </Transition>
+                                    
+                                    <div>
+                                        <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Cabecera del Certificado</label>
+                                        <input v-model="infoCertificado.cabecera" type="text" placeholder="Ej: Certificado de Asistencia" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-xs text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none transition-all">
                                     </div>
                                     <h5 class="text-sm font-black text-primary-dark dark:text-white uppercase mb-2">Editor Visual Avanzado</h5>
                                     <p class="text-[10px] text-slate-500 dark:text-gray-400 max-w-[200px] mx-auto mb-6">
@@ -2341,26 +2460,46 @@ const changeStep = (delta: number) => {
                                     </div>
                                 </div>
 
-                                <div class="bg-slate-100/50 dark:bg-gray-800/30 border border-slate-200 dark:border-gray-700 p-5 rounded-[1.5rem]">
-                                    <h6 class="text-[10px] font-black text-primary-dark dark:text-white uppercase tracking-widest mb-3 flex items-center gap-2">
-                                        <span class="material-symbols-outlined text-sm text-emerald-500">category</span> Guía de Bloques en el Workplace
-                                    </h6>
-                                    <ul class="space-y-3">
-                                        <li class="flex items-start gap-3">
-                                            <div class="w-6 h-6 rounded bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5"><span class="material-symbols-outlined text-[14px]">text_fields</span></div>
-                                            <div>
-                                                <p class="text-[10px] font-bold text-primary-dark dark:text-white">Bloques de Texto (Cabecera / Tenor)</p>
-                                                <p class="text-[9px] text-slate-500 leading-tight">Muestran el contenido que configures arriba. Se adaptarán al ancho que les asignes.</p>
-                                            </div>
-                                        </li>
-                                        <li class="flex items-start gap-3">
-                                            <div class="w-6 h-6 rounded bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5"><span class="material-symbols-outlined text-[14px]">draw</span></div>
-                                            <div>
-                                                <p class="text-[10px] font-bold text-primary-dark dark:text-white">Bloque de Firmas</p>
-                                                <p class="text-[9px] text-slate-500 leading-tight">Contenedor dinámico donde se insertarán horizontalmente las firmas de ponentes y coordinadores.</p>
-                                            </div>
-                                        </li>
-                                    </ul>
+                                <!-- Acceso al Lienzo / Workplace -->
+                                <div class="flex flex-col space-y-6">
+                                    <div class="p-6 bg-slate-50 dark:bg-gray-900 border-2 border-dashed border-slate-200 dark:border-gray-700 rounded-[2rem] text-center relative overflow-hidden group">
+                                        <div class="w-20 h-20 rounded-full bg-white dark:bg-gray-800 border border-slate-100 dark:border-gray-700 flex items-center justify-center mx-auto mb-4 shadow-sm group-hover:scale-110 transition-transform">
+                                          <span class="material-symbols-outlined text-[40px] text-umsa-gold">design_services</span>
+                                        </div>
+                                        <h5 class="text-sm font-black text-primary-dark dark:text-white uppercase mb-2">Editor Visual Avanzado</h5>
+                                        <p class="text-[10px] text-slate-500 dark:text-gray-400 max-w-[200px] mx-auto mb-6">
+                                            Abre el Workplace para subir tu imagen de fondo y colocar dinámicamente el nombre, firmas, cabecera y tenor.
+                                        </p>
+                                        <router-link v-if="editEventoId" :to="{ name: 'coordinador-certificado-workplace-evento', params: { id: editEventoId }, query: { tipo: tipoCertificado, ...(tipoCertificado === 4 ? { es_excelencia: esExcelencia } : {}) } }" class="bg-umsa-gold hover:bg-yellow-600 text-white font-black px-6 py-3 rounded-xl text-[10px] uppercase tracking-widest shadow-lg inline-flex items-center gap-2 transition-all mx-auto">
+                                          <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+                                          Abrir Workplace
+                                        </router-link>
+                                        <div v-else class="text-[9px] text-red-500 font-bold uppercase p-3 bg-red-50 dark:bg-red-900/20 rounded-xl inline-block mx-auto">
+                                            Debes guardar el evento primero
+                                        </div>
+                                    </div>
+
+                                    <div class="bg-slate-100/50 dark:bg-gray-800/30 border border-slate-200 dark:border-gray-700 p-5 rounded-[1.5rem]">
+                                        <h6 class="text-[10px] font-black text-primary-dark dark:text-white uppercase tracking-widest mb-3 flex items-center gap-2">
+                                            <span class="material-symbols-outlined text-sm text-emerald-500">category</span> Guía de Bloques en el Workplace
+                                        </h6>
+                                        <ul class="space-y-3">
+                                            <li class="flex items-start gap-3">
+                                                <div class="w-6 h-6 rounded bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5"><span class="material-symbols-outlined text-[14px]">text_fields</span></div>
+                                                <div>
+                                                    <p class="text-[10px] font-bold text-primary-dark dark:text-white">Bloques de Texto (Cabecera / Tenor)</p>
+                                                    <p class="text-[9px] text-slate-500 leading-tight">Muestran el contenido que configures arriba. Se adaptarán al ancho que les asignes.</p>
+                                                </div>
+                                            </li>
+                                            <li class="flex items-start gap-3">
+                                                <div class="w-6 h-6 rounded bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5"><span class="material-symbols-outlined text-[14px]">draw</span></div>
+                                                <div>
+                                                    <p class="text-[10px] font-bold text-primary-dark dark:text-white">Bloque de Firmas</p>
+                                                    <p class="text-[9px] text-slate-500 leading-tight">Contenedor dinámico donde se insertarán horizontalmente las firmas de ponentes y coordinadores.</p>
+                                                </div>
+                                            </li>
+                                        </ul>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -2716,11 +2855,11 @@ const changeStep = (delta: number) => {
                                     <div class="flex items-center gap-2 mb-1">
                                         <div class="h-1 w-4 bg-umsa-gold rounded-full"></div>
                                         <span class="text-[8px] font-black text-umsa-gold uppercase tracking-widest">
-                                            Certificado para: {{ tipoCertificado === 1 ? 'Logística' : tipoCertificado === 2 ? 'Expositor' : tipoCertificado === 3 ? 'Organizador' : 'Asistente' }}
+                                            Certificado para: {{ tipoCertificado === null ? 'Ninguno' : (tipoCertificado === 1 ? 'Logística' : tipoCertificado === 2 ? 'Expositor' : tipoCertificado === 3 ? 'Organizador' : 'Asistente') }}
                                         </span>
                                         <div class="h-1 w-4 bg-umsa-gold rounded-full"></div>
                                     </div>
-                                    <h2 class="text-xl font-black text-primary-dark dark:text-white uppercase italic tracking-tighter">Vista Previa de Tenor</h2>
+                                    <h2 class="text-xl font-black text-primary-dark dark:text-white uppercase italic tracking-tighter">Diseño y Maquetación</h2>
                                 </div>
 
                                 <!-- MOCK DE CERTIFICADO -->
@@ -2760,11 +2899,26 @@ const changeStep = (delta: number) => {
                                             </div>
                                         </div>
                                     </div>
+                                    <h5 class="text-xs font-black text-primary-dark dark:text-white uppercase mb-2">Previsualizador de Alta Fidelidad</h5>
+                                    <p class="text-[9px] text-slate-500 dark:text-gray-400 max-w-[240px] mx-auto mb-6 leading-relaxed">
+                                        Visualiza el diploma maquetado en tiempo real con las variables dinámicas del estudiante y el fondo oficial.
+                                    </p>
+                                    <button 
+                                        v-if="tipoCertificado !== null"
+                                        @click.prevent="abrirVistaPreviaRapida"
+                                        class="bg-primary-dark hover:bg-slate-800 text-white font-black px-6 py-3 rounded-xl text-[10px] uppercase tracking-widest shadow-lg inline-flex items-center gap-2 transition-all cursor-pointer hover:-translate-y-0.5 active:translate-y-0 shadow-primary-dark/20"
+                                    >
+                                        <span class="material-symbols-outlined text-[16px]">pageview</span>
+                                        Previsualizar Certificado
+                                    </button>
+                                    <p v-else class="text-[9px] text-red-500 font-bold uppercase tracking-wider bg-red-50 dark:bg-red-950/20 px-3 py-1.5 rounded-lg">
+                                        Selecciona un rol para previsualizar
+                                    </p>
                                 </div>
                                 
                                 <div class="mt-6 bg-slate-50 dark:bg-gray-900/50 p-4 rounded-2xl border border-slate-100 dark:border-gray-800">
                                     <p class="text-[8px] font-bold text-slate-500 uppercase tracking-widest text-center leading-tight">
-                                        <span class="text-umsa-gold">Nota:</span> Estás editando la versión para <span class="text-primary-dark dark:text-white underline">{{ tipoCertificado === 1 ? 'Logística' : tipoCertificado === 2 ? 'Expositor' : tipoCertificado === 3 ? 'Organizador' : 'Asistente' }}</span>. Los cambios se guardan por separado para cada rol.
+                                        <span class="text-umsa-gold">Nota:</span> Estás editando la versión para <span class="text-primary-dark dark:text-white underline">{{ tipoCertificado === null ? 'Ninguno' : (tipoCertificado === 1 ? 'Logística' : tipoCertificado === 2 ? 'Expositor' : tipoCertificado === 3 ? 'Organizador' : 'Asistente') }}</span>. Los cambios se guardan por separado para cada rol.
                                     </p>
                                 </div>
                              </div>
@@ -2795,6 +2949,112 @@ const changeStep = (delta: number) => {
                     <button @click="showRegistroRapidoPonente = false" class="flex-1 text-[10px] font-black uppercase text-slate-400 hover:text-red-600 transition-all">Cancelar</button>
                     <button @click="registrarPonenteQuick" class="flex-1 bg-emerald-500 text-white px-4 py-3 rounded-xl font-black text-[10px] uppercase">Registrar</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Previsualización Rápida en Gestión de Eventos -->
+    <div v-if="showQuickPreviewModal" class="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div class="bg-white dark:bg-gray-900 rounded-[2.5rem] w-full max-w-[1080px] p-8 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-100 dark:border-gray-800 animate-in zoom-in-95 duration-300">
+            <div class="flex justify-between items-center mb-6 shrink-0">
+                <div>
+                    <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic tracking-tighter flex items-center gap-2">
+                      <span class="material-symbols-outlined text-umsa-gold text-2xl">workspace_premium</span>
+                      Previsualización de Alta Fidelidad
+                    </h3>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Simulación real del certificado generado en PDF</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <!-- Zoom Controls -->
+                    <button @click="quickPreviewZoom = Math.max(0.5, quickPreviewZoom - 0.1)" class="w-8 h-8 rounded-full bg-slate-50 dark:bg-gray-800 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors">
+                        <span class="material-symbols-outlined text-sm">zoom_out</span>
+                    </button>
+                    <div class="text-[10px] font-black font-mono text-slate-600 dark:text-gray-300 w-12 text-center">
+                        {{ Math.round(quickPreviewZoom * 100) }}%
+                    </div>
+                    <button @click="quickPreviewZoom = Math.min(2.0, quickPreviewZoom + 0.1)" class="w-8 h-8 rounded-full bg-slate-50 dark:bg-gray-800 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors">
+                        <span class="material-symbols-outlined text-sm">zoom_in</span>
+                    </button>
+                    
+                    <button @click="showQuickPreviewModal = false" class="w-10 h-10 rounded-full bg-slate-50 dark:bg-gray-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-400 hover:text-red-500 flex items-center justify-center transition-colors">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Preview Scrollable Viewport Wrapper with Mouse Grab Panning -->
+            <div ref="quickPreviewViewportRef" 
+                 @mousedown="onMouseDownQuickPreview" 
+                 @mousemove="onMouseMoveQuickPreview" 
+                 @mouseup="onMouseUpQuickPreview" 
+                 @mouseleave="onMouseLeaveQuickPreview" 
+                 class="flex-1 overflow-auto flex items-center justify-center p-12 bg-slate-100 dark:bg-gray-950 rounded-3xl border border-slate-200 dark:border-gray-800 relative select-none cursor-grab active:cursor-grabbing animate-in fade-in duration-300">
+                
+                <!-- Sizing Layout Box for Zoom -->
+                <div class="relative transition-all duration-200 flex items-center justify-center shrink-0" 
+                     :style="{ 
+                        width: `${960 * quickPreviewZoom}px`, 
+                        height: `${678 * quickPreviewZoom}px` 
+                     }">
+                     
+                    <!-- Certificado Previsualizado (Aspect A4) -->
+                    <div class="absolute left-1/2 top-1/2 w-[960px] h-[678px] bg-white shadow-2xl border border-slate-350 flex items-center justify-center rounded-xl transition-transform duration-200 shrink-0"
+                         :style="{ 
+                            backgroundImage: infoCertificado?.fondo_url ? `url(${getImageUrl('fondos', infoCertificado.fondo_url)})` : undefined,
+                            backgroundSize: '100% 100%',
+                            backgroundPosition: 'center',
+                            backgroundRepeat: 'no-repeat',
+                            transform: `translate(-50%, -50%) scale(${quickPreviewZoom})`,
+                            transformOrigin: 'center center'
+                         }">
+                         
+                        <!-- Elementos Dinámicos Sustituidos -->
+                        <div v-for="el in quickPreviewElements" :key="'quick-prev-' + el.id"
+                             class="absolute flex items-center justify-center text-center select-none text-slate-800 dark:text-slate-800"
+                             :style="{ 
+                                left: `${el.x}%`, top: `${el.y}%`, 
+                                fontSize: el.tipo !== 'qr' && el.tipo !== 'firma' ? `${el.fontSize * 0.9}px` : undefined, 
+                                color: el.color, fontFamily: el.fontFamily,
+                                width: el.width ? `${el.width * 0.9}px` : 'auto',
+                                height: el.height ? `${el.height * 0.9}px` : 'auto'
+                             }">
+                             
+                             <!-- Si es Cabecera -->
+                             <div v-if="el.tipo === 'cabecera'" class="font-black uppercase leading-tight text-slate-850 dark:text-slate-850">
+                                {{ infoCertificado?.cabecera || '[ CABECERA ]' }}
+                             </div>
+                             
+                             <!-- Si es Tenor -->
+                             <div v-else-if="el.tipo === 'tenor'" class="leading-relaxed italic whitespace-pre-line text-slate-800 dark:text-slate-800">
+                                {{ resolveQuickPreviewTenor(infoCertificado?.tenor) }}
+                             </div>
+                             
+                             <!-- Si es Texto Genérico -->
+                             <div v-else-if="el.tipo === 'texto'" class="font-bold leading-normal">
+                                {{ resolveQuickPreviewVariables(el.valor) }}
+                             </div>
+                             
+                             <!-- Si es QR -->
+                             <div v-else-if="el.tipo === 'qr'" class="w-full h-full border-2 border-slate-900 bg-white flex items-center justify-center rounded-xl p-2 shrink-0">
+                                <span class="material-symbols-outlined text-[60px] text-slate-800 select-none">qr_code_2</span>
+                             </div>
+                             
+                             <!-- Si es Firma -->
+                             <div v-else-if="el.tipo === 'firma'" class="w-full h-full flex flex-col items-center justify-center p-2 relative shrink-0">
+                                <div class="h-10 w-32 border-b border-dashed border-slate-400 mb-1 flex items-center justify-center select-none">
+                                    <span class="font-serif italic text-slate-400 text-xs select-none font-medium">Firma Autorizada</span>
+                                </div>
+                                <span class="text-[8px] font-black uppercase text-slate-500 select-none">COORDINADOR GENERAL</span>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-6 flex justify-end shrink-0">
+                <button @click="showQuickPreviewModal = false" class="px-6 py-3 bg-primary-dark hover:bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg active:scale-95 cursor-pointer">
+                    Cerrar Vista Previa
+                </button>
             </div>
         </div>
     </div>

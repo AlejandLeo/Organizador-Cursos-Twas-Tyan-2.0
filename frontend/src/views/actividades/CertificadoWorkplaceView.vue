@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api, { getImageUrl } from '@/services/api'
 import Swal from 'sweetalert2'
@@ -7,7 +7,38 @@ import Swal from 'sweetalert2'
 const route = useRoute()
 const router = useRouter()
 const eventoId = route.params.id
-const tipoCertificado = route.query.tipo || 1
+const tipoCertificado = ref<number>(Number(route.query.tipo || 1))
+const esExcelencia = ref<number>(route.query.es_excelencia !== undefined ? Number(route.query.es_excelencia) : 0)
+
+const showPreviewModal = ref(false)
+
+const resolvePreviewVariables = (text: string) => {
+    if (!text) return ''
+    return text
+        .replace(/{NOMBRE_ESTUDIANTE}/g, 'Lic. Alejandro Leonardo Nogales')
+        .replace(/{PRIMER_APELLIDO}/g, 'Nogales')
+        .replace(/{SEGUNDO_APELLIDO}/g, 'Ticona')
+        .replace(/{NOMBRE_CURSO}/g, 'Congreso Internacional de Biofertilizantes')
+        .replace(/{EVENTO}/g, 'Congreso Internacional de Biofertilizantes')
+        .replace(/{ACTIVIDAD}/g, 'Taller Avanzado de Suelos')
+        .replace(/{CODIGO_CERTIFICADO}/g, 'CERT-TWAS-TYAN-2026-9842')
+        .replace(/{GESTION}/g, '2026')
+        .replace(/{ROL}/g, 'Asistente')
+        .replace(/{CI_USUARIO}/g, '1234567 LP')
+        .replace(/{CARGA_HORARIA}/g, '40 horas académicas')
+        .replace(/{FECHA_EMISION}/g, '17 de Mayo de 2026')
+        .replace(/{NOTA_FINAL}/g, '95')
+}
+
+const resolvePreviewTenor = (text: string) => {
+    if (!text) return '[ TENOR PENDIENTE ]'
+    return resolvePreviewVariables(text)
+}
+
+const isNear = (val: number | undefined, target: number, threshold: number): boolean => {
+    if (val === undefined) return false
+    return Math.abs(val - target) <= threshold
+}
 
 interface ElementoLienzo {
   id: string
@@ -53,16 +84,74 @@ const fetchData = async () => {
                     } catch(e) {
                         elementosLienzo.value = []
                     }
+                } else {
+                    elementosLienzo.value = []
                 }
+            } else {
+                infoCertificado.value = {
+                    cabecera: '',
+                    tenor: '',
+                    estado: 1
+                }
+                elementosLienzo.value = []
             }
         }
     } catch (error) {
         console.error('Error fetching data', error)
+        infoCertificado.value = {
+            cabecera: '',
+            tenor: '',
+            estado: 1
+        }
+        elementosLienzo.value = []
     }
 }
 
 onMounted(() => {
     fetchData()
+})
+
+const handleKeyDown = (e: KeyboardEvent) => {
+    if (!selectedElementData.value) return
+    
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault()
+    }
+
+    const step = e.shiftKey ? 1.0 : 0.1
+    
+    if (e.key === 'ArrowUp') {
+        selectedElementData.value.y = Number(Math.max(0, selectedElementData.value.y - step).toFixed(2))
+    }
+    if (e.key === 'ArrowDown') {
+        selectedElementData.value.y = Number(Math.min(100, selectedElementData.value.y + step).toFixed(2))
+    }
+    if (e.key === 'ArrowLeft') {
+        selectedElementData.value.x = Number(Math.max(0, selectedElementData.value.x - step).toFixed(2))
+    }
+    if (e.key === 'ArrowRight') {
+        selectedElementData.value.x = Number(Math.min(100, selectedElementData.value.x + step).toFixed(2))
+    }
+}
+
+watch(elementoSeleccionado, (newVal) => {
+    if (newVal) {
+        window.addEventListener('keydown', handleKeyDown)
+    } else {
+        window.removeEventListener('keydown', handleKeyDown)
+    }
+})
+
+onUnmounted(() => {
+    window.removeEventListener('keydown', handleKeyDown)
+})
+
+watch([tipoCertificado, esExcelencia], async () => {
+    elementoSeleccionado.value = null
+    selectedElementData.value = null
+    elementosLienzo.value = []
+    infoCertificado.value = null
+    await fetchData()
 })
 
 const triggerUpload = () => {
@@ -103,6 +192,84 @@ const goBack = () => {
 
 // === DRAG AND DROP LOGIC ===
 const zoomLevel = ref(1)
+
+// --- PANNING LOGIC FOR MAIN WORKSPACE CANVAS ---
+const viewportRef = ref<HTMLElement | null>(null)
+const isPanning = ref(false)
+const startX = ref(0)
+const startY = ref(0)
+const scrollLeftStart = ref(0)
+const scrollTopStart = ref(0)
+
+const onMouseDownViewport = (e: MouseEvent) => {
+    const target = e.target as HTMLElement
+    if (target.closest('[draggable="true"]') || target.closest('button') || target.closest('input') || target.closest('select')) {
+        return
+    }
+    isPanning.value = true
+    startX.value = e.pageX - (viewportRef.value?.offsetLeft || 0)
+    startY.value = e.pageY - (viewportRef.value?.offsetTop || 0)
+    scrollLeftStart.value = viewportRef.value?.scrollLeft || 0
+    scrollTopStart.value = viewportRef.value?.scrollTop || 0
+}
+
+const onMouseMoveViewport = (e: MouseEvent) => {
+    if (!isPanning.value || !viewportRef.value) return
+    e.preventDefault()
+    const x = e.pageX - (viewportRef.value.offsetLeft || 0)
+    const y = e.pageY - (viewportRef.value.offsetTop || 0)
+    const walkX = (x - startX.value) * 1.5
+    const walkY = (y - startY.value) * 1.5
+    viewportRef.value.scrollLeft = scrollLeftStart.value - walkX
+    viewportRef.value.scrollTop = scrollTopStart.value - walkY
+}
+
+const onMouseUpViewport = () => {
+    isPanning.value = false
+}
+
+const onMouseLeaveViewport = () => {
+    isPanning.value = false
+}
+
+// --- PREVIEW MODAL ZOOM & PANNING LOGIC ---
+const previewZoom = ref(1.0)
+const previewViewportRef = ref<HTMLElement | null>(null)
+const isPreviewPanning = ref(false)
+const previewStartX = ref(0)
+const previewStartY = ref(0)
+const previewScrollLeftStart = ref(0)
+const previewScrollTopStart = ref(0)
+
+const onMouseDownPreviewViewport = (e: MouseEvent) => {
+    const target = e.target as HTMLElement
+    if (target.closest('button')) return
+    isPreviewPanning.value = true
+    previewStartX.value = e.pageX - (previewViewportRef.value?.offsetLeft || 0)
+    previewStartY.value = e.pageY - (previewViewportRef.value?.offsetTop || 0)
+    previewScrollLeftStart.value = previewViewportRef.value?.scrollLeft || 0
+    previewScrollTopStart.value = previewViewportRef.value?.scrollTop || 0
+}
+
+const onMouseMovePreviewViewport = (e: MouseEvent) => {
+    if (!isPreviewPanning.value || !previewViewportRef.value) return
+    e.preventDefault()
+    const x = e.pageX - (previewViewportRef.value.offsetLeft || 0)
+    const y = e.pageY - (previewViewportRef.value.offsetTop || 0)
+    const walkX = (x - previewStartX.value) * 1.5
+    const walkY = (y - previewStartY.value) * 1.5
+    previewViewportRef.value.scrollLeft = previewScrollLeftStart.value - walkX
+    previewViewportRef.value.scrollTop = previewScrollTopStart.value - walkY
+}
+
+const onMouseUpPreviewViewport = () => {
+    isPreviewPanning.value = false
+}
+
+const onMouseLeavePreviewViewport = () => {
+    isPreviewPanning.value = false
+}
+
 const isDraggingCanvasId = ref<string | null>(null)
 
 const zoomIn = () => { if (zoomLevel.value < 2) zoomLevel.value += 0.1 }
@@ -133,6 +300,12 @@ const getFirmaFullUrl = (firmaUrl: string) => {
     return `${base}${firmaUrl}`
 }
 
+const handleImageError = (e: Event) => {
+    const target = e.target as HTMLImageElement
+    if (target) {
+        target.style.display = 'none'
+    }
+}
 const onDragStartCanvas = (e: DragEvent, id: string) => {
     isDraggingCanvasId.value = id
     e.dataTransfer?.setData('application/json', JSON.stringify({ source: 'canvas', id }))
@@ -278,13 +451,17 @@ const guardarDiseno = async () => {
     if (!infoCertificado.value) return Swal.fire('Atención', 'Primero debes guardar la cabecera en el paso 7.', 'warning')
     try {
         Swal.fire({ title: 'Guardando diseño...', didOpen: () => Swal.showLoading() })
-        await api.post('/info-certificados', {
+        const payload: any = {
             id_evento: Number(eventoId),
-            tipo: Number(tipoCertificado),
+            tipo: Number(tipoCertificado.value),
             cabecera: infoCertificado.value.cabecera,
             tenor: infoCertificado.value.tenor,
             configuracion: elementosLienzo.value
-        })
+        }
+        if (Number(tipoCertificado.value) === 4) {
+            payload.es_excelencia = esExcelencia.value
+        }
+        await api.post('/info-certificados', payload)
         Swal.fire('Éxito', 'Diseño guardado correctamente.', 'success')
     } catch (error) {
         console.error(error)
@@ -308,8 +485,38 @@ const guardarDiseno = async () => {
         </div>
       </div>
 
+      <!-- Selector dinámico de Rol y Excelencia (Centro del Topbar) -->
+      <div class="hidden md:flex items-center gap-3 bg-slate-50 dark:bg-gray-800 px-4 py-1.5 rounded-2xl border border-slate-200 dark:border-gray-700">
+        <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Plantilla:</span>
+        <select v-model="tipoCertificado" class="bg-white dark:bg-gray-950 border border-slate-200 dark:border-gray-750 rounded-lg py-1 px-3 font-bold text-xs text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none cursor-pointer">
+            <option :value="1">Logística</option>
+            <option :value="2">Expositor</option>
+            <option :value="3">Organizador</option>
+            <option :value="4">Asistente</option>
+        </select>
+        
+        <div v-if="Number(tipoCertificado) === 4" class="flex gap-1 p-0.5 bg-slate-200 dark:bg-gray-950 rounded-lg border border-slate-350 dark:border-gray-900">
+            <button 
+                @click.prevent="esExcelencia = 0"
+                :class="Number(esExcelencia) === 0 ? 'bg-primary-dark text-white shadow-sm font-black' : 'text-slate-500 hover:bg-slate-300 dark:hover:bg-gray-850 font-bold'"
+                class="py-1 px-2.5 rounded-md text-[8px] uppercase tracking-wider transition-all flex items-center gap-1"
+            >
+                <span class="material-symbols-outlined text-[12px]">military_tech</span>
+                Participación
+            </button>
+            <button 
+                @click.prevent="esExcelencia = 1"
+                :class="Number(esExcelencia) === 1 ? 'bg-umsa-gold text-white shadow-sm font-black' : 'text-slate-500 hover:bg-slate-300 dark:hover:bg-gray-850 font-bold'"
+                class="py-1 px-2.5 rounded-md text-[8px] uppercase tracking-wider transition-all flex items-center gap-1"
+            >
+                <span class="material-symbols-outlined text-[12px]">workspace_premium</span>
+                Excelencia
+            </button>
+        </div>
+      </div>
+
       <div class="flex items-center gap-3">
-        <button class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-slate-500 dark:text-gray-300 text-[10px] font-black uppercase tracking-widest hover:border-umsa-gold shadow-sm transition-all flex items-center gap-2">
+        <button @click="showPreviewModal = true" class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-slate-500 dark:text-gray-300 text-[10px] font-black uppercase tracking-widest hover:border-umsa-gold shadow-sm transition-all flex items-center gap-2">
             <span class="material-symbols-outlined text-[14px]">visibility</span> Previsualizar
         </button>
         <button @click="guardarDiseno" class="px-6 py-2.5 rounded-xl bg-primary-dark text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 shadow-lg hover:shadow-emerald-500/20 transition-all flex items-center gap-2">
@@ -363,10 +570,55 @@ const guardarDiseno = async () => {
                             <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} NOMBRE_ESTUDIANTE {{ '}' }}</span>
                             <span class="material-symbols-outlined text-xs text-slate-400">person</span>
                         </div>
-                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{NOMBRE_CURSO}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{PRIMER_APELLIDO}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
                             <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
-                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} NOMBRE_CURSO {{ '}' }}</span>
-                            <span class="material-symbols-outlined text-xs text-slate-400">school</span>
+                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} PRIMER_APELLIDO {{ '}' }}</span>
+                            <span class="material-symbols-outlined text-xs text-slate-400">badge</span>
+                        </div>
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{SEGUNDO_APELLIDO}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                            <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
+                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} SEGUNDO_APELLIDO {{ '}' }}</span>
+                            <span class="material-symbols-outlined text-xs text-slate-400">badge</span>
+                        </div>
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{EVENTO}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                            <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
+                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} EVENTO {{ '}' }}</span>
+                            <span class="material-symbols-outlined text-xs text-slate-400">calendar_today</span>
+                        </div>
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{ACTIVIDAD}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                            <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
+                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} ACTIVIDAD {{ '}' }}</span>
+                            <span class="material-symbols-outlined text-xs text-slate-400">local_activity</span>
+                        </div>
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{GESTION}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                            <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
+                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} GESTION {{ '}' }}</span>
+                            <span class="material-symbols-outlined text-xs text-slate-400">history</span>
+                        </div>
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{ROL}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                            <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
+                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} ROL {{ '}' }}</span>
+                            <span class="material-symbols-outlined text-xs text-slate-400">assignment_ind</span>
+                        </div>
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{CI_USUARIO}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                            <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
+                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} CI_USUARIO {{ '}' }}</span>
+                            <span class="material-symbols-outlined text-xs text-slate-400">fingerprint</span>
+                        </div>
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{CARGA_HORARIA}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                            <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
+                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} CARGA_HORARIA {{ '}' }}</span>
+                            <span class="material-symbols-outlined text-xs text-slate-400">schedule</span>
+                        </div>
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{FECHA_EMISION}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                            <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
+                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} FECHA_EMISION {{ '}' }}</span>
+                            <span class="material-symbols-outlined text-xs text-slate-400">today</span>
+                        </div>
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{NOTA_FINAL}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                            <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
+                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} NOTA_FINAL {{ '}' }}</span>
+                            <span class="material-symbols-outlined text-xs text-slate-400">grade</span>
                         </div>
                         <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{CODIGO_CERTIFICADO}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
                             <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
@@ -488,7 +740,7 @@ const guardarDiseno = async () => {
                     <div v-if="el.tipo === 'firma'" class="flex flex-col items-center justify-center w-full h-full relative" :class="{ 'opacity-60': firmantes.length === 0 }">
                         <div v-if="firmantes.length > 0" class="flex items-end justify-center w-full px-4 gap-8">
                             <div v-for="f in firmantes" :key="f.id_usuario" class="flex flex-col items-center justify-end w-48 shrink-0">
-                                <img v-if="f.firma_url" :src="getFirmaFullUrl(f.firma_url)" @error="e => e.target.style.display = 'none'" class="h-16 object-contain mb-1 drop-shadow-sm mix-blend-multiply" />
+                                <img v-if="f.firma_url" :src="getFirmaFullUrl(f.firma_url)" @error="handleImageError" class="h-16 object-contain mb-1 drop-shadow-sm mix-blend-multiply" />
                                 <span v-else class="material-symbols-outlined text-[24px] mb-2 opacity-50">draw</span>
                                 
                                 <div class="w-full border-t border-black pt-1 flex flex-col items-center text-center">
@@ -510,7 +762,7 @@ const guardarDiseno = async () => {
                             <template v-if="getFirmanteData(el.id_usuario)">
                                 <img v-if="getFirmanteData(el.id_usuario).firma_url" 
                                      :src="getFirmaFullUrl(getFirmanteData(el.id_usuario).firma_url)" 
-                                     @error="e => e.target.style.display = 'none'" 
+                                     @error="handleImageError" 
                                      class="h-16 object-contain mb-1 drop-shadow-sm mix-blend-multiply" />
                                 <span v-else class="material-symbols-outlined text-[24px] mb-2 opacity-50">draw</span>
                                 
@@ -536,27 +788,25 @@ const guardarDiseno = async () => {
                     <span @click.stop="deleteElement(el.id)" class="material-symbols-outlined text-[12px] absolute -top-3 -right-3 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/el:opacity-100 transition-opacity z-10 hover:bg-red-600 cursor-pointer shadow-lg">close</span>
  
                     <!-- Resize Handles -->
-                    <template v-if="elementoSeleccionado === el.id">
-                        <!-- Right Handle (Width) -->
-                        <div v-if="el.tipo !== 'qr'" @mousedown.stop="startResize($event, el, 'width')"
-                             class="absolute top-1/2 -right-1.5 w-3 h-8 -translate-y-1/2 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-ew-resize flex flex-col items-center justify-center gap-[2px] shadow-sm z-20">
-                            <div class="w-0.5 h-1 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
-                            <div class="w-0.5 h-1 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
-                        </div>
- 
-                        <!-- Bottom Handle (Height) -->
-                        <div v-if="el.tipo !== 'qr'" @mousedown.stop="startResize($event, el, 'height')"
-                             class="absolute -bottom-1.5 left-1/2 h-3 w-8 -translate-x-1/2 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-ns-resize flex items-center justify-center gap-[2px] shadow-sm z-20">
-                            <div class="w-1 h-0.5 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
-                            <div class="w-1 h-0.5 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
-                        </div>
- 
-                        <!-- Bottom-Right Corner (Both) -->
-                        <div @mousedown.stop="startResize($event, el, 'both')"
-                             class="absolute -bottom-1.5 -right-1.5 w-4 h-4 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-nwse-resize shadow-sm z-20 flex items-center justify-center">
-                            <div class="w-1.5 h-1.5 bg-slate-200 dark:bg-gray-400 rounded-full"></div>
-                        </div>
-                    </template>
+                    <!-- Right Handle (Width) -->
+                    <div v-if="elementoSeleccionado === el.id && el.tipo !== 'qr'" @mousedown.stop="startResize($event, el, 'width')"
+                         class="absolute top-1/2 -right-1.5 w-3 h-8 -translate-y-1/2 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-ew-resize flex flex-col items-center justify-center gap-[2px] shadow-sm z-20">
+                        <div class="w-0.5 h-1 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
+                        <div class="w-0.5 h-1 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
+                    </div>
+
+                    <!-- Bottom Handle (Height) -->
+                    <div v-if="elementoSeleccionado === el.id && el.tipo !== 'qr'" @mousedown.stop="startResize($event, el, 'height')"
+                         class="absolute -bottom-1.5 left-1/2 h-3 w-8 -translate-x-1/2 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-ns-resize flex items-center justify-center gap-[2px] shadow-sm z-20">
+                        <div class="w-1 h-0.5 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
+                        <div class="w-1 h-0.5 bg-slate-300 dark:bg-gray-400 rounded-full"></div>
+                    </div>
+
+                    <!-- Bottom-Right Corner (Both) -->
+                    <div v-if="elementoSeleccionado === el.id" @mousedown.stop="startResize($event, el, 'both')"
+                         class="absolute -bottom-1.5 -right-1.5 w-4 h-4 bg-white border border-slate-300 dark:bg-gray-700 dark:border-gray-500 rounded-full cursor-nwse-resize shadow-sm z-20 flex items-center justify-center">
+                        <div class="w-1.5 h-1.5 bg-slate-200 dark:bg-gray-400 rounded-full"></div>
+                    </div>
                 </div>
             </div>
             </div>
@@ -626,6 +876,112 @@ const guardarDiseno = async () => {
                 </div>
             </div>
         </aside>
+    </div>
+
+    <!-- Modal de Previsualización -->
+    <div v-if="showPreviewModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div class="bg-white dark:bg-gray-900 rounded-[2.5rem] w-full max-w-[1080px] p-8 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-100 dark:border-gray-800 animate-in zoom-in-95 duration-300">
+            <div class="flex justify-between items-center mb-6 shrink-0">
+                <div>
+                    <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic tracking-tighter flex items-center gap-2">
+                      <span class="material-symbols-outlined text-umsa-gold text-2xl">workspace_premium</span>
+                      Previsualización de Alta Fidelidad
+                    </h3>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Simulación real del certificado generado en PDF</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <!-- Zoom Controls -->
+                    <button @click="previewZoom = Math.max(0.5, previewZoom - 0.1)" class="w-8 h-8 rounded-full bg-slate-50 dark:bg-gray-800 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors">
+                        <span class="material-symbols-outlined text-sm">zoom_out</span>
+                    </button>
+                    <div class="text-[10px] font-black font-mono text-slate-600 dark:text-gray-300 w-12 text-center">
+                        {{ Math.round(previewZoom * 100) }}%
+                    </div>
+                    <button @click="previewZoom = Math.min(2.0, previewZoom + 0.1)" class="w-8 h-8 rounded-full bg-slate-50 dark:bg-gray-800 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors">
+                        <span class="material-symbols-outlined text-sm">zoom_in</span>
+                    </button>
+                    
+                    <button @click="showPreviewModal = false" class="w-10 h-10 rounded-full bg-slate-50 dark:bg-gray-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-400 hover:text-red-500 flex items-center justify-center transition-colors">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Preview Scrollable Viewport Wrapper with Mouse Drag Panning -->
+            <div ref="previewViewportRef" 
+                 @mousedown="onMouseDownPreviewViewport" 
+                 @mousemove="onMouseMovePreviewViewport" 
+                 @mouseup="onMouseUpPreviewViewport" 
+                 @mouseleave="onMouseLeavePreviewViewport" 
+                 class="flex-1 overflow-auto flex items-center justify-center p-12 bg-slate-100 dark:bg-gray-950 rounded-3xl border border-slate-200 dark:border-gray-800 relative select-none cursor-grab active:cursor-grabbing animate-in fade-in duration-300">
+                
+                <!-- Sizing Layout Box for Zoom -->
+                <div class="relative transition-all duration-200 flex items-center justify-center shrink-0" 
+                     :style="{ 
+                        width: `${960 * previewZoom}px`, 
+                        height: `${678 * previewZoom}px` 
+                     }">
+                     
+                    <!-- Certificado Previsualizado (Aspect A4) -->
+                    <div class="absolute left-1/2 top-1/2 w-[960px] h-[678px] bg-white shadow-2xl border border-slate-350 flex items-center justify-center rounded-xl transition-transform duration-200 shrink-0"
+                         :style="{ 
+                            backgroundImage: infoCertificado?.fondo_url ? `url(${getImageUrl('fondos', infoCertificado.fondo_url)})` : undefined,
+                            backgroundSize: '100% 100%',
+                            backgroundPosition: 'center',
+                            backgroundRepeat: 'no-repeat',
+                            transform: `translate(-50%, -50%) scale(${previewZoom})`,
+                            transformOrigin: 'center center'
+                         }">
+                         
+                        <!-- Elementos Dinámicos Sustituidos -->
+                        <div v-for="el in elementosLienzo" :key="'prev-' + el.id"
+                             class="absolute flex items-center justify-center text-center select-none"
+                             :style="{ 
+                                left: `${el.x}%`, top: `${el.y}%`, 
+                                fontSize: el.tipo !== 'qr' && el.tipo !== 'firma' ? `${el.fontSize * 0.9}px` : undefined, 
+                                color: el.color, fontFamily: el.fontFamily,
+                                width: el.width ? `${el.width * 0.9}px` : 'auto',
+                                height: el.height ? `${el.height * 0.9}px` : 'auto'
+                             }">
+                             
+                             <!-- Si es Cabecera -->
+                             <div v-if="el.tipo === 'cabecera'" class="font-black uppercase leading-tight">
+                                {{ infoCertificado?.cabecera || '[ CABECERA ]' }}
+                             </div>
+                             
+                             <!-- Si es Tenor -->
+                             <div v-else-if="el.tipo === 'tenor'" class="leading-relaxed italic whitespace-pre-line">
+                                {{ resolvePreviewTenor(infoCertificado?.tenor) }}
+                             </div>
+                             
+                             <!-- Si es Texto Genérico -->
+                             <div v-else-if="el.tipo === 'texto'" class="font-bold leading-normal">
+                                {{ resolvePreviewVariables(el.valor) }}
+                             </div>
+                             
+                             <!-- Si es QR -->
+                             <div v-else-if="el.tipo === 'qr'" class="w-full h-full border-2 border-slate-900 bg-white flex items-center justify-center rounded-xl p-2 shrink-0">
+                                <span class="material-symbols-outlined text-[60px] text-slate-800 select-none">qr_code_2</span>
+                             </div>
+                             
+                             <!-- Si es Firma -->
+                             <div v-else-if="el.tipo === 'firma'" class="w-full h-full flex flex-col items-center justify-center p-2 relative shrink-0">
+                                <div class="h-10 w-32 border-b border-dashed border-slate-400 mb-1 flex items-center justify-center select-none">
+                                    <span class="font-serif italic text-slate-400 text-xs select-none font-medium">Firma Autorizada</span>
+                                </div>
+                                <span class="text-[8px] font-black uppercase text-slate-500 select-none">COORDINADOR GENERAL</span>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-6 flex justify-end shrink-0">
+                <button @click="showPreviewModal = false" class="px-6 py-3 bg-primary-dark hover:bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg active:scale-95 cursor-pointer">
+                    Cerrar Vista Previa
+                </button>
+            </div>
+        </div>
     </div>
 
   </div>

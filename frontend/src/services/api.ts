@@ -1,5 +1,7 @@
 import axios from 'axios';
 
+import { useUIStore } from '@/stores/ui';
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000', // Ajusta según tu backend
   headers: {
@@ -24,19 +26,17 @@ api.interceptors.response.use(
   (response) => {
     // Si la respuesta llega bien, aseguramos que el estado sea online
     try {
-      const { useUIStore } = require('@/stores/ui');
       const ui = useUIStore();
       if (!ui.isServerOnline) ui.setServerStatus(true);
-    } catch (e) {}
+    } catch (e) { }
     return response;
   },
   (error) => {
     // Si no hay respuesta del servidor (ERR_CONNECTION_REFUSED, etc)
     if (!error.response || error.code === 'ERR_NETWORK') {
       try {
-        const { useUIStore } = require('@/stores/ui');
         useUIStore().setServerStatus(false);
-      } catch (e) {}
+      } catch (e) { }
     }
     return Promise.reject(error);
   }
@@ -51,7 +51,7 @@ api.interceptors.response.use(
 export const getImageUrl = (carpeta: string, nombreArchivo: string, fallback = '') => {
   if (!nombreArchivo) return fallback;
   if (nombreArchivo.startsWith('http')) return nombreArchivo;
-  
+
   const baseUrl = api.defaults.baseURL || 'http://localhost:3000';
   // Decodificamos varias veces por si viene con doble codificación desde el backend (ej: %2520 -> %20 -> " ")
   let cleanName = nombreArchivo;
@@ -60,7 +60,7 @@ export const getImageUrl = (carpeta: string, nombreArchivo: string, fallback = '
   } catch (e) {
     try {
       cleanName = decodeURIComponent(nombreArchivo);
-    } catch (e2) {}
+    } catch (e2) { }
   }
   return `${baseUrl}/uploads/${carpeta}/${cleanName}`;
 };

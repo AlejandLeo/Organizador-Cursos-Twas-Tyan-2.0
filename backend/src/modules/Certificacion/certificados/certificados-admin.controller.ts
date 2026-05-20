@@ -31,7 +31,7 @@ export class CertificadosAdminController {
     private readonly service: CertificadosService,
     private readonly queueService: CertificadosQueueService,
     private readonly mailService: MailService,
-  ) {}
+  ) { }
 
   // ── Envío masivo con notificación a SuperUsuario ────────────
 
@@ -73,6 +73,12 @@ export class CertificadosAdminController {
     return resultado;
   }
 
+  @Post('enviar-evento/:eventoId')
+  @ApiOperation({ summary: 'Generar y encolar certificados pendientes de un evento para envío masivo' })
+  enviarEvento(@Param('eventoId', ParseIntPipe) eventoId: number) {
+    return this.queueService.generarYEncolarPorEvento(eventoId);
+  }
+
   /**
    * Encola el reintento de un certificado individual.
    */
@@ -108,7 +114,7 @@ export class CertificadosAdminController {
           <p><strong>${nombreSolicitante}</strong> ha iniciado el reintento de <strong>${resultado.encolados}</strong> certificados fallidos.</p>
           <p>Fecha: ${new Date().toLocaleString('es-BO')}</p>
         </body></html>`,
-      ).catch(() => {});
+      ).catch(() => { });
     }
 
     return resultado;
