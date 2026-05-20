@@ -523,7 +523,6 @@ onMounted(() => {
     <!-- TAB: TRAZABILIDAD -->
     <div v-if="activeTab === 'trazabilidad'" class="space-y-6 animate-in fade-in duration-300">
 
-
       <!-- FILTROS DE BÚSQUEDA LIBRE -->
       <div class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
         <div class="flex flex-wrap items-center gap-4">
@@ -592,8 +591,8 @@ onMounted(() => {
                 <!-- Evento -->
                 <td class="px-6 py-4">
                   <p class="text-[10px] font-black text-slate-400 uppercase tracking-tighter flex items-center gap-1">
-                    {{ cert.actividadAcademica?.evento.nombre }}
-                    <span v-if="(cert.actividadAcademica?.evento.fase || 0) < 4 && cert.actividadAcademica?.evento.estado !== 0"
+                    {{ cert.actividadAcademica?.evento?.nombre }}
+                    <span v-if="(cert.actividadAcademica?.evento?.fase || 0) < 4 && cert.actividadAcademica?.evento?.estado !== 0"
                           class="text-[8px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-black">
                       No Finalizado
                     </span>
@@ -843,7 +842,6 @@ onMounted(() => {
 
     </div>
 
-
     <!-- TAB: EMISIÓN MASIVA -->
     <div v-else-if="activeTab === 'emision'" class="space-y-6 animate-in fade-in duration-300">
       <div class="bg-white dark:bg-gray-900 rounded-3xl border border-slate-200 dark:border-gray-800 shadow-sm p-6 space-y-6">
@@ -1077,7 +1075,6 @@ onMounted(() => {
         </div>
       </Transition>
     </Teleport>
-
   </div>
 </template>
 

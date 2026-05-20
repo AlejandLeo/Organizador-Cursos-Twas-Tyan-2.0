@@ -31,7 +31,7 @@ export class CertificadosAdminController {
     private readonly service: CertificadosService,
     private readonly queueService: CertificadosQueueService,
     private readonly mailService: MailService,
-  ) {}
+  ) { }
 
   // ── Envío masivo con notificación a SuperUsuario ────────────
 
@@ -46,7 +46,7 @@ export class CertificadosAdminController {
 
     // Notificar al SuperUsuario
     const usuario = req.user;
-    const adminEmail = process.env.MAIL_USER || 'coursemanagementsystemumsa@gmail.com';
+    const adminEmail = process.env.MAIL_USER || 'certificadosty@fcpn.edu.bo';
     const nombreSolicitante = usuario?.persona
       ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
       : usuario?.email || 'Sistema';
@@ -99,7 +99,7 @@ export class CertificadosAdminController {
 
     if (resultado.encolados > 0) {
       const usuario = req.user;
-      const adminEmail = process.env.MAIL_USER || 'coursemanagementsystemumsa@gmail.com';
+      const adminEmail = process.env.MAIL_USER || 'certificadosty@fcpn.edu.bo';
       const nombreSolicitante = usuario?.persona
         ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
         : usuario?.email || 'Sistema';
@@ -114,7 +114,7 @@ export class CertificadosAdminController {
           <p><strong>${nombreSolicitante}</strong> ha iniciado el reintento de <strong>${resultado.encolados}</strong> certificados fallidos.</p>
           <p>Fecha: ${new Date().toLocaleString('es-BO')}</p>
         </body></html>`,
-      ).catch(() => {});
+      ).catch(() => { });
     }
 
     return resultado;

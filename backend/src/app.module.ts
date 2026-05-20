@@ -3,6 +3,8 @@ import { AppController } from 'src/app.controller';
 import { AppService } from './app.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 
 // --- Usuarios y Accesos ---
@@ -48,6 +50,7 @@ import { AuditLogModule } from './modules/Comun/audit-log/audit-log.module';
 
 // --- Dashboard ---
 import { CoordinadorModule } from './modules/Academico/coordinador/coordinador.module';
+import { TasksModule } from './modules/Cron/tasks.module';
 
 import { ScheduleModule } from '@nestjs/schedule';
 
@@ -59,6 +62,11 @@ import { ScheduleModule } from '@nestjs/schedule';
     }),
 
     ScheduleModule.forRoot(),
+
+    ThrottlerModule.forRoot([{
+      ttl: 60000,
+      limit: 10, // Max 10 requests per minute
+    }]),
 
     TypeOrmModule.forRoot({
       type: 'postgres',
@@ -114,8 +122,15 @@ import { ScheduleModule } from '@nestjs/schedule';
     // --- Especiales ---
     CoordinadorModule,
     AuditLogModule,
+    TasksModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

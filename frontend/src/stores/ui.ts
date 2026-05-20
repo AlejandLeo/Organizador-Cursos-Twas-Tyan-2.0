@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref } from 'vue';
 
 export const useUIStore = defineStore('ui', () => {
     const isSidebarOpen = ref(window.innerWidth > 1024);
@@ -46,15 +46,10 @@ export const useUIStore = defineStore('ui', () => {
         isServerOnline.value = status;
     };
 
-    onMounted(() => {
+    if (typeof window !== 'undefined') {
         window.addEventListener('resize', updateDimensions);
-
         applyTheme();
-    });
-
-    onUnmounted(() => {
-        window.removeEventListener('resize', updateDimensions);
-    });
+    }
 
     return {
         isSidebarOpen,

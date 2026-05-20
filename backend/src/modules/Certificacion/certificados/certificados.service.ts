@@ -150,6 +150,7 @@ export class CertificadosService {
           grado: gradoAcademico,
           firma_url: `/usuarios/${c.usuario.id}/firma-publica`,
           firma_filename: c.usuario.persona.firma_dig,
+          origen: 'coordinador',
         });
       }
     }
@@ -175,6 +176,7 @@ export class CertificadosService {
           grado: gradoAcademico,
           firma_url: `/usuarios/${i.usuario.id}/firma-publica`,
           firma_filename: i.usuario.persona.firma_dig,
+          origen: 'ponente',
         });
       }
     }
@@ -276,7 +278,14 @@ export class CertificadosService {
   findOne(id: number) {
     return this.certificadoRepository.findOne({
       where: { id },
-      relations: ['usuario', 'usuario.persona', 'infoCertificado', 'actividadAcademica', 'usuariosCertificados'],
+      relations: [
+        'usuario',
+        'usuario.persona',
+        'infoCertificado',
+        'actividadAcademica',
+        'actividadAcademica.evento',
+        'usuariosCertificados',
+      ],
     });
   }
 

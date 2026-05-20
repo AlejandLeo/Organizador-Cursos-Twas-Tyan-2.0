@@ -79,12 +79,11 @@ El proyecto utiliza una arquitectura moderna de desacoplamiento entre cliente y 
 Para que tu compañero o cualquier desarrollador pueda instalar todo sin problemas, aquí se listan las dependencias clave que se instalarán con `npm install`:
 
 ### Backend
-*   **Core**: `@nestjs/common`, `@nestjs/core`, `@nestjs/jwt`, `@nestjs/passport`
+*   **Core**: `@nestjs/common`, `@nestjs/core`, `@nestjs/jwt`, `@nestjs/passport`, `@nestjs/throttler` (Rate Limiting)
 *   **Base de Datos**: `typeorm`, `pg` (PostgreSQL), `typeorm-extension` (para seeds)
 *   **Seguridad**: `bcrypt`, `passport-jwt`
 *   **Utilidades**: `nodemailer`, `@nestjs-modules/mailer`, `handlebars` (plantillas de correo), `uuid`
-*   **Reportes**: `jspdf`, `jspdf-autotable`, `xlsx`
-*   **QR**: `html5-qrcode`, `qrcode.vue`
+*   **Reportes y Certificados**: `jspdf`, `jspdf-autotable`, `xlsx`, `qrcode` (Generación de QR dinámica)
 
 ### Frontend
 *   **Core**: `vue` (v3), `vue-router`, `pinia` (estado), `axios` (peticiones HTTP)
