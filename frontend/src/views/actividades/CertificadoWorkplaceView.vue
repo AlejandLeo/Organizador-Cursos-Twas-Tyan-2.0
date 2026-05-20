@@ -68,7 +68,7 @@ const fetchData = async () => {
     try {
         if (eventoId) {
             const [infoRes, firmantesRes] = await Promise.all([
-                api.get(`/info-certificados/evento/${eventoId}?tipo=${tipoCertificado}`),
+                api.get(`/info-certificados/evento/${eventoId}?tipo=${tipoCertificado.value}&es_excelencia=${esExcelencia.value}`),
                 api.get(`/admin/certificados/eventos/${eventoId}/firmantes`).catch(() => ({ data: [] }))
             ]);
             
@@ -155,8 +155,12 @@ watch([tipoCertificado, esExcelencia], async () => {
 })
 
 const triggerUpload = () => {
-    if (!infoCertificado.value) {
-        return Swal.fire('Atención', 'Primero debes guardar la configuración en la vista anterior.', 'warning')
+    if (!infoCertificado.value?.id) {
+        return Swal.fire(
+            'Atención',
+            'No hay un registro guardado para este certificado. Usa el botón "Guardar Diseño" primero para crear el registro, y luego podrás subir el fondo.',
+            'warning'
+        )
     }
     fileInput.value?.click()
 }
@@ -166,6 +170,36 @@ const onFileChange = async (e: Event) => {
     if (target.files && target.files.length > 0) {
         const file = target.files[0]
         if (!file) return;
+
+        // Si no existe id en el registro (nunca se guardó), auto-guardamos primero
+        if (!infoCertificado.value?.id) {
+            try {
+                Swal.fire({ title: 'Creando registro...', didOpen: () => Swal.showLoading() })
+                const payload: any = {
+                    id_evento: Number(eventoId),
+                    tipo: Number(tipoCertificado.value),
+                    cabecera: infoCertificado.value?.cabecera || '',
+                    tenor: infoCertificado.value?.tenor || '',
+                    configuracion: elementosLienzo.value
+                }
+                if (Number(tipoCertificado.value) === 4) {
+                    payload.es_excelencia = esExcelencia.value
+                }
+                await api.post('/info-certificados', payload)
+                await fetchData() // Recargamos para obtener el id del nuevo registro
+            } catch (saveErr) {
+                console.error('Error al auto-guardar antes del fondo:', saveErr)
+                Swal.fire('Error', 'No se pudo crear el registro del certificado. Intenta guardar el diseño primero.', 'error')
+                return
+            }
+        }
+
+        // Verificar que ahora sí tenemos id
+        if (!infoCertificado.value?.id) {
+            Swal.fire('Error', 'No se pudo obtener el ID del certificado. Guarda el diseño manualmente y vuelve a intentarlo.', 'error')
+            return
+        }
+
         const formData = new FormData()
         formData.append('fondo', file as Blob)
         try {
@@ -174,11 +208,13 @@ const onFileChange = async (e: Event) => {
                 headers: { 'Content-Type': 'multipart/form-data' }
             })
             await fetchData()
-            Swal.fire('Éxito', 'Imagen de fondo actualizada.', 'success')
+            Swal.fire('Éxito', 'Imagen de fondo actualizada correctamente.', 'success')
         } catch (error) {
             console.error(error)
             Swal.fire('Error', 'No se pudo subir el fondo.', 'error')
         }
+        // Limpiar el input para permitir subir el mismo archivo nuevamente
+        target.value = ''
     }
 }
 

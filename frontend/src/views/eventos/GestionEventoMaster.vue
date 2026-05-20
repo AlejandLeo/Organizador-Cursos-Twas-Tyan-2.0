@@ -2403,23 +2403,14 @@ const changeStep = (delta: number) => {
                                 <div class="w-20 h-20 rounded-full bg-white dark:bg-gray-800 border border-slate-100 dark:border-gray-700 flex items-center justify-center mb-4 shadow-sm text-umsa-gold">
                                     <span class="material-symbols-outlined text-[40px]">workspace_premium</span>
                                 </div>
-
-                                <div class="pt-2 flex justify-start">
-                                    <button @click.prevent="guardarInfoCertificado" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 w-full md:w-auto">
-                                        <span class="material-symbols-outlined text-base">save</span> Guardar Cabecera y Tenor
-                                    </button>
-                                </div>
-
-                                <div class="pt-2 flex justify-start">
-                                    <button @click.prevent="guardarInfoCertificado" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 w-full md:w-auto">
-                                        <span class="material-symbols-outlined text-base">save</span> Guardar Cabecera y Tenor
-                                    </button>
-                                </div>
+                                <p class="text-[11px] font-bold text-slate-500 dark:text-gray-400 max-w-xs">
+                                    Selecciona un rol arriba para configurar su plantilla de certificado (cabecera, tenor y diseño).
+                                </p>
                             </div>
 
                             <!-- Layout del Diseñador en 2 columnas al seleccionar rol -->
                             <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in duration-300">
-                                <!-- Datos Base -->
+                                <!-- Datos Base (Cabecera + Tenor + Variables + Guardar) -->
                                 <div class="space-y-5">
                                     <!-- Tabs de Modalidad para Asistente (Participación vs Excelencia) -->
                                     <Transition name="fade">
@@ -2443,20 +2434,42 @@ const changeStep = (delta: number) => {
                                         </div>
                                     </Transition>
                                     
+                                    <!-- Cabecera -->
                                     <div>
                                         <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Cabecera del Certificado</label>
                                         <input v-model="infoCertificado.cabecera" type="text" placeholder="Ej: Certificado de Asistencia" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-xs text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none transition-all">
                                     </div>
-                                    <h5 class="text-sm font-black text-primary-dark dark:text-white uppercase mb-2">Editor Visual Avanzado</h5>
-                                    <p class="text-[10px] text-slate-500 dark:text-gray-400 max-w-[200px] mx-auto mb-6">
-                                        Abre el Workplace para subir tu imagen de fondo y colocar dinámicamente el nombre, firmas, cabecera y tenor.
-                                    </p>
-                                    <router-link v-if="editEventoId" :to="{ name: isAdminContext ? 'admin-certificado-workplace-evento' : 'coordinador-certificado-workplace-evento', params: { id: editEventoId }, query: { tipo: tipoCertificado } }" class="bg-umsa-gold hover:bg-yellow-600 text-white font-black px-6 py-3 rounded-xl text-[10px] uppercase tracking-widest shadow-lg inline-flex items-center gap-2 transition-all mx-auto">
-                                      <span class="material-symbols-outlined text-[16px]">open_in_new</span>
-                                      Abrir Workplace
-                                    </router-link>
-                                    <div v-else class="text-[9px] text-red-500 font-bold uppercase p-3 bg-red-50 dark:bg-red-900/20 rounded-xl inline-block mx-auto">
-                                        Debes guardar el evento primero
+
+                                    <!-- Tenor -->
+                                    <div>
+                                        <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Tenor del Certificado</label>
+                                        <textarea
+                                            v-model="infoCertificado.tenor"
+                                            rows="5"
+                                            placeholder="Ej: Se certifica que {NOMBRE_ESTUDIANTE} participó en el evento {EVENTO}..."
+                                            class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-xs text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none transition-all resize-none leading-relaxed"
+                                        ></textarea>
+                                        <!-- Variables Dinámicas (clic para insertar) -->
+                                        <div class="mt-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl">
+                                            <p class="text-[9px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                                <span class="material-symbols-outlined text-[12px]">auto_fix_high</span>
+                                                Variables Dinámicas (clic para insertar)
+                                            </p>
+                                            <div class="grid grid-cols-2 gap-1">
+                                                <code v-for="v in ['{NOMBRE_ESTUDIANTE}','{PRIMER_APELLIDO}','{SEGUNDO_APELLIDO}','{NOMBRE_CURSO}','{ACTIVIDAD}','{EVENTO}','{GESTION}','{ROL}','{CI_USUARIO}','{CARGA_HORARIA}','{FECHA_EMISION}','{NOTA_FINAL}','{CODIGO_CERTIFICADO}']" :key="v"
+                                                    @click="infoCertificado.tenor = (infoCertificado.tenor || '') + v"
+                                                    class="text-[8px] font-mono bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-700 text-amber-800 dark:text-amber-300 px-1.5 py-0.5 rounded cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors truncate"
+                                                    :title="`Clic para insertar ${v}`"
+                                                >{{ v }}</code>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Botón Guardar Cabecera y Tenor -->
+                                    <div class="pt-2">
+                                        <button @click.prevent="guardarInfoCertificado" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                                            <span class="material-symbols-outlined text-base">save</span> Guardar Cabecera y Tenor
+                                        </button>
                                     </div>
                                 </div>
 
@@ -2470,7 +2483,15 @@ const changeStep = (delta: number) => {
                                         <p class="text-[10px] text-slate-500 dark:text-gray-400 max-w-[200px] mx-auto mb-6">
                                             Abre el Workplace para subir tu imagen de fondo y colocar dinámicamente el nombre, firmas, cabecera y tenor.
                                         </p>
-                                        <router-link v-if="editEventoId" :to="{ name: 'coordinador-certificado-workplace-evento', params: { id: editEventoId }, query: { tipo: tipoCertificado, ...(tipoCertificado === 4 ? { es_excelencia: esExcelencia } : {}) } }" class="bg-umsa-gold hover:bg-yellow-600 text-white font-black px-6 py-3 rounded-xl text-[10px] uppercase tracking-widest shadow-lg inline-flex items-center gap-2 transition-all mx-auto">
+                                        <router-link
+                                            v-if="editEventoId"
+                                            :to="{
+                                                name: isAdminContext ? 'admin-certificado-workplace-evento' : 'coordinador-certificado-workplace-evento',
+                                                params: { id: editEventoId },
+                                                query: { tipo: tipoCertificado, ...(tipoCertificado === 4 ? { es_excelencia: esExcelencia } : {}) }
+                                            }"
+                                            class="bg-umsa-gold hover:bg-yellow-600 text-white font-black px-6 py-3 rounded-xl text-[10px] uppercase tracking-widest shadow-lg inline-flex items-center gap-2 transition-all mx-auto"
+                                        >
                                           <span class="material-symbols-outlined text-[16px]">open_in_new</span>
                                           Abrir Workplace
                                         </router-link>

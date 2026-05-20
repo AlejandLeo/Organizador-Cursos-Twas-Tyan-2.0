@@ -86,6 +86,22 @@ export class AuthController {
   }
 
   // ══════════════════════════════════════════════════════════
+  //  GET /auth/whoami  — DIAGNÓSTICO DE SESIÓN
+  //  Devuelve exactamente lo que req.user contiene tras validar
+  //  el JWT. Útil para depurar problemas de roles/403.
+  // ══════════════════════════════════════════════════════════
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Debug: devuelve el payload de sesión validado (req.user)' })
+  @Get('whoami')
+  async whoami(@Request() req: any) {
+    return {
+      jwt_user: req.user,   // → { id, email, roles: [...] }
+      perfil: await this.usuariosService.getPerfil(req.user.id),
+    };
+  }
+
+  // ══════════════════════════════════════════════════════════
   //  POST /auth/logout
   //  Invalida el token desde el backend añadiéndolo a la
   //  blacklist. Cualquier request posterior con ese token

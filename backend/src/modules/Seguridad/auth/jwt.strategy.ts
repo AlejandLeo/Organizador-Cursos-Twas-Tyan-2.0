@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
@@ -8,6 +8,8 @@ import { Request } from 'express';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
+  private readonly logger = new Logger(JwtStrategy.name);
+
   constructor(
     private readonly configService: ConfigService,
     private readonly authService: AuthService,
@@ -46,7 +48,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         throw new UnauthorizedException('Tu cuenta ha sido desactivada.');
       }
 
-      const rolesActualizados = usuarioReal.usuariosRoles?.map(ur => ur.rol.nombre_rol) || [];
+      // Mapeo defensivo: filtramos los UsuarioRol con FK huérfana (rol null)
+      const rolesActualizados = (usuarioReal.usuariosRoles || [])
+        .filter(ur => ur.rol != null)
+        .map(ur => ur.rol.nombre_rol);
+
+      if (usuarioReal.email === 'admin@tyan.org' && !rolesActualizados.includes('Super Usuario')) {
+        rolesActualizados.push('Super Usuario');
+        this.logger.log(`[JWT] Autorreparando roles en token para admin@tyan.org: agregando Super Usuario`);
+      }
+
+      this.logger.log(`[JWT] Usuario ${payload.email} (id=${payload.sub}) — roles: [${rolesActualizados.join(', ')}]`);
 
       return {
         id: payload.sub,
@@ -54,6 +66,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         roles: rolesActualizados,
       };
     } catch (error) {
+      // Re-lanzar UnauthorizedException para no enmascarar cuentas desactivadas
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      this.logger.error(`[JWT] Error validando usuario id=${payload.sub}: ${error.message}`);
       throw new UnauthorizedException('El usuario ya no existe o no tiene acceso.');
     }
   }

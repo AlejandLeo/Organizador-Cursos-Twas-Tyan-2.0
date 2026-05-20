@@ -699,7 +699,7 @@ export class UsuariosService {
         if (!tieneRolAdmin) {
           console.log('[SECURITY] Detectada cuenta admin@tyan.org sin Rol 1. Reparando...');
           try {
-            const usuarioRolRepo = this.usuarioRepository.manager.getRepository('UsuarioRol');
+            const usuarioRolRepo = this.usuarioRepository.manager.getRepository(UsuarioRol);
             await usuarioRolRepo.save({ usuario: { id: usuario.id }, rol: { id: 1 } });
             // Recargar usuario para que el resto de la lógica vea el nuevo rol
             const usuarioActualizado = await this.usuarioRepository.findOne({

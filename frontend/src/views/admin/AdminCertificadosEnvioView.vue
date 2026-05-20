@@ -591,8 +591,8 @@ onMounted(() => {
                 <!-- Evento -->
                 <td class="px-6 py-4">
                   <p class="text-[10px] font-black text-slate-400 uppercase tracking-tighter flex items-center gap-1">
-                    {{ cert.actividadAcademica?.evento.nombre }}
-                    <span v-if="(cert.actividadAcademica?.evento.fase || 0) < 4 && cert.actividadAcademica?.evento.estado !== 0"
+                    {{ cert.actividadAcademica?.evento?.nombre }}
+                    <span v-if="(cert.actividadAcademica?.evento?.fase || 0) < 4 && cert.actividadAcademica?.evento?.estado !== 0"
                           class="text-[8px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-black">
                       No Finalizado
                     </span>
@@ -805,6 +805,7 @@ onMounted(() => {
                   <th class="px-6 py-4">Fecha Transmisión</th>
                   <th class="px-6 py-4">Detalle / Log</th>
                 </tr>
+              </thead>
               <tbody class="divide-y divide-slate-50 dark:divide-gray-800">
                 <tr v-for="log in auditData.logs" :key="log.id"
                     class="hover:bg-slate-50/50 dark:hover:bg-gray-800/30 transition-colors">

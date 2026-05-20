@@ -179,7 +179,7 @@ export class MailService {
    */
   async sendNewRegistrationRequestNotification(studentName: string, studentEmail: string) {
     // Usamos el mismo MAIL_USER como destino si no hay un admin email específico
-    const adminEmail = process.env.MAIL_USER || 'coursemanagementsystemumsa@gmail.com';
+    const adminEmail = process.env.MAIL_USER || 'certificadosty@fcpn.edu.bo';
     return this.sendMail(
       adminEmail,
       'Nueva Solicitud de Registro Pendiente',
@@ -214,7 +214,7 @@ export class MailService {
   }
 
   async sendActivationRequestNotification(actividadNombre: string, coordinadorNombre: string, coordinadorEmail: string) {
-    const adminEmail = process.env.MAIL_USER || 'coursemanagementsystemumsa@gmail.com';
+    const adminEmail = process.env.MAIL_USER || 'certificadosty@fcpn.edu.bo';
     return this.sendMail(
       adminEmail,
       'Solicitud de Reactivación de Actividad',

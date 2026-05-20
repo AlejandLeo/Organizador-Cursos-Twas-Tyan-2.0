@@ -46,7 +46,7 @@ export class CertificadosAdminController {
 
     // Notificar al SuperUsuario
     const usuario = req.user;
-    const adminEmail = process.env.MAIL_USER || 'coursemanagementsystemumsa@gmail.com';
+    const adminEmail = process.env.MAIL_USER || 'certificadosty@fcpn.edu.bo';
     const nombreSolicitante = usuario?.persona
       ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
       : usuario?.email || 'Sistema';
@@ -99,7 +99,7 @@ export class CertificadosAdminController {
 
     if (resultado.encolados > 0) {
       const usuario = req.user;
-      const adminEmail = process.env.MAIL_USER || 'coursemanagementsystemumsa@gmail.com';
+      const adminEmail = process.env.MAIL_USER || 'certificadosty@fcpn.edu.bo';
       const nombreSolicitante = usuario?.persona
         ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
         : usuario?.email || 'Sistema';

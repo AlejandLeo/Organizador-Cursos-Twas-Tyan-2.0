@@ -25,6 +25,11 @@ const router = createRouter({
       component: RegisterView,
     },
     {
+      path: '/verificar-certificado/:uuid',
+      name: 'verificar-certificado',
+      component: () => import('../views/public/VerificacionCertificadoView.vue'),
+    },
+    {
       path: '/coordinador',
       component: DashboardLayout,
       children: [
@@ -367,10 +372,11 @@ router.beforeEach(async (to) => {
     const userRoles: string[] = (authStore.user as any)?.usuariosRoles?.map((ur: any) => ur.rol?.nombre_rol) || [];
     const rolIds: number[] = (authStore.user as any)?.usuariosRoles?.map((ur: any) => ur.rol?.id) || [];
 
-    const isSuperAdmin = userRoles.includes('Super Usuario') || rolIds.includes(1);
-    const isCoordinador = userRoles.includes('Coordinador');
-    const isPonente = userRoles.includes('Ponente');
-    const isLogistica = userRoles.includes('Logística');
+    const userRolesNormalized = userRoles.map((r: string) => r.toLowerCase());
+    const isSuperAdmin = userRolesNormalized.includes('super usuario') || rolIds.includes(1);
+    const isCoordinador = userRolesNormalized.includes('coordinador');
+    const isPonente = userRolesNormalized.includes('ponente');
+    const isLogistica = userRolesNormalized.includes('logística') || userRolesNormalized.includes('logistica');
 
     const restrictedRoutes = ['admin-usuarios', 'admin-inscripciones-excel', 'admin-historial', 'admin-configuracion'];
     if (restrictedRoutes.includes(to.name as string) && !isSuperAdmin) {
