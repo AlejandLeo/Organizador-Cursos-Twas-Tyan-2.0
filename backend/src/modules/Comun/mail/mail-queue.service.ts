@@ -99,10 +99,13 @@ export class MailQueueService {
    * - Cancela definitivamente tras MAX_INTENTOS fallidos.
    * - Registra todo en mail_logs para auditoría.
    */
-  @Cron(CronExpression.EVERY_MINUTE)
+  @Cron(process.env.MAIL_QUEUE_CRON || CronExpression.EVERY_MINUTE)
   async processQueue() {
     if (this.isProcessing) return;
     this.isProcessing = true;
+
+    const batchSize = parseInt(process.env.MAIL_QUEUE_BATCH_SIZE || '10', 10);
+    const delayMs = parseInt(process.env.MAIL_QUEUE_DELAY_MS || '1000', 10);
 
     try {
       const pending = await this.mailQueueRepository.find({
@@ -112,7 +115,7 @@ export class MailQueueService {
           { estado: 'FAILED', intentos: LessThan(MAX_INTENTOS) },
         ],
         order: { fecha_creacion: 'ASC' },
-        take: 10,
+        take: batchSize,
       });
 
       if (pending.length === 0) { this.isProcessing = false; return; }
@@ -127,12 +130,12 @@ export class MailQueueService {
         }
 
         try {
-          const result = await this.mailService.sendMail(
+          const result = await this.mailService.sendMailDirect(
             mail.destinatario,
             mail.asunto,
-            undefined,
-            undefined,
-            mail.cuerpo,
+            mail.template || undefined,
+            mail.context ? JSON.parse(mail.context) : undefined,
+            mail.cuerpo || undefined,
           );
 
           if (result === null) {
@@ -142,6 +145,11 @@ export class MailQueueService {
           await this.mailQueueRepository.delete(mail.id);
           // No llamamos a registrarLog aquí porque mailService.sendMail ya crea el registro de auditoría.
           this.logger.log(`✓ Correo enviado a ${mail.destinatario} y eliminado de la cola.`);
+
+          // Pausa entre envíos
+          if (delayMs > 0) {
+            await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+          }
 
         } catch (error) {
           const errorMsg = (error as Error).message || 'Error desconocido';

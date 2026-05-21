@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth';
 
 import api, { getImageUrl } from '@/services/api';
 import Swal from 'sweetalert2';
+import CertificadoRender from '@/components/common/CertificadoRender.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -3025,57 +3026,12 @@ const changeStep = (delta: number) => {
                         height: `${678 * quickPreviewZoom}px` 
                      }">
                      
-                    <!-- Certificado Previsualizado (Aspect A4) -->
-                    <div class="absolute left-1/2 top-1/2 w-[960px] h-[678px] bg-white shadow-2xl border border-slate-350 flex items-center justify-center rounded-xl transition-transform duration-200 shrink-0"
-                         :style="{ 
-                            backgroundImage: infoCertificado?.fondo_url ? `url(${getImageUrl('fondos', infoCertificado.fondo_url)})` : undefined,
-                            backgroundSize: '100% 100%',
-                            backgroundPosition: 'center',
-                            backgroundRepeat: 'no-repeat',
-                            transform: `translate(-50%, -50%) scale(${quickPreviewZoom})`,
-                            transformOrigin: 'center center'
-                         }">
-                         
-                        <!-- Elementos Dinámicos Sustituidos -->
-                        <div v-for="el in quickPreviewElements" :key="'quick-prev-' + el.id"
-                             class="absolute flex items-center justify-center text-center select-none text-slate-800 dark:text-slate-800"
-                             :style="{ 
-                                left: `${el.x}%`, top: `${el.y}%`, 
-                                fontSize: el.tipo !== 'qr' && el.tipo !== 'firma' ? `${el.fontSize * 0.9}px` : undefined, 
-                                color: el.color, fontFamily: el.fontFamily,
-                                width: el.width ? `${el.width * 0.9}px` : 'auto',
-                                height: el.height ? `${el.height * 0.9}px` : 'auto'
-                             }">
-                             
-                             <!-- Si es Cabecera -->
-                             <div v-if="el.tipo === 'cabecera'" class="font-black uppercase leading-tight text-slate-850 dark:text-slate-850">
-                                {{ infoCertificado?.cabecera || '[ CABECERA ]' }}
-                             </div>
-                             
-                             <!-- Si es Tenor -->
-                             <div v-else-if="el.tipo === 'tenor'" class="leading-relaxed italic whitespace-pre-line text-slate-800 dark:text-slate-800">
-                                {{ resolveQuickPreviewTenor(infoCertificado?.tenor) }}
-                             </div>
-                             
-                             <!-- Si es Texto Genérico -->
-                             <div v-else-if="el.tipo === 'texto'" class="font-bold leading-normal">
-                                {{ resolveQuickPreviewVariables(el.valor) }}
-                             </div>
-                             
-                             <!-- Si es QR -->
-                             <div v-else-if="el.tipo === 'qr'" class="w-full h-full border-2 border-slate-900 bg-white flex items-center justify-center rounded-xl p-2 shrink-0">
-                                <span class="material-symbols-outlined text-[60px] text-slate-800 select-none">qr_code_2</span>
-                             </div>
-                             
-                             <!-- Si es Firma -->
-                             <div v-else-if="el.tipo === 'firma'" class="w-full h-full flex flex-col items-center justify-center p-2 relative shrink-0">
-                                <div class="h-10 w-32 border-b border-dashed border-slate-400 mb-1 flex items-center justify-center select-none">
-                                    <span class="font-serif italic text-slate-400 text-xs select-none font-medium">Firma Autorizada</span>
-                                </div>
-                                <span class="text-[8px] font-black uppercase text-slate-500 select-none">COORDINADOR GENERAL</span>
-                             </div>
-                        </div>
-                    </div>
+                    <!-- Certificado Previsualizado via Componente Universal -->
+                    <CertificadoRender 
+                        :elementos="quickPreviewElements"
+                        :fondoUrl="infoCertificado?.fondo_url"
+                        :zoom="quickPreviewZoom"
+                    />
                 </div>
             </div>
             

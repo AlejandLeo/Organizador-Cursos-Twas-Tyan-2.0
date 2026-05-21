@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
 import { Certificado } from './entities/certificado.entity';
@@ -11,25 +11,18 @@ import { Inscripcion } from '../../Inscripciones/inscripciones/entities/inscripc
 import { Imparticion } from '../../Academico/imparticiones/entities/imparticion.entity';
 import { CoordinacionEvento } from '../../Academico/coordinaciones/entities/coordinacion.entity';
 import { ActividadAcademica } from '../../Academico/actividades-academicas/entities/actividad-academica.entity';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 /**
- * Cola de envío en memoria — no requiere Redis ni ningún broker externo.
+ * Worker de envíos de certificados usando base de datos.
  *
  * Estrategia:
- *  - Los IDs se insertan en una cola interna (array FIFO).
- *  - Si el worker no está corriendo, se arranca con setImmediate() para no
- *    bloquear el ciclo de eventos (el endpoint responde de inmediato).
- *  - El worker procesa los certificados de uno en uno con un delay de 500 ms
- *    entre envíos para no saturar el SMTP.
- *  - Si un envío falla, el error queda registrado en la entidad (estado_envio='error')
- *    pero el worker continúa con el siguiente.
+ *  - Un Cron Job busca certificados con `estado_envio='pendiente'` cada minuto.
+ *  - Procesa un máximo de 10 por minuto para no saturar el SMTP.
  */
 @Injectable()
 export class CertificadosQueueService {
   private readonly logger = new Logger(CertificadosQueueService.name);
-
-  /** Cola FIFO de IDs pendientes de envío y su plantilla opcional */
-  private readonly queue: { id: number; idTemplate?: number }[] = [];
 
   /** Evita que dos workers corran en paralelo */
   private isProcessing = false;
@@ -45,17 +38,17 @@ export class CertificadosQueueService {
   // ── API pública ──────────────────────────────────────────────
 
   /**
-   * Encola un lote de IDs para envío asíncrono.
-   * Retorna inmediatamente; el envío ocurre en segundo plano.
+   * Encola un lote de IDs para envío asíncrono actualizando su estado.
+   * Retorna inmediatamente; el envío ocurre en segundo plano mediante Cron.
    */
   async encolarLote(ids: number[], idTemplate?: number): Promise<{ mensaje: string; encolados: number }> {
-    const items = ids.map(id => ({ id, idTemplate }));
-    this.queue.push(...items);
-    this.logger.log(`[Queue] +${ids.length} certificados encolados. Total pendiente: ${this.queue.length}`);
-    this.iniciarWorkerSiIdle();
+    if (ids && ids.length > 0) {
+      await this.certificadoRepository.update(ids, { estado_envio: 'pendiente' });
+      this.logger.log(`[Queue] +${ids.length} certificados actualizados a pendiente en DB.`);
+    }
     return {
-      mensaje: `Se encolaron ${ids.length} certificados. El envío se procesa en segundo plano.`,
-      encolados: ids.length,
+      mensaje: `Se encolaron ${ids?.length || 0} certificados. El envío se procesará en lotes automáticamente.`,
+      encolados: ids?.length || 0,
     };
   }
 
@@ -63,9 +56,8 @@ export class CertificadosQueueService {
    * Encola el reintento de un único certificado.
    */
   async encolarUno(id: number, idTemplate?: number): Promise<{ mensaje: string }> {
-    this.queue.push({ id, idTemplate });
-    this.logger.log(`[Queue] Certificado #${id} encolado para reintento.`);
-    this.iniciarWorkerSiIdle();
+    await this.certificadoRepository.update(id, { estado_envio: 'pendiente' });
+    this.logger.log(`[Queue] Certificado #${id} encolado para reintento en DB.`);
     return { mensaje: `Certificado #${id} encolado para envío. Se procesará en breve.` };
   }
 
@@ -350,43 +342,45 @@ export class CertificadosQueueService {
     }
   }
 
-  // ── Worker interno ───────────────────────────────────────────
+  // ── Worker interno (Cron Job) ───────────────────────────────────────────
 
-  /**
-   * Arranca el worker solo si no hay uno activo ya.
-   * Usa setImmediate para ceder el control al event loop
-   * (el cliente HTTP recibe su respuesta antes de que empiece el procesamiento).
-   */
-  private iniciarWorkerSiIdle(): void {
-    if (this.isProcessing) return;
-    setImmediate(() => this.procesarCola());
-  }
-
-  /**
-   * Procesa la cola de forma secuencial hasta vaciarla.
-   */
-  private async procesarCola(): Promise<void> {
+  @Cron(process.env.CERT_QUEUE_CRON || CronExpression.EVERY_MINUTE)
+  async procesarColaDB(): Promise<void> {
     if (this.isProcessing) return;
     this.isProcessing = true;
-    this.logger.log(`[Worker] Iniciando procesamiento. ${this.queue.length} jobs en cola.`);
 
-    while (this.queue.length > 0) {
-      const task = this.queue.shift();
-      if (task) {
+    const batchSize = parseInt(process.env.CERT_QUEUE_BATCH_SIZE || '10', 10);
+    const delayMs = parseInt(process.env.CERT_QUEUE_DELAY_MS || '1000', 10);
+
+    try {
+      const pendientes = await this.certificadoRepository.createQueryBuilder('cert')
+        .where('cert.estado_envio = :estado', { estado: 'pendiente' })
+        .orderBy('cert.id', 'ASC')
+        .take(batchSize) // Lote configurado por variable de entorno
+        .getMany();
+
+      if (pendientes.length > 0) {
+        this.logger.log(`[Worker DB] Procesando lote de ${pendientes.length} certificados pendientes.`);
+      }
+
+      for (const cert of pendientes) {
         try {
-          await this.envioService.enviarCertificado(task.id, task.idTemplate);
-          this.logger.log(`[Worker] ✓ Certificado #${task.id} enviado.`);
+          // El servicio se encarga de guardar en DB el éxito (enviado) o fracaso (error) y los reintentos
+          await this.envioService.enviarCertificado(cert.id);
+          this.logger.log(`[Worker DB] ✓ Certificado #${cert.id} enviado.`);
+          
+          // Pausa configurada entre correos
+          if (delayMs > 0) {
+            await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+          }
         } catch (error) {
-          this.logger.error(`[Worker] ✗ Certificado #${task.id} falló: ${error.message}`);
+          this.logger.error(`[Worker DB] ✗ Certificado #${cert.id} falló: ${error.message}`);
         }
       }
-      
-      if (this.queue.length > 0) {
-        await new Promise<void>((resolve) => setTimeout(resolve, 500));
-      }
+    } catch (err) {
+      this.logger.error(`[Worker DB] Error general: ${err.message}`);
+    } finally {
+      this.isProcessing = false;
     }
-
-    this.isProcessing = false;
-    this.logger.log('[Worker] Cola vacía. Worker detenido.');
   }
 }

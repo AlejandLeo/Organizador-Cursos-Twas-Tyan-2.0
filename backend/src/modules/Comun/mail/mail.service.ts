@@ -5,6 +5,7 @@ import { MailLog } from './entities/mail-log.entity';
 import { MailerService } from '@nestjs-modules/mailer';
 import { MailTemplate, MailTemplateType } from './entities/mail-template.entity';
 import { SistemaConfigService } from '../sistema-config/sistema-config.service';
+import { MailQueue } from './entities/mail-queue.entity';
 
 @Injectable()
 export class MailService {
@@ -13,6 +14,8 @@ export class MailService {
   constructor(
     @InjectRepository(MailLog)
     private readonly mailLogRepository: Repository<MailLog>,
+    @InjectRepository(MailQueue)
+    private readonly mailQueueRepository: Repository<MailQueue>,
     @InjectRepository(MailTemplate)
     private readonly mailTemplateRepository: Repository<MailTemplate>,
     private readonly mailerService: MailerService,
@@ -31,6 +34,43 @@ export class MailService {
     text?: string,
     attachments?: any[],
   ) {
+    // 1. Registrar intención de envío en la cola
+    const logEntry = new MailLog();
+    logEntry.destinatario = to;
+    logEntry.asunto = subject;
+    logEntry.template = template || undefined;
+    logEntry.contexto = context ? JSON.stringify(context) : undefined;
+    logEntry.estado = 'pendiente';
+
+    await this.mailLogRepository.save(logEntry);
+
+    // 2. Insertar en la cola para procesamiento asíncrono
+    const queueEntry = new MailQueue();
+    queueEntry.destinatario = to;
+    queueEntry.asunto = subject;
+    queueEntry.cuerpo = text || '';
+    queueEntry.template = template || null;
+    queueEntry.context = context ? JSON.stringify(context) : null;
+    queueEntry.estado = 'PENDING';
+    queueEntry.intentos = 0;
+    
+    await this.mailQueueRepository.save(queueEntry);
+    this.logger.log(`Correo encolado para ${to}. Asunto: ${subject}`);
+    
+    return true;
+  }
+
+  /**
+   * Envía un correo electrónico de forma real y directa. (Usado por el Worker y Certificados)
+   */
+  async sendMailDirect(
+    to: string,
+    subject: string,
+    template?: string,
+    context?: any,
+    text?: string,
+    attachments?: any[],
+  ) {
     // 1. Control de Límite Diario (Para cuentas Free)
     const limit = parseInt(process.env.MAIL_DAILY_LIMIT || '100', 10);
     const countToday = await this.mailLogRepository.createQueryBuilder('log')
@@ -40,58 +80,26 @@ export class MailService {
 
     if (countToday >= limit) {
       this.logger.warn(`Límite diario de correos alcanzado (${countToday}/${limit}). Bloqueando envío a ${to}.`);
-      throw new Error(`Servicio de mensajería temporalmente agotado (Límite diario alcanzado). Intente mañana o contacte a soporte.`);
+      throw new Error(`Límite diario alcanzado. Intente mañana o contacte a soporte.`);
     }
-
-    // 2. Registrar intención de envío
-    const logEntry = new MailLog();
-    logEntry.destinatario = to;
-    logEntry.asunto = subject;
-    logEntry.template = template || undefined;
-    logEntry.contexto = context ? JSON.stringify(context) : undefined;
-    logEntry.estado = 'pendiente';
-
-    const log = await this.mailLogRepository.save(logEntry);
 
     try {
       let info: any;
-
       if (template) {
-        // Ruta con plantilla Handlebars — usa mailerService normalmente
         info = await this.mailerService.sendMail({
-          to,
-          subject,
-          template,
-          context,
-          attachments,
+          to, subject, template, context, attachments,
         });
       } else {
-        // Ruta con HTML pre-renderizado — saltamos el HandlebarsAdapter
-        // porque está registrado como plugin de nodemailer y falla con template=undefined
         const transporter = (this.mailerService as any).transporter;
         info = await transporter.sendMail({
-          to,
-          subject,
-          html: text || '',
-          attachments,
+          to, subject, html: text || '', attachments,
         });
       }
-
-      // 3. Éxito: Actualizar log
-      await this.mailLogRepository.update(log.id, {
-        estado: 'enviado',
-        message_id: info.messageId,
-        fecha_envio: new Date(),
-      });
-
       this.logger.log(`Correo enviado correctamente a ${to}. [${countToday + 1}/${limit}] MessageId: ${info.messageId}`);
       return info;
     } catch (error) {
-      // Logueamos el error para auditoría
-      this.logger.error(`Error enviando correo a ${to}: ${error.message}`, error.stack);
-      // NO relanzamos el error para evitar que los flujos de negocio (inscripciones, roles)
-      // se rompan por un problema de conexión con el proveedor de correo.
-      return null;
+      this.logger.error(`Error enviando correo directo a ${to}: ${error.message}`, error.stack);
+      throw error; // Rethrow para que el Worker pueda registrar el error y pausar
     }
   }
 
@@ -264,7 +272,8 @@ export class MailService {
     fallbackTemplateName: string,
     context: any,
     specificTemplateId?: number,
-    attachments?: any[]
+    attachments?: any[],
+    direct: boolean = false,
   ) {
     let dbTemplate: MailTemplate | null = null;
 
@@ -305,10 +314,16 @@ export class MailService {
         asunto = asunto.replace(new RegExp(`{{${k}}}`, 'g'), value);
       });
 
+      if (direct) {
+        return this.sendMailDirect(to, asunto, undefined, undefined, finalHtml, attachments);
+      }
       return this.sendMail(to, asunto, undefined, undefined, finalHtml, attachments);
     }
 
     // Fallback al sistema anterior basado en archivos .hbs
+    if (direct) {
+      return this.sendMailDirect(to, fallbackSubject, fallbackTemplateName, context, undefined, attachments);
+    }
     return this.sendMail(to, fallbackSubject, fallbackTemplateName, context, undefined, attachments);
   }
 }

@@ -24,7 +24,7 @@
     "migration:create": "npm run typeorm -- migration:create ./src/database/migrations",
     "migration:revert": "npm run typeorm -- migration:revert -d ./typeorm.config.ts",
     "db:reset": "npm run typeorm -- schema:drop -d ./typeorm.config.ts && npm run migration:run && npm run seed:config",
-    "seed:config": "ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./typeorm.config.ts -n RoleSeeder && ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./typeorm.config.ts -n CatalogosSeeder",
+    "seed:config": "ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./typeorm.config.ts -n RoleSeeder && ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./typeorm.config.ts -n CatalogosSeeder && ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./typeorm.config.ts -n SuperAdminSeeder",
     "seed:dev": "ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./typeorm.config.ts",
     "seed:eventos": "ts-node -r tsconfig-paths/register src/database/seeds/run-eventos-seed.ts"
   },
