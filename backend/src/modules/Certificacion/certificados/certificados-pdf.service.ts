@@ -97,11 +97,12 @@ export class CertificadosPdfService {
       ? new Date(certificado.fecha_emision).toLocaleDateString('es-BO')
       : new Date().toLocaleDateString('es-BO');
 
-    // Recuperar temática si es ponente
+    // Recuperar temática si es ponente o docente
     let tematica = '';
-    if (certificado.tipo === 2 && certificado.usuario) {
+    const tipoNum = Number(certificado.tipo);
+    if ((tipoNum === 2 || tipoNum === 4) && certificado.usuario) {
       const idActividad = certificado.actividadAcademica?.id;
-      const idEvento = certificado.infoCertificado?.evento?.id;
+      const idEvento = certificado.infoCertificado?.evento?.id || certificado.actividadAcademica?.evento?.id;
       tematica = await this.certificadosService.obtenerTematicaPonente(certificado.usuario.id, idActividad, idEvento);
     }
 

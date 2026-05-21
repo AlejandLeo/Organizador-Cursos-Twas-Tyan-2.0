@@ -73,6 +73,13 @@ export class CertificadosEnvioService {
       };
       const tipoLabel = tiposMap[cert.tipo] ?? 'Participante';
 
+      let tematica = '';
+      if (cert.tipo === 2 || cert.tipo === 4) {
+        const idActividad = cert.actividadAcademica?.id;
+        const idEvento = cert.infoCertificado?.evento?.id || cert.actividadAcademica?.evento?.id;
+        tematica = await this.certificadosService.obtenerTematicaPonente(cert.usuario.id, idActividad, idEvento);
+      }
+
       // 5. Enviar correo con PDF adjunto usando el helper de dbTemplate
       const result = await this.mailService.sendMailWithDbTemplate(
         MailTemplateType.CERTIFICATE,
@@ -86,6 +93,7 @@ export class CertificadosEnvioService {
           evento: cert.actividadAcademica.evento.nombre,
           codigo: cert.codigo_certificado,
           tipo: tipoLabel,
+          tematica: tematica || '',
           verifyUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verificar-certificado/${cert.uuid_archivo}`,
           anio: new Date().getFullYear(),
         },

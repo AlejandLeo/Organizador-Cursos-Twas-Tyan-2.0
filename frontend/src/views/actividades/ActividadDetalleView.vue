@@ -42,7 +42,8 @@ const ponenteSeleccionado = ref<string>('');
 const ponenteForm = ref({
     email: '',
     nombres: '',
-    primer_apellido: ''
+    primer_apellido: '',
+    tematica: ''
 });
 
 
@@ -330,7 +331,7 @@ const cargarDatosPonente = () => {
         ponenteForm.value.nombres = p.persona?.nombres || '';
         ponenteForm.value.primer_apellido = p.persona?.primer_apellido || '';
     } else {
-        ponenteForm.value = { email: '', nombres: '', primer_apellido: '' };
+        ponenteForm.value = { email: '', nombres: '', primer_apellido: '', tematica: '' };
     }
 };
 
@@ -350,12 +351,39 @@ const asignarPonente = async () => {
         
         await fetchData();
         closeModal('modal-ponente');
-        ponenteForm.value = { email: '', nombres: '', primer_apellido: '' };
+        ponenteForm.value = { email: '', nombres: '', primer_apellido: '', tematica: '' };
+        ponenteSeleccionado.value = '';
         Swal.fire('¡Logrado!', 'El docente ha sido vinculado y/o creado exitosamente.', 'success');
     } catch (error) {
         Swal.fire('Error', 'Hubo un problema al vincular al docente. Verifica los datos.', 'error');
     }
 };
+
+const editarTematica = async (imp: any) => {
+    const { value: nuevaTematica, isConfirmed } = await Swal.fire({
+        title: 'Editar Temática',
+        html: `<p class="text-sm text-gray-500 mb-2">Ponente: <strong>${imp.usuario?.persona?.nombres} ${imp.usuario?.persona?.primer_apellido}</strong></p>`,
+        input: 'textarea',
+        inputLabel: 'Título de la presentación / Temática:',
+        inputValue: imp.tematica || '',
+        inputPlaceholder: 'Ej: Avances en biología molecular aplicada...',
+        showCancelButton: true,
+        confirmButtonText: 'Guardar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#003B71',
+    });
+
+    if (isConfirmed) {
+        try {
+            await api.patch(`/imparticiones/${imp.id}/tematica`, { tematica: nuevaTematica || '' });
+            await fetchData();
+            Swal.fire({ title: 'Temática actualizada', icon: 'success', toast: true, position: 'top-end', showConfirmButton: false, timer: 2000 });
+        } catch (e) {
+            Swal.fire('Error', 'No se pudo actualizar la temática.', 'error');
+        }
+    }
+};
+
 
 const eliminarPonente = async (id: number) => {
     try {
@@ -520,7 +548,7 @@ const eliminarPonente = async (id: number) => {
         <div class="bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden">
             <table class="w-full text-left">
                 <thead class="bg-slate-50 dark:bg-gray-800/50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-200 dark:border-gray-800">
-                    <tr><th class="px-8 py-5">Ponente</th><th class="px-8 py-5">Identificación</th><th class="px-8 py-5 text-center">Acciones</th></tr>
+                    <tr><th class="px-8 py-5">Ponente</th><th class="px-8 py-5">Temática / Presentación</th><th class="px-8 py-5 text-center">Acciones</th></tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-gray-800">
                     <tr v-for="imp in imparticiones" :key="imp.id" class="hover:bg-slate-50 dark:hover:bg-gray-800/80 transition-colors">
@@ -534,8 +562,12 @@ const eliminarPonente = async (id: number) => {
                                 </div>
                             </div>
                         </td>
-                        <td class="px-8 py-6 text-xs font-bold text-primary-dark dark:text-gray-300 uppercase">
-                            CI: {{ imp.usuario?.persona?.documento_identidad || 'S/N' }}
+                        <td class="px-8 py-6">
+                            <span v-if="imp.tematica" class="text-sm text-slate-700 dark:text-gray-300 italic">{{ imp.tematica }}</span>
+                            <span v-else class="text-[10px] text-slate-400 uppercase font-bold">Sin temática — </span>
+                            <button @click="editarTematica(imp)" class="text-[9px] font-black text-umsa-blue dark:text-blue-400 hover:underline uppercase tracking-wide" title="Editar temática">
+                                {{ imp.tematica ? 'Editar' : 'Asignar' }}
+                            </button>
                         </td>
                         <td class="px-8 py-6 text-center flex justify-center gap-2">
                             <button @click="eliminarPonente(imp.id)" class="p-2 border border-red-200 dark:border-red-900 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all" title="Remover Docente"><span class="material-symbols-outlined text-sm">delete</span></button>
@@ -847,6 +879,10 @@ const eliminarPonente = async (id: number) => {
                       <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Apellido Paterno</label>
                       <input v-model="ponenteForm.primer_apellido" type="text" placeholder="Apellido" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-primary-dark dark:text-white focus:border-umsa-gold outline-none focus:ring-4 focus:ring-umsa-gold/10">
                   </div>
+              </div>
+              <div>
+                  <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Temática / Título de la Presentación <span class="font-normal text-slate-300">(Opcional, se usará en el certificado)</span></label>
+                  <textarea v-model="ponenteForm.tematica" placeholder="Ej: Avances en biología molecular aplicada a cultivos andinos..." rows="2" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-primary-dark dark:text-white focus:border-umsa-gold outline-none focus:ring-4 focus:ring-umsa-gold/10 resize-none text-sm"></textarea>
               </div>
               <p class="text-[9px] text-slate-400 font-bold italic">* Si el docente no existe, se creará una cuenta con una contraseña segura temporal.</p>
           </div>
