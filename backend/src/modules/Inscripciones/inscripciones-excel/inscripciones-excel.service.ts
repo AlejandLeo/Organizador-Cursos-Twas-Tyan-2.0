@@ -145,6 +145,7 @@ export class InscripcionesExcelService {
             segundo_apellido: String(fila['segundo_apellido'] || '').trim() || undefined,
             documento_identidad: String(fila['documento_identidad'] || '').trim() || undefined,
             celular: String(fila['celular'] || '').trim() || undefined,
+            grado_academico: String(fila['grado_academico'] || fila['grado'] || '').trim() || undefined,
             usuario: usuarioGuardado,
           });
           await queryRunner.manager.save(persona);
@@ -275,6 +276,9 @@ export class InscripcionesExcelService {
             const persona = queryRunner.manager.create(Persona, {
               nombres: String(fila['nombres'] || '').trim() || 'Estudiante',
               primer_apellido: String(fila['primer_apellido'] || '').trim() || 'Nuevo',
+              segundo_apellido: String(fila['segundo_apellido'] || '').trim() || undefined,
+              documento_identidad: String(fila['documento_identidad'] || '').trim() || undefined,
+              grado_academico: String(fila['grado_academico'] || fila['grado'] || '').trim() || undefined,
               usuario: userSaved,
             });
             await queryRunner.manager.save(persona);
@@ -283,6 +287,12 @@ export class InscripcionesExcelService {
             if (rol) await queryRunner.manager.save(queryRunner.manager.create(UsuarioRol, { usuario: userSaved, rol, estado: 1 }));
             usuario = { ...userSaved, persona };
             fueCreado = true;
+          } else {
+            const excelGrado = String(fila['grado_academico'] || fila['grado'] || '').trim();
+            if (excelGrado && usuario.persona && !usuario.persona.grado_academico) {
+              usuario.persona.grado_academico = excelGrado;
+              await queryRunner.manager.save(usuario.persona);
+            }
           }
 
           if (!idEvento) throw new Error('Evento no seleccionado.');
@@ -419,12 +429,25 @@ export class InscripcionesExcelService {
             const hash = await bcrypt.hash(passwordTemporal, 10);
             usuario = queryRunner.manager.create(Usuario, { email, password: hash, estado: 1, requiere_cambio_password: true });
             const userSaved = await queryRunner.manager.save(usuario);
-            const persona = queryRunner.manager.create(Persona, { nombres: String(fila['nombres'] || '').trim() || 'Ponente', primer_apellido: String(fila['primer_apellido'] || '').trim() || 'Nuevo', usuario: userSaved });
+            const persona = queryRunner.manager.create(Persona, {
+              nombres: String(fila['nombres'] || '').trim() || 'Ponente',
+              primer_apellido: String(fila['primer_apellido'] || '').trim() || 'Nuevo',
+              segundo_apellido: String(fila['segundo_apellido'] || '').trim() || undefined,
+              documento_identidad: String(fila['documento_identidad'] || '').trim() || undefined,
+              grado_academico: String(fila['grado_academico'] || fila['grado'] || '').trim() || undefined,
+              usuario: userSaved,
+            });
             await queryRunner.manager.save(persona);
             const rol = await queryRunner.manager.findOne(Rol, { where: { id: ROL_PONENTE_ID } });
             if (rol) await queryRunner.manager.save(queryRunner.manager.create(UsuarioRol, { usuario: userSaved, rol, estado: 1 }));
             usuario = { ...userSaved, persona };
             fueCreado = true;
+          } else {
+            const excelGrado = String(fila['grado_academico'] || fila['grado'] || '').trim();
+            if (excelGrado && usuario.persona && !usuario.persona.grado_academico) {
+              usuario.persona.grado_academico = excelGrado;
+              await queryRunner.manager.save(usuario.persona);
+            }
           }
 
           if (!idEvento) throw new Error('Evento no seleccionado.');
@@ -467,21 +490,30 @@ export class InscripcionesExcelService {
   }
 
   generarPlantillaUsuarios(): Buffer {
-    const ws = XLSX.utils.aoa_to_sheet([['email', 'password', 'nombres', 'primer_apellido'], ['ejemplo@correo.com', 'Clave1234', 'Ana', 'Lopez']]);
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['email', 'password', 'nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad', 'celular', 'grado_academico'],
+      ['ejemplo@correo.com', 'Clave1234', 'Ana', 'Lopez', '', '1234567', '70000000', 'Lic.']
+    ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Registro');
     return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
   }
 
   generarPlantillaInscripciones(): Buffer {
-    const ws = XLSX.utils.aoa_to_sheet([['email', 'nombre_actividad_academica', 'nombres', 'primer_apellido']]);
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['email', 'nombre_actividad_academica', 'nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad', 'grado_academico'],
+      ['ejemplo@correo.com', 'Nombre del Curso', 'Ana', 'Lopez', '', '1234567', 'Lic.']
+    ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Inscripción');
     return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
   }
 
   generarPlantillaPonentes(): Buffer {
-    const ws = XLSX.utils.aoa_to_sheet([['email', 'nombre_actividad_academica', 'nombres', 'primer_apellido']]);
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['email', 'nombre_actividad_academica', 'nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad', 'grado_academico'],
+      ['ejemplo@correo.com', 'Nombre del Curso', 'Ana', 'Lopez', '', '1234567', 'Lic.']
+    ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Asignación');
     return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));

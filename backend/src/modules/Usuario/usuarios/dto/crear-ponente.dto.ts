@@ -60,6 +60,11 @@ export class CrearPonenteDto {
   @IsInt()
   id_grado_academico?: number;
 
+  @ApiPropertyOptional({ example: 'Lic.' })
+  @IsOptional()
+  @IsString()
+  grado_academico?: string;
+
   @ApiPropertyOptional({ example: 5, description: 'ID del Rol (2=Coordinador, 5=Ponente)' })
   @IsOptional()
   @IsInt()

@@ -372,12 +372,88 @@ const fetchEmisionActividades = async () => {
   } catch { emisionActividades.value = []; }
 };
 
+const autoSelectInfoCert = () => {
+  if (!emisionEventoId.value || emisionInfoCerts.value.length === 0) {
+    emisionInfoCertId.value = null;
+    return;
+  }
+  const matched = emisionInfoCerts.value.find(ic => ic.tipo === emisionTipo.value);
+  if (matched) {
+    emisionInfoCertId.value = matched.id;
+  } else {
+    emisionInfoCertId.value = emisionInfoCerts.value[0]?.id || null;
+  }
+};
+
 const fetchEmisionInfoCerts = async () => {
-  if (!emisionEventoId.value) return;
+  if (!emisionEventoId.value) {
+    emisionInfoCerts.value = [];
+    emisionInfoCertId.value = null;
+    return;
+  }
   try {
     const res = await api.get(`/info-certificados/evento/${emisionEventoId.value}`);
     emisionInfoCerts.value = Array.isArray(res.data) ? res.data : [];
-  } catch { emisionInfoCerts.value = []; }
+    autoSelectInfoCert();
+  } catch {
+    emisionInfoCerts.value = [];
+    autoSelectInfoCert();
+  }
+};
+
+// ── Previsualización de Correo ────────────────────────────
+const showPreviewModal = ref(false);
+const previewHtml = ref('');
+const previewName = ref('');
+
+const abrirPreviewCorreo = async () => {
+  previewHtml.value = '';
+  if (!selectedTemplateId.value) {
+    previewName.value = 'Plantilla predeterminada del sistema (.hbs)';
+    try {
+      const res = await api.get('/admin/mail-templates/default-preview?tipo=CERTIFICATE');
+      previewHtml.value = res.data?.html || '<p>No se pudo cargar la plantilla por defecto.</p>';
+    } catch {
+      previewHtml.value = '<p style="color:red">Error al cargar la plantilla predeterminada.</p>';
+    }
+  } else {
+    const tpl = certTemplates.value.find(t => t.id === selectedTemplateId.value);
+    if (!tpl) return;
+    previewName.value = tpl.nombre;
+    try {
+      const resLayout = await api.get('/admin/configuracion/key/MAIL_MASTER_LAYOUT');
+      const resUrl    = await api.get('/admin/configuracion/key/SYSTEM_URL');
+      const masterLayout = resLayout.data?.valor || '<html><body>{{{content}}}</body></html>';
+      const systemUrl    = resUrl.data?.valor    || window.location.origin;
+
+      const cabeceraText = tpl.cabecera || 'Plataforma Académica';
+
+      const ctxCertificate: Record<string, string | number> = {
+        nombre: 'Juan Carlos Pérez López',
+        name: 'Juan Carlos Pérez López',
+        actividad: 'Curso de Especialización en IA',
+        evento: 'Congreso Internacional de Tecnología 2026',
+        codigo: 'TYAN-2026-000123',
+        tipo: 'Asistente',
+        verifyUrl: `${systemUrl}/verificar-certificado/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`,
+        anio: new Date().getFullYear(),
+        year: new Date().getFullYear(),
+      };
+
+      let html = (tpl.cuerpo || '').replace(/\n/g, '<br>');
+      Object.keys(ctxCertificate).forEach(k => {
+        html = html.replace(new RegExp(`{{${k}}}`, 'g'), String(ctxCertificate[k]));
+      });
+
+      let finalHtml = masterLayout.replace('Plataforma Académica', cabeceraText);
+      finalHtml = finalHtml.replace('{{{content}}}', html).replace('{{year}}', String(new Date().getFullYear()));
+
+      previewHtml.value = finalHtml;
+    } catch {
+      previewHtml.value = '<p style="color:red">Error al renderizar la plantilla.</p>';
+    }
+  }
+  showPreviewModal.value = true;
 };
 
 const fetchCandidatos = async () => {
@@ -545,16 +621,19 @@ onMounted(() => {
         <div class="flex items-center gap-3 px-1 py-3 border-t border-slate-100 dark:border-gray-800/60">
           <div class="flex items-center gap-2 shrink-0">
             <span class="material-symbols-outlined text-[18px] text-amber-500">mail_outline</span>
-            <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Plantilla de correo:</span>
+            <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Plantilla del Mensaje de Correo:</span>
           </div>
-          <div class="flex-1">
+          <div class="flex items-center gap-2">
             <select v-model="selectedTemplateId"
-                    class="w-full max-w-xs px-4 py-2 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700 rounded-xl text-xs font-bold outline-none cursor-pointer focus:border-amber-400 transition-all">
+                    class="px-4 py-2 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700 rounded-xl text-xs font-bold outline-none cursor-pointer focus:border-amber-400 transition-all min-w-[280px]">
               <option :value="null">⚙ Plantilla predeterminada del sistema (.hbs)</option>
               <option v-for="tpl in certTemplates" :key="tpl.id" :value="tpl.id">
                 📧 {{ tpl.nombre }} — {{ tpl.asunto }}
               </option>
             </select>
+            <button @click="abrirPreviewCorreo" class="w-8 h-8 flex items-center justify-center text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all border border-blue-200 dark:border-blue-900/50" title="Previsualizar mensaje de correo">
+              <span class="material-symbols-outlined text-[18px]">visibility</span>
+            </button>
           </div>
           <div v-if="isFetchingTemplates" class="animate-spin w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full"></div>
           <div v-else-if="certTemplates.length === 0" class="text-[10px] text-slate-400 italic">
@@ -873,7 +952,7 @@ onMounted(() => {
 
         <!-- Tipo selector -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <button v-for="(label, key) in tipoLabels" :key="key" @click="emisionTipo = Number(key); emisionCandidatos = []; emisionSelectedIds = []"
+          <button v-for="(label, key) in tipoLabels" :key="key" @click="emisionTipo = Number(key); emisionCandidatos = []; emisionSelectedIds = []; autoSelectInfoCert()"
             :class="emisionTipo === Number(key) ? 'bg-slate-800 text-white shadow-lg' : 'bg-slate-100 dark:bg-gray-800 text-slate-500 hover:bg-slate-200'"
             class="px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all text-center">
             {{ label }}
@@ -897,11 +976,18 @@ onMounted(() => {
             </select>
           </div>
           <div>
-            <label class="text-[10px] font-black uppercase text-slate-400 mb-1 block">Plantilla Certificado</label>
-            <select v-model="emisionInfoCertId" class="w-full bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-500">
-              <option :value="null">Seleccionar plantilla...</option>
-              <option v-for="ic in emisionInfoCerts" :key="ic.id" :value="ic.id">{{ ic.cabecera || `Plantilla #${ic.id}` }}</option>
-            </select>
+            <label class="text-[10px] font-black uppercase text-slate-400 mb-1 block">Plantilla Certificado (Asignada automáticamente)</label>
+            <div class="w-full bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold text-slate-750 dark:text-slate-250 flex items-center min-h-[46px]">
+              <span v-if="emisionInfoCertId && emisionInfoCerts.find(ic => ic.id === emisionInfoCertId)" class="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                <span class="material-symbols-outlined text-[18px]">verified</span>
+                {{ emisionInfoCerts.find(ic => ic.id === emisionInfoCertId).cabecera || `Plantilla #${emisionInfoCertId}` }}
+                ({{ emisionInfoCerts.find(ic => ic.id === emisionInfoCertId).es_excelencia ? 'Excelencia' : 'Regular' }})
+              </span>
+              <span v-else class="text-rose-500 dark:text-rose-400 italic flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[18px]">warning</span>
+                Sin plantilla configurada para este rol
+              </span>
+            </div>
           </div>
         </div>
 
@@ -1091,6 +1177,46 @@ onMounted(() => {
                 <span v-if="isSavingEmail" class="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
                 {{ isSavingEmail ? 'Guardando...' : 'Guardar Email' }}
               </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- MODAL: Previsualización de Correo -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="showPreviewModal"
+             class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+             @click.self="showPreviewModal = false">
+          <div class="bg-white dark:bg-[#1a1a24] w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden border border-slate-100 dark:border-white/10 flex flex-col max-h-[90vh]">
+            <!-- Header modal -->
+            <div class="p-6 border-b border-slate-100 dark:border-white/5 flex items-center justify-between bg-slate-50/50 dark:bg-black/20">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
+                  <span class="material-symbols-outlined text-blue-600 text-[20px]">visibility</span>
+                </div>
+                <div>
+                  <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Vista Previa del Mensaje</p>
+                  <h2 class="text-sm font-black text-slate-800 dark:text-white truncate max-w-[320px]">{{ previewName }}</h2>
+                </div>
+              </div>
+              <button @click="showPreviewModal = false"
+                      class="w-10 h-10 rounded-full hover:bg-slate-200 dark:hover:bg-white/10 flex items-center justify-center transition-all">
+                <span class="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <!-- Body modal -->
+            <div class="flex-1 overflow-y-auto bg-slate-100 dark:bg-black/40 p-4 md:p-8">
+              <div class="bg-white rounded-xl shadow-sm overflow-hidden mx-auto max-w-[600px] border border-slate-200">
+                <div v-html="previewHtml"></div>
+              </div>
+            </div>
+
+            <!-- Footer modal -->
+            <div class="p-4 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 text-center">
+              <p class="text-[10px] text-slate-400 font-medium">※ Los datos mostrados (Juan Carlos Pérez, etc.) son de ejemplo para la previsualización.</p>
             </div>
           </div>
         </div>

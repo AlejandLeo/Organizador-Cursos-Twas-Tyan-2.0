@@ -148,7 +148,7 @@ const nuevoPonenteRegistro = ref({
   primer_apellido: '',
   email: '',
   profesion: '',
-  id_grado_academico: null as number | null,
+  grado_academico: '',
   id_rol: 5
 });
 
@@ -163,7 +163,7 @@ const registrarNuevoPonente = async () => {
         Swal.fire('¡Éxito!', 'Personal registrado correctamente', 'success');
         showRegistroRapido.value = false;
         // Limpiar
-        nuevoPonenteRegistro.value = { nombres: '', primer_apellido: '', email: '', profesion: '', id_grado_academico: null, id_rol: 5 };
+        nuevoPonenteRegistro.value = { nombres: '', primer_apellido: '', email: '', profesion: '', grado_academico: '', id_rol: 5 };
         // Recargar lista
         await fetchPonentes();
     } catch (err: any) {
@@ -1066,10 +1066,8 @@ const editarGestion = (gestion: any) => {
 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest block mb-1.5">Grado Académico</label>
-                        <select v-model="nuevoPonenteRegistro.id_grado_academico" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold focus:border-emerald-500">
-                            <option v-for="ga in gradosAcademicosDB" :key="ga.id" :value="ga.id">{{ ga.nombre }} ({{ ga.abreviacion }})</option>
-                        </select>
+                        <label class="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest block mb-1.5">Grado Académico (Abreviado)</label>
+                        <input v-model="nuevoPonenteRegistro.grado_academico" type="text" placeholder="Ej: Lic. o MSc." class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold focus:border-emerald-500" />
                     </div>
                 </div>
 

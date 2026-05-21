@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import { MailTemplateService } from './mail-template.service';
@@ -16,25 +16,34 @@ export class MailTemplateController {
   constructor(private readonly mailTemplateService: MailTemplateService) { }
 
   @Get()
-  @Roles('Super Usuario')
+  @Roles('Super Usuario', 'Coordinador')
   @ApiOperation({ summary: 'Listar todas las plantillas de correo' })
   findAll() {
     return this.mailTemplateService.findAll();
   }
 
   @Get('default-preview')
-  @Roles('Super Usuario')
-  @ApiOperation({ summary: 'Devuelve el HTML de admission.hbs con datos de muestra para previsualización' })
-  getDefaultPreview() {
-    const templatePath = path.join(process.cwd(), 'src', 'modules', 'Comun', 'mail', 'templates', 'admission.hbs');
+  @Roles('Super Usuario', 'Coordinador')
+  @ApiOperation({ summary: 'Devuelve el HTML de la plantilla por defecto con datos de muestra para previsualización' })
+  getDefaultPreview(@Query('tipo') tipo?: string) {
+    const templateName = tipo === 'CERTIFICATE' ? 'certificate-delivery.hbs' : 'admission.hbs';
+    const templatePath = path.join(process.cwd(), 'src', 'modules', 'Comun', 'mail', 'templates', templateName);
     let html = fs.readFileSync(templatePath, 'utf-8');
 
     const sampleContext: Record<string, string> = {
-      nombre: 'Juan',
-      apellidos: 'Pérez',
+      nombre: 'Juan Carlos Pérez López',
+      name: 'Juan Carlos Pérez López',
+      apellidos: 'Pérez López',
       email: 'ejemplo@correo.com',
       password: 'Contraseña123',
       loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+      actividad: 'Curso de Especialización en IA',
+      evento: 'Congreso Internacional de Tecnología 2026',
+      codigo: 'TYAN-2026-000123',
+      tipo: 'Asistente',
+      verifyUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verificar-certificado/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`,
+      anio: new Date().getFullYear().toString(),
+      year: new Date().getFullYear().toString(),
     };
 
     Object.keys(sampleContext).forEach((key) => {
@@ -51,7 +60,7 @@ export class MailTemplateController {
   }
 
   @Get(':id')
-  @Roles('Super Usuario')
+  @Roles('Super Usuario', 'Coordinador')
   findOne(@Param('id') id: string) {
     return this.mailTemplateService.findOne(+id);
   }

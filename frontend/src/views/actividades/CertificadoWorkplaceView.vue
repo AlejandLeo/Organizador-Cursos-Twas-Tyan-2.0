@@ -15,7 +15,11 @@ const showPreviewModal = ref(false)
 const resolvePreviewVariables = (text: string) => {
     if (!text) return ''
     return text
-        .replace(/{NOMBRE_ESTUDIANTE}/g, 'Lic. Alejandro Leonardo Nogales')
+        .replace(/{NOMBRE_ESTUDIANTE}/g, 'Lic. Alejandro Leonardo Nogales Ticona')
+        .replace(/{NOMBRE_COMPLETO_1}/g, 'Lic. Nogales Ticona Alejandro Leonardo')
+        .replace(/{NOMBRE_COMPLETO_2}/g, 'Lic. Alejandro Leonardo Nogales Ticona')
+        .replace(/{NOMBRE}/g, 'Lic. Alejandro Leonardo Nogales Ticona')
+        .replace(/{NOMBRES}/g, 'Lic. Alejandro Leonardo Nogales Ticona')
         .replace(/{PRIMER_APELLIDO}/g, 'Nogales')
         .replace(/{SEGUNDO_APELLIDO}/g, 'Ticona')
         .replace(/{NOMBRE_CURSO}/g, 'Congreso Internacional de Biofertilizantes')

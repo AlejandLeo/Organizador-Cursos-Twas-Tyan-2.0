@@ -20,7 +20,8 @@ const form = reactive({
         genero: '',
         pais_origen: '',
         pais_residencia: '',
-        celular: ''
+        celular: '',
+        grado_academico: ''
     },
     especialidad: '',
     institucion: '',
@@ -57,6 +58,7 @@ const parseName = (p: any) => `${p?.primer_apellido || ''} ${p?.segundo_apellido
 const openFicha = (usuario: any) => {
     selectedUser.value = usuario;
     Object.assign(form.persona, usuario.persona || {});
+    form.persona.grado_academico = usuario.persona?.grado_academico || '';
     form.institucion = usuario.afiliaciones?.[0]?.institucion || '';
     form.especialidad = usuario.afiliaciones?.[0]?.disciplina_cientifica || '';
     form.id_grado_academico = usuario.afiliaciones?.[0]?.id_grado_academico || null;
@@ -82,7 +84,8 @@ const saveChanges = async () => {
             genero: form.persona.genero,
             pais_origen: form.persona.pais_origen || '',
             pais_residencia: form.persona.pais_residencia || '',
-            celular: form.persona.celular || ''
+            celular: form.persona.celular || '',
+            grado_academico: form.persona.grado_academico || ''
         };
 
         const payload = {
@@ -267,10 +270,8 @@ const saveChanges = async () => {
                             <input v-model="form.persona.documento_identidad" :disabled="!isEditing" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-transparent focus:border-emerald-500 rounded-xl py-3 px-4 font-bold text-primary-dark dark:text-white outline-none transition-all">
                         </div>
                         <div>
-                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Grado Académico Actual</label>
-                            <select v-model="form.id_grado_academico" :disabled="!isEditing" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-transparent focus:border-emerald-500 rounded-xl py-3 px-4 font-bold text-primary-dark dark:text-white outline-none transition-all">
-                                <option :value="1">Licenciado</option><option :value="2">Diplomado</option><option :value="3">Especialista</option><option :value="4">Magister</option><option :value="5">Doctor / PhD</option>
-                            </select>
+                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Grado Académico (Abreviado)</label>
+                            <input v-model="form.persona.grado_academico" :disabled="!isEditing" placeholder="Ej: Lic. o MSc." class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-transparent focus:border-emerald-500 rounded-xl py-3 px-4 font-bold text-primary-dark dark:text-white outline-none transition-all">
                         </div>
                     </div>
                 </div>

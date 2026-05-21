@@ -136,7 +136,7 @@ export class CertificadosService {
       if (c.usuario?.persona?.firma_dig) {
         // Obtener grado académico
         const afiliacion = c.usuario.afiliaciones?.[0];
-        const gradoAcademico = afiliacion?.gradoAcademico?.abreviacion || afiliacion?.gradoAcademico?.descripcion || '';
+        const gradoAcademico = c.usuario.persona?.grado_academico || afiliacion?.gradoAcademico?.abreviacion || afiliacion?.gradoAcademico?.descripcion || '';
 
         // Obtener grado administrativo (cargo) del evento, o por defecto de su afiliación, fallback a 'Coordinador'
         const cargo = c.gradoAdministrativo?.nombre || c.gradoAdministrativo?.abreviatura
@@ -164,7 +164,7 @@ export class CertificadosService {
 
         // Obtener grado académico principal
         const afiliacion = i.usuario.afiliaciones?.[0];
-        const gradoAcademico = afiliacion?.gradoAcademico?.abreviacion || afiliacion?.gradoAcademico?.descripcion || '';
+        const gradoAcademico = i.usuario.persona?.grado_academico || afiliacion?.gradoAcademico?.abreviacion || afiliacion?.gradoAcademico?.descripcion || '';
 
         // Obtener cargo (si tiene un cargo administrativo en su afiliación lo usamos, sino 'Expositor')
         const cargo = afiliacion?.gradoAdministrativo?.nombre || afiliacion?.gradoAdministrativo?.abreviatura || 'Expositor';

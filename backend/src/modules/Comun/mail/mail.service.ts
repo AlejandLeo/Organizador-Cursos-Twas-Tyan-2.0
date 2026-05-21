@@ -17,7 +17,7 @@ export class MailService {
     private readonly mailTemplateRepository: Repository<MailTemplate>,
     private readonly mailerService: MailerService,
     private readonly sistemaConfigService: SistemaConfigService,
-  ) {}
+  ) { }
 
   /**
    * Envía un correo electrónico de forma síncrona.
@@ -108,10 +108,10 @@ export class MailService {
       to,
       'Solicitud de Acceso Aprobada',
       'admission', // Fallback
-      { 
+      {
         nombre: nombres, // Usar 'nombre' como nombres para la nueva paleta
         nombres: nombres,
-        email: to, 
+        email: to,
         password: tempPassword,
         loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
         url_sistema: process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -128,8 +128,8 @@ export class MailService {
       to,
       'Cuenta Reactivada',
       'reactivation',
-      { 
-        name, 
+      {
+        name,
         loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
       },
     );
@@ -193,7 +193,7 @@ export class MailService {
       to,
       '¡Bienvenido a la Plataforma!',
       'welcome-registration',
-      { 
+      {
         nombre: nombres,
         nombres: nombres,
         primer_apellido,
@@ -224,8 +224,8 @@ export class MailService {
       to,
       'Nueva Designación de Cargo',
       'role-designation',
-      { 
-        name, 
+      {
+        name,
         role: roleName,
         loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
       },
@@ -240,9 +240,9 @@ export class MailService {
       to,
       'Actualización de Permisos en la Plataforma',
       'role-update',
-      { 
-        name, 
-        addedRoles, 
+      {
+        name,
+        addedRoles,
         removedRoles,
         loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
         currentYear: new Date().getFullYear()
@@ -281,7 +281,7 @@ export class MailService {
     if (dbTemplate && dbTemplate.cuerpo) {
       // 1. Obtener Master Layout
       const masterLayout = await this.sistemaConfigService.getConfig('MAIL_MASTER_LAYOUT') || '<html><body>{{{content}}}</body></html>';
-      
+
       // 2. Reemplazar variables en el cuerpo de la plantilla
       let htmlCuerpo = dbTemplate.cuerpo.replace(/\n/g, '<br>');
       Object.keys(context).forEach(k => {
@@ -292,7 +292,7 @@ export class MailService {
       // 3. Reemplazar variables en el layout maestro (como cabecera y year)
       const cabeceraText = dbTemplate.cabecera || 'Plataforma Académica'; // Fallback a texto genérico si no hay cabecera en DB
       const yearStr = new Date().getFullYear().toString();
-      
+
       // Reemplazamos el título estático "Plataforma Académica" (si existe en el layout por defecto) por el título dinámico
       let finalHtml = masterLayout.replace('Plataforma Académica', cabeceraText);
       // Reemplazamos la etiqueta {{{content}}} y el año
