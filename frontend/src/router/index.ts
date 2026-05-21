@@ -25,6 +25,14 @@ const router = createRouter({
       component: RegisterView,
     },
     {
+      path: '/evento',
+      redirect: '/',
+    },
+    {
+      path: '/eventos/index',
+      redirect: '/',
+    },
+    {
       path: '/verificar-certificado/:uuid',
       name: 'verificar-certificado',
       component: () => import('../views/public/VerificacionCertificadoView.vue'),
@@ -350,8 +358,11 @@ const router = createRouter({
           name: 'logistica-certificados',
           component: () => import('../views/logistica/LogisticaCertificadosView.vue'),
         }
-      ]
     },
+    {
+      path: '/:pathMatch(.*)*',
+      redirect: '/'
+    }
   ],
 })
 

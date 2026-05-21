@@ -2,8 +2,17 @@ import axios from 'axios';
 
 import { useUIStore } from '@/stores/ui';
 
+export const getBaseUrl = () => {
+  const hostname = window.location.hostname;
+  const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.');
+  if (isLocal) {
+    return import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  }
+  return window.location.origin;
+};
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000', // Ajusta según tu backend
+  baseURL: getBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
@@ -52,7 +61,7 @@ export const getImageUrl = (carpeta: string, nombreArchivo: string, fallback = '
   if (!nombreArchivo) return fallback;
   if (nombreArchivo.startsWith('http')) return nombreArchivo;
 
-  const baseUrl = api.defaults.baseURL || 'http://localhost:3000';
+  const baseUrl = api.defaults.baseURL || window.location.origin;
   // Decodificamos varias veces por si viene con doble codificación desde el backend (ej: %2520 -> %20 -> " ")
   let cleanName = nombreArchivo;
   try {

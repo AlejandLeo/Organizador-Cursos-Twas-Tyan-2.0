@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { getImageUrl } from '@/services/api';
 
 const props = defineProps<{
     elementos: any[];
@@ -9,10 +10,6 @@ const props = defineProps<{
     width?: number; // canvas original width, default 1024
     height?: number; // canvas original height, default 724
 }>();
-
-const getImageUrl = (folder: string, filename: string) => {
-    return `${import.meta.env.VITE_API_URL}/uploads/${folder}/${filename}`;
-};
 
 const defaultVariables = {
     '{NOMBRE_ESTUDIANTE}': 'Lic. Alejandro Leonardo Nogales Ticona',

@@ -356,7 +356,7 @@ const getFirmanteData = (idUsuario?: number) => {
 const getFirmaFullUrl = (firmaUrl: string) => {
     if (!firmaUrl) return ''
     if (firmaUrl.startsWith('http')) return firmaUrl
-    const base = api.defaults.baseURL || 'http://localhost:3000'
+    const base = api.defaults.baseURL || window.location.origin
     return `${base}${firmaUrl}`
 }
 

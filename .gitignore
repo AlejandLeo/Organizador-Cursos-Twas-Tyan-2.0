@@ -31,7 +31,24 @@ scratch/
 Thumbs.db
 .vscode/
 .idea/
-backend/uploads/profiles/*
-!backend/uploads/profiles/.gitkeep
+# Uploads (Archivos subidos localmente)
+backend/uploads/cursos/*
+!backend/uploads/cursos/.gitkeep
+backend/uploads/eventos/*
+!backend/uploads/eventos/.gitkeep
 backend/uploads/firmas/*
 !backend/uploads/firmas/.gitkeep
+backend/uploads/fondos/*
+!backend/uploads/fondos/.gitkeep
+backend/uploads/imagenes/*
+!backend/uploads/imagenes/.gitkeep
+backend/uploads/inscripciones/*
+!backend/uploads/inscripciones/.gitkeep
+backend/uploads/perfiles/*
+!backend/uploads/perfiles/.gitkeep
+backend/uploads/profiles/*
+!backend/uploads/profiles/.gitkeep
+backend/uploads/logo/*
+!backend/uploads/logo/.gitkeep
+!backend/uploads/logo/EscudoFCPN.png
+!backend/uploads/logo/LOGO UMSA OFICIAL.png

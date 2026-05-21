@@ -192,7 +192,7 @@ const descargarPlantilla = async () => {
   
   try {
     const token = localStorage.getItem('token');
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const baseUrl = import.meta.env.VITE_API_URL || window.location.origin;
     
     // Usamos fetch nativo para bypass de interceptores XHR que causan el error InvalidStateError
     const response = await fetch(`${baseUrl}${endpoint}`, {

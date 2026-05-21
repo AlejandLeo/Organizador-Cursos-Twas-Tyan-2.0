@@ -191,14 +191,14 @@ const fondoQuality = ref<{status: 'hd' | 'low' | 'ok' | null, msg: string}>({sta
 const resolvedLogo = computed(() => {
     if (!logoPreview.value) return null;
     if (logoPreview.value.startsWith('data:') || logoPreview.value.startsWith('http')) return logoPreview.value;
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const baseUrl = import.meta.env.VITE_API_URL || window.location.origin;
     return `${baseUrl}/uploads/logo/${logoPreview.value}`;
 });
 
 const resolvedBanner = computed(() => {
     if (!fondoPreview.value) return null;
     if (fondoPreview.value.startsWith('data:') || fondoPreview.value.startsWith('http')) return fondoPreview.value;
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const baseUrl = import.meta.env.VITE_API_URL || window.location.origin;
     return `${baseUrl}/uploads/banner/${fondoPreview.value}`;
 });
 
