@@ -901,8 +901,12 @@ export class UsuariosService {
       // Notificar al usuario por correo (No-bloqueante)
       let correoEnviado = false;
       try {
-        const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
-        await this.mailService.sendWelcomeRegistrationEmail(dto.email, nombreCompleto);
+        await this.mailService.sendWelcomeRegistrationEmail(
+          dto.email,
+          dto.nombres || '',
+          dto.primer_apellido || '',
+          dto.segundo_apellido || ''
+        );
         correoEnviado = true;
       } catch (mailError) {
         this.logger.error(`Error enviando correo de bienvenida a ${dto.email}: ${mailError.message}`);
@@ -1211,20 +1215,12 @@ export class UsuariosService {
 
       await queryRunner.commitTransaction();
 
-      // Notificar a administración (opcional/no-bloqueante)
-      let correoEnviado = false;
-      try {
-        const nombreCompleto = `${dto.nombres} ${dto.primer_apellido}`;
-        await this.mailService.sendNewRegistrationRequestNotification(nombreCompleto, dto.email);
-        correoEnviado = true;
-      } catch (mailError) {
-        this.logger.error(`Error enviando notificación de solicitud a admin: ${mailError.message}`);
-      }
+      // Ya no enviamos notificación de registro pendiente al administrador (MAIL_USER).
 
       return {
         mensaje:
           'Su solicitud fue recepcionada correctamente. La confirmación de su cuenta se realizará una vez finalice el proceso de inscripciones y sea validada por administración.',
-        correoEnviado
+        correoEnviado: false
       };
     } catch (error) {
       if (queryRunner.isTransactionActive) {

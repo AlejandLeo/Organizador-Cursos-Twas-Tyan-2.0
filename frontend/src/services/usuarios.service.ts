@@ -92,4 +92,18 @@ export const usuariosService = {
       notificar
     });
   },
+
+  /**
+   * Obtiene el perfil completo de un usuario (para administradores).
+   */
+  getPerfilAdmin(id: number) {
+    return api.get<any>(`/usuarios/${id}/perfil`);
+  },
+
+  /**
+   * Actualiza el perfil completo de un usuario (para administradores).
+   */
+  actualizarPerfilAdmin(id: number, data: any) {
+    return api.patch<any>(`/usuarios/${id}/perfil-completo`, data);
+  },
 };
