@@ -13,6 +13,8 @@ const isDashboard = computed(() =>
   route.path.startsWith('/estudiante') ||
   route.path.startsWith('/admin')
 )
+
+const showFooter = computed(() => !isDashboard.value && route.path !== '/')
 </script>
 
 <template>
@@ -22,7 +24,7 @@ const isDashboard = computed(() =>
     <main class="flex-grow">
       <RouterView />
     </main>
-    <AppFooter v-if="!isDashboard" />
+    <AppFooter v-if="showFooter" />
 
     <!-- Overlay de seguridad global -->
     <ForcePasswordChange />

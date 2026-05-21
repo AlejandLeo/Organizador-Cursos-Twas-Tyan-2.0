@@ -2,7 +2,7 @@
     "liveServer.settings.donotShowInfoMsg": true,
     "workbench.startupEditor": "none",
     "javascript.updateImportsOnFileMove.enabled": "always",
-    "workbench.colorTheme": "Winter is Coming (Dark Blue - No Italics)",
+    "workbench.colorTheme": "Nord Deep",
     "php.validate.executablePath": "",
     "[dart]": {
         "editor.formatOnSave": true,
