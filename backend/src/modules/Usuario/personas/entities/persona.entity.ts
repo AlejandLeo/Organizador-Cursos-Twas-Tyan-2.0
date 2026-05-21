@@ -81,6 +81,10 @@ export class Persona {
   @Column({ type: 'boolean', default: false })
   ponente_configurado: boolean;
 
+  /** Grado académico abreviado (ej: Lic., MSc, PhD) como VARCHAR. */
+  @Column({ name: 'grado_academico', length: 100, nullable: true })
+  grado_academico: string;
+
   // ── Relación ─────────────────────────────────────────────────────────────
 
   /**

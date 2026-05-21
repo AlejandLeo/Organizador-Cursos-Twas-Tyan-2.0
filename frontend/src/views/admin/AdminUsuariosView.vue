@@ -277,6 +277,7 @@ const editForm = ref({
   pais_residencia: '',
   institucion: '',
   id_grado_academico: null as number | null,
+  grado_academico: '',
   especialidad: ''
 });
 const detallesUsuario = ref<any>(null);
@@ -307,6 +308,7 @@ const abrirEditModal = async (user: any) => {
       pais_residencia: p.persona?.pais_residencia || '',
       institucion: af?.institucion || '',
       id_grado_academico: af?.id_grado_academico || null,
+      grado_academico: p.persona?.grado_academico || '',
       especialidad: af?.disciplina_cientifica || ''
     };
   } catch (error) {
@@ -339,6 +341,7 @@ const guardarDetalles = async () => {
       pais_residencia: editForm.value.pais_residencia,
       institucion: editForm.value.institucion,
       id_grado_academico: editForm.value.id_grado_academico,
+      grado_academico: editForm.value.grado_academico,
       especialidad: editForm.value.especialidad
     });
     
@@ -994,8 +997,8 @@ onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
               
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="space-y-1">
-                  <label class="text-[10px] font-black text-slate-500 uppercase ml-2">ID Grado Académico</label>
-                  <input v-model.number="editForm.id_grado_academico" type="number" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-emerald-500/50" />
+                  <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Grado Académico (Abreviado)</label>
+                  <input v-model="editForm.grado_academico" type="text" placeholder="Ej: Lic. o MSc." class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-emerald-500/50" />
                 </div>
                 <div class="space-y-1">
                   <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Especialidad / Disciplina</label>

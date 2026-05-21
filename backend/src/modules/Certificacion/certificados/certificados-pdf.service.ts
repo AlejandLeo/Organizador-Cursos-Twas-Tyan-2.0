@@ -47,10 +47,20 @@ export class CertificadosPdfService {
 
     // Información del beneficiario
     const persona = certificado.usuario?.persona;
-    const nombreCompleto = persona 
-      ? `${persona.nombres} ${persona.primer_apellido} ${persona.segundo_apellido || ''}`.trim()
-      : 'Usuario Desconocido';
+    const grado = (persona?.grado_academico || '').trim();
+    const nombres = (persona?.nombres || '').toUpperCase().trim();
+    const primerApellido = (persona?.primer_apellido || '').toUpperCase().trim();
+    const segundoApellido = (persona?.segundo_apellido || '').toUpperCase().trim();
     const ciUsuario = persona?.documento_identidad || '';
+
+    // Nombres Apellido1 Apellido2
+    const nombreCompleto2 = persona
+      ? `${grado ? grado + ' ' : ''}${nombres} ${primerApellido} ${segundoApellido}`.replace(/\s+/g, ' ').trim()
+      : 'Usuario Desconocido';
+    // Apellido1 Apellido2 Nombres
+    const nombreCompleto1 = persona
+      ? `${grado ? grado + ' ' : ''}${primerApellido} ${segundoApellido} ${nombres}`.replace(/\s+/g, ' ').trim()
+      : 'Usuario Desconocido';
 
     // Información del Evento
     const eventoNombre = certificado.actividadAcademica?.evento?.nombre || (certificado.actividadAcademica as any)?.nombre || 'Evento Desconocido';
@@ -64,9 +74,13 @@ export class CertificadosPdfService {
 
     // Mapeo de variables dinámicas a sus valores reales
     const variablesReales: Record<string, string> = {
-      '{NOMBRE_ESTUDIANTE}': persona?.nombres || '',
-      '{PRIMER_APELLIDO}': persona?.primer_apellido || '',
-      '{SEGUNDO_APELLIDO}': persona?.segundo_apellido || '',
+      '{NOMBRE_ESTUDIANTE}': nombreCompleto2,
+      '{NOMBRE_COMPLETO_1}': nombreCompleto1,
+      '{NOMBRE_COMPLETO_2}': nombreCompleto2,
+      '{NOMBRE}': nombreCompleto2,
+      '{NOMBRES}': nombreCompleto2,
+      '{PRIMER_APELLIDO}': primerApellido,
+      '{SEGUNDO_APELLIDO}': segundoApellido,
       '{EVENTO}': eventoNombre,
       '{ACTIVIDAD}': (certificado.actividadAcademica as any)?.nombre || '',
       '{GESTION}': new Date().getFullYear().toString(),
@@ -88,9 +102,15 @@ export class CertificadosPdfService {
         let textoFinal = el.valor || '';
         // Reemplazar variables dinámicas
         for (const [variable, valor] of Object.entries(variablesReales)) {
-          if (textoFinal.includes(variable)) {
-            textoFinal = textoFinal.replace(new RegExp(variable, 'g'), valor);
-          }
+          // Reemplazar formato {VAR}
+          textoFinal = textoFinal.replace(new RegExp(variable.replace(/[\{\}]/g, '\\$&'), 'gi'), valor);
+          
+          // Reemplazar formato [VAR]
+          const varClean = variable.replace(/[\{\}]/g, ''); // "NOMBRE_COMPLETO_1"
+          textoFinal = textoFinal.replace(new RegExp('\\[' + varClean.replace(/[\[\]]/g, '\\$&') + '\\]', 'gi'), valor);
+          
+          // Reemplazar formato {{VAR}}
+          textoFinal = textoFinal.replace(new RegExp('\\{\\{' + varClean.replace(/[\{\}]/g, '\\$&') + '\\}\\}', 'gi'), valor);
         }
         
         doc.setFontSize(el.fontSize || 12);

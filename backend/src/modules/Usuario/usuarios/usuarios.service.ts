@@ -27,6 +27,7 @@ import { Rol } from '../../Usuario/roles/entities/rol.entity';
 import { UsuarioRol } from '../../Usuario/usuarios-roles/entities/usuario-rol.entity';
 import { Afiliacion } from '../../Usuario/afiliaciones/entities/afiliacion.entity';
 import { RoleId } from './constants/user-roles.constants';
+import { GradoAcademico } from '../../Usuario/grados-academicos/entities/grado-academico.entity';
 import * as fs from 'fs';
 import { join } from 'path';
 import { MailService } from '../../Comun/mail/mail.service';
@@ -78,7 +79,8 @@ export class UsuariosService {
     // 1. Filtrar campos específicos para la entidad Persona
     const camposPersonaValidos = [
       'nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad',
-      'genero', 'pais_origen', 'pais_residencia', 'fecha_nacimiento', 'celular'
+      'genero', 'pais_origen', 'pais_residencia', 'fecha_nacimiento', 'celular',
+      'grado_academico'
     ];
 
     const datosPersona: any = {};
@@ -188,7 +190,7 @@ export class UsuariosService {
       const datosPersona: any = {};
 
       // Mapeo seguro de campos existentes en Persona
-      const camposSeguros = ['nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad', 'celular', 'pais_origen', 'pais_residencia'];
+      const camposSeguros = ['nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad', 'celular', 'pais_origen', 'pais_residencia', 'grado_academico'];
       camposSeguros.forEach(c => {
         if (datosPersonaOriginal[c] !== undefined) datosPersona[c] = datosPersonaOriginal[c];
       });
@@ -225,7 +227,16 @@ export class UsuariosService {
       }
 
       if (institucion !== undefined) af.institucion = institucion;
-      if (id_grado_academico !== undefined) af.id_grado_academico = id_grado_academico;
+      if (id_grado_academico !== undefined) {
+        af.id_grado_academico = id_grado_academico;
+        // También actualizar el grado_academico string en Persona
+        const ga = await this.dataSource.getRepository(GradoAcademico).findOne({ where: { id: id_grado_academico } });
+        if (ga && usuario.persona) {
+          await this.personaRepository.update(usuario.persona.id, {
+            grado_academico: ga.abreviacion || ga.descripcion || ''
+          });
+        }
+      }
       if (especialidad !== undefined) af.disciplina_cientifica = especialidad;
 
       await afRepo.save(af);
@@ -597,6 +608,14 @@ export class UsuariosService {
         ...datosPersona,
         usuario: usuarioGuardado,
       });
+
+      if (id_grado_academico) {
+        const ga = await queryRunner.manager.findOne(GradoAcademico, { where: { id: id_grado_academico } });
+        if (ga) {
+          persona.grado_academico = ga.abreviacion || ga.descripcion || '';
+        }
+      }
+
       await queryRunner.manager.save(persona);
 
       // 4️⃣ Crear Afiliación Inicial si se especificó grado académico

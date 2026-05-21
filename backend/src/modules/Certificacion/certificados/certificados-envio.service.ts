@@ -81,6 +81,7 @@ export class CertificadosEnvioService {
         'certificate-delivery',
         {
           nombre: nombreUsuario, // Usando nombre en lugar de name para ser consistentes con la paleta
+          name: nombreUsuario,   // Para compatibilidad con la plantilla .hbs por defecto
           actividad: cert.actividadAcademica.nombre,
           evento: cert.actividadAcademica.evento.nombre,
           codigo: cert.codigo_certificado,
@@ -188,11 +189,12 @@ export class CertificadosEnvioService {
     const primerApellido = (cert.usuario.persona?.primer_apellido || '').toUpperCase().trim();
     const segundoApellido = (cert.usuario.persona?.segundo_apellido || '').toUpperCase().trim();
     const ciUsuario = (cert.usuario.persona?.documento_identidad || '').toUpperCase().trim();
+    const grado = (cert.usuario.persona?.grado_academico || '').trim();
     
     // Nombres Apellido1 Apellido2
-    const nombreCompleto2 = `${nombres} ${primerApellido} ${segundoApellido}`.replace(/\s+/g, ' ').trim();
+    const nombreCompleto2 = `${grado ? grado + ' ' : ''}${nombres} ${primerApellido} ${segundoApellido}`.replace(/\s+/g, ' ').trim();
     // Apellido1 Apellido2 Nombres
-    const nombreCompleto1 = `${primerApellido} ${segundoApellido} ${nombres}`.replace(/\s+/g, ' ').trim();
+    const nombreCompleto1 = `${grado ? grado + ' ' : ''}${primerApellido} ${segundoApellido} ${nombres}`.replace(/\s+/g, ' ').trim();
 
     const studentName = nombreCompleto2; // Para compatibilidad
     
@@ -246,7 +248,7 @@ export class CertificadosEnvioService {
           if (!text) return '';
           let res = text;
           // Formatos con corchetes (insensibles a mayúsculas)
-          res = res.replace(/\[NOMBRE\]/gi, nombres);
+          res = res.replace(/\[NOMBRE\]/gi, nombreCompleto2);
           res = res.replace(/\[NOMBRE_COMPLETO_1\]/gi, nombreCompleto1);
           res = res.replace(/\[NOMBRE_COMPLETO_2\]/gi, nombreCompleto2);
           res = res.replace(/\[ACTIVIDAD\]/gi, courseName);
@@ -257,8 +259,8 @@ export class CertificadosEnvioService {
           res = res.replace(/\{NOMBRE_ESTUDIANTE\}/gi, nombreCompleto2); // legacy
           res = res.replace(/\{NOMBRE_COMPLETO_1\}/gi, nombreCompleto1);
           res = res.replace(/\{NOMBRE_COMPLETO_2\}/gi, nombreCompleto2);
-          res = res.replace(/\{NOMBRE\}/gi, nombres);
-          res = res.replace(/\{NOMBRES\}/gi, nombres);
+          res = res.replace(/\{NOMBRE\}/gi, nombreCompleto2);
+          res = res.replace(/\{NOMBRES\}/gi, nombreCompleto2);
           res = res.replace(/\{PRIMER_APELLIDO\}/gi, primerApellido);
           res = res.replace(/\{SEGUNDO_APELLIDO\}/gi, segundoApellido);
           res = res.replace(/\{PRIMER APELLIDO\}/gi, primerApellido);

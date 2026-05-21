@@ -20,6 +20,7 @@ const formData = ref({
   pais_residencia: '',
   fecha_nacimiento: '',
   celular: '',
+  grado_academico: '',
   afiliaciones: [] as any[]
 });
 
@@ -561,6 +562,10 @@ onMounted(() => {
              <div>
               <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Celular</label>
               <input v-model="formData.celular" type="text" :disabled="isCompleted && !!originalData.celular" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none disabled:bg-slate-100 dark:disabled:bg-gray-950 disabled:text-slate-400" />
+            </div>
+            <div>
+              <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Grado Académico (Abreviado)</label>
+              <input v-model="formData.grado_academico" type="text" placeholder="Ej: Lic. o MSc." :disabled="isCompleted && !!originalData.grado_academico" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-umsa-blue outline-none disabled:bg-slate-100 dark:disabled:bg-gray-950 disabled:text-slate-400" />
             </div>
             <div>
               <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">País Origen</label>

@@ -149,7 +149,7 @@ const nuevoPonenteRegistro = ref({
   primer_apellido: '',
   email: '',
   profesion: '',
-  id_grado_academico: null as number | null,
+  grado_academico: '',
   id_rol: 5
 });
 
@@ -164,7 +164,7 @@ const registrarNuevoPonente = async () => {
         Swal.fire('¡Éxito!', 'Personal registrado correctamente', 'success');
         showRegistroRapido.value = false;
         // Limpiar
-        nuevoPonenteRegistro.value = { nombres: '', primer_apellido: '', email: '', profesion: '', id_grado_academico: null, id_rol: 5 };
+        nuevoPonenteRegistro.value = { nombres: '', primer_apellido: '', email: '', profesion: '', grado_academico: '', id_rol: 5 };
         // Recargar lista
         await fetchPonentes();
     } catch (err: any) {
