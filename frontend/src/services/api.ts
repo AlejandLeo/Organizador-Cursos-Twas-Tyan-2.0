@@ -2,17 +2,53 @@ import axios from 'axios';
 
 import { useUIStore } from '@/stores/ui';
 
-export const getBaseUrl = () => {
-  const hostname = window.location.hostname;
-  const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.');
-  if (isLocal) {
-    return import.meta.env.VITE_API_URL || 'http://localhost:3000';
+export const getApiBaseUrl = (): string => {
+  const envUrl = import.meta.env.VITE_API_URL as string | undefined;
+  if (envUrl) return envUrl.replace(/\/$/, '');
+  if (typeof window !== 'undefined') return window.location.origin;
+  return 'http://localhost:3000';
+};
+
+// Mantener por compatibilidad si es requerido por algún módulo
+export const getBaseUrl = getApiBaseUrl;
+
+/**
+ * Normaliza URLs de medios devueltas por el API.
+ * Corrige rutas con localhost y rutas relativas /uploads/... en producción HTTPS.
+ */
+export const resolveMediaUrl = (url: string | null | undefined, fallback = ''): string => {
+  if (!url) return fallback;
+
+  const defaultFallback =
+    'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?w=1600&q=80';
+
+  const base = getApiBaseUrl();
+
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    try {
+      const parsed = new URL(url);
+      const isLocal =
+        parsed.hostname === 'localhost' ||
+        parsed.hostname === '127.0.0.1' ||
+        parsed.hostname.endsWith('.local');
+      if (isLocal && parsed.pathname.startsWith('/uploads/')) {
+        return `${base}${parsed.pathname}${parsed.search}`;
+      }
+      return url;
+    } catch {
+      return url;
+    }
   }
-  return window.location.origin;
+
+  if (url.startsWith('/uploads/')) {
+    return `${base}${url}`;
+  }
+
+  return url || fallback || defaultFallback;
 };
 
 const api = axios.create({
-  baseURL: getBaseUrl(),
+  baseURL: getApiBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
