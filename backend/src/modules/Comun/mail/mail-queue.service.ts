@@ -64,7 +64,7 @@ export class MailQueueService {
     }
 
     const systemUrl = await this.configService.getConfig('SYSTEM_URL')
-      .catch(() => process.env.FRONTEND_URL || 'http://localhost:5173');
+      .catch(() => process.env.FRONTEND_URL);
 
     const fullContext: Record<string, any> = {
       ...context,

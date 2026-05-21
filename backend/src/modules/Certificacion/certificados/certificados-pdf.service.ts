@@ -7,7 +7,7 @@ import * as path from 'path';
 
 @Injectable()
 export class CertificadosPdfService {
-  constructor(private readonly certificadosService: CertificadosService) {}
+  constructor(private readonly certificadosService: CertificadosService) { }
 
   /**
    * Genera el buffer del PDF dinámicamente al vuelo leyendo la configuración
@@ -16,7 +16,7 @@ export class CertificadosPdfService {
   async generarPdfBuffer(certificadoId: number, usuarioId: number): Promise<Buffer> {
     // 1. Obtener el certificado cruzado con infoCertificado, usuario, evento, etc.
     const certificado = await this.certificadosService.findOne(certificadoId);
-    
+
     if (!certificado) {
       throw new NotFoundException('Certificado no encontrado');
     }
@@ -85,15 +85,15 @@ export class CertificadosPdfService {
     const disciplinaCientifica = (afiliacion?.disciplina_cientifica || '').toUpperCase().trim();
 
     // Información del Evento
-    const eventoNombre = certificado.actividadAcademica?.evento?.nombre 
-                      || certificado.infoCertificado?.evento?.nombre 
-                      || (certificado.actividadAcademica as any)?.nombre 
-                      || 'Evento Desconocido';
-    
+    const eventoNombre = certificado.actividadAcademica?.evento?.nombre
+      || certificado.infoCertificado?.evento?.nombre
+      || (certificado.actividadAcademica as any)?.nombre
+      || 'Evento Desconocido';
+
     const tiposStr = { 1: 'Asistente', 2: 'Ponente', 3: 'Logística', 4: 'Docente' };
     const rolParticipacion = tiposStr[certificado.tipo] || 'Participante';
 
-    const fechaEmision = certificado.fecha_emision 
+    const fechaEmision = certificado.fecha_emision
       ? new Date(certificado.fecha_emision).toLocaleDateString('es-BO')
       : new Date().toLocaleDateString('es-BO');
 
@@ -149,23 +149,23 @@ export class CertificadosPdfService {
           textoFinal = textoFinal.split(`[${varClean}]`).join(valor);
           textoFinal = textoFinal.split(`{{${varClean}}}`).join(valor);
         }
-        
+
         const fontSize = el.fontSize || 12;
         doc.setFontSize(fontSize);
         if (el.color) doc.setTextColor(el.color);
         else doc.setTextColor(0, 0, 0);
-        
+
         // El texto ahora tiene width definido por defecto o se usa un máximo.
         const blockWidthPt = el.width ? (el.width / CANVAS_W) * pdfWidth : pdfWidth;
         const y_baseline = y_top + (fontSize * 0.8);
-        
+
         let x_anchor = x_left;
         const align = el.alineacion || 'center';
-        
+
         if (align === 'center') {
-           x_anchor = x_left + (blockWidthPt / 2);
+          x_anchor = x_left + (blockWidthPt / 2);
         } else if (align === 'right') {
-           x_anchor = x_left + blockWidthPt;
+          x_anchor = x_left + blockWidthPt;
         }
 
         const lines = doc.splitTextToSize(textoFinal, blockWidthPt);
@@ -177,21 +177,21 @@ export class CertificadosPdfService {
         doc.setTextColor(el.color || '#000000');
 
         const y_baseline = y_top + (fontSize * 0.8);
-        
+
         // En Vue, tienen un width específico (ej. 600px).
         // Calculamos el ancho en pt del PDF
         const blockWidthPt = el.width ? (el.width / CANVAS_W) * pdfWidth : pdfWidth;
-        
+
         // En Vue, el texto se alinea DENTRO de esa caja.
         // Si la caja empieza en x_left y tiene de ancho blockWidthPt,
         // el centro absoluto para jsPDF está en x_left + blockWidthPt / 2
         let x_anchor = x_left;
         const align = el.alineacion || 'center';
-        
+
         if (align === 'center') {
-           x_anchor = x_left + (blockWidthPt / 2);
+          x_anchor = x_left + (blockWidthPt / 2);
         } else if (align === 'right') {
-           x_anchor = x_left + blockWidthPt;
+          x_anchor = x_left + blockWidthPt;
         }
 
         let textoFinal = el.valor || '';
@@ -207,9 +207,9 @@ export class CertificadosPdfService {
         doc.text(lines, x_anchor, y_baseline, { align: align as any });
       }
       else if (el.tipo === 'qr') {
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const frontendUrl = process.env.FRONTEND_URL;
         const urlVerificacion = `${frontendUrl}/verificar-certificado/${certificado.uuid_archivo}`;
-        
+
         const qrDataUrl = await QRCode.toDataURL(urlVerificacion, {
           errorCorrectionLevel: 'H',
           margin: 1,
@@ -219,7 +219,7 @@ export class CertificadosPdfService {
         const qrSizePx = el.width || 100;
         // Convertimos el tamaño del QR de px a pt
         const qrSizePt = (qrSizePx / CANVAS_W) * pdfWidth;
-        
+
         // x_left, y_top es la esquina superior izquierda. jsPDF addImage asume top-left por defecto!
         // No restamos el tamaño.
         doc.addImage(qrDataUrl, 'PNG', x_left, y_top, qrSizePt, qrSizePt);
@@ -233,14 +233,14 @@ export class CertificadosPdfService {
             const numFirmas = firmantes.length;
             const blockWidthPx = el.width || 400; // Ancho total en px del editor
             const blockWidthPt = (blockWidthPx / CANVAS_W) * pdfWidth;
-            
+
             const signatureWidthPx = 100;
             const signatureHeightPx = 50;
             const signatureWidthPt = (signatureWidthPx / CANVAS_W) * pdfWidth;
             const signatureHeightPt = (signatureHeightPx / CANVAS_H) * pdfHeight;
-            
+
             const gapPt = (blockWidthPt - (numFirmas * signatureWidthPt)) / (numFirmas + 1);
-            
+
             // x_left es el borde izquierdo del contenedor entero.
             let currentX = x_left + gapPt;
             // El contenedor mide 120px de alto en Vue. La firma se pone "al centro", la línea va abajo.
@@ -248,7 +248,7 @@ export class CertificadosPdfService {
             const boxHeightPx = 120;
             const boxHeightPt = (boxHeightPx / CANVAS_H) * pdfHeight;
             const lineY = y_top + (boxHeightPt * 0.8);
-            
+
             for (const f of firmantes) {
               if (f.firma_filename) {
                 const firmaPath = path.join(process.cwd(), 'uploads/firmas', f.firma_filename);
@@ -257,17 +257,17 @@ export class CertificadosPdfService {
                     const firmaBuffer = fs.readFileSync(firmaPath);
                     const base64Firma = `data:image/png;base64,${firmaBuffer.toString('base64')}`;
                     doc.addImage(base64Firma, 'PNG', currentX, lineY - signatureHeightPt, signatureWidthPt, signatureHeightPt);
-                  } catch(e) {}
+                  } catch (e) { }
                 }
               }
               doc.setLineWidth(1);
               doc.line(currentX, lineY, currentX + signatureWidthPt, lineY);
-              
+
               doc.setFontSize(8);
               doc.text(`${f.grado || ''} ${f.nombre}`.trim(), currentX + (signatureWidthPt / 2), lineY + 12, { align: 'center' });
               doc.setFontSize(7);
               doc.text(`${f.rol || 'Autoridad'}`.trim(), currentX + (signatureWidthPt / 2), lineY + 22, { align: 'center' });
-              
+
               currentX += signatureWidthPt + gapPt;
             }
           }
@@ -283,12 +283,12 @@ export class CertificadosPdfService {
             const signatureWidthPt = (signatureWidthPx / CANVAS_W) * pdfWidth;
             const signatureHeightPx = el.height || 50;
             const signatureHeightPt = (signatureHeightPx / CANVAS_H) * pdfHeight;
-            
+
             // La caja en Vue mide el.width x 120px. 
             const boxHeightPx = 120;
             const boxHeightPt = (boxHeightPx / CANVAS_H) * pdfHeight;
             const lineY = y_top + (boxHeightPt * 0.8);
-            
+
             // La firma ocupa todo el ancho de x_left
             if (f.firma_filename) {
               const firmaPath = path.join(process.cwd(), 'uploads/firmas', f.firma_filename);
@@ -297,12 +297,12 @@ export class CertificadosPdfService {
                   const firmaBuffer = fs.readFileSync(firmaPath);
                   const base64Firma = `data:image/png;base64,${firmaBuffer.toString('base64')}`;
                   doc.addImage(base64Firma, 'PNG', x_left, lineY - signatureHeightPt, signatureWidthPt, signatureHeightPt);
-                } catch(e) {}
+                } catch (e) { }
               }
             }
             doc.setLineWidth(1);
             doc.line(x_left, lineY, x_left + signatureWidthPt, lineY);
-            
+
             doc.setFontSize(el.fontSize || 8);
             doc.text(`${f.grado || ''} ${f.nombre}`.trim(), x_left + (signatureWidthPt / 2), lineY + 12, { align: 'center' });
             doc.setFontSize(Math.max(5, (el.fontSize || 8) - 1));

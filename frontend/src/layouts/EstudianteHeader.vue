@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useUIStore } from '@/stores/ui';
-import api from '@/services/api';
+import api, { getBaseUrl } from '@/services/api';
 import { usuariosService } from '@/services/usuarios.service';
 import Swal from 'sweetalert2';
 
@@ -220,7 +220,7 @@ onMounted(async () => {
   // Cargar foto de perfil - Manejo silencioso con fetch para evitar error InvalidStateError en inspectores
   try {
     const token = localStorage.getItem('token');
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const baseUrl = getBaseUrl();
     const photoRes = await fetch(`${baseUrl}/usuarios/perfil/foto`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
