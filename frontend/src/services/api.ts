@@ -59,7 +59,9 @@ api.interceptors.response.use(
  */
 export const getImageUrl = (carpeta: string, nombreArchivo: string, fallback = '') => {
   if (!nombreArchivo) return fallback;
-  if (nombreArchivo.startsWith('http')) return nombreArchivo;
+  if (nombreArchivo.startsWith('http') || nombreArchivo.startsWith('/uploads/')) {
+    return resolveMediaUrl(nombreArchivo, fallback);
+  }
 
   const baseUrl = api.defaults.baseURL || window.location.origin;
   // Decodificamos varias veces por si viene con doble codificación desde el backend (ej: %2520 -> %20 -> " ")

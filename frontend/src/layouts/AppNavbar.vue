@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { useRouter, useRoute } from 'vue-router';
 import { useEventoStore } from '@/stores/eventoStore';
 import { useAuthStore } from '@/stores/auth';
-import { getImageUrl, getBaseUrl } from '@/services/api';
+import { getApiBaseUrl, getImageUrl } from '@/services/api';
 
 const { t, locale } = useI18n();
 const router = useRouter();
@@ -12,7 +12,7 @@ const route = useRoute();
 const eventoStore = useEventoStore();
 const authStore = useAuthStore();
 
-const baseUrl = getBaseUrl();
+const baseUrl = getApiBaseUrl();
 
 const navLinks = computed(() => [
   { name: t('navbar.home'), href: '#inicio' },
