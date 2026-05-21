@@ -1,5 +1,5 @@
-import { IsEmail, IsNotEmpty, IsNumber, IsString } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsEmail, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class AsignarPonenteDto {
   @ApiProperty({ example: 'ponente@ejemplo.com' })
@@ -26,4 +26,9 @@ export class AsignarPonenteDto {
   @IsNumber()
   @IsNotEmpty()
   id_evento: number;
+
+  @ApiPropertyOptional({ example: 'Avances en inteligencia artificial aplicada', description: 'Temática o título de la presentación' })
+  @IsOptional()
+  @IsString()
+  tematica?: string;
 }

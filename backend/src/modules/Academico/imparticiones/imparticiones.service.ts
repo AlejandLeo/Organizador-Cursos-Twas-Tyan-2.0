@@ -52,12 +52,20 @@ export class ImparticionesService {
       },
     });
 
-    if (existe) return existe;
+    if (existe) {
+      // Si ya existe pero nos pasan temática, actualizarla
+      if (dto.tematica && existe.tematica !== dto.tematica) {
+        await this.imparticionRepository.update(existe.id, { tematica: dto.tematica });
+        return { ...existe, tematica: dto.tematica };
+      }
+      return existe;
+    }
 
     const nuevaImparticion = this.imparticionRepository.create({
       usuario: { id: usuario.id },
       actividadAcademica: { id: id_actividad },
       evento: { id: id_evento },
+      tematica: dto.tematica || undefined,
     });
 
     return this.imparticionRepository.save(nuevaImparticion);
@@ -71,8 +79,19 @@ export class ImparticionesService {
       usuario: { id: dto.id_usuario },
       actividadAcademica: { id: dto.id_actividad_academica },
       evento: { id: dto.id_evento },
+      tematica: dto.tematica || undefined,
     });
     return this.imparticionRepository.save(imparticion);
+  }
+
+  /** Actualizar la temática de una impartición existente */
+  async actualizarTematica(id: number, tematica: string) {
+    const imparticion = await this.imparticionRepository.findOneBy({ id });
+    if (!imparticion) {
+      throw new NotFoundException(`Impartición ${id} no encontrada`);
+    }
+    await this.imparticionRepository.update(id, { tematica });
+    return { id, tematica, mensaje: 'Temática actualizada correctamente.' };
   }
 
   /** Remover una asignación de ponente */

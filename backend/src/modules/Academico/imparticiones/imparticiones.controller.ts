@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   Delete,
   Param,
@@ -71,6 +72,18 @@ export class ImparticionesController {
   @ApiOperation({ summary: 'Remover asignación de ponente (Coordinador)' })
   remover(@Param('id', ParseIntPipe) id: number) {
     return this.service.remover(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Coordinador', 'Super Usuario', 'Ponente')
+  @ApiBearerAuth()
+  @Patch(':id/tematica')
+  @ApiOperation({ summary: 'Actualizar la temática de una impartición (Coordinador/Ponente)' })
+  actualizarTematica(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('tematica') tematica: string,
+  ) {
+    return this.service.actualizarTematica(id, tematica);
   }
 
   // ══════════════════════════════════════════════════════════

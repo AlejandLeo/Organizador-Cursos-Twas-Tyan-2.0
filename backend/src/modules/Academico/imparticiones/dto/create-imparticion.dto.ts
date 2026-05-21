@@ -1,5 +1,5 @@
-import { IsInt, IsNotEmpty } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export class CreateImparticionDto {
@@ -20,4 +20,9 @@ export class CreateImparticionDto {
   @Type(() => Number)
   @IsInt()
   id_evento: number;
+
+  @ApiPropertyOptional({ example: 'Avances en inteligencia artificial aplicada', description: 'Temática o título de la presentación' })
+  @IsOptional()
+  @IsString()
+  tematica?: string;
 }

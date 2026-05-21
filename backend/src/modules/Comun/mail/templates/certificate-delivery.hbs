@@ -143,6 +143,7 @@
             font-weight: 600;
             color: #1e293b;
             line-height: 1.4;
+            word-break: break-word;
         }
 
         /* Código de verificación */
@@ -172,6 +173,7 @@
             font-weight: 700;
             color: #38bdf8;
             letter-spacing: 3px;
+            word-break: break-all;
         }
 
         .code-note {
@@ -230,6 +232,50 @@
 
         .footer strong {
             color: #64748b;
+        }
+
+        /* Mobile Responsiveness */
+        @media only screen and (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            .header {
+                padding: 30px 20px 24px;
+            }
+            .header h1 {
+                font-size: 22px;
+            }
+            .body {
+                padding: 24px 20px;
+            }
+            .cert-card {
+                padding: 20px 16px;
+            }
+            .cert-row {
+                flex-direction: column;
+                gap: 4px;
+            }
+            .cert-row-label {
+                padding-top: 0;
+            }
+            .code-block {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                padding: 16px;
+            }
+            .code-value {
+                font-size: 15px;
+                letter-spacing: 1px;
+            }
+            .btn {
+                padding: 14px 24px;
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .footer {
+                padding: 20px;
+            }
         }
     </style>
 </head>
