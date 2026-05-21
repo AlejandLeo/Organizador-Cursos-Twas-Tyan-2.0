@@ -94,7 +94,7 @@ export class CertificadosEnvioService {
           codigo: cert.codigo_certificado,
           tipo: tipoLabel,
           tematica: tematica || '',
-          verifyUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verificar-certificado/${cert.uuid_archivo}`,
+          verifyUrl: `${process.env.FRONTEND_URL || 'http://:5173'}/verificar-certificado/${cert.uuid_archivo}`,
           anio: new Date().getFullYear(),
         },
         idTemplate, // Pasamos el ID de la plantilla específica

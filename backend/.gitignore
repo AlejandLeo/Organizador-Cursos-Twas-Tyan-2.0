@@ -43,3 +43,25 @@ tmp/
 *.pid
 *.seed
 *.pid.lock
+
+# Uploads (Archivos subidos localmente)
+uploads/cursos/*
+!uploads/cursos/.gitkeep
+uploads/eventos/*
+!uploads/eventos/.gitkeep
+uploads/firmas/*
+!uploads/firmas/.gitkeep
+uploads/fondos/*
+!uploads/fondos/.gitkeep
+uploads/imagenes/*
+!uploads/imagenes/.gitkeep
+uploads/inscripciones/*
+!uploads/inscripciones/.gitkeep
+uploads/perfiles/*
+!uploads/perfiles/.gitkeep
+uploads/profiles/*
+!uploads/profiles/.gitkeep
+uploads/logo/*
+!uploads/logo/.gitkeep
+!uploads/logo/EscudoFCPN.png
+!uploads/logo/LOGO UMSA OFICIAL.png
