@@ -2,8 +2,51 @@ import axios from 'axios';
 
 import { useUIStore } from '@/stores/ui';
 
+/** URL base del API: en producción usa el mismo dominio si no hay VITE_API_URL. */
+export const getApiBaseUrl = (): string => {
+  const envUrl = import.meta.env.VITE_API_URL as string | undefined;
+  if (envUrl) return envUrl.replace(/\/$/, '');
+  if (typeof window !== 'undefined') return window.location.origin;
+  return 'http://localhost:3000';
+};
+
+/**
+ * Normaliza URLs de medios devueltas por el API.
+ * Corrige rutas con localhost y rutas relativas /uploads/... en producción HTTPS.
+ */
+export const resolveMediaUrl = (url: string | null | undefined, fallback = ''): string => {
+  if (!url) return fallback;
+
+  const defaultFallback =
+    'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?w=1600&q=80';
+
+  const base = getApiBaseUrl();
+
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    try {
+      const parsed = new URL(url);
+      const isLocal =
+        parsed.hostname === 'localhost' ||
+        parsed.hostname === '127.0.0.1' ||
+        parsed.hostname.endsWith('.local');
+      if (isLocal && parsed.pathname.startsWith('/uploads/')) {
+        return `${base}${parsed.pathname}${parsed.search}`;
+      }
+      return url;
+    } catch {
+      return url;
+    }
+  }
+
+  if (url.startsWith('/uploads/')) {
+    return `${base}${url}`;
+  }
+
+  return url || fallback || defaultFallback;
+};
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000', // Ajusta según tu backend
+  baseURL: getApiBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
@@ -50,9 +93,11 @@ api.interceptors.response.use(
  */
 export const getImageUrl = (carpeta: string, nombreArchivo: string, fallback = '') => {
   if (!nombreArchivo) return fallback;
-  if (nombreArchivo.startsWith('http')) return nombreArchivo;
+  if (nombreArchivo.startsWith('http') || nombreArchivo.startsWith('/uploads/')) {
+    return resolveMediaUrl(nombreArchivo, fallback);
+  }
 
-  const baseUrl = api.defaults.baseURL || 'http://localhost:3000';
+  const baseUrl = getApiBaseUrl();
   // Decodificamos varias veces por si viene con doble codificación desde el backend (ej: %2520 -> %20 -> " ")
   let cleanName = nombreArchivo;
   try {

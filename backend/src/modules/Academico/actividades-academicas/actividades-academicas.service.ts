@@ -6,6 +6,7 @@ import { ActividadAcademica } from './entities/actividad-academica.entity';
 import { CreateActividadDto } from './dto/create-actividad.dto';
 import { UpdateActividadDto } from './dto/update-actividad.dto';
 import { MailService } from '../../Comun/mail/mail.service';
+import { formatMediaUrl } from '../../../common/media-url.util';
 
 @Injectable()
 export class ActividadesAcademicasService {
@@ -31,11 +32,7 @@ export class ActividadesAcademicasService {
   }
 
   private formatImageUrl(filenameOrUrl: string, folder: string = 'cursos'): string | null {
-    if (!filenameOrUrl) return null;
-    if (filenameOrUrl.startsWith('http')) return filenameOrUrl;
-    
-    const baseUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
-    return `${baseUrl}/uploads/${folder}/${encodeURIComponent(filenameOrUrl)}`;
+    return formatMediaUrl(filenameOrUrl, folder);
   }
 
   // ── CRUD básico ────────────────────────────────────────────

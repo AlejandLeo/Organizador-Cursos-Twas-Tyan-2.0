@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import api from '@/services/api';
+import api, { resolveMediaUrl } from '@/services/api';
 import { useEventoStore } from '@/stores/eventoStore';
 
 const eventoStore = useEventoStore();
@@ -48,7 +48,7 @@ const cargarEventos = async () => {
                     name: `${p.grado_abreviacion} ${p.nombres} ${p.primer_apellido}`.trim(),
                     topic: p.profesion || 'Expositor',
                     country: p.email, // Podríamos usar país si existiera en el modelo
-                    img: p.foto || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&q=80'
+                    img: resolveMediaUrl(p.foto, 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&q=80')
                 }));
             } catch (e) {
                 console.error(`Error cargando ponentes para evento ${ev.id}`, e);
@@ -66,8 +66,8 @@ const cargarEventos = async () => {
                 version: ev.version || '',
                 color: colors[index % colors.length],
                 icon: icons[index % icons.length],
-                imagen_fondo: ev.imagen_fondo || 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?w=1600&q=80',
-                logo: ev.imagen_portada || null,
+                imagen_fondo: resolveMediaUrl(ev.imagen_fondo),
+                logo: resolveMediaUrl(ev.imagen_portada || ev.logo, ''),
                 google_maps_link: ev.google_maps_link || null,
                 direccion: ev.direccion || null,
                 sobre_evento_1: ev.sobre_evento_1 || null,
@@ -138,7 +138,7 @@ const abrirMapa = (url: string) => {
     <!-- SECCIÓN PRINCIPAL (HERO) -->
     <section id="inicio" class="relative w-full min-h-[95vh] group flex flex-col justify-end text-left pt-36 pb-20 overflow-hidden">
         <div class="absolute inset-0 bg-primary-dark/40 dark:bg-black/60 z-10 transition-colors duration-700"></div>
-        <img :src="eventoSeleccionado?.imagen_fondo || 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?w=1600&q=80'" class="absolute inset-0 w-full h-full object-cover object-center transition-all duration-[1.5s]" alt="Fondo del Evento">
+        <img :src="resolveMediaUrl(eventoSeleccionado?.imagen_fondo)" class="absolute inset-0 w-full h-full object-cover object-center transition-all duration-[1.5s]" alt="Fondo del Evento">
         <div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/80 to-transparent dark:from-black dark:via-black/80 z-20"></div>
 
         <div class="relative z-30 w-full px-6 md:px-16 lg:px-24 max-w-[2500px] mx-auto flex flex-col items-start mt-auto">
