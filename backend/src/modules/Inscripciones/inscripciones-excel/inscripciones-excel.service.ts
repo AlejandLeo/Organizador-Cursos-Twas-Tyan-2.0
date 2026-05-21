@@ -70,7 +70,7 @@ export class InscripcionesExcelService implements OnModuleInit {
         .replace(/[\u0300-\u036f]/g, "")
         .replace(/[^a-z0-9]/g, "")
         .trim();
-      
+
       for (const kw of keywords) {
         if (norm.includes(kw)) {
           return String(fila[key] || '').trim();
@@ -99,12 +99,12 @@ export class InscripcionesExcelService implements OnModuleInit {
         .replace(/[\u0300-\u036f]/g, "")
         .replace(/[^a-z0-9]/g, "")
         .trim();
-      
+
       // Si la columna es de trabajo o exposición, no debe asignarse al grado académico
       if (norm.includes('trabajo') || norm.includes('exposicion') || norm.includes('ponencia') || norm.includes('proyecto') || norm.includes('investigacion') || norm.includes('tema')) {
         continue;
       }
-      
+
       if (norm.includes('gradoacademico') || norm.includes('grado') || norm.includes('titulo')) {
         return String(fila[key] || '').trim();
       }
@@ -603,9 +603,9 @@ export class InscripcionesExcelService implements OnModuleInit {
               await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
             }
           } else {
-            await queryRunner.manager.save(queryRunner.manager.create(Imparticion, { 
-              usuario, 
-              actividadAcademica: actividad, 
+            await queryRunner.manager.save(queryRunner.manager.create(Imparticion, {
+              usuario,
+              actividadAcademica: actividad,
               evento: actividad.evento,
               tematica: tematica || undefined
             }));
