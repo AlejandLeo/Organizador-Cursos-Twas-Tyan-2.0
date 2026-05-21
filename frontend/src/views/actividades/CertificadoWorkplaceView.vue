@@ -601,9 +601,19 @@ const guardarDiseno = async () => {
                             <span class="text-[10px] font-black text-blue-700 dark:text-blue-300 flex-1 uppercase">Bloque: Tenor</span>
                             <span class="material-symbols-outlined text-xs text-blue-400">notes</span>
                         </div>
-                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{NOMBRE_ESTUDIANTE}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group mt-4">
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{NOMBRE}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group mt-4">
                             <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
-                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} NOMBRE_ESTUDIANTE {{ '}' }}</span>
+                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} NOMBRE {{ '}' }}</span>
+                            <span class="material-symbols-outlined text-xs text-slate-400">person</span>
+                        </div>
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{NOMBRE_COMPLETO_1}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                            <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
+                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} NOMBRE_COMPLETO_1 {{ '}' }}</span>
+                            <span class="material-symbols-outlined text-xs text-slate-400">person</span>
+                        </div>
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{NOMBRE_COMPLETO_2}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                            <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
+                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} NOMBRE_COMPLETO_2 {{ '}' }}</span>
                             <span class="material-symbols-outlined text-xs text-slate-400">person</span>
                         </div>
                         <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{PRIMER_APELLIDO}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
@@ -641,20 +651,11 @@ const guardarDiseno = async () => {
                             <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} CI_USUARIO {{ '}' }}</span>
                             <span class="material-symbols-outlined text-xs text-slate-400">fingerprint</span>
                         </div>
-                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{CARGA_HORARIA}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
-                            <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
-                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} CARGA_HORARIA {{ '}' }}</span>
-                            <span class="material-symbols-outlined text-xs text-slate-400">schedule</span>
-                        </div>
+
                         <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{FECHA_EMISION}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
                             <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
                             <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} FECHA_EMISION {{ '}' }}</span>
                             <span class="material-symbols-outlined text-xs text-slate-400">today</span>
-                        </div>
-                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{NOTA_FINAL}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
-                            <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
-                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} NOTA_FINAL {{ '}' }}</span>
-                            <span class="material-symbols-outlined text-xs text-slate-400">grade</span>
                         </div>
                         <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{CODIGO_CERTIFICADO}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
                             <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>

@@ -28,8 +28,8 @@ import { ActividadAcademica } from '../../Academico/actividades-academicas/entit
 export class CertificadosQueueService {
   private readonly logger = new Logger(CertificadosQueueService.name);
 
-  /** Cola FIFO de IDs pendientes de envío */
-  private readonly queue: number[] = [];
+  /** Cola FIFO de IDs pendientes de envío y su plantilla opcional */
+  private readonly queue: { id: number; idTemplate?: number }[] = [];
 
   /** Evita que dos workers corran en paralelo */
   private isProcessing = false;
@@ -48,8 +48,9 @@ export class CertificadosQueueService {
    * Encola un lote de IDs para envío asíncrono.
    * Retorna inmediatamente; el envío ocurre en segundo plano.
    */
-  async encolarLote(ids: number[]): Promise<{ mensaje: string; encolados: number }> {
-    this.queue.push(...ids);
+  async encolarLote(ids: number[], idTemplate?: number): Promise<{ mensaje: string; encolados: number }> {
+    const items = ids.map(id => ({ id, idTemplate }));
+    this.queue.push(...items);
     this.logger.log(`[Queue] +${ids.length} certificados encolados. Total pendiente: ${this.queue.length}`);
     this.iniciarWorkerSiIdle();
     return {
@@ -61,8 +62,8 @@ export class CertificadosQueueService {
   /**
    * Encola el reintento de un único certificado.
    */
-  async encolarUno(id: number): Promise<{ mensaje: string }> {
-    this.queue.push(id);
+  async encolarUno(id: number, idTemplate?: number): Promise<{ mensaje: string }> {
+    this.queue.push({ id, idTemplate });
     this.logger.log(`[Queue] Certificado #${id} encolado para reintento.`);
     this.iniciarWorkerSiIdle();
     return { mensaje: `Certificado #${id} encolado para envío. Se procesará en breve.` };
@@ -370,14 +371,16 @@ export class CertificadosQueueService {
     this.logger.log(`[Worker] Iniciando procesamiento. ${this.queue.length} jobs en cola.`);
 
     while (this.queue.length > 0) {
-      const id = this.queue.shift()!;
-      try {
-        await this.envioService.enviarCertificadoIndividual(id);
-        this.logger.log(`[Worker] ✓ Certificado #${id} enviado.`);
-      } catch (error) {
-        this.logger.error(`[Worker] ✗ Certificado #${id} falló: ${error.message}`);
+      const task = this.queue.shift();
+      if (task) {
+        try {
+          await this.envioService.enviarCertificado(task.id, task.idTemplate);
+          this.logger.log(`[Worker] ✓ Certificado #${task.id} enviado.`);
+        } catch (error) {
+          this.logger.error(`[Worker] ✗ Certificado #${task.id} falló: ${error.message}`);
+        }
       }
-
+      
       if (this.queue.length > 0) {
         await new Promise<void>((resolve) => setTimeout(resolve, 500));
       }

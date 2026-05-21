@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { createHmac } from 'crypto';
 import { Certificado } from './entities/certificado.entity';
 import { MailService } from '../../Comun/mail/mail.service';
+import { MailTemplateType } from '../../Comun/mail/entities/mail-template.entity';
 import { CertificadosService } from './certificados.service';
 import jsPDF from 'jspdf';
 import * as fs from 'fs';
@@ -25,7 +26,7 @@ export class CertificadosEnvioService {
    * Genera y envía un certificado individual.
    * Calcula el HMAC-SHA256 real del PDF y lo persiste en DB antes de enviar.
    */
-  async enviarCertificadoIndividual(id: number) {
+  async enviarCertificado(id: number, idTemplate?: number) {
     const cert = await this.certificadoRepository.findOne({
       where: { id },
       relations: [
@@ -39,19 +40,8 @@ export class CertificadosEnvioService {
 
     if (!cert) throw new NotFoundException(`Certificado ${id} no encontrado.`);
 
-    // Validar Fase del Evento (Solo fase >= 4: Finalizado o Archivado)
-    const faseEvento = cert.actividadAcademica.evento.fase;
-    if (faseEvento < 4) {
-      const errorMsg = `No se puede enviar el certificado. El evento '${cert.actividadAcademica.evento.nombre}' aún no ha finalizado (Fase actual: ${faseEvento}).`;
-      this.logger.warn(errorMsg);
-      await this.certificadoRepository.update(id, {
-        estado_envio: 'error',
-        log_error_envio: errorMsg,
-        fecha_ultimo_envio: new Date(),
-        reintentos: cert.reintentos + 1,
-      });
-      throw new Error(errorMsg);
-    }
+    // La validación de fase fue removida para homologar la lógica con la emisión,
+    // permitiendo enviar certificados en cualquier fase del evento.
 
     try {
       // 1. Generar el PDF en memoria
@@ -83,21 +73,22 @@ export class CertificadosEnvioService {
       };
       const tipoLabel = tiposMap[cert.tipo] ?? 'Participante';
 
-      // 5. Enviar correo con PDF adjunto
-      await this.mailService.sendMail(
+      // 5. Enviar correo con PDF adjunto usando el helper de dbTemplate
+      const result = await this.mailService.sendMailWithDbTemplate(
+        MailTemplateType.CERTIFICATE,
         email,
         asunto,
         'certificate-delivery',
         {
-          name: nombreUsuario,
+          nombre: nombreUsuario, // Usando nombre en lugar de name para ser consistentes con la paleta
           actividad: cert.actividadAcademica.nombre,
           evento: cert.actividadAcademica.evento.nombre,
           codigo: cert.codigo_certificado,
           tipo: tipoLabel,
-          verifyUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verificar/${cert.codigo_certificado}`,
+          verifyUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verificar-certificado/${cert.uuid_archivo}`,
           anio: new Date().getFullYear(),
         },
-        undefined,
+        idTemplate, // Pasamos el ID de la plantilla específica
         [
           {
             filename: `Certificado_${cert.codigo_certificado}.pdf`,
@@ -105,6 +96,11 @@ export class CertificadosEnvioService {
           },
         ],
       );
+
+      // Si result es null, significa que falló silenciosamente (o algo en sendMail devolvió null)
+      if (result === null) {
+        throw new Error('El proveedor SMTP no pudo enviar el correo (retornó null). Verifique la conexión SMTP.');
+      }
 
       // 6. Actualizar estado en DB → éxito
       await this.certificadoRepository.update(id, {
@@ -188,9 +184,27 @@ export class CertificadosEnvioService {
       }
     }
 
-    const studentName = `${cert.usuario.persona?.nombres ?? ''} ${cert.usuario.persona?.primer_apellido ?? ''} ${cert.usuario.persona?.segundo_apellido ?? ''}`.trim().toUpperCase();
+    const nombres = (cert.usuario.persona?.nombres || '').toUpperCase().trim();
+    const primerApellido = (cert.usuario.persona?.primer_apellido || '').toUpperCase().trim();
+    const segundoApellido = (cert.usuario.persona?.segundo_apellido || '').toUpperCase().trim();
+    const ciUsuario = (cert.usuario.persona?.documento_identidad || '').toUpperCase().trim();
+    
+    // Nombres Apellido1 Apellido2
+    const nombreCompleto2 = `${nombres} ${primerApellido} ${segundoApellido}`.replace(/\s+/g, ' ').trim();
+    // Apellido1 Apellido2 Nombres
+    const nombreCompleto1 = `${primerApellido} ${segundoApellido} ${nombres}`.replace(/\s+/g, ' ').trim();
+
+    const studentName = nombreCompleto2; // Para compatibilidad
+    
     const courseName = (cert.actividadAcademica?.nombre || '').toUpperCase();
+    const eventoNombre = (cert.actividadAcademica?.evento?.nombre || '').toUpperCase();
+    const gestionEvento = cert.actividadAcademica?.evento?.gestion?.toString() || new Date().getFullYear().toString();
+    
     const certCode = cert.codigo_certificado || '';
+    const fechaEmision = cert.fecha_emision ? new Date(cert.fecha_emision).toLocaleDateString('es-BO') : new Date().toLocaleDateString('es-BO');
+    
+    const tipos = { 1: 'Asistente', 2: 'Expositor', 3: 'Organizador', 4: 'Docente' };
+    const rol = (tipos[cert.tipo] || '').toUpperCase();
 
     // Si existen elementos definidos en el lienzo, realizamos renderizado 100% dinámico
     if (Array.isArray(elementos) && elementos.length > 0) {
@@ -216,8 +230,9 @@ export class CertificadosEnvioService {
           doc.setTextColor(0, 0, 0);
         }
 
-        // Fuente
-        doc.setFontSize(el.fontSize || 14);
+        // Fuente: jsPDF usa puntos (pt). El canvas usa píxeles (px). 1px = 0.75pt
+        const fontSizePt = (el.fontSize || 14) * 0.75;
+        doc.setFontSize(fontSizePt);
         if (el.fontFamily === 'Courier New') {
           doc.setFont('courier');
         } else if (el.fontFamily === 'Times New Roman') {
@@ -226,33 +241,73 @@ export class CertificadosEnvioService {
           doc.setFont('helvetica');
         }
 
+        // Función auxiliar para reemplazar todas las variables dinámicas
+        const replaceVars = (text: string) => {
+          if (!text) return '';
+          let res = text;
+          // Formatos con corchetes (insensibles a mayúsculas)
+          res = res.replace(/\[NOMBRE\]/gi, nombres);
+          res = res.replace(/\[NOMBRE_COMPLETO_1\]/gi, nombreCompleto1);
+          res = res.replace(/\[NOMBRE_COMPLETO_2\]/gi, nombreCompleto2);
+          res = res.replace(/\[ACTIVIDAD\]/gi, courseName);
+          res = res.replace(/\[CODIGO\]/gi, certCode);
+          res = res.replace(/\[FECHA\]/gi, fechaEmision);
+          
+          // Formatos con llaves simples
+          res = res.replace(/\{NOMBRE_ESTUDIANTE\}/gi, nombreCompleto2); // legacy
+          res = res.replace(/\{NOMBRE_COMPLETO_1\}/gi, nombreCompleto1);
+          res = res.replace(/\{NOMBRE_COMPLETO_2\}/gi, nombreCompleto2);
+          res = res.replace(/\{NOMBRE\}/gi, nombres);
+          res = res.replace(/\{NOMBRES\}/gi, nombres);
+          res = res.replace(/\{PRIMER_APELLIDO\}/gi, primerApellido);
+          res = res.replace(/\{SEGUNDO_APELLIDO\}/gi, segundoApellido);
+          res = res.replace(/\{PRIMER APELLIDO\}/gi, primerApellido);
+          res = res.replace(/\{SEGUNDO APELLIDO\}/gi, segundoApellido);
+          res = res.replace(/\{PRIMER_APÉLLIDO\}/gi, primerApellido); // Por el typo reportado por el usuario
+          res = res.replace(/\{CI_USUARIO\}/gi, ciUsuario);
+          res = res.replace(/\{CI\}/gi, ciUsuario);
+          
+          res = res.replace(/\{NOMBRE_CURSO\}/gi, courseName);
+          res = res.replace(/\{CURSO\}/gi, courseName);
+          res = res.replace(/\{ACTIVIDAD\}/gi, courseName);
+          res = res.replace(/\{EVENTO\}/gi, eventoNombre);
+          res = res.replace(/\{GESTION\}/gi, gestionEvento);
+          res = res.replace(/\{ROL\}/gi, rol);
+          
+          res = res.replace(/\{CODIGO_CERTIFICADO\}/gi, certCode);
+          res = res.replace(/\{CODIGO\}/gi, certCode);
+          res = res.replace(/\{FECHA_EMISION\}/gi, fechaEmision);
+          res = res.replace(/\{FECHA\}/gi, fechaEmision);
+
+          // Formatos con llaves dobles
+          res = res.replace(/\{\{NOMBRE_ESTUDIANTE\}\}/gi, nombreCompleto2);
+          res = res.replace(/\{\{NOMBRE_COMPLETO_1\}\}/gi, nombreCompleto1);
+          res = res.replace(/\{\{NOMBRE_COMPLETO_2\}\}/gi, nombreCompleto2);
+          res = res.replace(/\{\{NOMBRE\}\}/gi, nombres);
+          res = res.replace(/\{\{NOMBRE_CURSO\}\}/gi, courseName);
+          res = res.replace(/\{\{ACTIVIDAD\}\}/gi, courseName);
+          res = res.replace(/\{\{CODIGO_CERTIFICADO\}\}/gi, certCode);
+          return res;
+        };
+
         if (el.tipo === 'texto') {
-          let val = el.valor || '';
-          val = val.replace('{NOMBRE_ESTUDIANTE}', studentName);
-          val = val.replace('{NOMBRE_CURSO}', courseName);
-          val = val.replace('{CODIGO_CERTIFICADO}', certCode);
-          doc.text(val, mmX, mmY);
+          // En CSS el X,Y es la esquina superior izquierda. jsPDF text usa baseline por defecto.
+          doc.text(replaceVars(el.valor || ''), mmX, mmY, { baseline: 'top' });
         } 
-        else if (el.tipo === 'cabecera') {
-          let val = info.cabecera || el.valor || '';
-          val = val.replace('{NOMBRE_ESTUDIANTE}', studentName);
-          val = val.replace('{NOMBRE_CURSO}', courseName);
-          val = val.replace('{CODIGO_CERTIFICADO}', certCode);
-          doc.text(val, mmX, mmY, { align: 'center', maxWidth: mmW || 200 });
-        } 
-        else if (el.tipo === 'tenor') {
-          let val = info.tenor || el.valor || '';
-          val = val.replace('{NOMBRE_ESTUDIANTE}', studentName);
-          val = val.replace('{NOMBRE_CURSO}', courseName);
-          val = val.replace('{CODIGO_CERTIFICADO}', certCode);
-          val = val.replace('[NOMBRE]', studentName);
-          val = val.replace('[ACTIVIDAD]', courseName);
-          val = val.replace('[CODIGO]', certCode);
-          doc.text(val, mmX, mmY, { align: 'center', maxWidth: mmW || 200 });
+        else if (el.tipo === 'cabecera' || el.tipo === 'tenor') {
+          // Si el texto está centrado, en jsPDF el X debe ser el centro real de la caja
+          const w = mmW || 200;
+          const centerX = mmX + (w / 2);
+          doc.text(replaceVars(info[el.tipo] || el.valor || ''), centerX, mmY, { 
+            align: 'center', 
+            maxWidth: w,
+            baseline: 'top' 
+          });
         }
         else if (el.tipo === 'qr') {
-          // Generar código QR dinámico real
-          const verificationUrl = `http://localhost:3000/api/certificados/verificar/${certCode}`;
+          // Generar código QR dinámico real apuntando a la página frontend de verificación
+          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+          const verificationUrl = `${frontendUrl}/verificar-certificado/${cert.uuid_archivo}`;
           let qrDrawn = false;
           try {
             const qrRes = await fetch(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(verificationUrl)}`);

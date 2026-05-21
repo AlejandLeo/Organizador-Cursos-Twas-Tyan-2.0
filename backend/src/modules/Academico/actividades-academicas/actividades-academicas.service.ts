@@ -273,17 +273,7 @@ export class ActividadesAcademicasService {
         await this.actividadRepository.save(act);
     }
 
-    const coordinadorNombre = usuario.persona?.nombres || usuario.email;
-    
-    try {
-        await this.mailService.sendActivationRequestNotification(
-          act.nombre,
-          coordinadorNombre,
-          usuario.email
-        );
-    } catch (e) {
-        console.error("Error enviando correo de activación:", e);
-    }
+    // El log para activación ya fue añadido a la descripción. No se envía correo a MAIL_USER.
     
     return { message: 'Solicitud enviada correctamente al Super Usuario.' };
   }

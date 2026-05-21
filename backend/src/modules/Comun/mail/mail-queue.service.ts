@@ -127,7 +127,7 @@ export class MailQueueService {
         }
 
         try {
-          await this.mailService.sendMail(
+          const result = await this.mailService.sendMail(
             mail.destinatario,
             mail.asunto,
             undefined,
@@ -135,9 +135,12 @@ export class MailQueueService {
             mail.cuerpo,
           );
 
-          await this.mailQueueRepository.delete(mail.id);
+          if (result === null) {
+            throw new Error('Error en el proveedor SMTP (retornó null).');
+          }
 
-          await this.registrarLog(mail, 'enviado');
+          await this.mailQueueRepository.delete(mail.id);
+          // No llamamos a registrarLog aquí porque mailService.sendMail ya crea el registro de auditoría.
           this.logger.log(`✓ Correo enviado a ${mail.destinatario} y eliminado de la cola.`);
 
         } catch (error) {

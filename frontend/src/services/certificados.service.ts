@@ -20,12 +20,12 @@ export const certificadosService = {
     return api.get<Certificado[]>('/admin/certificados');
   },
 
-  enviarMasivo(ids: number[]) {
-    return api.post('/admin/certificados/enviar-masivo', { ids });
+  enviarMasivo(ids: number[], idTemplate?: number) {
+    return api.post('/admin/certificados/enviar-masivo', { ids, idTemplate });
   },
 
-  reintentarEnvio(id: number) {
-    return api.post(`/admin/certificados/${id}/reintentar-envio`);
+  reintentarEnvio(id: number, idTemplate?: number) {
+    return api.post(`/admin/certificados/${id}/reintentar-envio`, { idTemplate });
   },
 
   /** Reintenta el envío de TODOS los certificados con estado_envio = 'error' */

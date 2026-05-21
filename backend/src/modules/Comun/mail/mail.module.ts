@@ -12,11 +12,13 @@ import { MailQueueService } from './mail-queue.service';
 import { MailTemplate } from './entities/mail-template.entity';
 import { MailTemplateService } from './mail-template.service';
 import { MailTemplateController } from './mail-template.controller';
+import { SistemaConfigModule } from '../sistema-config/sistema-config.module';
 
 @Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([MailLog, MailQueue, MailTemplate]),
+    SistemaConfigModule,
     
     MailerModule.forRootAsync({
       useFactory: async (config: ConfigService) => ({
