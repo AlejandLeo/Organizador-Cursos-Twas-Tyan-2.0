@@ -506,6 +506,7 @@ export class InscripcionesExcelService implements OnModuleInit {
         const numFila = i + 2;
         const email = (this.getFilaVal(fila, ['email', 'correo', 'mail']) || String(fila['email'] || '')).trim().toLowerCase();
         const nombreActividad = (this.getFilaVal(fila, ['actividad', 'curso', 'nombreactividad']) || String(fila['nombre_actividad_academica'] || '')).trim();
+        const tematica = (this.getFilaVal(fila, ['tematica', 'tema']) || String(fila['tematica'] || '')).trim();
 
         if (!email || !nombreActividad) {
           detalle.push({ fila: numFila, estado: 'error', mensaje: 'Email o nombre de actividad vacío.' });
@@ -590,16 +591,28 @@ export class InscripcionesExcelService implements OnModuleInit {
 
           const existente = await queryRunner.manager.findOne(Imparticion, { where: { usuario: { id: usuario.id }, actividadAcademica: { id: actividad.id } } });
           if (existente) {
-            detalle.push({ fila: numFila, email, estado: 'omitido', mensaje: 'Ya asignado.' });
-            omitidos++;
-            await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-            continue;
+            if (tematica && existente.tematica !== tematica) {
+              existente.tematica = tematica;
+              await queryRunner.manager.save(existente);
+              detalle.push({ fila: numFila, email, estado: 'asignado', mensaje: 'Temática actualizada.' });
+              asignados++;
+              // No hacemos rollback porque queremos guardar el update
+            } else {
+              detalle.push({ fila: numFila, email, estado: 'omitido', mensaje: 'Ya asignado.' });
+              omitidos++;
+              await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+            }
+          } else {
+            await queryRunner.manager.save(queryRunner.manager.create(Imparticion, { 
+              usuario, 
+              actividadAcademica: actividad, 
+              evento: actividad.evento,
+              tematica: tematica || undefined
+            }));
+            detalle.push({ fila: numFila, email, estado: modo === 'verificar' ? 'omitido' : (fueCreado ? 'creado' : 'asignado'), mensaje: 'Procesado.' });
+            if (fueCreado) creados++;
+            asignados++;
           }
-
-          await queryRunner.manager.save(queryRunner.manager.create(Imparticion, { usuario, actividadAcademica: actividad, evento: actividad.evento }));
-          detalle.push({ fila: numFila, email, estado: modo === 'verificar' ? 'omitido' : (fueCreado ? 'creado' : 'asignado'), mensaje: 'Procesado.' });
-          if (fueCreado) creados++;
-          asignados++;
         } catch (error) {
           await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
           detalle.push({ fila: numFila, email, estado: 'error', mensaje: error.message });
@@ -639,8 +652,8 @@ export class InscripcionesExcelService implements OnModuleInit {
 
   generarPlantillaPonentes(): Buffer {
     const ws = XLSX.utils.aoa_to_sheet([
-      ['email', 'nombre_actividad_academica', 'nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad', 'grado_academico'],
-      ['ejemplo@correo.com', 'Nombre del Curso', 'Ana', 'Lopez', '', '1234567', 'Lic.']
+      ['email', 'nombre_actividad_academica', 'tematica', 'nombres', 'primer_apellido', 'segundo_apellido', 'documento_identidad', 'grado_academico'],
+      ['ejemplo@correo.com', 'Nombre del Curso', 'Título de su presentación', 'Ana', 'Lopez', '', '1234567', 'Lic.']
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Asignación');

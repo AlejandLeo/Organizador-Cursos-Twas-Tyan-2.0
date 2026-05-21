@@ -1,4 +1,5 @@
 import {
+  Column,
   CreateDateColumn,
   Entity,
   JoinColumn,
@@ -43,6 +44,10 @@ export class Imparticion {
   @ManyToOne(() => Evento, (evento) => evento.imparticiones)
   @JoinColumn({ name: 'id_evento' })
   evento: Evento;
+
+  /** Tema o tópico específico de la ponencia impartida. */
+  @Column({ type: 'text', nullable: true })
+  tematica: string;
 
   @CreateDateColumn({ type: 'timestamptz' })
   fecha_creacion: Date;

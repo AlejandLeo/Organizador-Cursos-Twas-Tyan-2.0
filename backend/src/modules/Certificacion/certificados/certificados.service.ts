@@ -283,6 +283,7 @@ export class CertificadosService {
         'usuario.persona',
         'usuario.afiliaciones',
         'infoCertificado',
+        'infoCertificado.evento',
         'actividadAcademica',
         'actividadAcademica.evento',
         'usuariosCertificados',
@@ -481,5 +482,25 @@ export class CertificadosService {
       logs,
       cola,
     };
+  }
+
+  /**
+   * Obtiene la temática de la ponencia impartida por un usuario en una actividad.
+   */
+  async obtenerTematicaPonente(idUsuario: number, idActividad?: number, idEvento?: number): Promise<string> {
+    if (!idActividad && !idEvento) return '';
+
+    const query = this.imparticionRepository.createQueryBuilder('i')
+      .where('i.id_usuario = :idUsuario', { idUsuario });
+
+    if (idActividad) {
+      query.andWhere('i.id_actividad_academica = :idActividad', { idActividad });
+    } else if (idEvento) {
+      query.leftJoin('i.actividadAcademica', 'act')
+           .andWhere('(i.id_evento = :idEvento OR act.id_evento = :idEvento)', { idEvento });
+    }
+
+    const imparticion = await query.getOne();
+    return imparticion?.tematica || '';
   }
 }
