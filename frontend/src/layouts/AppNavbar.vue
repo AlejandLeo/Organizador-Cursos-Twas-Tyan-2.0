@@ -12,6 +12,8 @@ const route = useRoute();
 const eventoStore = useEventoStore();
 const authStore = useAuthStore();
 
+const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 const navLinks = computed(() => [
   { name: t('navbar.home'), href: '#inicio' },
   { name: t('navbar.info'), href: '#informacion' },
@@ -182,7 +184,7 @@ onMounted(async () => {
              </a>
              <a href="https://www.umsa.bo/" target="_blank" 
                 class="w-10 h-10 rounded-full border border-slate-100 dark:border-slate-700 p-1 flex items-center justify-center bg-white dark:bg-slate-900 shadow-sm hover:scale-110 transition-all cursor-pointer">
-               <img src="http://localhost:3000/uploads/logo/LOGO%20UMSA%20OFICIAL.png" 
+               <img :src="`${baseUrl}/uploads/logo/LOGO%20UMSA%20OFICIAL.png`" 
                     class="w-full h-full object-contain dark:opacity-90" alt="UMSA" />
              </a>
           </div>
@@ -250,7 +252,7 @@ onMounted(async () => {
           <!-- Logos Institucionales en Móvil -->
           <div class="flex justify-center items-center gap-6 pt-4">
              <img src="/logo/logoOficial.png" class="h-10 w-auto opacity-70" alt="Logo Oficial" />
-             <img src="http://localhost:3000/uploads/logo/Logo%20UMSA.png" class="h-10 w-auto opacity-70" alt="UMSA" />
+             <img :src="`${baseUrl}/uploads/logo/Logo%20UMSA.png`" class="h-10 w-auto opacity-70" alt="UMSA" />
           </div>
         </div>
       </div>
