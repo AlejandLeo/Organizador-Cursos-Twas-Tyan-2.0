@@ -177,16 +177,16 @@ onMounted(async () => {
           
           <!-- LOGOS INSTITUCIONALES (TAMAÑO EQUILIBRADO) -->
           <div class="hidden sm:flex items-center gap-2 border-l pl-4 border-slate-200 dark:border-slate-800 ml-1">
-             <a href="https://www.fcpn.edu.bo/" target="_blank" 
-                class="w-10 h-10 flex items-center justify-center hover:scale-110 transition-all cursor-pointer">
-               <img src="/logo/logoOficial.png" 
-                    class="w-full h-full object-contain dark:opacity-90" alt="Logo Oficial" />
-             </a>
-             <a href="https://www.umsa.bo/" target="_blank" 
-                class="w-10 h-10 rounded-full border border-slate-100 dark:border-slate-700 p-1 flex items-center justify-center bg-white dark:bg-slate-900 shadow-sm hover:scale-110 transition-all cursor-pointer">
-               <img :src="`${baseUrl}/uploads/logo/LOGO%20UMSA%20OFICIAL.png`" 
-                    class="w-full h-full object-contain dark:opacity-90" alt="UMSA" />
-             </a>
+              <a href="https://www.fcpn.edu.bo/" target="_blank" 
+                 class="w-10 h-10 flex items-center justify-center hover:scale-110 transition-all cursor-pointer">
+                <img :src="getImageUrl('logo', 'EscudoFCPN.png')" 
+                     class="w-full h-full object-contain dark:opacity-90" alt="FCPN" />
+              </a>
+              <a href="https://www.umsa.bo/" target="_blank" 
+                 class="w-10 h-10 rounded-full border border-slate-100 dark:border-slate-700 p-1 flex items-center justify-center bg-white dark:bg-slate-900 shadow-sm hover:scale-110 transition-all cursor-pointer">
+                <img :src="getImageUrl('logo', 'LOGO UMSA OFICIAL.png')" 
+                     class="w-full h-full object-contain dark:opacity-90" alt="UMSA" />
+              </a>
           </div>
 
           <!-- BOTÓN MENÚ MÓVIL (HAMBURGUESA) -->
@@ -251,8 +251,12 @@ onMounted(async () => {
 
           <!-- Logos Institucionales en Móvil -->
           <div class="flex justify-center items-center gap-6 pt-4">
-             <img src="/logo/logoOficial.png" class="h-10 w-auto opacity-70" alt="Logo Oficial" />
-             <img :src="`${baseUrl}/uploads/logo/Logo%20UMSA.png`" class="h-10 w-auto opacity-70" alt="UMSA" />
+             <a href="https://www.fcpn.edu.bo/" target="_blank">
+               <img :src="getImageUrl('logo', 'EscudoFCPN.png')" class="h-10 w-auto opacity-70" alt="FCPN" />
+             </a>
+             <a href="https://www.umsa.bo/" target="_blank">
+               <img :src="getImageUrl('logo', 'LOGO UMSA OFICIAL.png')" class="h-10 w-auto opacity-70" alt="UMSA" />
+             </a>
           </div>
         </div>
       </div>

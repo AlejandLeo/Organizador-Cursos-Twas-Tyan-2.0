@@ -13,6 +13,7 @@ import {
   UploadedFiles,
   UseInterceptors,
   Request,
+  Redirect,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -42,6 +43,14 @@ export class EventosController {
   // ══════════════════════════════════════════════════════════
   //  ENDPOINTS PÚBLICOS
   // ══════════════════════════════════════════════════════════
+
+  /** GET /eventos/index — Redirección para URLs heredadas */
+  @Get('index')
+  @Redirect('/', 302)
+  @ApiOperation({ summary: 'Redireccionar index de eventos a la raíz de la web' })
+  redirectIndex() {
+    return { url: '/' };
+  }
 
   /** GET /eventos — Lista (con URLs de imágenes formateadas) */
   @Get()

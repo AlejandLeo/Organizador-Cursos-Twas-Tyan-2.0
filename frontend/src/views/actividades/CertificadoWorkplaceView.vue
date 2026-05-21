@@ -356,7 +356,7 @@ const getFirmanteData = (idUsuario?: number) => {
 const getFirmaFullUrl = (firmaUrl: string) => {
     if (!firmaUrl) return ''
     if (firmaUrl.startsWith('http')) return firmaUrl
-    const base = api.defaults.baseURL || 'http://localhost:3000'
+    const base = api.defaults.baseURL || window.location.origin
     return `${base}${firmaUrl}`
 }
 
@@ -686,14 +686,11 @@ const guardarDiseno = async () => {
                             <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} DISCIPLINA {{ '}' }}</span>
                             <span class="material-symbols-outlined text-xs text-slate-400">subject</span>
                         </div>
-<<<<<<< HEAD
-=======
                         <div v-if="Number(tipoCertificado) === 2" draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{TEMATICA}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
                             <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
                             <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} TEMATICA {{ '}' }}</span>
                             <span class="material-symbols-outlined text-xs text-slate-400">psychology</span>
                         </div>
->>>>>>> 9b0c81ce15d4bfb7ad481eff2cd1ae45ca14566e
 
                         <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{FECHA_EMISION}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
                             <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
