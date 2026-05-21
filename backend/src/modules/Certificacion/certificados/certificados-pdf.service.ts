@@ -45,6 +45,24 @@ export class CertificadosPdfService {
     const pdfWidth = doc.internal.pageSize.getWidth();
     const pdfHeight = doc.internal.pageSize.getHeight();
 
+    // Dibujar imagen de fondo si existe
+    const info = certificado.infoCertificado;
+    if (info && info.fondo_url) {
+      try {
+        const fileName = info.fondo_url.split('?')[0].split('/').pop() || '';
+        const localFondoPath = path.join(process.cwd(), 'uploads', 'fondos', fileName);
+        if (fs.existsSync(localFondoPath)) {
+          const ext = (localFondoPath.split('.').pop() || 'JPG').toUpperCase();
+          const imgData = fs.readFileSync(localFondoPath).toString('base64');
+          doc.addImage(imgData, ext as any, 0, 0, pdfWidth, pdfHeight);
+        } else {
+          console.warn(`No se encontró la imagen de fondo localmente: ${localFondoPath}`);
+        }
+      } catch (err) {
+        console.warn(`No se pudo cargar la imagen de fondo: ${err.message}`);
+      }
+    }
+
     // Información del beneficiario
     const persona = certificado.usuario?.persona;
     const grado = (persona?.grado_academico || '').trim();
@@ -123,12 +141,12 @@ export class CertificadosPdfService {
 
       if (el.tipo === 'texto') {
         let textoFinal = el.valor || '';
-        // Reemplazar variables dinámicas
+        // Reemplazar variables dinámicas usando split.join de forma segura
         for (const [variable, valor] of Object.entries(variablesReales)) {
-          textoFinal = textoFinal.replace(new RegExp(variable.replace(/[\{\}]/g, '\\$&'), 'gi'), valor);
+          textoFinal = textoFinal.split(variable).join(valor);
           const varClean = variable.replace(/[\{\}]/g, '');
-          textoFinal = textoFinal.replace(new RegExp('\\[' + varClean.replace(/[\[\]]/g, '\\$&') + '\\]', 'gi'), valor);
-          textoFinal = textoFinal.replace(new RegExp('\\{\\{' + varClean.replace(/[\{\}]/g, '\\$&') + '\\}\\}', 'gi'), valor);
+          textoFinal = textoFinal.split(`[${varClean}]`).join(valor);
+          textoFinal = textoFinal.split(`{{${varClean}}}`).join(valor);
         }
         
         const fontSize = el.fontSize || 12;
@@ -149,7 +167,8 @@ export class CertificadosPdfService {
            x_anchor = x_left + blockWidthPt;
         }
 
-        doc.text(textoFinal, x_anchor, y_baseline, { align: align as any, maxWidth: blockWidthPt });
+        const lines = doc.splitTextToSize(textoFinal, blockWidthPt);
+        doc.text(lines, x_anchor, y_baseline, { align: align as any });
       }
       else if (el.tipo === 'cabecera' || el.tipo === 'tenor') {
         const fontSize = el.fontSize || (el.tipo === 'cabecera' ? 16 : 12);
@@ -174,7 +193,17 @@ export class CertificadosPdfService {
            x_anchor = x_left + blockWidthPt;
         }
 
-        doc.text(el.valor || '', x_anchor, y_baseline, { align: align as any, maxWidth: blockWidthPt });
+        let textoFinal = el.valor || '';
+        // Reemplazar variables dinámicas usando split.join de forma segura
+        for (const [variable, valor] of Object.entries(variablesReales)) {
+          textoFinal = textoFinal.split(variable).join(valor);
+          const varClean = variable.replace(/[\{\}]/g, '');
+          textoFinal = textoFinal.split(`[${varClean}]`).join(valor);
+          textoFinal = textoFinal.split(`{{${varClean}}}`).join(valor);
+        }
+
+        const lines = doc.splitTextToSize(textoFinal, blockWidthPt);
+        doc.text(lines, x_anchor, y_baseline, { align: align as any });
       }
       else if (el.tipo === 'qr') {
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
