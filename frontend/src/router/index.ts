@@ -358,6 +358,7 @@ const router = createRouter({
           name: 'logistica-certificados',
           component: () => import('../views/logistica/LogisticaCertificadosView.vue'),
         }
+      ]
     },
     {
       path: '/:pathMatch(.*)*',
