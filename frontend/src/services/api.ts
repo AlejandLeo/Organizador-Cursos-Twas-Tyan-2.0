@@ -6,7 +6,7 @@ export const getApiBaseUrl = (): string => {
   const envUrl = import.meta.env.VITE_API_URL as string | undefined;
   if (envUrl) return envUrl.replace(/\/$/, '');
   if (typeof window !== 'undefined') return window.location.origin;
-  return 'http://localhost:3000';
+  return 'https://eventos.fcpn.edu.bo';
 };
 
 // Mantener por compatibilidad si es requerido por algún módulo
