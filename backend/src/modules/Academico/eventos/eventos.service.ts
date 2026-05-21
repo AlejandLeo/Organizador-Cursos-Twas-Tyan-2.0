@@ -5,6 +5,7 @@ import { Evento } from './entities/evento.entity';
 import { CreateEventoDto } from './dto/create-evento.dto';
 import { UpdateEventoDto } from './dto/update-evento.dto';
 import { existsSync, unlinkSync } from 'fs';
+import { formatMediaUrl } from '../../../common/media-url.util';
 
 @Injectable()
 export class EventosService {
@@ -38,14 +39,7 @@ export class EventosService {
   }
 
   private formatImageUrl(filenameOrUrl: string, folder: string = 'imagenes'): string | null {
-    if (!filenameOrUrl) return null;
-    if (filenameOrUrl.startsWith('http')) return filenameOrUrl;
-
-    // Evitar doble codificación: decodificar primero por si ya viene codificado
-    const cleanFilename = decodeURIComponent(filenameOrUrl);
-
-    const baseUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
-    return `${baseUrl}/uploads/${folder}/${encodeURIComponent(cleanFilename)}`;
+    return formatMediaUrl(filenameOrUrl, folder);
   }
 
   async findAll() {
