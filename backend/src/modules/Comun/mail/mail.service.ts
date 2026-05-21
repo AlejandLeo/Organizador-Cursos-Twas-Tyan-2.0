@@ -53,10 +53,10 @@ export class MailService {
     queueEntry.context = context ? JSON.stringify(context) : null;
     queueEntry.estado = 'PENDING';
     queueEntry.intentos = 0;
-    
+
     await this.mailQueueRepository.save(queueEntry);
     this.logger.log(`Correo encolado para ${to}. Asunto: ${subject}`);
-    
+
     return true;
   }
 
@@ -121,8 +121,8 @@ export class MailService {
         nombres: nombres,
         email: to,
         password: tempPassword,
-        loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
-        url_sistema: process.env.FRONTEND_URL || 'http://localhost:5173',
+        loginUrl: process.env.FRONTEND_URL,
+        url_sistema: process.env.FRONTEND_URL,
         year: new Date().getFullYear()
       },
     );
@@ -138,7 +138,7 @@ export class MailService {
       'reactivation',
       {
         name,
-        loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
+        loginUrl: process.env.FRONTEND_URL
       },
     );
   }
@@ -207,8 +207,8 @@ export class MailService {
         primer_apellido,
         segundo_apellido,
         email: to,
-        loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
-        url_sistema: process.env.FRONTEND_URL || 'http://localhost:5173',
+        loginUrl: process.env.FRONTEND_URL,
+        url_sistema: process.env.FRONTEND_URL,
         year: new Date().getFullYear()
       },
     );
@@ -235,7 +235,7 @@ export class MailService {
       {
         name,
         role: roleName,
-        loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
+        loginUrl: process.env.FRONTEND_URL
       },
     );
   }
@@ -252,7 +252,7 @@ export class MailService {
         name,
         addedRoles,
         removedRoles,
-        loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+        loginUrl: process.env.FRONTEND_URL,
         currentYear: new Date().getFullYear()
       },
     );
