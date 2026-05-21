@@ -1,21 +1,29 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tu Certificado Digital</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f1f5f9;
             padding: 40px 20px;
             color: #1e293b;
         }
+
         .wrapper {
             max-width: 620px;
             margin: 0 auto;
         }
+
         /* Header */
         .header {
             background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
@@ -23,9 +31,10 @@
             padding: 40px 40px 32px;
             text-align: center;
         }
+
         .header-badge {
             display: inline-block;
-            background: rgba(255,255,255,0.12);
+            background: rgba(255, 255, 255, 0.12);
             color: #94a3b8;
             font-size: 10px;
             font-weight: 800;
@@ -33,9 +42,10 @@
             text-transform: uppercase;
             padding: 5px 14px;
             border-radius: 999px;
-            border: 1px solid rgba(255,255,255,0.15);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             margin-bottom: 18px;
         }
+
         .header h1 {
             color: #ffffff;
             font-size: 26px;
@@ -44,29 +54,35 @@
             line-height: 1.2;
             margin-bottom: 8px;
         }
+
         .header p {
             color: #94a3b8;
             font-size: 14px;
         }
+
         /* Body */
         .body {
             background: #ffffff;
             padding: 40px;
         }
+
         .greeting {
             font-size: 16px;
             color: #334155;
             margin-bottom: 12px;
         }
+
         .greeting strong {
             color: #0f172a;
         }
+
         .intro {
             font-size: 15px;
             color: #475569;
             line-height: 1.7;
             margin-bottom: 32px;
         }
+
         /* Certificate Card */
         .cert-card {
             background: #f8fafc;
@@ -77,14 +93,18 @@
             position: relative;
             overflow: hidden;
         }
+
         .cert-card::before {
             content: '';
             position: absolute;
-            top: 0; left: 0;
-            width: 5px; height: 100%;
+            top: 0;
+            left: 0;
+            width: 5px;
+            height: 100%;
             background: linear-gradient(180deg, #0f172a, #3b82f6);
             border-radius: 16px 0 0 16px;
         }
+
         .cert-card-label {
             font-size: 9px;
             font-weight: 900;
@@ -94,6 +114,7 @@
             margin-bottom: 16px;
             padding-left: 16px;
         }
+
         .cert-row {
             display: flex;
             align-items: flex-start;
@@ -102,7 +123,11 @@
             border-radius: 10px;
             margin-bottom: 6px;
         }
-        .cert-row:last-child { margin-bottom: 0; }
+
+        .cert-row:last-child {
+            margin-bottom: 0;
+        }
+
         .cert-row-label {
             font-size: 11px;
             font-weight: 700;
@@ -112,12 +137,15 @@
             min-width: 90px;
             padding-top: 2px;
         }
+
         .cert-row-value {
             font-size: 14px;
             font-weight: 600;
             color: #1e293b;
             line-height: 1.4;
+            word-break: break-word;
         }
+
         /* Código de verificación */
         .code-block {
             background: #0f172a;
@@ -129,6 +157,7 @@
             justify-content: space-between;
             gap: 16px;
         }
+
         .code-label {
             font-size: 10px;
             font-weight: 800;
@@ -137,20 +166,28 @@
             color: #64748b;
             margin-bottom: 6px;
         }
+
         .code-value {
             font-family: 'Courier New', Courier, monospace;
             font-size: 18px;
             font-weight: 700;
             color: #38bdf8;
             letter-spacing: 3px;
+            word-break: break-all;
         }
+
         .code-note {
             font-size: 11px;
             color: #475569;
             margin-top: 4px;
         }
+
         /* Verify Button */
-        .btn-wrapper { text-align: center; margin-bottom: 32px; }
+        .btn-wrapper {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
         .btn {
             display: inline-block;
             background: #0f172a;
@@ -162,6 +199,7 @@
             font-weight: 700;
             letter-spacing: 0.5px;
         }
+
         .note {
             background: #eff6ff;
             border: 1px solid #bfdbfe;
@@ -172,7 +210,11 @@
             line-height: 1.6;
             margin-bottom: 28px;
         }
-        .note strong { font-weight: 700; }
+
+        .note strong {
+            font-weight: 700;
+        }
+
         /* Footer */
         .footer {
             background: #f8fafc;
@@ -181,14 +223,63 @@
             padding: 24px 40px;
             text-align: center;
         }
+
         .footer p {
             font-size: 11px;
             color: #94a3b8;
             line-height: 1.6;
         }
-        .footer strong { color: #64748b; }
+
+        .footer strong {
+            color: #64748b;
+        }
+
+        /* Mobile Responsiveness */
+        @media only screen and (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            .header {
+                padding: 30px 20px 24px;
+            }
+            .header h1 {
+                font-size: 22px;
+            }
+            .body {
+                padding: 24px 20px;
+            }
+            .cert-card {
+                padding: 20px 16px;
+            }
+            .cert-row {
+                flex-direction: column;
+                gap: 4px;
+            }
+            .cert-row-label {
+                padding-top: 0;
+            }
+            .code-block {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                padding: 16px;
+            }
+            .code-value {
+                font-size: 15px;
+                letter-spacing: 1px;
+            }
+            .btn {
+                padding: 14px 24px;
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .footer {
+                padding: 20px;
+            }
+        }
     </style>
 </head>
+
 <body>
     <div class="wrapper">
 
@@ -196,7 +287,7 @@
         <div class="header">
             <div class="header-badge">Certificado Digital Oficial</div>
             <h1>¡Tu certificado está listo!</h1>
-            <p>Se ha emitido y adjuntado a este correo en formato PDF</p>
+            {{!-- <p>Se ha emitido y adjuntado a este correo en formato PDF</p> --}}
         </div>
 
         <!-- BODY -->
@@ -204,8 +295,8 @@
 
             <p class="greeting">Estimado(a) <strong>{{name}}</strong>,</p>
             <p class="intro">
-                Nos complace informarle que se ha emitido con éxito su certificado digital 
-                por su participación en el siguiente evento académico. El documento PDF 
+                Nos complace informarle que se ha emitido con éxito su certificado digital
+                por su participación en {{evento}}. El documento PDF
                 se encuentra adjunto a este correo.
             </p>
 
@@ -237,30 +328,32 @@
 
             <!-- Botón verificar -->
             <div class="btn-wrapper">
-                <a href="{{verifyUrl}}" class="btn">🔍 Verificar Autenticidad del Certificado</a>
+                <a href="{{verifyUrl}}" class="btn">Verificar Autenticidad del Certificado</a>
             </div>
 
-            <!-- Nota -->
+            {{!-- <!-- Nota -->
             <div class="note">
-                <strong>📎 Adjunto:</strong> El archivo PDF de su certificado está adjunto a este 
-                correo. Le recomendamos guardarlo en un lugar seguro. Puede verificar su 
+                <strong>📎 Adjunto:</strong> El archivo PDF de su certificado está adjunto a este
+                correo. Le recomendamos guardarlo en un lugar seguro. Puede verificar su
                 autenticidad en cualquier momento usando el código o el enlace de arriba.
-            </div>
+            </div> --}}
 
-            <p style="font-size:14px; color:#475569; line-height:1.6;">
+            {{!-- <p style="font-size:14px; color:#475569; line-height:1.6;">
                 Gracias por su participación y contribución a nuestra comunidad académica.<br>
                 <strong style="color:#1e293b;">The World Academy of Sciences – UMSA</strong>
-            </p>
+            </p> --}}
 
         </div>
 
         <!-- FOOTER -->
         <div class="footer">
             <p>Este es un mensaje automático generado por la Plataforma de Gestión de Eventos Académicos.</p>
-            <p><strong>© {{anio}} The World Academy of Sciences – UMSA.</strong> Todos los derechos reservados.</p>
+            <p><strong>© {{anio}} Facultad de Ciencias Puras y Naturales – UMSA.</strong> Todos los derechos reservados.
+            </p>
             <p style="margin-top:8px;">Por favor no responda a este correo electrónico.</p>
         </div>
 
     </div>
 </body>
+
 </html>

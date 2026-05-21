@@ -283,6 +283,7 @@ export class CertificadosService {
         'usuario.persona',
         'usuario.afiliaciones',
         'infoCertificado',
+        'infoCertificado.evento',
         'actividadAcademica',
         'actividadAcademica.evento',
         'usuariosCertificados',
@@ -481,5 +482,47 @@ export class CertificadosService {
       logs,
       cola,
     };
+  }
+
+  /**
+   * Obtiene la temática de la ponencia impartida por un usuario en una actividad o evento.
+   * Usa find() con filtros para evitar problemas del query builder con columnas null.
+   */
+  async obtenerTematicaPonente(idUsuario: number, idActividad?: number, idEvento?: number): Promise<string> {
+    if (!idUsuario) return '';
+
+    // Primero buscar directamente por actividad (más preciso)
+    if (idActividad) {
+      const byActividad = await this.imparticionRepository.findOne({
+        where: { usuario: { id: idUsuario }, actividadAcademica: { id: idActividad } },
+        relations: ['usuario', 'actividadAcademica'],
+      });
+      if (byActividad?.tematica) return byActividad.tematica;
+    }
+
+    // Luego buscar por evento (directo en imparticion.id_evento)
+    if (idEvento) {
+      const byEvento = await this.imparticionRepository.findOne({
+        where: { usuario: { id: idUsuario }, evento: { id: idEvento } },
+        relations: ['usuario', 'evento'],
+      });
+      if (byEvento?.tematica) return byEvento.tematica;
+
+      // Finalmente buscar via actividad → evento
+      const byActividadEvento = await this.imparticionRepository.findOne({
+        where: { usuario: { id: idUsuario }, actividadAcademica: { evento: { id: idEvento } } },
+        relations: ['usuario', 'actividadAcademica', 'actividadAcademica.evento'],
+      });
+      if (byActividadEvento?.tematica) return byActividadEvento.tematica;
+    }
+
+    // Si ninguna búsqueda específica funcionó, buscar solo por usuario
+    if (!idActividad && !idEvento) return '';
+    const byUsuario = await this.imparticionRepository.findOne({
+      where: { usuario: { id: idUsuario } },
+      relations: ['usuario'],
+      order: { fecha_creacion: 'DESC' },
+    });
+    return byUsuario?.tematica || '';
   }
 }

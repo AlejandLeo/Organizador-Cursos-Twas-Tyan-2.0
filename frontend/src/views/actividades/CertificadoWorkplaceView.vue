@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api, { getImageUrl } from '@/services/api'
 import Swal from 'sweetalert2'
+import CertificadoRender from '@/components/common/CertificadoRender.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -35,6 +36,7 @@ const resolvePreviewVariables = (text: string) => {
         .replace(/{CARGA_HORARIA}/g, '40 horas académicas')
         .replace(/{FECHA_EMISION}/g, '17 de Mayo de 2026')
         .replace(/{NOTA_FINAL}/g, '95')
+        .replace(/{TEMATICA}/g, 'Innovaciones en Ciencias de la Vida')
 }
 
 const resolvePreviewTenor = (text: string) => {
@@ -58,7 +60,22 @@ interface ElementoLienzo {
   fontSize: number
   color: string
   fontFamily: string
+  alineacion?: 'left' | 'center' | 'right' | string
   id_usuario?: number
+}
+
+const getElementStyle = (el: ElementoLienzo) => {
+    return {
+        left: `${el.x}%`, 
+        top: `${el.y}%`, 
+        fontSize: el.tipo !== 'qr' && el.tipo !== 'firma' && el.tipo !== 'firma_individual' ? `${el.fontSize}px` : undefined, 
+        color: el.color, 
+        fontFamily: el.fontFamily,
+        width: el.width ? `${el.width}px` : '600px',
+        height: el.height ? `${el.height}px` : 'auto',
+        textAlign: (el.alineacion || 'center') as any,
+        justifyContent: el.alineacion === 'left' ? 'flex-start' : (el.alineacion === 'right' ? 'flex-end' : 'center')
+    }
 }
 
 const infoCertificado = ref<any>(null)
@@ -390,7 +407,7 @@ const onDropCanvas = (e: DragEvent) => {
     const yPercent = (dropY / canvasRect.height) * 100
 
     if (data.source === 'palette') {
-        const defaultWidth = data.tipo === 'qr' ? 100 : (data.tipo === 'firma' || data.tipo === 'cabecera' || data.tipo === 'tenor' ? 600 : (data.tipo === 'firma_individual' ? 180 : undefined));
+        const defaultWidth = data.tipo === 'qr' ? 100 : (data.tipo === 'firma' || data.tipo === 'cabecera' || data.tipo === 'tenor' || data.tipo === 'texto' ? 600 : (data.tipo === 'firma_individual' ? 180 : undefined));
         elementosLienzo.value.push({
             id: Date.now().toString(),
             tipo: data.tipo,
@@ -402,6 +419,7 @@ const onDropCanvas = (e: DragEvent) => {
             fontSize: 24,
             color: '#000000',
             fontFamily: 'Arial',
+            alineacion: 'center',
             id_usuario: data.id_usuario
         })
     } else if (data.source === 'canvas') {
@@ -668,6 +686,14 @@ const guardarDiseno = async () => {
                             <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} DISCIPLINA {{ '}' }}</span>
                             <span class="material-symbols-outlined text-xs text-slate-400">subject</span>
                         </div>
+<<<<<<< HEAD
+=======
+                        <div v-if="Number(tipoCertificado) === 2" draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{TEMATICA}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                            <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
+                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} TEMATICA {{ '}' }}</span>
+                            <span class="material-symbols-outlined text-xs text-slate-400">psychology</span>
+                        </div>
+>>>>>>> 9b0c81ce15d4bfb7ad481eff2cd1ae45ca14566e
 
                         <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{FECHA_EMISION}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
                             <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
@@ -762,7 +788,7 @@ const guardarDiseno = async () => {
                      @dragstart="e => onDragStartCanvas(e, el.id)"
                      @dragend="onDragEndCanvas"
                      @click.stop="selectElement(el.id)"
-                     class="absolute cursor-move flex items-center justify-center group/el border hover:border-blue-500 transition-colors backdrop-blur-[2px]"
+                     class="absolute cursor-move flex items-start group/el border hover:border-blue-500 transition-colors backdrop-blur-[2px]"
                      :class="{ 
                         'border-solid border-umsa-gold ring-2 ring-umsa-gold/30 bg-blue-50/20 dark:bg-white/10': elementoSeleccionado === el.id,
                         'border-dashed border-slate-300 bg-white/40 dark:bg-black/30': elementoSeleccionado !== el.id,
@@ -771,17 +797,10 @@ const guardarDiseno = async () => {
                         'h-[120px] rounded-2xl': el.tipo === 'firma' || el.tipo === 'firma_individual',
                         'opacity-30': isDraggingCanvasId === el.id
                      }"
-                     :style="{ 
-                        left: `${el.x}%`, top: `${el.y}%`, 
-                        fontSize: el.tipo !== 'qr' && el.tipo !== 'firma' && el.tipo !== 'firma_individual' ? `${el.fontSize}px` : undefined, 
-                        color: el.color, fontFamily: el.fontFamily,
-                        width: el.width ? `${el.width}px` : 'auto',
-                        height: el.height ? `${el.height}px` : 'auto'
-                     }">
+                     :style="getElementStyle(el)">
                     
-                    <div v-if="el.tipo === 'texto'" class="flex items-center gap-2">
-                        <span class="material-symbols-outlined opacity-50" :style="{ fontSize: `${el.fontSize * 0.8}px` }">tag</span>
-                        <span class="font-bold whitespace-nowrap">{{ el.valor }}</span>
+                    <div v-if="el.tipo === 'texto'" class="flex flex-col w-full text-center">
+                        <span class="font-bold whitespace-pre-line" :style="{ fontSize: `${el.fontSize || 24}px` }">{{ el.valor }}</span>
                     </div>
  
                     <div v-if="el.tipo === 'cabecera' || el.tipo === 'tenor'" class="flex flex-col w-full text-center">
@@ -928,6 +947,21 @@ const guardarDiseno = async () => {
                         <option value="Verdana">Verdana</option>
                     </select>
                 </div>
+
+                <div v-if="['texto', 'cabecera', 'tenor'].includes(selectedElementData.tipo)">
+                    <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Alineación</label>
+                    <div class="flex bg-slate-50 dark:bg-gray-800 p-1 rounded-xl border border-slate-200 dark:border-gray-700">
+                        <button @click="selectedElementData.alineacion = 'left'" :class="selectedElementData.alineacion === 'left' ? 'bg-white shadow-sm text-umsa-gold font-bold' : 'text-slate-400 hover:text-slate-600'" class="flex-1 py-2 rounded-lg flex items-center justify-center transition-all">
+                            <span class="material-symbols-outlined text-[18px]">format_align_left</span>
+                        </button>
+                        <button @click="selectedElementData.alineacion = 'center'" :class="(!selectedElementData.alineacion || selectedElementData.alineacion === 'center') ? 'bg-white shadow-sm text-umsa-gold font-bold' : 'text-slate-400 hover:text-slate-600'" class="flex-1 py-2 rounded-lg flex items-center justify-center transition-all">
+                            <span class="material-symbols-outlined text-[18px]">format_align_center</span>
+                        </button>
+                        <button @click="selectedElementData.alineacion = 'right'" :class="selectedElementData.alineacion === 'right' ? 'bg-white shadow-sm text-umsa-gold font-bold' : 'text-slate-400 hover:text-slate-600'" class="flex-1 py-2 rounded-lg flex items-center justify-center transition-all">
+                            <span class="material-symbols-outlined text-[18px]">format_align_right</span>
+                        </button>
+                    </div>
+                </div>
             </div>
         </aside>
     </div>
@@ -976,6 +1010,7 @@ const guardarDiseno = async () => {
                         height: `${678 * previewZoom}px` 
                      }">
                      
+<<<<<<< HEAD
                     <!-- Certificado Previsualizado (Aspect A4) -->
                     <div class="absolute left-1/2 top-1/2 w-[960px] h-[678px] bg-white shadow-2xl border border-slate-350 flex items-center justify-center rounded-xl transition-transform duration-200 shrink-0"
                          :style="{ 
@@ -1028,6 +1063,14 @@ const guardarDiseno = async () => {
                              </div>
                         </div>
                     </div>
+=======
+                    <!-- Certificado Previsualizado via Componente Universal -->
+                    <CertificadoRender 
+                        :elementos="elementosLienzo"
+                        :fondoUrl="infoCertificado?.fondo_url"
+                        :zoom="previewZoom"
+                    />
+>>>>>>> 9b0c81ce15d4bfb7ad481eff2cd1ae45ca14566e
                 </div>
             </div>
             

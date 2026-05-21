@@ -191,13 +191,15 @@ const fondoQuality = ref<{status: 'hd' | 'low' | 'ok' | null, msg: string}>({sta
 const resolvedLogo = computed(() => {
     if (!logoPreview.value) return null;
     if (logoPreview.value.startsWith('data:') || logoPreview.value.startsWith('http')) return logoPreview.value;
-    return `http://localhost:3000/uploads/logo/${logoPreview.value}`;
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    return `${baseUrl}/uploads/logo/${logoPreview.value}`;
 });
 
 const resolvedBanner = computed(() => {
     if (!fondoPreview.value) return null;
     if (fondoPreview.value.startsWith('data:') || fondoPreview.value.startsWith('http')) return fondoPreview.value;
-    return `http://localhost:3000/uploads/banner/${fondoPreview.value}`;
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    return `${baseUrl}/uploads/banner/${fondoPreview.value}`;
 });
 
 const onLogoChange = (e: any) => {
