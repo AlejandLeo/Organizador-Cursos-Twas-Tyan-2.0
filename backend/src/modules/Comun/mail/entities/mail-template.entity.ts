@@ -21,6 +21,9 @@ export class MailTemplate {
   @Column({ type: 'varchar', length: 255 })
   asunto: string;
 
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  cabecera: string;
+
   @Column({ type: 'text' })
   cuerpo: string;
 

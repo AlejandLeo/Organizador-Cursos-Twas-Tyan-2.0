@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MailLog } from './entities/mail-log.entity';
 import { MailerService } from '@nestjs-modules/mailer';
+import { MailTemplate, MailTemplateType } from './entities/mail-template.entity';
+import { SistemaConfigService } from '../sistema-config/sistema-config.service';
 
 @Injectable()
 export class MailService {
@@ -11,8 +13,11 @@ export class MailService {
   constructor(
     @InjectRepository(MailLog)
     private readonly mailLogRepository: Repository<MailLog>,
+    @InjectRepository(MailTemplate)
+    private readonly mailTemplateRepository: Repository<MailTemplate>,
     private readonly mailerService: MailerService,
-  ) {}
+    private readonly sistemaConfigService: SistemaConfigService,
+  ) { }
 
   /**
    * Envía un correo electrónico de forma síncrona.
@@ -97,15 +102,20 @@ export class MailService {
    * Envía correo de aprobación de cuenta con contraseña temporal.
    */
   async sendAccountApprovalEmail(to: string, name: string, tempPassword: string) {
-    return this.sendMail(
+    const nombres = name.split(' ')[0] || name; // Simplificación si viene el nombre completo
+    return this.sendMailWithDbTemplate(
+      MailTemplateType.WELCOME,
       to,
       'Solicitud de Acceso Aprobada',
-      'admission',
-      { 
-        name, 
-        email: to, 
+      'admission', // Fallback
+      {
+        nombre: nombres, // Usar 'nombre' como nombres para la nueva paleta
+        nombres: nombres,
+        email: to,
         password: tempPassword,
-        loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
+        loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+        url_sistema: process.env.FRONTEND_URL || 'http://localhost:5173',
+        year: new Date().getFullYear()
       },
     );
   }
@@ -118,8 +128,8 @@ export class MailService {
       to,
       'Cuenta Reactivada',
       'reactivation',
-      { 
-        name, 
+      {
+        name,
         loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
       },
     );
@@ -173,32 +183,25 @@ export class MailService {
       { name, actividad, reason },
     );
   }
-  
-  /**
-   * Notifica a administración sobre una nueva solicitud de cuenta pendiente.
-   */
-  async sendNewRegistrationRequestNotification(studentName: string, studentEmail: string) {
-    // Usamos el mismo MAIL_USER como destino si no hay un admin email específico
-    const adminEmail = process.env.MAIL_USER || 'certificadosty@fcpn.edu.bo';
-    return this.sendMail(
-      adminEmail,
-      'Nueva Solicitud de Registro Pendiente',
-      'admin-notification',
-      { studentName, studentEmail },
-    );
-  }
 
   /**
    * Envía correo de bienvenida tras el registro exitoso.
    */
-  async sendWelcomeRegistrationEmail(to: string, name: string) {
-    return this.sendMail(
+  async sendWelcomeRegistrationEmail(to: string, nombres: string, primer_apellido: string, segundo_apellido: string = '') {
+    return this.sendMailWithDbTemplate(
+      MailTemplateType.WELCOME,
       to,
       '¡Bienvenido a la Plataforma!',
       'welcome-registration',
-      { 
-        name,
-        loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
+      {
+        nombre: nombres,
+        nombres: nombres,
+        primer_apellido,
+        segundo_apellido,
+        email: to,
+        loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+        url_sistema: process.env.FRONTEND_URL || 'http://localhost:5173',
+        year: new Date().getFullYear()
       },
     );
   }
@@ -207,24 +210,9 @@ export class MailService {
     return this.sendMail(
       to,
       'Bienvenido a la Plataforma',
-      'welcome', // Debe existir en src/modules/Comun/mail/templates/welcome.hbs
+      'welcome',
       { name },
       `Hola ${name}, bienvenido a nuestra plataforma.`,
-    );
-  }
-
-  async sendActivationRequestNotification(actividadNombre: string, coordinadorNombre: string, coordinadorEmail: string) {
-    const adminEmail = process.env.MAIL_USER || 'certificadosty@fcpn.edu.bo';
-    return this.sendMail(
-      adminEmail,
-      'Solicitud de Reactivación de Actividad',
-      'activation-request',
-      { 
-        actividadNombre, 
-        coordinadorNombre, 
-        coordinadorEmail,
-        fecha: new Date().toLocaleString()
-      },
     );
   }
 
@@ -236,8 +224,8 @@ export class MailService {
       to,
       'Nueva Designación de Cargo',
       'role-designation',
-      { 
-        name, 
+      {
+        name,
         role: roleName,
         loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
       },
@@ -252,13 +240,75 @@ export class MailService {
       to,
       'Actualización de Permisos en la Plataforma',
       'role-update',
-      { 
-        name, 
-        addedRoles, 
+      {
+        name,
+        addedRoles,
         removedRoles,
         loginUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
         currentYear: new Date().getFullYear()
       },
     );
+  }
+
+  // ── Helper para enviar usando plantillas de DB ─────────────────────────────
+
+  /**
+   * Envía un correo buscando primero una plantilla activa en la BD.
+   * Si no la encuentra, utiliza el template fallback (archivo .hbs).
+   * Puede usarse pasando un ID de plantilla específico.
+   */
+  async sendMailWithDbTemplate(
+    tipo: MailTemplateType,
+    to: string,
+    fallbackSubject: string,
+    fallbackTemplateName: string,
+    context: any,
+    specificTemplateId?: number,
+    attachments?: any[]
+  ) {
+    let dbTemplate: MailTemplate | null = null;
+
+    if (specificTemplateId) {
+      dbTemplate = await this.mailTemplateRepository.findOne({ where: { id: specificTemplateId } });
+    } else {
+      // Buscar la plantilla activa para este tipo
+      dbTemplate = await this.mailTemplateRepository.findOne({
+        where: { tipo, activo: true },
+        order: { fecha_creacion: 'DESC' }
+      });
+    }
+
+    if (dbTemplate && dbTemplate.cuerpo) {
+      // 1. Obtener Master Layout
+      const masterLayout = await this.sistemaConfigService.getConfig('MAIL_MASTER_LAYOUT') || '<html><body>{{{content}}}</body></html>';
+
+      // 2. Reemplazar variables en el cuerpo de la plantilla
+      let htmlCuerpo = dbTemplate.cuerpo.replace(/\n/g, '<br>');
+      Object.keys(context).forEach(k => {
+        const value = context[k] !== undefined && context[k] !== null ? String(context[k]) : '';
+        htmlCuerpo = htmlCuerpo.replace(new RegExp(`{{${k}}}`, 'g'), value);
+      });
+
+      // 3. Reemplazar variables en el layout maestro (como cabecera y year)
+      const cabeceraText = dbTemplate.cabecera || 'Plataforma Académica'; // Fallback a texto genérico si no hay cabecera en DB
+      const yearStr = new Date().getFullYear().toString();
+
+      // Reemplazamos el título estático "Plataforma Académica" (si existe en el layout por defecto) por el título dinámico
+      let finalHtml = masterLayout.replace('Plataforma Académica', cabeceraText);
+      // Reemplazamos la etiqueta {{{content}}} y el año
+      finalHtml = finalHtml.replace('{{{content}}}', htmlCuerpo).replace('{{year}}', yearStr);
+
+      // 4. Reemplazar variables en el asunto
+      let asunto = dbTemplate.asunto || fallbackSubject;
+      Object.keys(context).forEach(k => {
+        const value = context[k] !== undefined && context[k] !== null ? String(context[k]) : '';
+        asunto = asunto.replace(new RegExp(`{{${k}}}`, 'g'), value);
+      });
+
+      return this.sendMail(to, asunto, undefined, undefined, finalHtml, attachments);
+    }
+
+    // Fallback al sistema anterior basado en archivos .hbs
+    return this.sendMail(to, fallbackSubject, fallbackTemplateName, context, undefined, attachments);
   }
 }

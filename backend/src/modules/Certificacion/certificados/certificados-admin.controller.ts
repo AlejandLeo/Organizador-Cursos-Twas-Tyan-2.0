@@ -8,7 +8,6 @@ import {
   Query,
   ParseIntPipe,
   UseGuards,
-  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { CertificadosService } from './certificados.service';
@@ -19,7 +18,7 @@ import { JwtAuthGuard } from '../../Seguridad/auth/jwt-auth.guard';
 import { RolesGuard } from '../../Seguridad/auth/roles.guard';
 import { Roles } from '../../Seguridad/auth/roles.decorator';
 import { CertificadosQueueService } from './certificados-queue.service';
-import { MailService } from '../../Comun/mail/mail.service';
+
 
 @ApiTags('Certificados (Admin)')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -30,47 +29,17 @@ export class CertificadosAdminController {
   constructor(
     private readonly service: CertificadosService,
     private readonly queueService: CertificadosQueueService,
-    private readonly mailService: MailService,
   ) { }
 
-  // ── Envío masivo con notificación a SuperUsuario ────────────
+  // ── Envío masivo ────────────────────────────────────────────
 
   /**
    * Encola un lote de certificados para envío asíncrono.
-   * Notifica al SuperUsuario sobre la acción.
    */
   @Post('enviar-masivo')
   @ApiOperation({ summary: 'Encolar certificados para envío masivo por email (asíncrono)' })
-  async enviarMasivo(@Body('ids') ids: number[], @Req() req: any) {
-    const resultado = await this.queueService.encolarLote(ids);
-
-    // Notificar al SuperUsuario
-    const usuario = req.user;
-    const adminEmail = process.env.MAIL_USER || 'certificadosty@fcpn.edu.bo';
-    const nombreSolicitante = usuario?.persona
-      ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
-      : usuario?.email || 'Sistema';
-
-    this.mailService.sendMail(
-      adminEmail,
-      'Notificación: Envío Masivo de Certificados Iniciado',
-      'certificate-send-notification',
-      {
-        nombre: 'Administrador',
-        solicitante: nombreSolicitante,
-        cantidad: ids.length,
-        fecha: new Date().toLocaleString('es-BO'),
-        tipo: 'Envío Masivo',
-      },
-      `<html><body>
-        <h2>Envío Masivo de Certificados</h2>
-        <p><strong>${nombreSolicitante}</strong> ha iniciado el envío masivo de <strong>${ids.length}</strong> certificados.</p>
-        <p>Fecha: ${new Date().toLocaleString('es-BO')}</p>
-        <p>Los certificados se están procesando en segundo plano.</p>
-      </body></html>`,
-    ).catch(() => { /* No bloquear si falla la notificación */ });
-
-    return resultado;
+  async enviarMasivo(@Body('ids') ids: number[], @Body('idTemplate') idTemplate?: number) {
+    return this.queueService.encolarLote(ids, idTemplate);
   }
 
   @Post('enviar-evento/:eventoId')
@@ -84,8 +53,8 @@ export class CertificadosAdminController {
    */
   @Post(':id/reintentar-envio')
   @ApiOperation({ summary: 'Reintentar envío de un certificado individual (asíncrono)' })
-  reintentarEnvio(@Param('id', ParseIntPipe) id: number) {
-    return this.queueService.encolarUno(id);
+  reintentarEnvio(@Param('id', ParseIntPipe) id: number, @Body('idTemplate') idTemplate?: number) {
+    return this.queueService.encolarUno(id, idTemplate);
   }
 
   /**
@@ -94,30 +63,8 @@ export class CertificadosAdminController {
    */
   @Post('reintentar-fallidos')
   @ApiOperation({ summary: 'Reintentar masivamente todos los certificados con error' })
-  async reintentarFallidos(@Req() req: any) {
-    const resultado = await this.queueService.reintentarTodosLosFallidos();
-
-    if (resultado.encolados > 0) {
-      const usuario = req.user;
-      const adminEmail = process.env.MAIL_USER || 'certificadosty@fcpn.edu.bo';
-      const nombreSolicitante = usuario?.persona
-        ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
-        : usuario?.email || 'Sistema';
-
-      this.mailService.sendMail(
-        adminEmail,
-        'Notificación: Reintento Masivo de Certificados Fallidos',
-        undefined,
-        undefined,
-        `<html><body>
-          <h2>Reintento Masivo de Certificados</h2>
-          <p><strong>${nombreSolicitante}</strong> ha iniciado el reintento de <strong>${resultado.encolados}</strong> certificados fallidos.</p>
-          <p>Fecha: ${new Date().toLocaleString('es-BO')}</p>
-        </body></html>`,
-      ).catch(() => { });
-    }
-
-    return resultado;
+  async reintentarFallidos() {
+    return this.queueService.reintentarTodosLosFallidos();
   }
 
   // ── Emisión por tipo ────────────────────────────────────────

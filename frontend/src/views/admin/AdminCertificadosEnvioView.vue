@@ -61,6 +61,11 @@ const emailModalCert = ref<Certificado | null>(null);
 const emailModalValue = ref('');
 const isSavingEmail = ref(false);
 
+// ── Plantillas de certificado ──────────────────────────────────
+const certTemplates = ref<any[]>([]);
+const selectedTemplateId = ref<number | null>(null);
+const isFetchingTemplates = ref(false);
+
 // ── Datos computados ──────────────────────────────────────────
 const filteredCertificados = computed(() => {
   return certificados.value.filter(c => {
@@ -105,6 +110,18 @@ const fetchEventos = async () => {
   }
 };
 
+const fetchCertTemplates = async () => {
+  try {
+    isFetchingTemplates.value = true;
+    const res = await api.get('/admin/mail-templates/tipo/CERTIFICATE');
+    certTemplates.value = res.data || [];
+  } catch {
+    certTemplates.value = [];
+  } finally {
+    isFetchingTemplates.value = false;
+  }
+};
+
 const fetchAuditoria = async () => {
   try {
     isStatsLoading.value = true;
@@ -132,21 +149,7 @@ const toggleSelectAll = (event: any) => {
 const handleSendMasivo = async () => {
   if (selectedIds.value.length === 0) return;
 
-  const problematicos = certificados.value.filter(c => {
-    if (!selectedIds.value.includes(c.id)) return false;
-    const ev = c.actividadAcademica?.evento;
-    return (ev?.fase || 0) < 4 && ev?.estado !== 0;
-  });
-
-  if (problematicos.length > 0) {
-    Swal.fire({
-      title: 'Acción Bloqueada',
-      text: `${problematicos.length} certificados pertenecen a eventos aún no finalizados o activos.`,
-      icon: 'warning',
-      confirmButtonColor: '#0f172a',
-    });
-    return;
-  }
+  // La restricción de fase fue eliminada para permitir envíos en cualquier estado del evento
 
   const result = await Swal.fire({
     title: '¿Iniciar envío masivo?',
@@ -162,7 +165,7 @@ const handleSendMasivo = async () => {
 
   try {
     isSending.value = true;
-    const res = await certificadosService.enviarMasivo(selectedIds.value);
+    const res = await certificadosService.enviarMasivo(selectedIds.value, selectedTemplateId.value || undefined);
     Swal.fire('¡Encolado!', res.data.mensaje, 'success');
     selectedIds.value = [];
     setTimeout(fetchCertificados, 2000);
@@ -245,14 +248,10 @@ const handleReintentarFallidos = async () => {
 
 // ── Reintento individual ──────────────────────────────────────
 const reintentarUno = async (cert: Certificado) => {
-  const ev = cert.actividadAcademica?.evento;
-  if ((ev?.fase || 0) < 4 && ev?.estado !== 0) {
-    Swal.fire('Atención', 'El evento asociado aún no está finalizado.', 'warning');
-    return;
-  }
+  // La restricción de fase fue eliminada para homologar con la lógica de emisión
   try {
     cert.estado_envio = 'procesando';
-    const res = await certificadosService.reintentarEnvio(cert.id);
+    const res = await certificadosService.reintentarEnvio(cert.id, selectedTemplateId.value || undefined);
     Swal.fire('¡Encolado!', res.data.mensaje || 'El reintento fue encolado.', 'success');
     setTimeout(fetchCertificados, 2000);
   } catch (error: any) {
@@ -452,6 +451,7 @@ onMounted(() => {
   }
   fetchCertificados();
   fetchEmisionEventos();
+  fetchCertTemplates();
 });
 </script>
 
@@ -539,6 +539,27 @@ onMounted(() => {
             <option value="error">Con Error</option>
             <option value="procesando">Procesando</option>
           </select>
+        </div>
+
+        <!-- SELECTOR DE PLANTILLA DE CORREO -->
+        <div class="flex items-center gap-3 px-1 py-3 border-t border-slate-100 dark:border-gray-800/60">
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="material-symbols-outlined text-[18px] text-amber-500">mail_outline</span>
+            <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Plantilla de correo:</span>
+          </div>
+          <div class="flex-1">
+            <select v-model="selectedTemplateId"
+                    class="w-full max-w-xs px-4 py-2 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700 rounded-xl text-xs font-bold outline-none cursor-pointer focus:border-amber-400 transition-all">
+              <option :value="null">⚙ Plantilla predeterminada del sistema (.hbs)</option>
+              <option v-for="tpl in certTemplates" :key="tpl.id" :value="tpl.id">
+                📧 {{ tpl.nombre }} — {{ tpl.asunto }}
+              </option>
+            </select>
+          </div>
+          <div v-if="isFetchingTemplates" class="animate-spin w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full"></div>
+          <div v-else-if="certTemplates.length === 0" class="text-[10px] text-slate-400 italic">
+            (Sin plantillas personalizadas. <router-link to="/admin/correos" class="text-amber-500 underline hover:text-amber-600">Crear una</router-link>)
+          </div>
         </div>
       </div>
 

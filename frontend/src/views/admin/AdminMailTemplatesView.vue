@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import api from '@/services/api';
 import Swal from 'sweetalert2';
 
@@ -20,6 +20,7 @@ const currentTemplate = ref({
   nombre: '',
   descripcion: '',
   asunto: '',
+  cabecera: '',
   cuerpo: '',
   tipo: 'WELCOME'
 });
@@ -78,20 +79,74 @@ const openCustomPreview = async (t: any) => {
     const resUrl    = await api.get('/admin/configuracion/key/SYSTEM_URL');
     const masterLayout = resLayout.data?.valor || '<html><body>{{{content}}}</body></html>';
     const systemUrl    = resUrl.data?.valor    || window.location.origin;
-    const ctx: Record<string, string | number> = {
-      nombre: 'Juan', apellidos: 'Pérez', email: 'ejemplo@correo.com',
-      password: 'Contraseña123', actividad: 'Curso de Especialización',
-      evento: 'Congreso Internacional 2026', url_sistema: systemUrl, loginUrl: systemUrl,
+
+    // Context base
+    const cabeceraText = t.cabecera || 'Plataforma Académica';
+
+    const ctxWelcome: Record<string, string | number> = {
+      nombre: 'Juan',
+      nombres: 'Juan Carlos',
+      primer_apellido: 'Pérez',
+      segundo_apellido: 'López',
+      email: 'ejemplo@correo.com',
+      password: 'Contraseña123',
+      loginUrl: systemUrl,
+      url_sistema: systemUrl,
       year: new Date().getFullYear(),
     };
+    const ctxCertificate: Record<string, string | number> = {
+      nombre: 'Juan Carlos Pérez López',
+      actividad: 'Curso de Especialización en IA',
+      evento: 'Congreso Internacional 2026',
+      codigo: 'CERT-2026-00123',
+      tipo: 'Asistente',
+      verifyUrl: `${systemUrl}/verificar-certificado/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`,
+      anio: new Date().getFullYear(),
+      year: new Date().getFullYear(),
+    };
+
+    const ctx = t.tipo === 'CERTIFICATE' ? ctxCertificate : ctxWelcome;
+
     let html = (t.cuerpo || '').replace(/\n/g, '<br>');
     Object.keys(ctx).forEach(k => { html = html.replace(new RegExp(`{{${k}}}`, 'g'), String(ctx[k])); });
-    previewHtml.value = masterLayout.replace('{{{content}}}', html).replace('{{year}}', String(new Date().getFullYear()));
+
+    // Reemplazar cabecera dinámica en layout
+    let finalHtml = masterLayout.replace('Plataforma Académica', cabeceraText);
+    finalHtml = finalHtml.replace('{{{content}}}', html).replace('{{year}}', String(new Date().getFullYear()));
+
+    previewHtml.value = finalHtml;
   } catch {
     previewHtml.value = '<p style="color:red">Error al renderizar.</p>';
   }
   showPreviewModal.value = true;
 };
+
+// ── Variables por tipo de plantilla ────────────────────────────────────────
+const variablesByTipo = {
+  WELCOME: [
+    { code: '{{nombre}}',          desc: 'Solo los nombres (sin apellidos)' },
+    { code: '{{primer_apellido}}', desc: 'Primer apellido' },
+    { code: '{{segundo_apellido}}',desc: 'Segundo apellido' },
+    { code: '{{email}}',           desc: 'Correo electrónico del usuario' },
+    { code: '{{password}}',        desc: 'Contraseña temporal' },
+    { code: '{{loginUrl}}',        desc: 'URL de inicio de sesión' },
+    { code: '{{url_sistema}}',     desc: 'URL del sistema' },
+    { code: '{{year}}',            desc: 'Año actual' },
+  ],
+  CERTIFICATE: [
+    { code: '{{nombre}}',    desc: 'Nombre completo del participante' },
+    { code: '{{actividad}}', desc: 'Nombre de la actividad/curso' },
+    { code: '{{evento}}',    desc: 'Nombre del evento' },
+    { code: '{{codigo}}',    desc: 'Código del certificado' },
+    { code: '{{tipo}}',      desc: 'Tipo (Asistente, Expositor, etc.)' },
+    { code: '{{verifyUrl}}', desc: 'URL de verificación del certificado' },
+    { code: '{{anio}}',      desc: 'Año de emisión' },
+  ],
+};
+
+const currentVariables = computed(() => {
+  return variablesByTipo[currentTemplate.value.tipo as keyof typeof variablesByTipo] || variablesByTipo.WELCOME;
+});
 
 // ── Download ───────────────────────────────────────────────────────────────
 const downloadHtml = (filename: string, html: string) => {
@@ -106,7 +161,7 @@ const downloadHtml = (filename: string, html: string) => {
 
 // ── CRUD ───────────────────────────────────────────────────────────────────
 const openCreate = () => {
-  currentTemplate.value = { id: null, nombre: '', descripcion: '', asunto: '', cuerpo: '', tipo: 'WELCOME' };
+  currentTemplate.value = { id: null, nombre: '', descripcion: '', asunto: '', cabecera: '', cuerpo: '', tipo: 'WELCOME' };
   isEditing.value = false;
   showModal.value = true;
 };
@@ -156,9 +211,16 @@ const deleteTemplate = async (id: number) => {
 const getTipoColor = (tipo: string) => {
   switch (tipo) {
     case 'WELCOME':     return 'bg-blue-500/20 text-blue-500 border-blue-500/20';
-    case 'ENROLLMENT':  return 'bg-emerald-500/20 text-emerald-500 border-emerald-500/20';
     case 'CERTIFICATE': return 'bg-amber-500/20 text-amber-500 border-amber-500/20';
     default:            return 'bg-slate-500/20 text-slate-500 border-slate-500/20';
+  }
+};
+
+const getTipoLabel = (tipo: string) => {
+  switch (tipo) {
+    case 'WELCOME':     return 'Registro al Sistema';
+    case 'CERTIFICATE': return 'Envío de Certificado';
+    default:            return tipo;
   }
 };
 
@@ -280,7 +342,7 @@ const getStatusIcon = (status: string) => {
              class="bg-white dark:bg-[#0d0d14] rounded-3xl border border-slate-200 dark:border-white/5 p-6 shadow-xl shadow-slate-200/50 dark:shadow-none hover:border-umsa-blue/30 transition-all group flex flex-col">
           <div class="flex justify-between items-start mb-4">
             <span :class="getTipoColor(t.tipo)" class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border">
-              {{ t.tipo }}
+              {{ getTipoLabel(t.tipo) }}
             </span>
             <div class="flex gap-1">
               <button @click="openCustomPreview(t)" class="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-500/10 rounded-xl transition-all" title="Previsualizar">
@@ -425,9 +487,7 @@ const getStatusIcon = (status: string) => {
               <select v-model="currentTemplate.tipo"
                       class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-5 py-3 text-sm outline-none focus:border-umsa-blue transition-all">
                 <option value="WELCOME">Registro al Sistema (Bienvenida)</option>
-                <option value="ENROLLMENT">Inscripción a Evento</option>
                 <option value="CERTIFICATE">Envío de Certificado</option>
-                <option value="GENERAL">Mensaje General</option>
               </select>
             </div>
           </div>
@@ -445,26 +505,41 @@ const getStatusIcon = (status: string) => {
           </div>
 
           <div class="space-y-2">
-            <label class="text-[11px] font-black text-slate-400 uppercase ml-2 tracking-widest flex items-center justify-between">
+            <label class="text-[11px] font-black text-slate-400 uppercase ml-2 tracking-widest flex items-center gap-2">
+              <span class="material-symbols-outlined text-[16px]">title</span>
+              Encabezado del Correo (Cabecera visible en el email)
+            </label>
+            <input v-model="currentTemplate.cabecera" type="text" placeholder="Ej: Universidad Mayor de San Andrés"
+                   class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-5 py-3 text-sm outline-none focus:border-umsa-blue transition-all">
+            <p class="text-[10px] text-slate-400 ml-2">Este texto reemplaza "Plataforma Académica" en el encabezado superior del correo.</p>
+          </div>
+
+          <div class="space-y-2">
+            <label class="text-[11px] font-black text-slate-400 uppercase ml-2 tracking-widest">
               Cuerpo del Mensaje (HTML)
-              <span class="text-[9px] normal-case font-normal text-slate-400 italic" v-pre>
-                Variables: <code>{{nombre}}</code> <code>{{email}}</code> <code>{{password}}</code> <code>{{loginUrl}}</code> <code>{{actividad}}</code>
-              </span>
             </label>
             <textarea v-model="currentTemplate.cuerpo" rows="14"
                       class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-5 py-4 text-sm font-mono outline-none focus:border-umsa-blue transition-all"
                       placeholder="Escribe tu mensaje aquí. Puedes usar etiquetas HTML..."></textarea>
           </div>
 
-          <!-- Info box variables -->
-          <div class="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/20">
-            <p class="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <!-- Info box variables dinámico por tipo -->
+          <div class="p-4 rounded-2xl border transition-colors"
+               :class="currentTemplate.tipo === 'CERTIFICATE' ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/20' : 'bg-blue-50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/20'">
+            <p class="text-[10px] font-black uppercase tracking-wider mb-3 flex items-center gap-2"
+               :class="currentTemplate.tipo === 'CERTIFICATE' ? 'text-amber-600 dark:text-amber-400' : 'text-blue-600 dark:text-blue-400'">
               <span class="material-symbols-outlined text-[16px]">info</span>
-              Variables dinámicas disponibles
+              Variables disponibles — {{ currentTemplate.tipo === 'CERTIFICATE' ? 'Envío de Certificado' : 'Registro al Sistema' }}
             </p>
-            <div class="flex flex-wrap gap-3">
-              <div v-for="v in ['{{nombre}}','{{apellidos}}','{{email}}','{{password}}','{{loginUrl}}','{{actividad}}','{{evento}}','{{url_sistema}}','{{year}}']" :key="v" class="flex flex-col gap-0.5">
-                <code class="px-2 py-1 bg-white dark:bg-black/20 text-[11px] rounded border border-blue-200 text-blue-700 font-bold">{{ v }}</code>
+            <div class="flex flex-wrap gap-2">
+              <div v-for="v in currentVariables" :key="v.code"
+                   class="flex flex-col gap-0.5 group cursor-default"
+                   :title="v.desc">
+                <code class="px-2 py-1 text-[11px] rounded border font-bold transition-colors"
+                      :class="currentTemplate.tipo === 'CERTIFICATE' ? 'bg-white dark:bg-black/20 border-amber-200 text-amber-700' : 'bg-white dark:bg-black/20 border-blue-200 text-blue-700'">
+                  {{ v.code }}
+                </code>
+                <span class="text-[9px] text-slate-400 text-center opacity-0 group-hover:opacity-100 transition-opacity">{{ v.desc }}</span>
               </div>
             </div>
           </div>

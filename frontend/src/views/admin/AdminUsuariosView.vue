@@ -78,6 +78,12 @@ const rolesDisponibles = [
   { id: ROLE_IDS.ESTUDIANTE,  nombre: 'Estudiante' },
 ];
 
+// Los Coordinadores no pueden asignar el rol Super Usuario
+const rolesDisponiblesParaAsignar = computed(() => {
+  if (authStore.esSuperUsuario) return rolesDisponibles;
+  return rolesDisponibles.filter(r => r.id !== ROLE_IDS.SUPER_USUARIO);
+});
+
 const formUsuario = ref({
   email: '',
   password: '',
@@ -230,6 +236,12 @@ const guardarRoles = async () => {
     const res = await usuariosService.actualizarRolesBulk(u.id, rolesTemp.value, notificarRoles.value);
     const data = res.data as any;
     
+    if (data.mensaje === 'No se detectaron cambios en los roles.') {
+      Swal.fire('Atención', data.mensaje, 'info');
+      isGestionandoRoles.value = false;
+      return;
+    }
+
     if (data.correoEnviado) {
       Swal.fire('¡Éxito!', 'Roles actualizados y notificación encolada para el usuario.', 'success');
     } else if (notificarRoles.value) {
@@ -244,6 +256,99 @@ const guardarRoles = async () => {
     Swal.fire('Error', error.response?.data?.message || 'No se pudo actualizar los roles.', 'error');
   } finally {
     rolesCargando.value = false;
+  }
+};
+
+// ── Editar Detalles del Usuario ─────────────────────────────────────────────
+const isEditingModal = ref(false);
+const isLoadingDetails = ref(false);
+const isSavingDetails = ref(false);
+const editForm = ref({
+  id: null as number | null,
+  email: '',
+  nombres: '',
+  primer_apellido: '',
+  segundo_apellido: '',
+  documento_identidad: '',
+  celular: '',
+  fecha_nacimiento: '',
+  genero: 2,
+  pais_origen: '',
+  pais_residencia: '',
+  institucion: '',
+  id_grado_academico: null as number | null,
+  especialidad: ''
+});
+const detallesUsuario = ref<any>(null);
+
+const abrirEditModal = async (user: any) => {
+  editForm.value.id = user.id;
+  isEditingModal.value = true;
+  isLoadingDetails.value = true;
+  
+  try {
+    const res = await usuariosService.getPerfilAdmin(user.id);
+    const p = res.data;
+    detallesUsuario.value = p;
+    
+    const af = p.afiliaciones && p.afiliaciones.length > 0 ? p.afiliaciones[0] : null;
+    
+    editForm.value = {
+      id: p.id,
+      email: p.email || '',
+      nombres: p.persona?.nombres || '',
+      primer_apellido: p.persona?.primer_apellido || '',
+      segundo_apellido: p.persona?.segundo_apellido || '',
+      documento_identidad: p.persona?.documento_identidad || '',
+      celular: p.persona?.celular || '',
+      fecha_nacimiento: p.persona?.fecha_nacimiento ? p.persona.fecha_nacimiento.split('T')[0] : '',
+      genero: p.persona?.genero ?? 2,
+      pais_origen: p.persona?.pais_origen || '',
+      pais_residencia: p.persona?.pais_residencia || '',
+      institucion: af?.institucion || '',
+      id_grado_academico: af?.id_grado_academico || null,
+      especialidad: af?.disciplina_cientifica || ''
+    };
+  } catch (error) {
+    Swal.fire('Error', 'No se pudieron cargar los detalles del usuario', 'error');
+    isEditingModal.value = false;
+  } finally {
+    isLoadingDetails.value = false;
+  }
+};
+
+const guardarDetalles = async () => {
+  if (!editForm.value.id) return;
+  
+  if (!editForm.value.email || !editForm.value.nombres || !editForm.value.primer_apellido) {
+    return Swal.fire('Atención', 'El email, nombre y primer apellido son obligatorios', 'warning');
+  }
+
+  isSavingDetails.value = true;
+  try {
+    await usuariosService.actualizarPerfilAdmin(editForm.value.id, {
+      email: editForm.value.email,
+      nombres: editForm.value.nombres,
+      primer_apellido: editForm.value.primer_apellido,
+      segundo_apellido: editForm.value.segundo_apellido,
+      documento_identidad: editForm.value.documento_identidad,
+      celular: editForm.value.celular,
+      fecha_nacimiento: editForm.value.fecha_nacimiento,
+      genero: editForm.value.genero,
+      pais_origen: editForm.value.pais_origen,
+      pais_residencia: editForm.value.pais_residencia,
+      institucion: editForm.value.institucion,
+      id_grado_academico: editForm.value.id_grado_academico,
+      especialidad: editForm.value.especialidad
+    });
+    
+    Swal.fire('Guardado', 'Los datos del usuario han sido actualizados', 'success');
+    isEditingModal.value = false;
+    await fetchUsuarios();
+  } catch (error: any) {
+    Swal.fire('Error', error.response?.data?.message || 'Error al guardar los datos', 'error');
+  } finally {
+    isSavingDetails.value = false;
   }
 };
 
@@ -535,6 +640,12 @@ onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
               </td>
               <td class="px-6 py-4">
                 <div class="flex items-center justify-end gap-1">
+                  <!-- Botón editar detalles -->
+                  <button @click="abrirEditModal(user)"
+                          title="Ver / Editar Detalles"
+                          class="p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-slate-400 hover:text-emerald-500 transition-all">
+                    <span class="material-symbols-outlined text-[18px]">edit_document</span>
+                  </button>
                   <!-- Botón gestionar roles -->
                   <button @click="abrirGestionRoles(user)"
                           title="Gestionar Roles"
@@ -632,7 +743,7 @@ onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
             <div class="space-y-1">
               <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Rol del Sistema *</label>
               <select v-model="formUsuario.id_rol" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-red-600/50 font-bold uppercase">
-                <option v-for="rol in rolesDisponibles" :key="rol.id" :value="rol.id">{{ rol.nombre }}</option>
+                <option v-for="rol in rolesDisponiblesParaAsignar" :key="rol.id" :value="rol.id">{{ rol.nombre }}</option>
               </select>
             </div>
             <div class="space-y-1">
@@ -703,7 +814,7 @@ onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
           <div class="space-y-2 mb-6">
             <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-3">Roles asignados al sistema</p>
             
-            <div v-for="rol in rolesDisponibles" :key="rol.id"
+            <div v-for="rol in rolesDisponiblesParaAsignar" :key="rol.id"
                  @click="toggleRolLocal(rol.id)"
                  :class="[
                    rolesTemp.includes(rol.id) 
@@ -718,6 +829,13 @@ onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
                 </span>
                 <span class="text-xs font-black uppercase tracking-wide">{{ rol.nombre }}</span>
               </div>
+            </div>
+
+            <div v-if="!authStore.esSuperUsuario" class="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-900/30 flex items-start gap-2">
+              <span class="material-symbols-outlined text-blue-500 text-[18px]">info</span>
+              <p class="text-[10px] text-blue-700 dark:text-blue-300 leading-snug">
+                El rol <strong>Super Usuario</strong> solo puede ser asignado o removido por otro Super Usuario.
+              </p>
             </div>
           </div>
 
@@ -761,6 +879,147 @@ onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
         <div class="p-4 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 text-center">
           <p class="text-[10px] text-slate-400 font-medium">※ Los datos mostrados son solo de ejemplo para previsualización.</p>
         </div>
+      </div>
+    </div>
+
+    <!-- Modal Editar Detalles -->
+    <div v-if="isEditingModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
+      <div class="bg-white dark:bg-[#0d0d14] w-full max-w-3xl rounded-[2rem] border border-white/10 overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+        
+        <div class="p-6 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
+          <h2 class="text-xl font-black text-slate-800 dark:text-white uppercase italic flex items-center gap-2">
+            <span class="material-symbols-outlined text-emerald-500">edit_document</span>
+            Detalles del Usuario
+          </h2>
+          <button @click="isEditingModal = false" class="text-slate-400 hover:text-red-600 transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/20">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-6 md:p-8">
+          <div v-if="isLoadingDetails" class="flex flex-col items-center justify-center py-12">
+            <span class="material-symbols-outlined animate-spin text-4xl text-emerald-500 mb-4">progress_activity</span>
+            <p class="text-sm font-bold text-slate-500 uppercase tracking-widest">Cargando detalles...</p>
+          </div>
+          
+          <div v-else class="space-y-8">
+            
+            <!-- Sección: Cuenta -->
+            <div class="space-y-4">
+              <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 pb-2">Información de Cuenta</h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-1">
+                  <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Correo Electrónico *</label>
+                  <input v-model="editForm.email" type="email" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-emerald-500/50" />
+                </div>
+                <div class="space-y-1">
+                  <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Estado del Perfil</label>
+                  <div class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 flex items-center gap-2">
+                    <span :class="detallesUsuario?.persona?.perfil_completado ? 'text-emerald-500' : 'text-amber-500'" class="material-symbols-outlined text-[18px]">
+                      {{ detallesUsuario?.persona?.perfil_completado ? 'check_circle' : 'pending' }}
+                    </span>
+                    <span class="text-sm font-bold" :class="detallesUsuario?.persona?.perfil_completado ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'">
+                      {{ detallesUsuario?.persona?.perfil_completado ? 'Completado' : 'Incompleto' }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sección: Datos Personales -->
+            <div class="space-y-4">
+              <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 pb-2">Datos Personales</h3>
+              
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="space-y-1">
+                  <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Nombres *</label>
+                  <input v-model="editForm.nombres" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-emerald-500/50" />
+                </div>
+                <div class="space-y-1">
+                  <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Primer Apellido *</label>
+                  <input v-model="editForm.primer_apellido" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-emerald-500/50" />
+                </div>
+                <div class="space-y-1">
+                  <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Segundo Apellido</label>
+                  <input v-model="editForm.segundo_apellido" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-emerald-500/50" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-1">
+                  <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Documento de Identidad (CI)</label>
+                  <input v-model="editForm.documento_identidad" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-emerald-500/50" />
+                </div>
+                <div class="space-y-1">
+                  <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Teléfono / Celular</label>
+                  <input v-model="editForm.celular" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-emerald-500/50" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-1">
+                  <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Fecha de Nacimiento</label>
+                  <input v-model="editForm.fecha_nacimiento" type="date" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-emerald-500/50" />
+                </div>
+                <div class="space-y-1">
+                  <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Género</label>
+                  <select v-model="editForm.genero" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-emerald-500/50">
+                    <option :value="0">Masculino</option>
+                    <option :value="1">Femenino</option>
+                    <option :value="2">Prefiero no decirlo</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-1">
+                  <label class="text-[10px] font-black text-slate-500 uppercase ml-2">País de Origen</label>
+                  <input v-model="editForm.pais_origen" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-emerald-500/50" />
+                </div>
+                <div class="space-y-1">
+                  <label class="text-[10px] font-black text-slate-500 uppercase ml-2">País de Residencia</label>
+                  <input v-model="editForm.pais_residencia" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-emerald-500/50" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Sección: Datos Académicos -->
+            <div class="space-y-4">
+              <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 pb-2">Información Institucional / Académica</h3>
+              
+              <div class="space-y-1">
+                <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Institución u Organización</label>
+                <input v-model="editForm.institucion" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-emerald-500/50" />
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-1">
+                  <label class="text-[10px] font-black text-slate-500 uppercase ml-2">ID Grado Académico</label>
+                  <input v-model.number="editForm.id_grado_academico" type="number" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-emerald-500/50" />
+                </div>
+                <div class="space-y-1">
+                  <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Especialidad / Disciplina</label>
+                  <input v-model="editForm.especialidad" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-emerald-500/50" />
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="p-6 border-t border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#13131f] flex items-center justify-end gap-3">
+          <button @click="isEditingModal = false" :disabled="isSavingDetails"
+                  class="px-6 py-3 rounded-xl border-2 border-slate-200 dark:border-gray-700 text-slate-500 font-bold text-xs uppercase hover:bg-slate-100 dark:hover:bg-gray-800 transition-all">
+            Cancelar
+          </button>
+          <button @click="guardarDetalles" :disabled="isSavingDetails || isLoadingDetails"
+                  class="px-8 py-3 rounded-xl bg-emerald-600 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+            <span v-if="isSavingDetails" class="material-symbols-outlined animate-spin text-[16px]">refresh</span>
+            <span v-else class="material-symbols-outlined text-[16px]">save</span>
+            {{ isSavingDetails ? 'Guardando...' : 'Guardar Cambios' }}
+          </button>
+        </div>
+
       </div>
     </div>
 

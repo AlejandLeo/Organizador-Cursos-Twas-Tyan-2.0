@@ -189,4 +189,9 @@ export class CreateEventoDto {
   @IsOptional()
   @IsString()
   logistica_ids?: string;
+
+  @ApiPropertyOptional({ example: '{"1": 2}', description: 'Mapa de grados administrativos por coordinador (JSON)' })
+  @IsOptional()
+  @IsString()
+  coordinadores_grados?: string;
 }

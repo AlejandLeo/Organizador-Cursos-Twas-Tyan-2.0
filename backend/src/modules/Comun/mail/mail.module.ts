@@ -12,11 +12,13 @@ import { MailQueueService } from './mail-queue.service';
 import { MailTemplate } from './entities/mail-template.entity';
 import { MailTemplateService } from './mail-template.service';
 import { MailTemplateController } from './mail-template.controller';
+import { SistemaConfigModule } from '../sistema-config/sistema-config.module';
 
 @Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([MailLog, MailQueue, MailTemplate]),
+    SistemaConfigModule,
     
     MailerModule.forRootAsync({
       useFactory: async (config: ConfigService) => ({
@@ -26,7 +28,7 @@ import { MailTemplateController } from './mail-template.controller';
           secure: config.get('MAIL_PORT') === '465',
           auth: {
             user: config.get('MAIL_USER'),
-            pass: config.get('MAIL_PASS'),
+            pass: config.get('MAIL_PASSWORD'),
           },
           tls: {
             rejectUnauthorized: false, // Permite certificados auto-firmados
