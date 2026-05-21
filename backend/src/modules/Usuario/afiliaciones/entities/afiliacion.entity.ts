@@ -28,11 +28,11 @@ export class Afiliacion {
   tipo_afiliacion: string;
 
   /** Campo temático principal, ej: "Ciencias Exactas", "Ciencias de la Vida" */
-  @Column({ length: 100, nullable: true })
+  @Column({ length: 500, nullable: true })
   area_tematica: string;
 
   /** Disciplina específica, ej: "Informática", "Biología Molecular" */
-  @Column({ length: 100, nullable: true })
+  @Column({ length: 500, nullable: true })
   disciplina_cientifica: string;
 
   // ── Relación ─────────────────────────────────────────────────────────────

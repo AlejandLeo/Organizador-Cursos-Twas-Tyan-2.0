@@ -22,6 +22,9 @@ const resolvePreviewVariables = (text: string) => {
         .replace(/{NOMBRES}/g, 'Lic. Alejandro Leonardo Nogales Ticona')
         .replace(/{PRIMER_APELLIDO}/g, 'Nogales')
         .replace(/{SEGUNDO_APELLIDO}/g, 'Ticona')
+        .replace(/{AREA_TEMATICA}/g, 'CIENCIAS DE LA VIDA Y DE LA TIERRA')
+        .replace(/{DISCIPLINA}/g, 'BIOLOGÍA MOLECULAR')
+        .replace(/{DISCIPLINA_CIENTIFICA}/g, 'BIOLOGÍA MOLECULAR')
         .replace(/{NOMBRE_CURSO}/g, 'Congreso Internacional de Biofertilizantes')
         .replace(/{EVENTO}/g, 'Congreso Internacional de Biofertilizantes')
         .replace(/{ACTIVIDAD}/g, 'Taller Avanzado de Suelos')
@@ -655,6 +658,16 @@ const guardarDiseno = async () => {
                             <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} CI_USUARIO {{ '}' }}</span>
                             <span class="material-symbols-outlined text-xs text-slate-400">fingerprint</span>
                         </div>
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{AREA_TEMATICA}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                            <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
+                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} AREA_TEMATICA {{ '}' }}</span>
+                            <span class="material-symbols-outlined text-xs text-slate-400">school</span>
+                        </div>
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{DISCIPLINA}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                            <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
+                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} DISCIPLINA {{ '}' }}</span>
+                            <span class="material-symbols-outlined text-xs text-slate-400">subject</span>
+                        </div>
 
                         <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{FECHA_EMISION}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
                             <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
@@ -981,8 +994,9 @@ const guardarDiseno = async () => {
                                 left: `${el.x}%`, top: `${el.y}%`, 
                                 fontSize: el.tipo !== 'qr' && el.tipo !== 'firma' ? `${el.fontSize * 0.9}px` : undefined, 
                                 color: el.color, fontFamily: el.fontFamily,
-                                width: el.width ? `${el.width * 0.9}px` : 'auto',
-                                height: el.height ? `${el.height * 0.9}px` : 'auto'
+                                width: (el.tipo === 'texto' || !el.width) ? 'auto' : `${el.width * 0.9}px`,
+                                height: el.height ? `${el.height * 0.9}px` : 'auto',
+                                overflow: 'visible'
                              }">
                              
                              <!-- Si es Cabecera -->
@@ -996,7 +1010,7 @@ const guardarDiseno = async () => {
                              </div>
                              
                              <!-- Si es Texto Genérico -->
-                             <div v-else-if="el.tipo === 'texto'" class="font-bold leading-normal">
+                             <div v-else-if="el.tipo === 'texto'" class="font-bold leading-normal whitespace-nowrap">
                                 {{ resolvePreviewVariables(el.valor) }}
                              </div>
                              

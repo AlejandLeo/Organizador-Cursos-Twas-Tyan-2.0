@@ -343,6 +343,9 @@ const resolveQuickPreviewVariables = (text: string) => {
         .replace(/{NOMBRES}/g, 'Lic. Alejandro Leonardo Nogales Ticona')
         .replace(/{PRIMER_APELLIDO}/g, 'Nogales')
         .replace(/{SEGUNDO_APELLIDO}/g, 'Ticona')
+        .replace(/{AREA_TEMATICA}/g, 'CIENCIAS DE LA VIDA Y DE LA TIERRA')
+        .replace(/{DISCIPLINA}/g, 'BIOLOGÍA MOLECULAR')
+        .replace(/{DISCIPLINA_CIENTIFICA}/g, 'BIOLOGÍA MOLECULAR')
         .replace(/{NOMBRE_CURSO}/g, formEvento.value.nombre || 'Curso de Especialización')
         .replace(/{EVENTO}/g, formEvento.value.nombre || 'Curso de Especialización')
         .replace(/{ACTIVIDAD}/g, 'Actividad Académica Base')
@@ -2460,7 +2463,7 @@ const changeStep = (delta: number) => {
                                                 Variables Dinámicas (clic para insertar)
                                             </p>
                                             <div class="grid grid-cols-2 gap-1">
-                                                <code v-for="v in ['{NOMBRE_ESTUDIANTE}','{PRIMER_APELLIDO}','{SEGUNDO_APELLIDO}','{NOMBRE_CURSO}','{ACTIVIDAD}','{EVENTO}','{GESTION}','{ROL}','{CI_USUARIO}','{CARGA_HORARIA}','{FECHA_EMISION}','{NOTA_FINAL}','{CODIGO_CERTIFICADO}']" :key="v"
+                                                <code v-for="v in ['{NOMBRE_ESTUDIANTE}','{PRIMER_APELLIDO}','{SEGUNDO_APELLIDO}','{NOMBRE_CURSO}','{ACTIVIDAD}','{EVENTO}','{GESTION}','{ROL}','{CI_USUARIO}','{AREA_TEMATICA}','{DISCIPLINA}','{CARGA_HORARIA}','{FECHA_EMISION}','{NOTA_FINAL}','{CODIGO_CERTIFICADO}']" :key="v"
                                                     @click="infoCertificado.tenor = (infoCertificado.tenor || '') + v"
                                                     class="text-[8px] font-mono bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-700 text-amber-800 dark:text-amber-300 px-1.5 py-0.5 rounded cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors truncate"
                                                     :title="`Clic para insertar ${v}`"

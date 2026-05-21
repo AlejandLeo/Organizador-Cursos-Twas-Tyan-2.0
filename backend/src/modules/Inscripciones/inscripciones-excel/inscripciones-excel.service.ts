@@ -2,6 +2,7 @@ import {
   Injectable,
   BadRequestException,
   Logger,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository, ILike } from 'typeorm';
@@ -47,8 +48,69 @@ const ROL_ESTUDIANTE_ID = 4;
 const ROL_PONENTE_ID = 5;
 
 @Injectable()
-export class InscripcionesExcelService {
+export class InscripcionesExcelService implements OnModuleInit {
   private readonly logger = new Logger(InscripcionesExcelService.name);
+
+  async onModuleInit() {
+    try {
+      await this.dataSource.query(`
+        ALTER TABLE "afiliaciones" ALTER COLUMN "disciplina_cientifica" TYPE character varying(500);
+        ALTER TABLE "afiliaciones" ALTER COLUMN "area_tematica" TYPE character varying(500);
+      `);
+      this.logger.log('✓ Columnas disciplina_cientifica y area_tematica ampliadas a 500 caracteres.');
+    } catch (err) {
+      this.logger.error(`Error al ampliar columnas en la base de datos: ${err.message}`);
+    }
+  }
+
+  private getFilaVal(fila: Record<string, any>, keywords: string[]): string {
+    for (const key of Object.keys(fila)) {
+      const norm = key.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]/g, "")
+        .trim();
+      
+      for (const kw of keywords) {
+        if (norm.includes(kw)) {
+          return String(fila[key] || '').trim();
+        }
+      }
+    }
+    return '';
+  }
+
+  private getInstitucionValue(fila: any): string {
+    return this.getFilaVal(fila, ['institucion', 'afiliacion', 'universidad', 'entidad', 'centro']) || String(fila['institucion'] || '').trim();
+  }
+
+  private getDisciplinaValue(fila: any): string {
+    return this.getFilaVal(fila, ['disciplina', 'especialidad', 'trabajo', 'exposicion', 'titulo']) || String(fila['disciplina'] || fila['especialidad'] || fila['disciplina_cientifica'] || '').trim();
+  }
+
+  private getAreaValue(fila: any): string {
+    return this.getFilaVal(fila, ['areatematica', 'area']) || String(fila['area_tematica'] || '').trim();
+  }
+
+  private getGradoAcademicoValue(fila: any): string {
+    for (const key of Object.keys(fila)) {
+      const norm = key.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]/g, "")
+        .trim();
+      
+      // Si la columna es de trabajo o exposición, no debe asignarse al grado académico
+      if (norm.includes('trabajo') || norm.includes('exposicion') || norm.includes('ponencia') || norm.includes('proyecto') || norm.includes('investigacion') || norm.includes('tema')) {
+        continue;
+      }
+      
+      if (norm.includes('gradoacademico') || norm.includes('grado') || norm.includes('titulo')) {
+        return String(fila[key] || '').trim();
+      }
+    }
+    return String(fila['grado_academico'] || fila['grado'] || '').trim();
+  }
 
   constructor(
     @InjectRepository(Usuario)
@@ -101,7 +163,7 @@ export class InscripcionesExcelService {
       for (let i = 0; i < filas.length; i++) {
         const fila = filas[i];
         const numFila = i + 2;
-        const email = String(fila['email'] || '').trim().toLowerCase();
+        const email = (this.getFilaVal(fila, ['email', 'correo', 'mail']) || String(fila['email'] || '')).trim().toLowerCase();
 
         if (!email) {
           detalle.push({ fila: numFila, estado: 'error', mensaje: 'Email vacío o inválido.' });
@@ -136,19 +198,35 @@ export class InscripcionesExcelService {
           });
           const usuarioGuardado = await queryRunner.manager.save(usuario);
 
-          const nombres = String(fila['nombres'] || '').trim();
-          const primerApellido = String(fila['primer_apellido'] || '').trim();
+          const nombres = (this.getFilaVal(fila, ['nombres', 'nombre']) || String(fila['nombres'] || '')).trim();
+          const primerApellido = (this.getFilaVal(fila, ['primerapellido', 'apellidos', 'apellido']) || String(fila['primer_apellido'] || '')).trim();
 
           const persona = queryRunner.manager.create(Persona, {
             nombres: nombres || undefined,
             primer_apellido: primerApellido || undefined,
-            segundo_apellido: String(fila['segundo_apellido'] || '').trim() || undefined,
-            documento_identidad: String(fila['documento_identidad'] || '').trim() || undefined,
-            celular: String(fila['celular'] || '').trim() || undefined,
-            grado_academico: String(fila['grado_academico'] || fila['grado'] || '').trim() || undefined,
+            segundo_apellido: (this.getFilaVal(fila, ['segundoapellido']) || String(fila['segundo_apellido'] || '')).trim() || undefined,
+            documento_identidad: (this.getFilaVal(fila, ['documentoidentidad', 'ci', 'documento', 'identidad']) || String(fila['documento_identidad'] || '')).trim() || undefined,
+            celular: (this.getFilaVal(fila, ['celular', 'telefono', 'movil']) || String(fila['celular'] || '')).trim() || undefined,
+            grado_academico: this.getGradoAcademicoValue(fila) || undefined,
             usuario: usuarioGuardado,
           });
           await queryRunner.manager.save(persona);
+
+          // Guardar Afiliación si viene institución, disciplina o área temática
+          const instVal = this.getInstitucionValue(fila);
+          const discVal = this.getDisciplinaValue(fila);
+          const areaVal = this.getAreaValue(fila);
+
+          if (instVal || discVal || areaVal) {
+            const newAf = queryRunner.manager.create(Afiliacion, {
+              institucion: instVal || 'Ninguna',
+              disciplina_cientifica: discVal,
+              area_tematica: areaVal,
+              usuario: usuarioGuardado,
+              estado: 1,
+            });
+            await queryRunner.manager.save(newAf);
+          }
 
           const idRolRaw = fila['id_rol'];
           const rolId = idRolRaw ? Number(idRolRaw) : ROL_ESTUDIANTE_ID;
@@ -244,8 +322,8 @@ export class InscripcionesExcelService {
       for (let i = 0; i < filas.length; i++) {
         const fila = filas[i];
         const numFila = i + 2;
-        const email = String(fila['email'] || '').trim().toLowerCase();
-        const nombreActividad = String(fila['nombre_actividad_academica'] || '').trim();
+        const email = (this.getFilaVal(fila, ['email', 'correo', 'mail']) || String(fila['email'] || '')).trim().toLowerCase();
+        const nombreActividad = (this.getFilaVal(fila, ['actividad', 'curso', 'nombreactividad']) || String(fila['nombre_actividad_academica'] || '')).trim();
 
         if (!email) {
           detalle.push({ fila: numFila, estado: 'error', mensaje: 'Email vacío.' });
@@ -274,11 +352,11 @@ export class InscripcionesExcelService {
             const userSaved = await queryRunner.manager.save(usuario);
 
             const persona = queryRunner.manager.create(Persona, {
-              nombres: String(fila['nombres'] || '').trim() || 'Estudiante',
-              primer_apellido: String(fila['primer_apellido'] || '').trim() || 'Nuevo',
-              segundo_apellido: String(fila['segundo_apellido'] || '').trim() || undefined,
-              documento_identidad: String(fila['documento_identidad'] || '').trim() || undefined,
-              grado_academico: String(fila['grado_academico'] || fila['grado'] || '').trim() || undefined,
+              nombres: (this.getFilaVal(fila, ['nombres', 'nombre']) || String(fila['nombres'] || '')).trim() || 'Estudiante',
+              primer_apellido: (this.getFilaVal(fila, ['primerapellido', 'apellidos', 'apellido']) || String(fila['primer_apellido'] || '')).trim() || 'Nuevo',
+              segundo_apellido: (this.getFilaVal(fila, ['segundoapellido']) || String(fila['segundo_apellido'] || '')).trim() || undefined,
+              documento_identidad: (this.getFilaVal(fila, ['documentoidentidad', 'ci', 'documento', 'identidad']) || String(fila['documento_identidad'] || '')).trim() || undefined,
+              grado_academico: this.getGradoAcademicoValue(fila) || undefined,
               usuario: userSaved,
             });
             await queryRunner.manager.save(persona);
@@ -288,11 +366,36 @@ export class InscripcionesExcelService {
             usuario = { ...userSaved, persona };
             fueCreado = true;
           } else {
-            const excelGrado = String(fila['grado_academico'] || fila['grado'] || '').trim();
+            const excelGrado = this.getGradoAcademicoValue(fila);
             if (excelGrado && usuario.persona && !usuario.persona.grado_academico) {
               usuario.persona.grado_academico = excelGrado;
               await queryRunner.manager.save(usuario.persona);
             }
+          }
+
+          // Guardar o actualizar Afiliación
+          const instVal = this.getInstitucionValue(fila);
+          const discVal = this.getDisciplinaValue(fila);
+          const areaVal = this.getAreaValue(fila);
+
+          if (instVal || discVal || areaVal) {
+            let af = await queryRunner.manager.findOne(Afiliacion, {
+              where: { usuario: { id: usuario.id } },
+            });
+            if (!af) {
+              af = queryRunner.manager.create(Afiliacion, {
+                usuario: usuario,
+                institucion: instVal || 'Ninguna',
+                disciplina_cientifica: discVal,
+                area_tematica: areaVal,
+                estado: 1,
+              });
+            } else {
+              if (instVal) af.institucion = instVal;
+              if (discVal) af.disciplina_cientifica = discVal;
+              if (areaVal) af.area_tematica = areaVal;
+            }
+            await queryRunner.manager.save(af);
           }
 
           if (!idEvento) throw new Error('Evento no seleccionado.');
@@ -401,8 +504,8 @@ export class InscripcionesExcelService {
       for (let i = 0; i < filas.length; i++) {
         const fila = filas[i];
         const numFila = i + 2;
-        const email = String(fila['email'] || '').trim().toLowerCase();
-        const nombreActividad = String(fila['nombre_actividad_academica'] || '').trim();
+        const email = (this.getFilaVal(fila, ['email', 'correo', 'mail']) || String(fila['email'] || '')).trim().toLowerCase();
+        const nombreActividad = (this.getFilaVal(fila, ['actividad', 'curso', 'nombreactividad']) || String(fila['nombre_actividad_academica'] || '')).trim();
 
         if (!email || !nombreActividad) {
           detalle.push({ fila: numFila, estado: 'error', mensaje: 'Email o nombre de actividad vacío.' });
@@ -430,11 +533,11 @@ export class InscripcionesExcelService {
             usuario = queryRunner.manager.create(Usuario, { email, password: hash, estado: 1, requiere_cambio_password: true });
             const userSaved = await queryRunner.manager.save(usuario);
             const persona = queryRunner.manager.create(Persona, {
-              nombres: String(fila['nombres'] || '').trim() || 'Ponente',
-              primer_apellido: String(fila['primer_apellido'] || '').trim() || 'Nuevo',
-              segundo_apellido: String(fila['segundo_apellido'] || '').trim() || undefined,
-              documento_identidad: String(fila['documento_identidad'] || '').trim() || undefined,
-              grado_academico: String(fila['grado_academico'] || fila['grado'] || '').trim() || undefined,
+              nombres: (this.getFilaVal(fila, ['nombres', 'nombre']) || String(fila['nombres'] || '')).trim() || 'Ponente',
+              primer_apellido: (this.getFilaVal(fila, ['primerapellido', 'apellidos', 'apellido']) || String(fila['primer_apellido'] || '')).trim() || 'Nuevo',
+              segundo_apellido: (this.getFilaVal(fila, ['segundoapellido']) || String(fila['segundo_apellido'] || '')).trim() || undefined,
+              documento_identidad: (this.getFilaVal(fila, ['documentoidentidad', 'ci', 'documento', 'identidad']) || String(fila['documento_identidad'] || '')).trim() || undefined,
+              grado_academico: this.getGradoAcademicoValue(fila) || undefined,
               usuario: userSaved,
             });
             await queryRunner.manager.save(persona);
@@ -443,11 +546,36 @@ export class InscripcionesExcelService {
             usuario = { ...userSaved, persona };
             fueCreado = true;
           } else {
-            const excelGrado = String(fila['grado_academico'] || fila['grado'] || '').trim();
+            const excelGrado = this.getGradoAcademicoValue(fila);
             if (excelGrado && usuario.persona && !usuario.persona.grado_academico) {
               usuario.persona.grado_academico = excelGrado;
               await queryRunner.manager.save(usuario.persona);
             }
+          }
+
+          // Guardar o actualizar Afiliación
+          const instVal = this.getInstitucionValue(fila);
+          const discVal = this.getDisciplinaValue(fila);
+          const areaVal = this.getAreaValue(fila);
+
+          if (instVal || discVal || areaVal) {
+            let af = await queryRunner.manager.findOne(Afiliacion, {
+              where: { usuario: { id: usuario.id } },
+            });
+            if (!af) {
+              af = queryRunner.manager.create(Afiliacion, {
+                usuario: usuario,
+                institucion: instVal || 'Ninguna',
+                disciplina_cientifica: discVal,
+                area_tematica: areaVal,
+                estado: 1,
+              });
+            } else {
+              if (instVal) af.institucion = instVal;
+              if (discVal) af.disciplina_cientifica = discVal;
+              if (areaVal) af.area_tematica = areaVal;
+            }
+            await queryRunner.manager.save(af);
           }
 
           if (!idEvento) throw new Error('Evento no seleccionado.');

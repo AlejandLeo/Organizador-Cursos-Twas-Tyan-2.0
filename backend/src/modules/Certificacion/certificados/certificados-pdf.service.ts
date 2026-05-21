@@ -62,6 +62,10 @@ export class CertificadosPdfService {
       ? `${grado ? grado + ' ' : ''}${primerApellido} ${segundoApellido} ${nombres}`.replace(/\s+/g, ' ').trim()
       : 'Usuario Desconocido';
 
+    const afiliacion = certificado.usuario?.afiliaciones?.[0];
+    const areaTematica = (afiliacion?.area_tematica || '').toUpperCase().trim();
+    const disciplinaCientifica = (afiliacion?.disciplina_cientifica || '').toUpperCase().trim();
+
     // Información del Evento
     const eventoNombre = certificado.actividadAcademica?.evento?.nombre || (certificado.actividadAcademica as any)?.nombre || 'Evento Desconocido';
     
@@ -81,6 +85,9 @@ export class CertificadosPdfService {
       '{NOMBRES}': nombreCompleto2,
       '{PRIMER_APELLIDO}': primerApellido,
       '{SEGUNDO_APELLIDO}': segundoApellido,
+      '{AREA_TEMATICA}': areaTematica,
+      '{DISCIPLINA}': disciplinaCientifica,
+      '{DISCIPLINA_CIENTIFICA}': disciplinaCientifica,
       '{EVENTO}': eventoNombre,
       '{ACTIVIDAD}': (certificado.actividadAcademica as any)?.nombre || '',
       '{GESTION}': new Date().getFullYear().toString(),

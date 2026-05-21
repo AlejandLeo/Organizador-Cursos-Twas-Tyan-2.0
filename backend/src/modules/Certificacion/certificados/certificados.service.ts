@@ -281,6 +281,7 @@ export class CertificadosService {
       relations: [
         'usuario',
         'usuario.persona',
+        'usuario.afiliaciones',
         'infoCertificado',
         'actividadAcademica',
         'actividadAcademica.evento',

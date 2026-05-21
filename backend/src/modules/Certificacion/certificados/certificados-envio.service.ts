@@ -32,6 +32,7 @@ export class CertificadosEnvioService {
       relations: [
         'usuario',
         'usuario.persona',
+        'usuario.afiliaciones',
         'infoCertificado',
         'actividadAcademica',
         'actividadAcademica.evento',
@@ -198,6 +199,10 @@ export class CertificadosEnvioService {
 
     const studentName = nombreCompleto2; // Para compatibilidad
     
+    const afiliacion = cert.usuario.afiliaciones?.[0];
+    const areaTematica = (afiliacion?.area_tematica || '').toUpperCase().trim();
+    const disciplinaCientifica = (afiliacion?.disciplina_cientifica || '').toUpperCase().trim();
+    
     const courseName = (cert.actividadAcademica?.nombre || '').toUpperCase();
     const eventoNombre = (cert.actividadAcademica?.evento?.nombre || '').toUpperCase();
     const gestionEvento = cert.actividadAcademica?.evento?.gestion?.toString() || new Date().getFullYear().toString();
@@ -254,6 +259,9 @@ export class CertificadosEnvioService {
           res = res.replace(/\[ACTIVIDAD\]/gi, courseName);
           res = res.replace(/\[CODIGO\]/gi, certCode);
           res = res.replace(/\[FECHA\]/gi, fechaEmision);
+          res = res.replace(/\[AREA_TEMATICA\]/gi, areaTematica);
+          res = res.replace(/\[DISCIPLINA\]/gi, disciplinaCientifica);
+          res = res.replace(/\[DISCIPLINA_CIENTIFICA\]/gi, disciplinaCientifica);
           
           // Formatos con llaves simples
           res = res.replace(/\{NOMBRE_ESTUDIANTE\}/gi, nombreCompleto2); // legacy
@@ -275,20 +283,26 @@ export class CertificadosEnvioService {
           res = res.replace(/\{EVENTO\}/gi, eventoNombre);
           res = res.replace(/\{GESTION\}/gi, gestionEvento);
           res = res.replace(/\{ROL\}/gi, rol);
+          res = res.replace(/\{AREA_TEMATICA\}/gi, areaTematica);
+          res = res.replace(/\{DISCIPLINA\}/gi, disciplinaCientifica);
+          res = res.replace(/\{DISCIPLINA_CIENTIFICA\}/gi, disciplinaCientifica);
           
           res = res.replace(/\{CODIGO_CERTIFICADO\}/gi, certCode);
           res = res.replace(/\{CODIGO\}/gi, certCode);
           res = res.replace(/\{FECHA_EMISION\}/gi, fechaEmision);
           res = res.replace(/\{FECHA\}/gi, fechaEmision);
-
+ 
           // Formatos con llaves dobles
           res = res.replace(/\{\{NOMBRE_ESTUDIANTE\}\}/gi, nombreCompleto2);
           res = res.replace(/\{\{NOMBRE_COMPLETO_1\}\}/gi, nombreCompleto1);
           res = res.replace(/\{\{NOMBRE_COMPLETO_2\}\}/gi, nombreCompleto2);
-          res = res.replace(/\{\{NOMBRE\}\}/gi, nombres);
+          res = res.replace(/\{\{NOMBRE\}\}/gi, nombreCompleto2);
           res = res.replace(/\{\{NOMBRE_CURSO\}\}/gi, courseName);
           res = res.replace(/\{\{ACTIVIDAD\}\}/gi, courseName);
           res = res.replace(/\{\{CODIGO_CERTIFICADO\}\}/gi, certCode);
+          res = res.replace(/\{\{AREA_TEMATICA\}\}/gi, areaTematica);
+          res = res.replace(/\{\{DISCIPLINA\}\}/gi, disciplinaCientifica);
+          res = res.replace(/\{\{DISCIPLINA_CIENTIFICA\}\}/gi, disciplinaCientifica);
           return res;
         };
 
