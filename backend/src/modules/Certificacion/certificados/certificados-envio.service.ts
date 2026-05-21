@@ -96,6 +96,7 @@ export class CertificadosEnvioService {
             content: pdfBuffer,
           },
         ],
+        true, // direct = true (para enviar y adjuntar inmediatamente en el Worker)
       );
 
       // Si result es null, significa que falló silenciosamente (o algo en sendMail devolvió null)

@@ -11,8 +11,14 @@ export class MailQueue {
   @Column({ length: 255 })
   asunto: string;
 
-  @Column({ type: 'text' })
-  cuerpo: string;
+  @Column({ type: 'text', nullable: true })
+  cuerpo: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  template: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  context: string | null;
 
   /** PENDING, SENT, FAILED, PAUSED_QUOTA */
   @Column({ length: 20, default: 'PENDING' })
