@@ -2,13 +2,15 @@ import axios from 'axios';
 
 import { useUIStore } from '@/stores/ui';
 
-/** URL base del API: en producción usa el mismo dominio si no hay VITE_API_URL. */
 export const getApiBaseUrl = (): string => {
   const envUrl = import.meta.env.VITE_API_URL as string | undefined;
   if (envUrl) return envUrl.replace(/\/$/, '');
   if (typeof window !== 'undefined') return window.location.origin;
-  return 'http://localhost:3000';
+  return 'https://eventos.fcpn.edu.bo';
 };
+
+// Mantener por compatibilidad si es requerido por algún módulo
+export const getBaseUrl = getApiBaseUrl;
 
 /**
  * Normaliza URLs de medios devueltas por el API.
@@ -97,7 +99,7 @@ export const getImageUrl = (carpeta: string, nombreArchivo: string, fallback = '
     return resolveMediaUrl(nombreArchivo, fallback);
   }
 
-  const baseUrl = getApiBaseUrl();
+  const baseUrl = api.defaults.baseURL || window.location.origin;
   // Decodificamos varias veces por si viene con doble codificación desde el backend (ej: %2520 -> %20 -> " ")
   let cleanName = nombreArchivo;
   try {

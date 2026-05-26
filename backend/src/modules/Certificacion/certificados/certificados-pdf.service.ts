@@ -207,7 +207,7 @@ export class CertificadosPdfService {
         doc.text(lines, x_anchor, y_baseline, { align: align as any });
       }
       else if (el.tipo === 'qr') {
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const frontendUrl = process.env.FRONTEND_URL;
         const urlVerificacion = `${frontendUrl}/verificar-certificado/${certificado.uuid_archivo}`;
 
         const qrDataUrl = await QRCode.toDataURL(urlVerificacion, {

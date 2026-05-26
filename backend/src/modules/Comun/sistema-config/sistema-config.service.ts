@@ -8,16 +8,16 @@ export class SistemaConfigService implements OnModuleInit {
   constructor(
     @InjectRepository(ConfiguracionSistema)
     private readonly configRepository: Repository<ConfiguracionSistema>,
-  ) {}
+  ) { }
 
   async onModuleInit() {
     // Inicializar configuración por defecto si no existe
     await this.ensureConfig('WELCOME_MESSAGE_SUBJECT', '¡Bienvenido a la Plataforma!', 'Asunto del correo de bienvenida');
-    await this.ensureConfig('WELCOME_MESSAGE_BODY', 
-      'Hola {{nombre}},\n\nBienvenido a nuestra plataforma. Tus credenciales son:\nUsuario: {{email}}\nPassword: {{password}}\n\n¡Te esperamos!', 
+    await this.ensureConfig('WELCOME_MESSAGE_BODY',
+      'Hola {{nombre}},\n\nBienvenido a nuestra plataforma. Tus credenciales son:\nUsuario: {{email}}\nPassword: {{password}}\n\n¡Te esperamos!',
       'Cuerpo del correo de bienvenida (Soporta {{nombre}}, {{email}}, {{password}})'
     );
-    await this.ensureConfig('MAIL_MASTER_LAYOUT', 
+    await this.ensureConfig('MAIL_MASTER_LAYOUT',
       `<!DOCTYPE html>
 <html>
 <head>
@@ -52,7 +52,7 @@ export class SistemaConfigService implements OnModuleInit {
 </html>`,
       'Layout maestro HTML para todos los correos. Usa {{{content}}} para el cuerpo.'
     );
-    await this.ensureConfig('SYSTEM_URL', 'http://localhost:5173', 'URL pública del sistema (frontend)');
+    await this.ensureConfig('SYSTEM_URL', process.env.FRONTEND_URL || '', 'URL pública del sistema (frontend)');
   }
 
   private async ensureConfig(clave: string, valor: string, descripcion: string) {

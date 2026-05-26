@@ -45,12 +45,6 @@ const eventoStore = useEventoStore()
         </div>
 
       </div>
-
-      <div class="border-t border-gray-300 mt-8 pt-6 flex flex-col md:flex-row justify-between items-center text-xs text-gray-500">
-        <p class="mb-2 md:mb-0">&copy; 2025 - Todos los derechos reservados - BattleBread</p>
-        <p>Desarrollado por <a href="#" class="text-blue-600 hover:text-blue-800">BattleBread Academy</a></p>
-      </div>
-
     </div>
   </footer>
 </template>

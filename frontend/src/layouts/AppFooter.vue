@@ -60,11 +60,6 @@
               </template>
           </div>
         </div>
-
-        <div class="border-t border-gray-700 dark:border-gray-800 mt-12 pt-6 text-center text-gray-400 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p class="mb-0 text-sm md:text-base">{{ t('footer.rights') }} - BattleBread</p>
-          <p class="text-sm md:text-base">{{ t('footer.developed_by') }} <a href="https://aiverke.github.io/BattleBread-Web-Site/" target="_blank" rel="noopener noreferrer" class="text-umsa-blue dark:text-blue-400 hover:text-blue-300 transition-colors font-medium hover:underline">BattleBread Academy</a></p>
-        </div>
       </div>
     </footer>
   </template>

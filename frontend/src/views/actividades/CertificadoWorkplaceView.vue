@@ -16,13 +16,13 @@ const showPreviewModal = ref(false)
 const resolvePreviewVariables = (text: string) => {
     if (!text) return ''
     return text
-        .replace(/{NOMBRE_ESTUDIANTE}/g, 'Lic. Alejandro Leonardo Nogales Ticona')
-        .replace(/{NOMBRE_COMPLETO_1}/g, 'Lic. Nogales Ticona Alejandro Leonardo')
-        .replace(/{NOMBRE_COMPLETO_2}/g, 'Lic. Alejandro Leonardo Nogales Ticona')
-        .replace(/{NOMBRE}/g, 'Lic. Alejandro Leonardo Nogales Ticona')
-        .replace(/{NOMBRES}/g, 'Lic. Alejandro Leonardo Nogales Ticona')
-        .replace(/{PRIMER_APELLIDO}/g, 'Nogales')
-        .replace(/{SEGUNDO_APELLIDO}/g, 'Ticona')
+        .replace(/{NOMBRE_ESTUDIANTE}/g, 'Lic. Diego Michael Dai Maldonado')
+        .replace(/{NOMBRE_COMPLETO_1}/g, 'Lic. Maldonado Dai Diego Michael')
+        .replace(/{NOMBRE_COMPLETO_2}/g, 'Lic. Diego Michael Dai Maldonado')
+        .replace(/{NOMBRE}/g, 'Lic. Diego Michael Dai Maldonado')
+        .replace(/{NOMBRES}/g, 'Lic. Diego Michael Dai Maldonado')
+        .replace(/{PRIMER_APELLIDO}/g, 'Maldonado')
+        .replace(/{SEGUNDO_APELLIDO}/g, 'Dai')
         .replace(/{AREA_TEMATICA}/g, 'CIENCIAS DE LA VIDA Y DE LA TIERRA')
         .replace(/{DISCIPLINA}/g, 'BIOLOGÍA MOLECULAR')
         .replace(/{DISCIPLINA_CIENTIFICA}/g, 'BIOLOGÍA MOLECULAR')
@@ -1007,67 +1007,12 @@ const guardarDiseno = async () => {
                         height: `${678 * previewZoom}px` 
                      }">
                      
-<<<<<<< HEAD
-                    <!-- Certificado Previsualizado (Aspect A4) -->
-                    <div class="absolute left-1/2 top-1/2 w-[960px] h-[678px] bg-white shadow-2xl border border-slate-350 flex items-center justify-center rounded-xl transition-transform duration-200 shrink-0"
-                         :style="{ 
-                            backgroundImage: infoCertificado?.fondo_url ? `url(${getImageUrl('fondos', infoCertificado.fondo_url)})` : undefined,
-                            backgroundSize: '100% 100%',
-                            backgroundPosition: 'center',
-                            backgroundRepeat: 'no-repeat',
-                            transform: `translate(-50%, -50%) scale(${previewZoom})`,
-                            transformOrigin: 'center center'
-                         }">
-                         
-                        <!-- Elementos Dinámicos Sustituidos -->
-                        <div v-for="el in elementosLienzo" :key="'prev-' + el.id"
-                             class="absolute flex items-center justify-center text-center select-none"
-                             :style="{ 
-                                left: `${el.x}%`, top: `${el.y}%`, 
-                                fontSize: el.tipo !== 'qr' && el.tipo !== 'firma' ? `${el.fontSize * 0.9}px` : undefined, 
-                                color: el.color, fontFamily: el.fontFamily,
-                                width: (el.tipo === 'texto' || !el.width) ? 'auto' : `${el.width * 0.9}px`,
-                                height: el.height ? `${el.height * 0.9}px` : 'auto',
-                                overflow: 'visible'
-                             }">
-                             
-                             <!-- Si es Cabecera -->
-                             <div v-if="el.tipo === 'cabecera'" class="font-black uppercase leading-tight">
-                                {{ infoCertificado?.cabecera || '[ CABECERA ]' }}
-                             </div>
-                             
-                             <!-- Si es Tenor -->
-                             <div v-else-if="el.tipo === 'tenor'" class="leading-relaxed italic whitespace-pre-line">
-                                {{ resolvePreviewTenor(infoCertificado?.tenor) }}
-                             </div>
-                             
-                             <!-- Si es Texto Genérico -->
-                             <div v-else-if="el.tipo === 'texto'" class="font-bold leading-normal whitespace-nowrap">
-                                {{ resolvePreviewVariables(el.valor) }}
-                             </div>
-                             
-                             <!-- Si es QR -->
-                             <div v-else-if="el.tipo === 'qr'" class="w-full h-full border-2 border-slate-900 bg-white flex items-center justify-center rounded-xl p-2 shrink-0">
-                                <span class="material-symbols-outlined text-[60px] text-slate-800 select-none">qr_code_2</span>
-                             </div>
-                             
-                             <!-- Si es Firma -->
-                             <div v-else-if="el.tipo === 'firma'" class="w-full h-full flex flex-col items-center justify-center p-2 relative shrink-0">
-                                <div class="h-10 w-32 border-b border-dashed border-slate-400 mb-1 flex items-center justify-center select-none">
-                                    <span class="font-serif italic text-slate-400 text-xs select-none font-medium">Firma Autorizada</span>
-                                </div>
-                                <span class="text-[8px] font-black uppercase text-slate-500 select-none">COORDINADOR GENERAL</span>
-                             </div>
-                        </div>
-                    </div>
-=======
-                    <!-- Certificado Previsualizado via Componente Universal -->
+                 <!-- Certificado Previsualizado via Componente Universal -->
                     <CertificadoRender 
                         :elementos="elementosLienzo"
                         :fondoUrl="infoCertificado?.fondo_url"
                         :zoom="previewZoom"
                     />
->>>>>>> 9b0c81ce15d4bfb7ad481eff2cd1ae45ca14566e
                 </div>
             </div>
             
