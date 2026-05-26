@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #c0392b; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { border: 1px solid #e1e1e1; padding: 30px; border-radius: 0 0 8px 8px; background: #fff; }
+        .footer { text-align: center; font-size: 12px; color: #777; margin-top: 20px; }
+        .reason-box { background: #fff5f5; padding: 15px; border-radius: 4px; border-left: 4px solid #c0392b; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Estado de tu Solicitud</h1>
+    </div>
+    <div class="content">
+        <p>Hola <strong>{{name}}</strong>,</p>
+        <p>Lamentamos informarte que tu solicitud de acceso a la <strong>Plataforma de Gestión de Eventos Académicos</strong> no ha podido ser aprobada en este momento.</p>
+        
+        {{#if reason}}
+        <div class="reason-box">
+            <strong>Motivo/Observación:</strong><br>
+            {{reason}}
+        </div>
+        {{/if}}
+
+        <p>Si consideras que esto ha sido un error o deseas proporcionar más información, por favor ponte en contacto con la administración.</p>
+    </div>
+    <div class="footer">
+        <p>Este es un mensaje automático, por favor no respondas a este correo.</p>
+        <p>&copy; 2026 Plataforma de Eventos Académicos</p>
+    </div>
+</body>
+</html>

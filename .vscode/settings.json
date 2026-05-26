@@ -1,0 +1,32 @@
+{
+    "liveServer.settings.donotShowInfoMsg": true,
+    "workbench.startupEditor": "none",
+    "javascript.updateImportsOnFileMove.enabled": "always",
+    "workbench.colorTheme": "Nord Deep",
+    "php.validate.executablePath": "",
+    "[dart]": {
+        "editor.formatOnSave": true,
+        "editor.formatOnType": true,
+        "editor.rulers": [
+            80
+        ],
+        "editor.selectionHighlight": false,
+        "editor.tabCompletion": "onlySnippets",
+        "editor.wordBasedSuggestions": "off"
+    },
+    "[typescript]": {
+        "editor.defaultFormatter": "vscode.typescript-language-features"
+    },
+    "python.defaultInterpreterPath": "c:\\Users\\Killer\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+    "debug.javascript.autoAttachFilter": "always",
+    "claudeCode.preferredLocation": "panel",
+
+    "claudeCode.gitBashPath": "C:\\Program Files\\Git\\bin\\bash.exe",
+
+    "terminal.integrated.defaultProfile.windows": "Git Bash",
+    "terminal.integrated.profiles.windows": {
+        "Git Bash": {
+            "path": "C:\\Program Files\\Git\\bin\\bash.exe"
+        }
+    }
+}

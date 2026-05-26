@@ -1,0 +1,67 @@
+# Dependencias
+node_modules/
+backend/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Archivos de compilación
+dist/
+build/
+*.tsbuildinfo
+
+# Archivos de entorno
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDEs y editores
+.vscode/
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Pruebas
+coverage/
+*.lcov
+
+# Otros
+temp/
+tmp/
+*.pid
+*.seed
+*.pid.lock
+
+# Uploads (Archivos subidos localmente)
+uploads/cursos/*
+!uploads/cursos/.gitkeep
+uploads/eventos/*
+!uploads/eventos/.gitkeep
+uploads/firmas/*
+!uploads/firmas/.gitkeep
+uploads/fondos/*
+!uploads/fondos/.gitkeep
+uploads/imagenes/*
+!uploads/imagenes/.gitkeep
+uploads/inscripciones/*
+!uploads/inscripciones/.gitkeep
+uploads/perfiles/*
+!uploads/perfiles/.gitkeep
+uploads/profiles/*
+!uploads/profiles/.gitkeep
+uploads/logo/*
+!uploads/logo/.gitkeep
+!uploads/logo/EscudoFCPN.png
+!uploads/logo/LOGO UMSA OFICIAL.png

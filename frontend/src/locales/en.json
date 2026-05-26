@@ -1,0 +1,35 @@
+{
+  "navbar": {
+    "home": "Home",
+    "info": "Information",
+    "organization": "Organization",
+    "location": "Location",
+    "contact": "Contact",
+    "login": "Login",
+    "register": "Register",
+    "language": "ENGLISH"
+  },
+  "footer": {
+    "where_we_are": "Where we are",
+    "address": "Cota Cota, 27th Street, Faculty of Pure and Natural Sciences Building - La Paz, Bolivia",
+    "contact_us": "Contact Us",
+    "phone": "Reference phone",
+    "email": "Email",
+    "organization": "Organization and Sponsorship",
+    "rights": "© 2025 - All rights reserved",
+    "developed_by": "Developed by"
+  },
+  "login": {
+    "welcome": "WELCOME",
+    "subtitle": "ACADEMIC MANAGEMENT SYSTEM",
+    "access": "Platform Access",
+    "instructions": "Enter your credentials to access the services.",
+    "email": "Email Address",
+    "password": "Password",
+    "forgot_password": "Forgot your password? Recover here",
+    "submit": "Log In",
+    "no_account": "Don't have an account?",
+    "register_here": "Register here",
+    "verifying": "Verifying..."
+  }
+}

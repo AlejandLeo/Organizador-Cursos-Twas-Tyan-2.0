@@ -1,0 +1,35 @@
+{
+  "navbar": {
+    "home": "Inicio",
+    "info": "Información",
+    "organization": "Organización",
+    "location": "Ubicación",
+    "contact": "Contacto",
+    "login": "Ingresar",
+    "register": "Registrarse",
+    "language": "ESPAÑOL"
+  },
+  "footer": {
+    "where_we_are": "Dónde estamos",
+    "address": "Cota Cota, Calle 27, Edif. Facultad de Ciencias Puras y Naturales - La Paz, Bolivia",
+    "contact_us": "Contáctanos",
+    "phone": "Teléfono de referencia",
+    "email": "Email",
+    "organization": "Organización y Auspicio",
+    "rights": "© 2025 - Todos los derechos reservados",
+    "developed_by": "Desarrollado por"
+  },
+  "login": {
+    "welcome": "BIENVENIDO",
+    "subtitle": " AL SISTEMA DE GESTIÓN ACADÉMICA",
+    "access": "Acceso Plataforma",
+    "instructions": "Ingresa tus credenciales para acceder a los servicios.",
+    "email": "Correo Electrónico",
+    "password": "Contraseña",
+    "forgot_password": "¿Olvidaste tu contraseña? Recuperar aquí",
+    "submit": "Ingresar al Sistema",
+    "no_account": "¿No tienes una cuenta?",
+    "register_here": "Regístrate aquí",
+    "verifying": "Verificando..."
+  }
+}

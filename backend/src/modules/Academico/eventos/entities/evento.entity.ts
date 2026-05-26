@@ -1,0 +1,169 @@
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+import { ActividadAcademica } from '../../../Academico/actividades-academicas/entities/actividad-academica.entity';
+import { CoordinacionEvento } from '../../../Academico/coordinaciones/entities/coordinacion.entity';
+import { InfoCertificado } from '../../../Certificacion/info-certificados/entities/info-certificado.entity';
+import { Imparticion } from '../../../Academico/imparticiones/entities/imparticion.entity';
+
+/**
+ * EVENTOS — edición concreta de un evento académico.
+ *
+ * Cambio v2: se eliminó la tabla VERSIONES_EVENTOS.
+ * Los campos de versión (ubicacion, estado, fechas) ahora viven aquí.
+ * Cada fila en EVENTOS es una instancia completa y autónoma.
+ *
+ * Ejemplo: "Congreso TWAS-TYAN 2025 — La Paz" es una fila de EVENTOS.
+ *
+ * estado: 1 = Activo/En curso | 0 = Finalizado
+ * logo: UUID para localizar el logo en el servidor (no es una ruta).
+ */
+@Entity('eventos')
+export class Evento {
+  /** El SQL usa id_eventos (plural), lo respetamos aquí. */
+  @PrimaryGeneratedColumn({ name: 'id' })
+  id: number;
+
+  @Column({ length: 255, nullable: true })
+  nombre: string;
+
+  @Column({ type: 'text', nullable: true })
+  descripcion: string;
+
+  /** Año de gestión, ej: "2025" */
+  @Column({ length: 10, nullable: true })
+  gestion: string;
+
+  @Column({ length: 255, nullable: true })
+  ubicacion: string;
+
+  @Column({ length: 255, nullable: true })
+  direccion: string;
+
+  @Column({ type: 'date', nullable: true })
+  fecha_inicio: Date;
+
+  @Column({ type: 'date', nullable: true })
+  fecha_fin: Date;
+
+  /** 1 = Activo | 0 = Finalizado */
+  @Column({ type: 'integer', default: 1 })
+  estado: number;
+
+  /** 
+   * Fase del evento: 
+   * 1: Planificación (Oculto)
+   * 2: Inscripciones Abiertas (Público)
+   * 3: En Ejecución
+   * 4: Finalizado (Emisión de certificados habilitada)
+   * 5: Archivado (Solo visible para Super Admin)
+   */
+  @Column({ type: 'integer', default: 1 })
+  fase: number;
+
+  /** UUID para localizar el archivo de logo en el servidor. */
+  @Column({ length: 255, nullable: true })
+  logo: string;
+
+  @Column({ length: 50, nullable: true })
+  telefono: string;
+
+  @Column({ length: 150, nullable: true })
+  email: string;
+
+  /** UUID o URL para la imagen de fondo de las vistas del evento */
+  @Column({ length: 255, nullable: true })
+  imagen_fondo: string;
+
+  @Column({ length: 150, nullable: true })
+  version: string;
+
+  @Column({ type: 'text', nullable: true })
+  sobre_evento_1: string;
+
+  @Column({ type: 'text', nullable: true })
+  sobre_evento_2: string;
+
+  @Column({ type: 'text', nullable: true })
+  frase_destacada: string;
+
+  @Column({ type: 'text', nullable: true })
+  google_maps_link: string;
+
+  /** Almacena el cronograma en formato JSON o texto */
+  @Column({ type: 'text', nullable: true })
+  cronograma: string;
+
+  @Column({ type: 'text', nullable: true })
+  organizadores: string;
+
+  @Column({ length: 100, nullable: true })
+  sigla: string;
+
+  @Column({ length: 50, nullable: true })
+  color_principal: string;
+
+  @Column({ length: 255, nullable: true })
+  institucion_badge: string;
+
+  @Column({ length: 255, nullable: true })
+  link_facebook: string;
+
+  @Column({ length: 255, nullable: true })
+  link_web: string;
+
+  @Column({ length: 50, nullable: true })
+  color_sigla: string;
+
+  @Column({ length: 50, nullable: true })
+  color_texto_header: string;
+
+  @Column({ length: 50, nullable: true })
+  color_titulo_2: string;
+
+  @Column({ length: 50, nullable: true })
+  color_badge_gestion: string;
+
+  @Column({ length: 50, nullable: true })
+  color_badge_institucion: string;
+
+  @Column({ length: 50, nullable: true })
+  color_badge_fecha: string;
+
+  @Column({ length: 255, nullable: true })
+  nombre_2: string;
+
+  @Column({ type: 'integer', default: 3 })
+  prioridad: number;
+
+  @Column({ length: 50, default: 'visible' })
+  visibilidad_al_finalizar: string;
+
+  // ── Relaciones ────────────────────────────────────────────────────────────
+
+  /** Un evento tiene múltiples actividades (cursos, talleres, conferencias). */
+  @OneToMany(() => ActividadAcademica, (act) => act.evento)
+  actividades: ActividadAcademica[];
+
+  /** Usuarios que coordinan este evento. */
+  @OneToMany(() => CoordinacionEvento, (ce) => ce.evento)
+  coordinaciones: CoordinacionEvento[];
+
+  /** Plantillas de certificado para este evento. */
+  @OneToMany(() => InfoCertificado, (ic) => ic.evento)
+  infosCertificados: InfoCertificado[];
+
+  @OneToMany(() => Imparticion, (imp) => imp.evento)
+  imparticiones: Imparticion[];
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  fecha_creacion: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  fecha_actualizacion: Date;
+}

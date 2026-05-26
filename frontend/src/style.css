@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary-dark: #012248;
+  --color-primary-light: #0070BB;
+  --color-umsa-gold: #BC9C31;
+  --color-umsa-blue: #0070BB;
+  --color-primary-accent: #0079d9;
+  --color-neutral-bg: #f8f9fa;
+  --color-neutral-border: #e2e8f0;
+  --color-neutral-text: #475569;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans",
+    "Droid Sans", "Helvetica Neue", sans-serif;
+}
+
+:root {
+  /* Legacy/Fallback variables if needed directly in JS or other CSS */
+  --primary-dark: #012248;
+  --primary-light: #0070BB;
+  --umsa-gold: #BC9C31;
+  --umsa-blue: #0070BB;
+  --primary-accent: #0079d9;
+  --neutral-bg: #f8f9fa;
+  --neutral-border: #e2e8f0;
+  --neutral-text: #475569;
+  --white: #ffffff;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-neutral-bg);
+  color: var(--color-neutral-text);
+  @apply dark:bg-gray-950 dark:text-gray-200 transition-colors duration-300;
+}
+
+/* Custom Component Classes using @apply - Notice: v4 works slightly differently */
+.btn {
+  @apply px-6 py-3 rounded-lg font-medium transition-all duration-300 inline-flex items-center justify-center;
+}
+
+.btn-primary {
+    /* Using custom colors from @theme */
+  @apply bg-primary-dark text-white hover:bg-[#003d7a] active:scale-95;
+}
+
+.btn-secondary {
+  @apply bg-white border-2 border-primary-dark text-primary-dark hover:bg-blue-50;
+}
+
+.btn-ghost {
+  @apply text-primary-dark hover:bg-blue-50 px-4 py-2;
+}
+
+.card {
+  @apply bg-white rounded-lg border border-neutral-border p-6 shadow-sm hover:shadow-md transition-shadow;
+}
+
+/* Animations for Dynamic Logos */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes zoomIn {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.animate-in {
+  animation-fill-mode: forwards;
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.zoom-in {
+  animation: zoomIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
