@@ -224,7 +224,7 @@ const router = createRouter({
       children: [
         {
           path: '',
-          redirect: '/ponente/catalogo'
+          redirect: '/ponente/eventos'
         },
         {
           path: 'catalogo',

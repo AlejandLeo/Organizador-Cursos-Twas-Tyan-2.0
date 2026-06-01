@@ -83,7 +83,7 @@ const onNombreChange = (e: any) => {
     </nav>
 
     <div class="mt-auto space-y-2">
-      <button @click="authStore.cambiarRolActivo('')" v-if="authStore.userRoles.length > 1"
+      <button @click="authStore.cambiarRolActivo('')" v-if="authStore.tieneMultiplesRoles"
         class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all font-bold text-slate-500 hover:bg-slate-50 dark:hover:bg-gray-900 border border-transparent">
         <span class="text-[10px] uppercase tracking-widest">Cambiar Rol</span>
         <span class="material-symbols-outlined text-[18px]">cached</span>

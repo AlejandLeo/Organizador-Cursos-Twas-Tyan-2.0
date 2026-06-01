@@ -14,9 +14,28 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => !!token.value);
 
-  /** Todos los nombres de roles que posee el usuario autenticado */
+  /** Todos los nombres de roles que posee el usuario autenticado (normalizados y únicos) */
   const userRoles = computed<string[]>(() => {
-    return (user.value as any)?.usuariosRoles?.map((ur: any) => ur.rol?.nombre_rol) || [];
+    const rawRoles: string[] = (user.value as any)?.usuariosRoles?.map((ur: any) => ur.rol?.nombre_rol) || [];
+    const normalizedSet = new Set<string>();
+    for (const r of rawRoles) {
+      if (!r) continue;
+      const lower = r.toLowerCase().trim();
+      if (lower === 'estudiante') {
+        normalizedSet.add('Estudiante');
+      } else if (lower === 'ponente') {
+        normalizedSet.add('Ponente');
+      } else if (lower === 'logistica' || lower === 'logística') {
+        normalizedSet.add('Logística');
+      } else if (lower === 'super usuario') {
+        normalizedSet.add('Super Usuario');
+      } else if (lower === 'coordinador') {
+        normalizedSet.add('Coordinador');
+      } else {
+        normalizedSet.add(r.charAt(0).toUpperCase() + r.slice(1));
+      }
+    }
+    return Array.from(normalizedSet);
   });
 
   /** True si el usuario tiene al menos dos roles asignados */

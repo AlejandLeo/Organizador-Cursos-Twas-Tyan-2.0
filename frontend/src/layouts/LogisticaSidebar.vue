@@ -26,6 +26,16 @@ const handleLogout = () => {
   authStore.logout();
   router.push('/login');
 };
+
+const cambiarAEstudiante = () => {
+  if (authStore.esEstudiante) {
+    authStore.cambiarRolActivo('Estudiante');
+    router.push('/estudiante');
+  } else {
+    authStore.cambiarRolActivo('');
+    router.push(authStore.getRutaInicio());
+  }
+};
 </script>
 
 <template>
@@ -60,7 +70,7 @@ const handleLogout = () => {
       </nav>
 
       <div class="mt-auto pt-6 border-t border-slate-100 dark:border-gray-800 space-y-3">
-        <button @click="authStore.cambiarRolActivo('')" v-if="authStore.userRoles.length > 1"
+        <button @click="cambiarAEstudiante" v-if="authStore.tieneMultiplesRoles"
           class="w-full flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm text-slate-500 hover:bg-slate-50 dark:hover:bg-gray-800 transition-all border border-transparent group">
           <span class="material-symbols-outlined text-teal-600">cached</span>
           <span class="uppercase tracking-widest text-[11px]">Cambiar Rol</span>

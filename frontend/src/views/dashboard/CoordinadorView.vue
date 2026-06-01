@@ -270,19 +270,19 @@ onMounted(cargarDatos);
     <!-- ══════════════════ ACCESOS RÁPIDOS ══════════════════ -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
       <!-- 1. Eventos -->
-      <button @click="router.push({ name: 'admin-eventos' })"
+      <button @click="router.push({ name: 'coordinador-gestion-eventos' })"
         class="p-6 bg-white dark:bg-gray-900 rounded-[2rem] border border-slate-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all flex items-center gap-4 group text-left">
         <div class="w-12 h-12 p-3 rounded-2xl bg-sky-50 dark:bg-sky-900/20 text-sky-500 group-hover:bg-sky-500 group-hover:text-white transition-colors shrink-0">
           <span class="material-symbols-outlined text-2xl">event_available</span>
         </div>
         <div>
           <p class="text-xs font-black text-sky-700 dark:text-sky-300 uppercase tracking-tight italic">Gestión de Eventos</p>
-          <p class="text-[10px] text-slate-400 mt-0.5">Crear y administrar eventos</p>
+          <p class="text-[10px] text-slate-400 mt-0.5">Administrar eventos asignados</p>
         </div>
       </button>
-
+ 
       <!-- 2. Solicitudes -->
-      <button @click="router.push({ name: 'admin-solicitudes' })"
+      <button @click="router.push({ name: 'coordinador-solicitudes' })"
         class="p-6 bg-white dark:bg-gray-900 rounded-[2rem] border border-slate-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all flex items-center gap-4 group text-left">
         <div class="w-12 h-12 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors shrink-0">
           <span class="material-symbols-outlined text-2xl">how_to_reg</span>
@@ -292,9 +292,9 @@ onMounted(cargarDatos);
           <p class="text-[10px] text-slate-400 mt-0.5">Aprobación de inscripciones</p>
         </div>
       </button>
-
+ 
       <!-- 3. Certificados -->
-      <button @click="router.push({ name: 'admin-certificados' })"
+      <button @click="router.push({ name: 'coordinador-certificados' })"
         class="p-6 bg-white dark:bg-gray-900 rounded-[2rem] border border-slate-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all flex items-center gap-4 group text-left">
         <div class="w-12 h-12 p-3 rounded-2xl bg-amber-50 dark:bg-amber-900/20 text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-colors shrink-0">
           <span class="material-symbols-outlined text-2xl">workspace_premium</span>
