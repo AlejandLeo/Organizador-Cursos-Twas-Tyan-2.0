@@ -11,10 +11,7 @@ const historial = ref<any[]>([]);
 const fetchHistorialCompleto = async () => {
     loading.value = true;
     try {
-        // NOTA: Este endpoint debería devolver todas las inscripciones 
-        // donde el usuario logueado es el ponente.
-        // Mientras tanto, usamos datos de ejemplo premium.
-        const response = await api.get('/inscripciones/ponente/historial');
+        const response = await api.get('/ponente/inscripciones/historial');
         historial.value = response.data;
     } catch (error) {
         console.error('Error al cargar historial:', error);

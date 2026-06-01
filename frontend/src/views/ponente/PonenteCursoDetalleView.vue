@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, nextTick, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
-import api from '@/services/api';
+import api, { resolveMediaUrl } from '@/services/api';
 import Swal from 'sweetalert2';
 import QrcodeVue from 'qrcode.vue';
 import { Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
@@ -10,6 +10,18 @@ import { Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+
+// Materiales
+const materiales = ref<any[]>([]);
+const nuevoMaterial = ref({
+    titulo: '',
+    tipo: 'Enlace', // 'Enlace' | 'Archivo'
+    url: '',
+    tamano: ''
+});
+const selectedFile = ref<File | null>(null);
+const subiendoMaterial = ref(false);
+const mostrarFormMaterial = ref(false);
 
 const activeTab = ref('resumen');
 const loading = ref(true);
@@ -88,7 +100,7 @@ const fetchDetalleActividad = async () => {
                 text: 'Esta actividad ha sido inhabilitada y no puede ser gestionada ni visualizada.',
                 confirmButtonColor: '#003B71'
             });
-            router.push({ name: 'ponente-catalogo' });
+            router.push({ name: 'ponente-eventos' });
             return;
         }
         
@@ -102,8 +114,10 @@ const fetchDetalleActividad = async () => {
             estado: data.estado === 1 ? 'Activo' : 'Cerrado',
             modalidad: data.modalidad || 'Presencial',
             descripcion: data.descripcion || 'Sin descripción disponible.',
-            imparticiones: data.imparticiones || []
+            imparticiones: data.imparticiones || [],
+            materiales: data.materiales || []
         };
+        materiales.value = data.materiales || [];
         
         // Estudiantes
         estudiantes.value = (data.inscripciones || []).map((ins: any) => ({
@@ -285,6 +299,129 @@ const simularEscaneo = async () => {
     }
 };
 
+const handleFileChange = (e: any) => {
+    const file = e.target.files[0];
+    if (file) {
+        selectedFile.value = file;
+    }
+};
+
+const guardarMaterial = async () => {
+    if (!nuevoMaterial.value.titulo.trim()) {
+        Swal.fire('Atención', 'El título del material es obligatorio.', 'warning');
+        return;
+    }
+
+    subiendoMaterial.value = true;
+    try {
+        let finalUrl = '';
+        let finalSize = '';
+
+        if (nuevoMaterial.value.tipo === 'Archivo') {
+            if (!selectedFile.value) {
+                Swal.fire('Atención', 'Debe seleccionar un archivo.', 'warning');
+                subiendoMaterial.value = false;
+                return;
+            }
+            // Subir archivo al servidor
+            const formData = new FormData();
+            formData.append('file', selectedFile.value);
+
+            const uploadRes = await api.post(`/actividades-academicas/${actividadId}/materiales/upload`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            finalUrl = uploadRes.data.path;
+            
+            // Formatear tamaño
+            const sizeInMb = (selectedFile.value.size / (1024 * 1024)).toFixed(2);
+            finalSize = `${sizeInMb} MB`;
+        } else {
+            if (!nuevoMaterial.value.url.trim()) {
+                Swal.fire('Atención', 'Debe ingresar un enlace (URL).', 'warning');
+                subiendoMaterial.value = false;
+                return;
+            }
+            finalUrl = nuevoMaterial.value.url.trim();
+        }
+
+        // Agregar al array local
+        const nuevo = {
+            id: Date.now().toString(),
+            titulo: nuevoMaterial.value.titulo.trim(),
+            tipo: nuevoMaterial.value.tipo === 'Archivo' ? 'PDF' : 'Enlace',
+            url: finalUrl,
+            tamaño: finalSize || '---',
+            fecha: new Date().toLocaleDateString('es-ES')
+        };
+
+        const listaActualizada = [...materiales.value, nuevo];
+
+        // Guardar en la base de datos
+        await api.patch(`/actividades-academicas/${actividadId}/materiales`, {
+            materiales: listaActualizada
+        });
+
+        materiales.value = listaActualizada;
+        
+        // Resetear form
+        nuevoMaterial.value = {
+            titulo: '',
+            tipo: 'Enlace',
+            url: '',
+            tamano: ''
+        };
+        selectedFile.value = null;
+        mostrarFormMaterial.value = false;
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Material Guardado',
+            text: 'El material ha sido subido correctamente.',
+            timer: 2000,
+            showConfirmButton: false
+        });
+
+    } catch (e: any) {
+        console.error(e);
+        Swal.fire('Error', e.response?.data?.message || 'Error al guardar el material.', 'error');
+    } finally {
+        subiendoMaterial.value = false;
+    }
+};
+
+const eliminarMaterial = async (id: string) => {
+    const result = await Swal.fire({
+        title: '¿Eliminar material?',
+        text: 'Esta acción no se puede deshacer.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+        try {
+            const listaActualizada = materiales.value.filter((m: any) => m.id !== id);
+            await api.patch(`/actividades-academicas/${actividadId}/materiales`, {
+                materiales: listaActualizada
+            });
+            materiales.value = listaActualizada;
+            Swal.fire('Eliminado', 'El material ha sido eliminado.', 'success');
+        } catch (e: any) {
+            console.error(e);
+            Swal.fire('Error', e.response?.data?.message || 'Error al eliminar el material.', 'error');
+        }
+    }
+};
+
+const openMaterial = (mat: any) => {
+    if (!mat.url) return;
+    const url = resolveMediaUrl(mat.url);
+    window.open(url, '_blank');
+};
+
 </script>
 
 <template>
@@ -354,6 +491,10 @@ const simularEscaneo = async () => {
       
       <!-- Pestañas Extras solo si tiene permisos -->
       <template v-if="tienePermisos">
+          <button @click="switchTab('materiales')" :class="[activeTab === 'materiales' ? 'bg-white dark:bg-gray-800 text-umsa-blue dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700']" class="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all flex items-center gap-2 flex-shrink-0">
+            <span class="material-symbols-outlined text-[18px]" :class="{'text-umsa-gold': activeTab === 'materiales'}">auto_stories</span>
+            Materiales
+          </button>
           <button @click="switchTab('qr')" :class="[activeTab === 'qr' ? 'bg-white dark:bg-gray-800 text-umsa-blue dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700']" class="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all flex items-center gap-2 flex-shrink-0 relative">
             <span class="material-symbols-outlined text-[18px]" :class="{'text-umsa-gold': activeTab === 'qr'}">qr_code_2</span>
             Asistencia
@@ -493,6 +634,89 @@ const simularEscaneo = async () => {
                     <button @click="simularEscaneo" class="mb-6 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-widest px-6 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2">
                         <span class="material-symbols-outlined text-[16px]">qr_code_scanner</span>
                         Simular Escaneo (Prueba)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Materiales (Ponente) -->
+    <div v-if="activeTab === 'materiales' && tienePermisos" class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-[1.5rem] md:rounded-[2.5rem] p-6 md:p-10 shadow-xl space-y-8 animate-in slide-in-from-bottom-4 duration-500 fade-in">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 dark:border-gray-800 pb-6">
+            <div>
+                <h3 class="text-2xl font-black text-slate-800 dark:text-white uppercase italic tracking-tight flex items-center gap-2">
+                    <span class="material-symbols-outlined text-umsa-blue text-3xl">auto_stories</span>
+                    Material Didáctico y Enlaces
+                </h3>
+                <p class="text-slate-500 dark:text-gray-400 text-xs font-bold uppercase tracking-widest mt-1">Sube archivos o comparte enlaces a clases virtuales, libros o diapositivas.</p>
+            </div>
+            <button @click="mostrarFormMaterial = !mostrarFormMaterial" class="bg-umsa-blue hover:bg-blue-600 text-white font-black text-xs uppercase tracking-widest px-6 py-3 rounded-xl transition-all shadow-md flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px]">{{ mostrarFormMaterial ? 'close' : 'add' }}</span>
+                {{ mostrarFormMaterial ? 'Cancelar' : 'Agregar Material' }}
+            </button>
+        </div>
+
+        <!-- Formulario para agregar material -->
+        <div v-if="mostrarFormMaterial" class="bg-slate-50 dark:bg-gray-950 p-6 md:p-8 rounded-[1.5rem] border border-slate-200 dark:border-gray-800 space-y-6">
+            <h4 class="text-sm font-black text-slate-700 dark:text-gray-300 uppercase tracking-widest">Nuevo Recurso</h4>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Título -->
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Título del Material</label>
+                    <input v-model="nuevoMaterial.titulo" type="text" placeholder="Ej. Diapositivas - Sesión 1 o Enlace a Zoom" class="w-full bg-white dark:bg-gray-900 border border-slate-300 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-umsa-blue/20 outline-none text-slate-700 dark:text-white" />
+                </div>
+
+                <!-- Tipo -->
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Tipo de Recurso</label>
+                    <select v-model="nuevoMaterial.tipo" class="w-full bg-white dark:bg-gray-900 border border-slate-300 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-umsa-blue/20 outline-none text-slate-700 dark:text-white">
+                        <option value="Enlace">Enlace Web (Meet, Zoom, Drive, etc.)</option>
+                        <option value="Archivo">Archivo (PDF, Documento, Diapositivas, etc.)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Entrada de Enlace -->
+            <div v-if="nuevoMaterial.tipo === 'Enlace'">
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Dirección URL (Link)</label>
+                <input v-model="nuevoMaterial.url" type="url" placeholder="https://meet.google.com/... o https://zoom.us/..." class="w-full bg-white dark:bg-gray-900 border border-slate-300 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-umsa-blue/20 outline-none text-slate-700 dark:text-white" />
+            </div>
+
+            <!-- Entrada de Archivo -->
+            <div v-if="nuevoMaterial.tipo === 'Archivo'">
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Subir Archivo</label>
+                <input type="file" @change="handleFileChange" class="w-full bg-white dark:bg-gray-900 border border-slate-300 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-blue-50 file:text-umsa-blue hover:file:bg-blue-100" />
+            </div>
+
+            <!-- Guardar button -->
+            <div class="flex justify-end">
+                <button @click="guardarMaterial" :disabled="subiendoMaterial" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-widest px-8 py-4 rounded-xl transition-all shadow-lg shadow-emerald-600/10 flex items-center gap-2">
+                    <span v-if="subiendoMaterial" class="material-symbols-outlined animate-spin text-[18px]">sync</span>
+                    <span v-else class="material-symbols-outlined text-[18px]">save</span>
+                    {{ subiendoMaterial ? 'Guardando...' : 'Guardar Recurso' }}
+                </button>
+            </div>
+        </div>
+
+        <!-- Lista de materiales -->
+        <div v-if="materiales.length === 0" class="text-sm font-bold text-slate-500 bg-slate-50 dark:bg-gray-800 p-8 rounded-2xl border border-slate-200 dark:border-gray-700 text-center">
+            Aún no has agregado material didáctico para esta actividad.
+        </div>
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div v-for="mat in materiales" :key="mat.id" class="border border-slate-200 dark:border-gray-800 rounded-2xl p-5 hover:border-umsa-blue transition-colors group relative flex flex-col justify-between dark:bg-gray-950">
+                <div>
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="material-symbols-outlined text-3xl" :class="mat.tipo === 'PDF' ? 'text-red-500' : 'text-blue-500'">{{ mat.tipo === 'PDF' ? 'picture_as_pdf' : 'link' }}</span>
+                        <span class="text-[10px] bg-slate-100 dark:bg-gray-800 px-2 py-1 rounded font-bold uppercase tracking-widest text-slate-500 dark:text-gray-400">{{ mat.tamaño || mat.tipo }}</span>
+                    </div>
+                    <h4 @click="openMaterial(mat)" class="font-bold text-slate-800 dark:text-white mb-1 line-clamp-2 cursor-pointer hover:text-umsa-blue transition-colors">{{ mat.titulo }}</h4>
+                    <p class="text-xs text-slate-500 font-medium">{{ mat.fecha }}</p>
+                </div>
+                <div class="flex justify-end border-t border-slate-100 dark:border-gray-800 mt-4 pt-3">
+                    <button @click="eliminarMaterial(mat.id)" class="text-red-500 hover:text-red-700 flex items-center gap-1 text-[10px] font-black uppercase tracking-widest transition-colors">
+                        <span class="material-symbols-outlined text-[16px]">delete</span>
+                        Eliminar
                     </button>
                 </div>
             </div>

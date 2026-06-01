@@ -135,6 +135,7 @@ const formEvento = ref({
   logistica_ids: [] as number[],
   coordinadores_grados: {} as Record<number, number>,
   fase: 1, // 1: Planificación, 2: Inscripciones, 3: Ejecución, 4: Finalizado, 5: Archivado
+  mostrar_correos: true,
 });
 
 const formatDate = (dateStr: string) => {
@@ -203,7 +204,8 @@ const resetFormEvento = () => {
         coordinadores_ids: [] as number[],
         logistica_ids: [] as number[],
         coordinadores_grados: {} as Record<number, number>,
-        fase: 1
+        fase: 1,
+        mostrar_correos: true
     };
 };
 
@@ -499,7 +501,7 @@ const onFondoChange = (e: any) => {
 const fetchEventos = async () => {
     try {
         isLoading.value = true;
-        const res = await api.get('/eventos');
+        const res = await api.get('/admin/eventos/lista?limit=100');
         
         // Usar exactamente la misma lógica que eventoStore (que sí funciona)
         const eventosRaw = Array.isArray(res.data) ? res.data : (res.data.data || []);
@@ -509,7 +511,7 @@ const fetchEventos = async () => {
             ...ev,
             nombreCorto: ev.nombre || 'Sin nombre',
             version: ev.gestion || '2025',
-            imagen: ev.imagen_fondo || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80',
+            imagen: getImageUrl('fondos', ev.imagen_fondo, 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80'),
             estado: ev.estado === 1 ? 'Activo' : (ev.estado === 2 ? 'Planificación' : 'Cerrado'),
             colorEstado: ev.estado === 1 ? 'bg-emerald-500 text-white' : (ev.estado === 2 ? 'bg-blue-500 text-white' : 'bg-slate-500 text-white'),
             mostrarActividades: true,
@@ -526,7 +528,7 @@ const fetchEventos = async () => {
                 date: act.fecha_inicio ? new Date(act.fecha_inicio).toLocaleDateString() : 'Pendiente',
                 students: act.inscripciones?.length || 0,
                 modules: 1,
-                image: act.imagen || act.image || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80',
+                image: getImageUrl('cursos', act.imagen || act.image, 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80'),
                 id_evento: ev.id,
                 min_nota: act.min_nota,
                 min_asistencia: act.min_asistencia,
@@ -625,7 +627,21 @@ const handleSaveEvento = async () => {
         })).filter(d => d.events.length > 0);
         formData.append('cronograma', JSON.stringify(cleanedCronograma));
 
-        formData.append('descripcion', formEvento.value.descripcion);
+        let finalDescripcion = formEvento.value.descripcion;
+        finalDescripcion += `\n[MOSTRAR_CORREOS]:${formEvento.value.mostrar_correos ? 'true' : 'false'}`;
+
+        const ponentesStr = formEvento.value.ponentes_seleccionados
+            .map(id => {
+                const found = ponentesDB.value.find((p: any) => p.id === id);
+                return found ? found.displayName : '';
+            })
+            .filter(s => s)
+            .join(', ');
+
+        if (ponentesStr) {
+            finalDescripcion += `\n[PONENTES_METADATA]:${ponentesStr}`;
+        }
+        formData.append('descripcion', finalDescripcion);
 
         if (formEvento.value.fondo_img instanceof File) {
             formData.append('imagen_fondo', formEvento.value.fondo_img);
@@ -650,18 +666,22 @@ const handleSaveEvento = async () => {
             : `Nuevo evento creado: "${formEvento.value.nombre}"`,
           { entidadId: editEventoId.value?.toString() ?? undefined, entidadNombre: formEvento.value.nombre }
         );
-        isCreatingEvento.value = false;
-        logoPreview.value = null;
-        fondoPreview.value = null;
-        fetchEventos();
-        eventoStore.fetchEventosInfo();
+        if (isSuperAdminTheme.value) {
+            router.push({ name: 'admin-gestion' });
+        } else {
+            isCreatingEvento.value = false;
+            logoPreview.value = null;
+            fondoPreview.value = null;
+            fetchEventos();
+            eventoStore.fetchEventosInfo();
+        }
     } catch (err) {
         Swal.fire('Error', 'No se pudo guardar el evento', 'error');
     } finally { isLoading.value = false; }
 };
 
 const editarEvento = (evento: any) => {
-    if (evento.estado === 0 || evento.estado === 'Cerrado' || evento.estado === 'Concluido') {
+    if (!authStore.esSuperUsuario && (evento.estado === 0 || evento.estado === 'Cerrado' || evento.estado === 'Concluido')) {
         Swal.fire({
             icon: 'info',
             title: 'Modo de Solo Lectura',
@@ -676,10 +696,19 @@ const editarEvento = (evento: any) => {
     editEventoId.value = evento.id;
     const rawDesc = evento.descripcion || '';
     const parts = rawDesc.split('\n[PONENTES_METADATA]:');
+    const descPart = parts[0] || '';
+    
+    let baseDesc = descPart;
+    let mostrarCorreos = true;
+    if (descPart.includes('\n[MOSTRAR_CORREOS]:')) {
+        const mcParts = descPart.split('\n[MOSTRAR_CORREOS]:');
+        baseDesc = mcParts[0];
+        mostrarCorreos = mcParts[1]?.trim() === 'true';
+    }
     
     formEvento.value = {
         nombre: evento.nombreCorto,
-        descripcion: parts[0] || '',
+        descripcion: baseDesc || '',
         gestion: (evento.gestion || evento.version)?.toString(),
         version: evento.version_slogan || evento.version || '',
         fecha_inicio: evento.fecha_inicio ? evento.fecha_inicio.split('T')[0] : '',
@@ -704,7 +733,11 @@ const editarEvento = (evento: any) => {
         estado: evento.estado === 'Activo' ? 1 : (evento.estado === 'Cerrado' ? 0 : 2),
         fondo_img: null,
         logo_img: null,
-        ponentes_seleccionados: [],
+        ponentes_seleccionados: parts[1]
+          ? ponentesDB.value
+              .filter((p: any) => parts[1].split(',').map((s: string) => s.trim()).includes(p.displayName))
+              .map((p: any) => p.id)
+          : [],
         cronograma: '',
         cronograma_lista: [],
         nombre_2: evento.nombre_2 || '',
@@ -715,11 +748,16 @@ const editarEvento = (evento: any) => {
         prioridad: evento.prioridad || '3',
         visibilidad_al_finalizar: evento.visibilidad_al_finalizar || 'visible',
         fase: evento.fase || 1,
+        mostrar_correos: mostrarCorreos,
         // Filtramos para pre-seleccionar los usuarios que son Coordinadores o Logística
         coordinadores_ids: (evento.coordinaciones || [])
-          .filter((c: any) => c.usuario?.usuariosRoles?.some((ur: any) => ur.rol?.id === 2 || ur.rol?.id === 6 || ur.rol?.nombre_rol === 'Logística'))
+          .filter((c: any) => c.usuario?.usuariosRoles?.some((ur: any) => 
+              ur.rol?.nombre_rol?.toLowerCase() === 'coordinador' || 
+              Number(ur.rol?.id) === 2 || 
+              Number(ur.rol?.id) === 7
+          ))
           .map((c: any) => c.usuario.id),
-        logistica_ids: (evento.coordinaciones || []).filter((c: any) => c.usuario?.usuariosRoles?.some((ur: any) => ur.rol?.id === 3)).map((c: any) => c.usuario.id),
+        logistica_ids: [],
         coordinadores_grados: (evento.coordinaciones || []).reduce((acc: any, c: any) => {
             if (c.gradoAdministrativo) acc[c.usuario.id] = c.gradoAdministrativo.id;
             return acc;
@@ -741,20 +779,17 @@ const editarEvento = (evento: any) => {
 
 // --- GESTIÓN DE PERSONAL ---
 const usuariosCoordinadores = ref<any[]>([]);
-const usuariosLogistica = ref<any[]>([]);
 
 const fetchUsuariosPersonal = async () => {
     try {
-        // Traer tanto a Coordinadores como Logística
-        const res = await api.get('/usuarios?rol=Coordinador,Logística&limit=100');
+        const res = await api.get('/usuarios?rol=Coordinador&limit=100');
         const data = res.data.data || res.data || [];
         
-        // Separar por rol: 2 = Coordinador, 3 = Logística
         usuariosCoordinadores.value = data.filter((u: any) => 
-            u.usuariosRoles?.some((ur: any) => Number(ur.rol?.id) === 2)
-        );
-        usuariosLogistica.value = data.filter((u: any) => 
-            u.usuariosRoles?.some((ur: any) => Number(ur.rol?.id) === 3)
+            u.usuariosRoles?.some((ur: any) => 
+                ur.rol?.nombre_rol?.toLowerCase() === 'coordinador' || 
+                Number(ur.rol?.id) === 7
+            )
         );
     } catch (err) {
         console.error("Error fetching personnel:", err);
@@ -767,10 +802,18 @@ const toggleCoordinador = (id: number) => {
     else formEvento.value.coordinadores_ids.splice(idx, 1);
 };
 
-const toggleLogistica = (id: number) => {
-    const idx = formEvento.value.logistica_ids.indexOf(id);
-    if (idx === -1) formEvento.value.logistica_ids.push(id);
-    else formEvento.value.logistica_ids.splice(idx, 1);
+const togglePonenteSeleccionado = (id: number) => {
+    const idx = formEvento.value.ponentes_seleccionados.indexOf(id);
+    if (idx === -1) formEvento.value.ponentes_seleccionados.push(id);
+    else formEvento.value.ponentes_seleccionados.splice(idx, 1);
+};
+
+const seleccionarTodosPonentes = () => {
+    formEvento.value.ponentes_seleccionados = ponentesDB.value.map(p => p.id);
+};
+
+const deseleccionarTodosPonentes = () => {
+    formEvento.value.ponentes_seleccionados = [];
 };
 
 const inhabilitarEvento = async (id: number, nombre: string) => {
@@ -790,7 +833,7 @@ const inhabilitarEvento = async (id: number, nombre: string) => {
 
     if (motivo) {
         try {
-            await api.patch(`/eventos/${id}`, { 
+            await api.patch(`/admin/eventos/${id}`, { 
                 estado: -1, 
                 descripcion: `[INHABILITACION_MOTIVO]:${motivo}\n[FECHA]:${new Date().toLocaleString()}\n` 
             });
@@ -1269,7 +1312,7 @@ const changeStep = (delta: number) => {
           <h2 class="text-2xl sm:text-3xl font-black text-primary-dark dark:text-white uppercase italic">Gestión de Eventos</h2>
         </div>
         
-        <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+        <div v-if="authStore.esSuperUsuario" class="flex items-center gap-3 w-full sm:w-auto justify-end">
           <button @click="isCreatingEvento = true; isEditingEvento = false; resetFormEvento()" 
             :class="[themeBg, themeHover, themeShadow]"
             class="w-full sm:w-auto text-white font-black px-8 py-4 rounded-2xl text-[12px] uppercase tracking-widest hover:-translate-y-1 active:translate-y-0 transition-all flex items-center gap-3 justify-center shadow-xl">
@@ -1298,10 +1341,10 @@ const changeStep = (delta: number) => {
               </div>
 
               <div class="flex flex-wrap items-center justify-start md:justify-end gap-2 z-30 relative">
-                <button @click="editarEvento(evento)" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 px-3 py-2.5 rounded-xl transition-all shadow-lg flex items-center justify-center cursor-pointer" title="Configurar Eventos">
+                <button v-if="authStore.esSuperUsuario" @click="editarEvento(evento)" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 px-3 py-2.5 rounded-xl transition-all shadow-lg flex items-center justify-center cursor-pointer" title="Configurar Eventos">
                    <span class="material-symbols-outlined text-[18px]">settings</span>
                 </button>
-                <button @click="inhabilitarEvento(evento.id, evento.nombreCorto)" class="bg-red-500/20 hover:bg-red-500/40 backdrop-blur-md text-white border border-red-500/30 px-3 py-2.5 rounded-xl transition-all shadow-lg flex items-center justify-center cursor-pointer" title="Inhabilitar Evento">
+                <button v-if="authStore.esSuperUsuario" @click="inhabilitarEvento(evento.id, evento.nombreCorto)" class="bg-red-500/20 hover:bg-red-500/40 backdrop-blur-md text-white border border-red-500/30 px-3 py-2.5 rounded-xl transition-all shadow-lg flex items-center justify-center cursor-pointer" title="Inhabilitar Evento">
                    <span class="material-symbols-outlined text-[18px]">block</span>
                 </button>
 
@@ -1453,12 +1496,17 @@ const changeStep = (delta: number) => {
       
       <div class="flex items-center justify-between border-b border-slate-200 dark:border-gray-800 pb-6">
           <div>
-              <h2 class="text-3xl font-black text-primary-dark dark:text-white tracking-tighter uppercase italic">Configurar Nueva Actividad</h2>
+              <h2 class="text-3xl font-black text-primary-dark dark:text-white tracking-tighter uppercase italic">{{ isEditingActividad ? 'Editar Actividad' : 'Configurar Nueva Actividad' }}</h2>
               <p class="text-slate-400 dark:text-gray-500 font-medium mt-1 text-sm">Diseño, reglas y horarios del curso.</p>
           </div>
-          <button @click="isAdminContext ? router.push({ name: 'admin-gestion' }) : isCreating = false" class="flex items-center gap-2 px-6 py-2.5 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 font-black text-[10px] uppercase rounded-xl hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-200 transition-all shadow-sm">
-              <span class="material-symbols-outlined text-sm">arrow_back</span> Volver al Listado
-          </button>
+          <div class="flex items-center gap-3">
+              <button v-if="isEditingActividad" @click="publicarActividad" :disabled="isLoading" class="flex items-center gap-2 px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[10px] uppercase rounded-xl transition-all shadow-sm">
+                  <span class="material-symbols-outlined text-sm">save</span> Guardar Cambios
+              </button>
+              <button @click="isAdminContext ? router.push({ name: 'admin-gestion' }) : isCreating = false" class="flex items-center gap-2 px-6 py-2.5 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 font-black text-[10px] uppercase rounded-xl hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-200 transition-all shadow-sm">
+                  <span class="material-symbols-outlined text-sm">arrow_back</span> Volver al Listado
+              </button>
+          </div>
       </div>
 
       <div class="max-w-4xl mx-auto mb-10">
@@ -1888,16 +1936,23 @@ const changeStep = (delta: number) => {
               <span class="material-symbols-outlined text-[18px]">arrow_back</span> Regresar
           </button>
           
-          <button v-if="currentStep < 5" @click="changeStep(1)" 
-            :class="[themeBg, themeHover]"
-            class="px-8 py-3 text-white font-black text-[11px] uppercase rounded-xl flex items-center gap-2 transition-all shadow-xl hover:-translate-y-0.5">
-              Continuar <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
-          </button>
+          <div class="flex items-center gap-3">
+              <button v-if="isEditingActividad" @click="publicarActividad" :disabled="isLoading"
+                class="px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[11px] uppercase rounded-xl flex items-center gap-2 transition-all shadow-xl hover:-translate-y-0.5">
+                  <span class="material-symbols-outlined text-[18px]">save</span> Guardar Cambios
+              </button>
+              
+              <button v-if="currentStep < 5" @click="changeStep(1)" 
+                :class="[themeBg, themeHover]"
+                class="px-8 py-3 text-white font-black text-[11px] uppercase rounded-xl flex items-center gap-2 transition-all shadow-xl hover:-translate-y-0.5">
+                  Continuar <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+              </button>
 
-          <button v-else @click="publicarActividad" :disabled="isLoading"
-            class="px-8 py-3 bg-umsa-gold hover:bg-yellow-600 text-white font-black text-[11px] uppercase rounded-xl flex items-center gap-2 transition-all shadow-xl hover:-translate-y-0.5 disabled:opacity-50">
-              <span class="material-symbols-outlined text-[18px]">publish</span> Publicar Actividad
-          </button>
+              <button v-else @click="publicarActividad" :disabled="isLoading"
+                class="px-8 py-3 bg-umsa-gold hover:bg-yellow-600 text-white font-black text-[11px] uppercase rounded-xl flex items-center gap-2 transition-all shadow-xl hover:-translate-y-0.5 disabled:opacity-50">
+                  <span class="material-symbols-outlined text-[18px]">publish</span> {{ isEditingActividad ? 'Guardar Cambios' : 'Publicar Actividad' }}
+              </button>
+          </div>
       </div>
 
     </div>
@@ -2268,38 +2323,60 @@ const changeStep = (delta: number) => {
                                         </div>
                                     </div>
                                     <!-- Dropdown de Grado Administrativo -->
-                                    <div v-if="formEvento.coordinadores_ids.includes(user.id)" class="pt-2 border-t border-blue-200 dark:border-blue-800" @click.stop>
-                                        <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Grado para Firmas</label>
-                                        <select v-model="formEvento.coordinadores_grados[user.id]" class="w-full bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-700 rounded-lg px-2 py-1.5 text-xs font-bold text-primary-dark dark:text-gray-200 transition-all focus:ring-1 focus:ring-blue-500">
-                                            <option :value="null">Ninguno / Por defecto</option>
-                                            <option v-for="g in gradosAdministrativosDB" :key="g.id" :value="g.id">{{ g.nombre }} {{ g.abreviatura ? `(${g.abreviatura})` : '' }}</option>
-                                        </select>
+                                    <div v-if="formEvento.coordinadores_ids.includes(user.id)" class="pt-2 border-t border-blue-100 dark:border-blue-800/50" @click.stop>
+                                        <div v-if="user.persona?.firma_dig">
+                                            <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Grado para Firmas</label>
+                                            <select v-model="formEvento.coordinadores_grados[user.id]" class="w-full bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-700 rounded-lg px-2 py-1.5 text-xs font-bold text-primary-dark dark:text-gray-200 transition-all focus:ring-1 focus:ring-blue-500">
+                                                <option :value="null">Ninguno / Por defecto</option>
+                                                <option v-for="g in gradosAdministrativosDB" :key="g.id" :value="g.id">{{ g.nombre }} {{ g.abreviatura ? `(${g.abreviatura})` : '' }}</option>
+                                            </select>
+                                        </div>
+                                        <div v-else class="text-[9px] font-bold text-slate-400 italic flex items-center gap-1.5 py-1">
+                                            <span class="material-symbols-outlined text-[14px] text-amber-500">warning</span>
+                                            Firma digital pendiente de cargar en perfil
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- SECCIÓN LOGÍSTICA -->
+                        <!-- SECCIÓN EXPOSITORES Y PONENTES -->
                         <div class="mt-8">
-                            <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-4 flex items-center gap-2">
-                                <span class="material-symbols-outlined text-sm">support_agent</span> Personal de Logística
-                            </label>
-                            <div v-if="usuariosLogistica.length === 0" class="p-8 text-center bg-slate-50 dark:bg-gray-800/50 rounded-2xl border-2 border-dashed border-slate-200 dark:border-gray-700">
-                                <p class="text-[10px] font-bold text-slate-400 uppercase">No se encontraron usuarios con rol de Logística</p>
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                                <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest block flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-sm">record_voice_over</span> Asignar Expositores y Ponentes
+                                </label>
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <!-- Selector Mostrar Correos -->
+                                    <label class="flex items-center gap-2 cursor-pointer select-none bg-slate-50 dark:bg-gray-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-gray-700">
+                                        <input type="checkbox" v-model="formEvento.mostrar_correos" class="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer" />
+                                        <span class="text-[9px] font-black uppercase text-slate-500 dark:text-gray-400 tracking-wider">Mostrar Correos</span>
+                                    </label>
+                                    <!-- Botones Seleccionar Todo -->
+                                    <button @click.prevent="seleccionarTodosPonentes" class="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all shadow-sm cursor-pointer">
+                                        <span class="material-symbols-outlined text-[12px]">done_all</span> Seleccionar Todos
+                                    </button>
+                                    <button @click.prevent="deseleccionarTodosPonentes" class="inline-flex items-center gap-1 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-900/40 text-rose-500 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all shadow-sm cursor-pointer">
+                                        <span class="material-symbols-outlined text-[12px]">close</span> Deseleccionar Todos
+                                    </button>
+                                </div>
                             </div>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto thin-scrollbar pr-2">
-                                <div v-for="user in usuariosLogistica" :key="user.id" 
-                                     @click="toggleLogistica(user.id)"
-                                     :class="[formEvento.logistica_ids.includes(user.id) ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-100 dark:border-gray-800 bg-white dark:bg-gray-900']"
+                            <div v-if="ponentesDB.length === 0" class="p-8 text-center bg-slate-50 dark:bg-gray-800/50 rounded-2xl border-2 border-dashed border-slate-200 dark:border-gray-700">
+                                <p class="text-[10px] font-bold text-slate-400 uppercase">No se encontraron ponentes registrados</p>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[350px] overflow-y-auto thin-scrollbar pr-2">
+                                <div v-for="user in ponentesDB" :key="user.id" 
+                                     @click="togglePonenteSeleccionado(user.id)"
+                                     :class="[formEvento.ponentes_seleccionados.includes(user.id) ? 'border-amber-500 bg-amber-50/20 dark:bg-amber-900/10' : 'border-slate-100 dark:border-gray-800 bg-white dark:bg-gray-900']"
                                      class="p-4 border-2 rounded-2xl cursor-pointer transition-all flex items-center gap-4 group shadow-sm hover:shadow-md">
                                     <div class="w-10 h-10 rounded-xl flex items-center justify-center transition-colors"
-                                         :class="formEvento.logistica_ids.includes(user.id) ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-gray-800 text-slate-400 group-hover:bg-emerald-100'">
-                                        <span class="material-symbols-outlined">{{ formEvento.logistica_ids.includes(user.id) ? 'check_circle' : 'engineering' }}</span>
+                                         :class="formEvento.ponentes_seleccionados.includes(user.id) ? 'bg-amber-500 text-white' : 'bg-slate-100 dark:bg-gray-800 text-slate-400 group-hover:bg-amber-100'">
+                                        <span class="material-symbols-outlined">{{ formEvento.ponentes_seleccionados.includes(user.id) ? 'check_circle' : 'person_play' }}</span>
                                     </div>
                                     <div class="flex-1 min-w-0">
-                                        <p class="text-xs font-black text-slate-700 dark:text-gray-200 uppercase truncate">{{ user.persona?.nombres }} {{ user.persona?.primer_apellido }}</p>
+                                        <p class="text-xs font-black text-slate-700 dark:text-gray-200 uppercase truncate">{{ user.displayName }}</p>
                                         <div class="flex items-center gap-2">
-                                            <span class="text-[7px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600">Logística</span>
+                                            <span class="text-[7px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700">{{ user.roleLabel }}</span>
                                             <p class="text-[9px] font-bold text-slate-400 truncate">{{ user.email }}</p>
                                         </div>
                                     </div>

@@ -5,7 +5,8 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { existsSync, mkdirSync } from 'fs';
+import { join, extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { ActividadesAcademicasService } from './actividades-academicas.service';
@@ -18,6 +19,19 @@ import { Roles } from '../../Seguridad/auth/roles.decorator';
 /** Configuración de multer para guardar imágenes en uploads/cursos/ */
 const activityImageStorage = diskStorage({
   destination: './uploads/cursos',
+  filename: (_req, file, cb) =>
+    cb(null, `${uuidv4()}${extname(file.originalname)}`),
+});
+
+/** Configuración de multer para guardar materiales en uploads/materiales/ */
+const materialStorage = diskStorage({
+  destination: (_req, _file, cb) => {
+    const dir = './uploads/materiales';
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    cb(null, dir);
+  },
   filename: (_req, file, cb) =>
     cb(null, `${uuidv4()}${extname(file.originalname)}`),
 });
@@ -125,5 +139,41 @@ export class ActividadesAcademicasController {
   @ApiOperation({ summary: 'Aprobar reactivación de una actividad (Super Admin)' })
   aprobarReactivacion(@Param('id', ParseIntPipe) id: number) {
     return this.service.aprobarReactivacion(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Ponente', 'Coordinador', 'Super Usuario')
+  @ApiBearerAuth()
+  @Patch(':id/materiales')
+  @ApiOperation({ summary: 'Actualizar materiales de una actividad (Ponente / Coordinador)' })
+  actualizarMateriales(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any
+  ) {
+    return this.service.actualizarMateriales(id, req.body.materiales, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Ponente', 'Coordinador', 'Super Usuario')
+  @ApiBearerAuth()
+  @Post(':id/materiales/upload')
+  @UseInterceptors(FileInterceptor('file', { storage: materialStorage }))
+  @ApiOperation({ summary: 'Subir archivo de material didáctico' })
+  async uploadMaterial(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+    @UploadedFile() file?: Express.Multer.File
+  ) {
+    await this.service.verificarPermisosEdicion(id, req.user);
+    if (!file) {
+      throw new Error('No se ha subido ningún archivo.');
+    }
+    return {
+      filename: file.filename,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size,
+      path: `/uploads/materiales/${file.filename}`
+    };
   }
 }

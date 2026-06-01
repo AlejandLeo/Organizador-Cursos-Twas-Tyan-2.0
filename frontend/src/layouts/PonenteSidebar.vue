@@ -39,22 +39,13 @@ const cambiarAEstudiante = () => {
     </div>
 
     <nav class="space-y-1 flex-1">
-      <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 mt-2 pl-2 border-b border-slate-100 dark:border-gray-800 pb-2">Descubrimiento</p>
-
-      <button @click="navigate('ponente-catalogo'); uiStore.closeSidebar()"
-        :class="[ $route.name === 'ponente-catalogo' ? 'nav-active bg-umsa-blue text-white shadow-lg shadow-umsa-blue/30' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500 hover:text-umsa-blue hover:translate-x-1' ]"
-        class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group font-medium">
-        <span class="text-[11px] uppercase tracking-widest font-bold">Actividades Académicas</span>
-        <span class="material-symbols-outlined text-[18px] transition-colors" :class="[ $route.name === 'ponente-catalogo' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">grid_view</span>
-      </button>
-
-      <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 mt-6 pl-2 border-b border-slate-100 dark:border-gray-800 pb-2">Mi área de Trabajo</p>
+      <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 mt-2 pl-2 border-b border-slate-100 dark:border-gray-800 pb-2">Mi área de Trabajo</p>
 
       <button @click="navigate('ponente-eventos'); uiStore.closeSidebar()"
         :class="[ $route.name === 'ponente-eventos' || $route.name === 'ponente-evento-detalle' ? 'nav-active bg-umsa-blue text-white shadow-lg shadow-umsa-blue/30' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500 hover:text-umsa-blue hover:translate-x-1' ]"
         class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group mt-1">
-        <span class="text-xs uppercase tracking-widest font-bold">Mis Cursos Asignados</span>
-        <span class="material-symbols-outlined text-[18px] transition-colors" :class="[ $route.name === 'ponente-eventos' || $route.name === 'ponente-evento-detalle' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">collections_bookmark</span>
+        <span class="text-xs uppercase tracking-widest font-bold">Mis Eventos Asignados</span>
+        <span class="material-symbols-outlined text-[18px] transition-colors" :class="[ $route.name === 'ponente-eventos' || $route.name === 'ponente-evento-detalle' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">event</span>
       </button>
 
       <button @click="navigate('ponente-historial-notas'); uiStore.closeSidebar()"

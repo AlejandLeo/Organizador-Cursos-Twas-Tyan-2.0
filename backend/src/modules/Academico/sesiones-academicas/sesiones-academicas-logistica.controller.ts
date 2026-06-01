@@ -5,8 +5,9 @@ import { JwtAuthGuard } from '../../Seguridad/auth/jwt-auth.guard';
 import { RolesGuard } from '../../Seguridad/auth/roles.guard';
 import { Roles } from '../../Seguridad/auth/roles.decorator';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { CoordinacionEvento } from '../coordinaciones/entities/coordinacion.entity';
+import { ActividadAcademica } from '../actividades-academicas/entities/actividad-academica.entity';
 
 @ApiTags('Sesiones Académicas (Logística)')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -18,6 +19,7 @@ export class SesionesAcademicasLogisticaController {
     private readonly service: SesionesAcademicasService,
     @InjectRepository(CoordinacionEvento)
     private readonly coordinacionRepo: Repository<CoordinacionEvento>,
+    private readonly dataSource: DataSource,
   ) {}
 
   @Post(':id/generar-pin')
@@ -35,22 +37,27 @@ export class SesionesAcademicasLogisticaController {
   async misEventos(@Req() req: any) {
     const userId = req.user?.id || req.user?.sub;
 
-    const coordinaciones = await this.coordinacionRepo.find({
-      where: { usuario: { id: userId } },
-      relations: [
-        'evento',
-        'evento.actividades',
-        'evento.actividades.modalidades',
-        'evento.actividades.modalidades.sesiones',
-      ],
-    });
+    const actividades = await this.dataSource.getRepository(ActividadAcademica).createQueryBuilder('act')
+      .innerJoinAndSelect('act.evento', 'evento')
+      .leftJoinAndSelect('act.modalidades', 'modalidad')
+      .leftJoinAndSelect('modalidad.sesiones', 'sesion')
+      .where("act.logistica_ids @> :userIdJson", { userIdJson: JSON.stringify([Number(userId)]) })
+      .getMany();
 
-    return coordinaciones.map(c => ({
-      id: c.evento.id,
-      nombre: c.evento.nombre,
-      estado: c.evento.estado,
-      fase: c.evento.fase,
-      actividades: (c.evento.actividades || []).map((act: any) => ({
+    const eventosMap = new Map<number, any>();
+    for (const act of actividades) {
+      const ev = act.evento;
+      if (!eventosMap.has(ev.id)) {
+        eventosMap.set(ev.id, {
+          id: ev.id,
+          nombre: ev.nombre,
+          estado: ev.estado,
+          fase: ev.fase,
+          actividades: []
+        });
+      }
+
+      const mappedAct = {
         id: act.id,
         nombre: act.nombre,
         estado: act.estado,
@@ -63,7 +70,10 @@ export class SesionesAcademicasLogisticaController {
             aula: s.aula,
           }))
         ),
-      })),
-    }));
+      };
+      eventosMap.get(ev.id).actividades.push(mappedAct);
+    }
+
+    return Array.from(eventosMap.values());
   }
 }

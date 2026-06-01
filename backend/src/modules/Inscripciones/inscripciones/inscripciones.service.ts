@@ -110,7 +110,7 @@ export class InscripcionesService {
         actividadAcademica: { id: In(actividadIds) },
         nota_principal: Not(IsNull()),
       },
-      relations: ['usuario', 'usuario.persona', 'actividadAcademica'],
+      relations: ['usuario', 'usuario.persona', 'actividadAcademica', 'actividadAcademica.evento'],
       order: { fecha_actualizacion: 'DESC' },
     });
 
@@ -119,11 +119,11 @@ export class InscripcionesService {
       estudiante: ins.usuario?.persona 
         ? `${ins.usuario.persona.nombres} ${ins.usuario.persona.primer_apellido}`.trim()
         : 'Desconocido',
+      correo: ins.usuario?.email || '',
       actividad: ins.actividadAcademica?.nombre || 'Desconocida',
-      nota_anterior: 0, 
-      nota_nueva: ins.nota_principal,
-      fecha: ins.fecha_actualizacion,
-      estado: ins.nota_principal >= 51 ? 'aprobado' : 'reprobado',
+      evento: ins.actividadAcademica?.evento?.sigla || ins.actividadAcademica?.evento?.nombre || 'General',
+      nota: ins.nota_principal,
+      fecha: ins.fecha_actualizacion ? new Date(ins.fecha_actualizacion).toISOString().split('T')[0] : 'Sin fecha',
     }));
   }
 
@@ -186,6 +186,35 @@ export class InscripcionesService {
     return { id, nota_principal: nota, mensaje: 'Nota actualizada' };
   }
 
+  async crearModalidadesInscripcion(inscripcion: Inscripcion) {
+    const actId = inscripcion.actividadAcademica?.id || (inscripcion as any).id_actividad_academica;
+    if (!actId) return;
+
+    const mods = await this.inscripcionRepository.manager.query(
+      `SELECT id FROM curso_modalidades WHERE id_actividad_academica = $1`,
+      [actId]
+    );
+
+    for (const mod of mods) {
+      const existe = await this.inscripcionModalidadRepository.findOne({
+        where: {
+          inscripcion: { id: inscripcion.id },
+          cursoModalidad: { id: mod.id }
+        }
+      });
+      if (!existe) {
+        const im = this.inscripcionModalidadRepository.create({
+          inscripcion: { id: inscripcion.id },
+          cursoModalidad: { id: mod.id },
+          nota: 0,
+          num_asistencia: 0,
+          aprobado: 0
+        });
+        await this.inscripcionModalidadRepository.save(im);
+      }
+    }
+  }
+
   async inscribir(dto: CreateInscripcionDto) {
     const { id_usuario, id_actividad_academica, ...rest } = dto;
 
@@ -209,7 +238,11 @@ export class InscripcionesService {
       actividadAcademica: { id: id_actividad_academica },
       datos_adicionales: dto.datos_adicionales,
     });
-    return this.inscripcionRepository.save(inscripcion);
+    const saved = await this.inscripcionRepository.save(inscripcion);
+    if (saved.estado === 1) {
+      await this.crearModalidadesInscripcion(saved);
+    }
+    return saved;
   }
 
   async cambiarEstado(id: number, estado: number, observacion?: string) {
@@ -222,6 +255,10 @@ export class InscripcionesService {
       throw new NotFoundException(`Inscripción ${id} no encontrada`);
 
     await this.inscripcionRepository.update(id, { estado, observacion });
+
+    if (estado === 1) {
+      await this.crearModalidadesInscripcion(inscripcion);
+    }
 
     // Notificación por correo
     const email = inscripcion.usuario?.email;

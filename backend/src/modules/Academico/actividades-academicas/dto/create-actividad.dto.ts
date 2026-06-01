@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsDateString, IsInt, IsNotEmpty, IsNumber, IsObject } from 'class-validator';
+import { IsOptional, IsString, IsDateString, IsInt, IsNotEmpty, IsNumber } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
 
@@ -46,13 +46,11 @@ export class CreateActividadDto {
       try {
         return JSON.parse(value);
       } catch (e) {
-        return value;
+        return undefined;
       }
     }
     return value;
   })
-  @IsObject()
-  @Type(() => Object)
   requisitos?: any;
 
   @ApiPropertyOptional()
@@ -113,4 +111,31 @@ export class CreateActividadDto {
   })
   @IsInt()
   estado?: number;
+
+  @ApiPropertyOptional({ type: 'string', description: 'JSON string de materiales' })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'undefined' || value === 'null' || value === '') return undefined;
+    if (typeof value === 'string') {
+      try { return JSON.parse(value); } catch (e) { return value; }
+    }
+    return value;
+  })
+  materiales?: any;
+
+  @ApiPropertyOptional({ type: 'string', description: 'JSON string de IDs de personal de logística' })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'undefined' || value === 'null' || value === '') return undefined;
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.map(id => Number(id)) : [];
+      } catch (e) {
+        return value;
+      }
+    }
+    return Array.isArray(value) ? value.map(id => Number(id)) : value;
+  })
+  logistica_ids?: number[];
 }

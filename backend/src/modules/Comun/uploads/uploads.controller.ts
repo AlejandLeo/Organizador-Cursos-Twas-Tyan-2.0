@@ -11,7 +11,7 @@ export class UploadsController {
     @Param('nombreArchivo') nombreArchivo: string, 
     @Res() res: express.Response
   ) {
-    const validFolders = ['imagenes', 'perfiles', 'fondos', 'eventos', 'cursos', 'inscripciones', 'logo', 'firmas'];
+    const validFolders = ['imagenes', 'perfiles', 'fondos', 'eventos', 'cursos', 'inscripciones', 'logo', 'firmas', 'materiales'];
     if (!validFolders.includes(carpeta)) {
       throw new NotFoundException('Carpeta no válida');
     }

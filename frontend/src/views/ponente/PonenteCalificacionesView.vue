@@ -35,7 +35,7 @@ const fetchEstudiantes = async () => {
                 text: 'No se pueden gestionar calificaciones para una actividad inhabilitada.',
                 confirmButtonColor: '#003B71'
             });
-            router.push({ name: 'ponente-catalogo' });
+            router.push({ name: 'ponente-eventos' });
             return;
         }
 

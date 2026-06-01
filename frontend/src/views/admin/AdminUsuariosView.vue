@@ -68,7 +68,7 @@ const rolesTemp = ref<number[]>([]);
 const notificarRoles = ref(true);
 
 // IDs de roles (deben coincidir con la BD)
-const ROLE_IDS = { SUPER_USUARIO: 1, COORDINADOR: 2, LOGISTICA: 3, ESTUDIANTE: 4, PONENTE: 5 };
+const ROLE_IDS = { SUPER_USUARIO: 6, COORDINADOR: 7, LOGISTICA: 8, ESTUDIANTE: 4, PONENTE: 5 };
 
 const rolesDisponibles = [
   { id: ROLE_IDS.SUPER_USUARIO, nombre: 'Super Usuario' },

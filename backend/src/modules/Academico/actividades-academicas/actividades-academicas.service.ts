@@ -299,6 +299,51 @@ export class ActividadesAcademicasService {
     return await this.actividadRepository.save(act);
   }
 
+  async verificarPermisosEdicion(actividadId: number, usuario: any) {
+    if (!usuario) return;
+    if (usuario.roles?.includes('Super Usuario')) return;
+
+    // Obtener la actividad
+    const act = await this.actividadRepository.findOne({
+      where: { id: actividadId },
+      relations: ['evento'],
+    });
+    if (!act) throw new NotFoundException(`Actividad ${actividadId} no encontrada.`);
+
+    // Verificar si es coordinador del evento
+    const coord = await this.dataSource.query(
+      `SELECT 1 FROM coordinacion_eventos WHERE id_evento = $1 AND id_usuario = $2`,
+      [act.evento.id, usuario.id]
+    );
+
+    if (coord.length > 0) return; // Es coordinador
+
+    // Verificar si es ponente asignado
+    const isImpartidor = await this.dataSource.query(
+      `SELECT 1 FROM imparticiones WHERE id_actividad_academica = $1 AND id_usuario = $2`,
+      [actividadId, usuario.id]
+    );
+
+    if (isImpartidor.length > 0) return; // Es ponente asignado
+
+    throw new ForbiddenException('No tienes permisos sobre esta actividad académica.');
+  }
+
+  async actualizarMateriales(actividadId: number, materiales: any[], usuario: any) {
+    await this.verificarPermisosEdicion(actividadId, usuario);
+
+    const act = await this.actividadRepository.findOneBy({ id: actividadId });
+    if (!act) throw new NotFoundException(`Actividad ${actividadId} no encontrada.`);
+
+    act.materiales = materiales;
+    await this.actividadRepository.save(act);
+
+    return { 
+      message: 'Materiales actualizados correctamente.', 
+      materiales: act.materiales 
+    };
+  }
+
   // Métodos legacy
   create(data: Partial<ActividadAcademica>) {
     const actividad = this.actividadRepository.create(data);
