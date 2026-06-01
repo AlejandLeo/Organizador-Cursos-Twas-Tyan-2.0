@@ -229,12 +229,14 @@ export class UsuariosService {
       if (institucion !== undefined) af.institucion = institucion;
       if (id_grado_academico !== undefined) {
         af.id_grado_academico = id_grado_academico;
-        // También actualizar el grado_academico string en Persona
-        const ga = await this.dataSource.getRepository(GradoAcademico).findOne({ where: { id: id_grado_academico } });
-        if (ga && usuario.persona) {
-          await this.personaRepository.update(usuario.persona.id, {
-            grado_academico: ga.abreviacion || ga.descripcion || ''
-          });
+        // También actualizar el grado_academico string en Persona si no fue enviado explícitamente en data
+        if (data.grado_academico === undefined) {
+          const ga = await this.dataSource.getRepository(GradoAcademico).findOne({ where: { id: id_grado_academico } });
+          if (ga && usuario.persona) {
+            await this.personaRepository.update(usuario.persona.id, {
+              grado_academico: ga.abreviacion || ga.descripcion || ''
+            });
+          }
         }
       }
       if (especialidad !== undefined) af.disciplina_cientifica = especialidad;
@@ -609,7 +611,7 @@ export class UsuariosService {
         usuario: usuarioGuardado,
       });
 
-      if (id_grado_academico) {
+      if (id_grado_academico && !datosPersona.grado_academico) {
         const ga = await queryRunner.manager.findOne(GradoAcademico, { where: { id: id_grado_academico } });
         if (ga) {
           persona.grado_academico = ga.abreviacion || ga.descripcion || '';
@@ -807,12 +809,69 @@ export class UsuariosService {
     nuevaPassword: string,
     tipo: 'principal' | 'ponente' = 'principal',
   ): Promise<{ mensaje: string }> {
+    const usuario = await this.usuarioRepository.findOne({
+      where: { id },
+      relations: ['persona'],
+    });
+
+    if (!usuario) {
+      throw new NotFoundException(`Usuario ${id} no encontrado`);
+    }
+
     const hash = await bcrypt.hash(nuevaPassword, 10);
     if (tipo === 'ponente') {
       await this.usuarioRepository.update(id, { password_ponente: hash });
     } else {
       await this.usuarioRepository.update(id, { password: hash });
     }
+
+    // Enviar correo de notificación de restablecimiento de contraseña
+    try {
+      const nombreCompleto = usuario.persona
+        ? `${usuario.persona.nombres} ${usuario.persona.primer_apellido}`
+        : 'Usuario';
+      
+      const portalName = tipo === 'ponente' ? 'Portal Ponente (Docente)' : 'Portal Estudiante';
+      const systemUrl = await this.configService.getConfig('SYSTEM_URL')
+        .catch(() => process.env.FRONTEND_URL || 'http://localhost:5173');
+
+      const emailBody = `
+        <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 30px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+          <div style="text-align: center; margin-bottom: 25px;">
+            <h2 style="color: #003a70; margin: 0; font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: -0.5px;">TYAN - Restablecimiento de Contraseña</h2>
+            <p style="color: #666; font-size: 14px; margin-top: 5px;">Tu solicitud de soporte ha sido resuelta</p>
+          </div>
+          <p style="font-size: 15px; color: #333; line-height: 1.6;">Hola <b>${nombreCompleto}</b>,</p>
+          <p style="font-size: 15px; color: #333; line-height: 1.6;">Te informamos que un administrador de soporte ha restablecido tu contraseña para acceder al sistema.</p>
+          
+          <div style="background-color: #f4f7fa; border-left: 4px solid #003a70; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 5px 0; font-size: 14px; color: #555;"><b>Portal de Acceso:</b> ${portalName}</p>
+            <p style="margin: 5px 0; font-size: 14px; color: #555;"><b>Usuario/Email:</b> ${usuario.email}</p>
+            <p style="margin: 5px 0; font-size: 14px; color: #555;"><b>Nueva Contraseña Temporal:</b> <span style="font-family: monospace; font-size: 16px; font-weight: bold; color: #d97706; background: #fef3c7; padding: 2px 6px; border-radius: 4px;">${nuevaPassword}</span></p>
+          </div>
+          
+          <p style="font-size: 13px; color: #dc2626; font-weight: bold;">⚠️ IMPORTANTE: Por seguridad, te recomendamos cambiar esta contraseña temporal una vez que inicies sesión.</p>
+          
+          <div style="text-align: center; margin: 30px 0 20px 0;">
+            <a href="${systemUrl}" style="background-color: #003a70; color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block; box-shadow: 0 4px 6px rgba(0, 58, 112, 0.2);">Iniciar Sesión</a>
+          </div>
+          
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0 20px 0;">
+          <p style="font-size: 11px; color: #888; text-align: center; line-height: 1.4;">Este correo fue enviado de forma automática por la Plataforma Académica TYAN.<br>Si no solicitaste este cambio, ponte en contacto con soporte de inmediato.</p>
+        </div>
+      `;
+
+      await this.mailService.sendMail(
+        usuario.email,
+        'Tu contraseña ha sido restablecida - TYAN',
+        undefined,
+        undefined,
+        emailBody
+      );
+    } catch (mailError) {
+      this.logger.error(`Error enviando correo de forzarReset a ${usuario.email}: ${mailError.message}`);
+    }
+
     return { mensaje: `Contraseña ${tipo} actualizada correctamente.` };
   }
 
@@ -1102,7 +1161,7 @@ export class UsuariosService {
    */
   async findCertificados(usuarioId: number) {
     await this.findOne(usuarioId); // valida existencia
-    return this.dataSource.query(
+    const rows = await this.dataSource.query(
       `SELECT
          c.id,
          c.codigo_certificado,
@@ -1111,6 +1170,8 @@ export class UsuariosService {
          c.fecha_emision,
          a.nombre  AS actividad_nombre,
          e.nombre  AS evento_nombre,
+         e.sigla   AS evento_sigla,
+         e.gestion AS evento_gestion,
          ic.titulo AS tipo_certificado
        FROM certificados c
        INNER JOIN actividades_academicas a ON a.id = c.id_actividad_academica
@@ -1120,6 +1181,31 @@ export class UsuariosService {
        ORDER BY c.fecha_emision DESC`,
       [usuarioId],
     );
+
+    return rows.map(row => ({
+      id: row.id,
+      codigo_certificado: row.codigo_certificado,
+      tipo: row.tipo,
+      estado: row.estado,
+      fecha_emision: row.fecha_emision,
+      tipo_certificado: row.tipo_certificado,
+      // For compatibility with old student views (MisCertificadosView/EstudianteCertificadosView)
+      evento: {
+        nombre: row.evento_nombre,
+        nombre_evento: row.evento_nombre,
+        gestion: row.evento_gestion,
+        sigla: row.evento_sigla,
+      },
+      // For compatibility with PonenteCertificadosView
+      actividadAcademica: {
+        nombre: row.actividad_nombre,
+        evento: {
+          nombre: row.evento_nombre,
+          sigla: row.evento_sigla,
+          gestion: row.evento_gestion,
+        }
+      }
+    }));
   }
 
   // ══════════════════════════════════════════════════════════

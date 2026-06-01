@@ -26,7 +26,8 @@
     "db:reset": "npm run typeorm -- schema:drop -d ./typeorm.config.ts && npm run migration:run && npm run seed:config",
     "seed:config": "ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./typeorm.config.ts -n RoleSeeder && ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./typeorm.config.ts -n CatalogosSeeder && ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./typeorm.config.ts -n SuperAdminSeeder",
     "seed:dev": "ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./typeorm.config.ts",
-    "seed:eventos": "ts-node -r tsconfig-paths/register src/database/seeds/run-eventos-seed.ts"
+    "seed:eventos": "ts-node -r tsconfig-paths/register src/database/seeds/run-eventos-seed.ts",
+    "seed:coordinador": "ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./typeorm.config.ts -n CoordinadorSeeder"
   },
   "dependencies": {
     "@nestjs-modules/mailer": "^2.3.4",
