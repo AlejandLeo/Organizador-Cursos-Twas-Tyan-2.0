@@ -716,12 +716,12 @@ export class UsuariosService {
       // ── AUTORREPARACIÓN DE ROL ADMIN ──────────────────────────────────────
       // Si es la cuenta maestra, aseguramos que tenga el ROL 1 (Super Usuario)
       if (usuario.email === 'admin@tyan.org') {
-        const tieneRolAdmin = usuario.usuariosRoles?.some((ur: any) => ur.rol?.id === 1);
+        const tieneRolAdmin = usuario.usuariosRoles?.some((ur: any) => ur.rol?.id === 6);
         if (!tieneRolAdmin) {
-          console.log('[SECURITY] Detectada cuenta admin@tyan.org sin Rol 1. Reparando...');
+          console.log('[SECURITY] Detectada cuenta admin@tyan.org sin Rol 6 (Super Usuario). Reparando...');
           try {
             const usuarioRolRepo = this.usuarioRepository.manager.getRepository(UsuarioRol);
-            await usuarioRolRepo.save({ usuario: { id: usuario.id }, rol: { id: 1 } });
+            await usuarioRolRepo.save({ usuario: { id: usuario.id }, rol: { id: 6 } });
             // Recargar usuario para que el resto de la lógica vea el nuevo rol
             const usuarioActualizado = await this.usuarioRepository.findOne({
               where: { id: usuario.id },

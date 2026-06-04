@@ -6,6 +6,9 @@ import { Rol } from '../../../modules/Usuario/roles/entities/rol.entity';
 import { UsuarioRol } from '../../../modules/Usuario/usuarios-roles/entities/usuario-rol.entity';
 import * as bcrypt from 'bcrypt';
 
+// ID de Super Usuario según la migración principal (NO crear rol ID=1)
+const SUPER_USUARIO_ROL_ID = 6;
+
 export default class SuperadminSeeder implements Seeder {
   public async run(dataSource: DataSource): Promise<void> {
     const adminEmail = 'admin@tyan.org';
@@ -16,10 +19,10 @@ export default class SuperadminSeeder implements Seeder {
     const rolRepository = dataSource.getRepository(Rol);
     const usuarioRolRepository = dataSource.getRepository(UsuarioRol);
 
-    // 1. Crear el rol si no existe
-    let adminRole = await rolRepository.findOneBy({ id: 1 });
+    // 1. Verificar que exista el rol Super Usuario (ID=6) en la BD
+    const adminRole = await rolRepository.findOneBy({ id: SUPER_USUARIO_ROL_ID });
     if (!adminRole) {
-      adminRole = await rolRepository.save(rolRepository.create({ id: 1, nombre_rol: 'Super Usuario' }));
+      throw new Error(`[SuperadminSeeder] ERROR: Rol 'Super Usuario' (ID=${SUPER_USUARIO_ROL_ID}) no encontrado. Ejecuta primero la migración de roles.`);
     }
 
     // 2. Crear al usuario si no existe
@@ -48,15 +51,28 @@ export default class SuperadminSeeder implements Seeder {
       await personaRepository.save(persona);
     }
 
-    // 4. Asignarle el rol
-    let usuarioRol = await usuarioRolRepository.findOne({ 
-      where: { usuario: { id: adminUser.id }, rol: { id: adminRole.id } } 
+    // 4. Asignarle el rol Super Usuario (ID=6) si aún no lo tiene
+    const tieneRolCorrecto = await usuarioRolRepository.findOne({
+      where: { usuario: { id: adminUser.id }, rol: { id: SUPER_USUARIO_ROL_ID } }
     });
-    if (!usuarioRol) {
+    if (!tieneRolCorrecto) {
       await usuarioRolRepository.save(usuarioRolRepository.create({
         usuario: adminUser,
         rol: adminRole,
       }));
+      console.log(`[SuperadminSeeder] Rol Super Usuario (ID=${SUPER_USUARIO_ROL_ID}) asignado a ${adminEmail}.`);
+    }
+
+    // 5. Limpiar asignaciones huérfanas (rol null o rol ID=1 que ya no debería existir)
+    const todasAsignaciones = await usuarioRolRepository.find({
+      where: { usuario: { id: adminUser.id } },
+      relations: ['rol'],
+    });
+    for (const ur of todasAsignaciones) {
+      if (!ur.rol || ur.rol.id === 1) {
+        await usuarioRolRepository.delete(ur.id);
+        console.log(`[SuperadminSeeder] Eliminada asignación huérfana UsuarioRol id=${ur.id} (rol_id=${ur.rol?.id ?? 'null'})`);
+      }
     }
 
     console.log('Super Usuario admin@tyan.org verificado y actualizado con nombre: Alejandro Leonardo Tyan Admin');

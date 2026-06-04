@@ -11,10 +11,11 @@ const isDashboard = computed(() =>
   route.path.startsWith('/coordinador') ||
   route.path.startsWith('/ponente') ||
   route.path.startsWith('/estudiante') ||
-  route.path.startsWith('/admin')
+  route.path.startsWith('/admin') ||
+  route.path.startsWith('/logistica')
 )
 
-const showFooter = computed(() => !isDashboard.value && route.path !== '/')
+const showFooter = computed(() => route.path === '/' || route.path.startsWith('/verificar-certificado'))
 </script>
 
 <template>

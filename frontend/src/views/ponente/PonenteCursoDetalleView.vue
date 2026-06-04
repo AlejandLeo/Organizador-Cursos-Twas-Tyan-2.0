@@ -125,7 +125,7 @@ const fetchDetalleActividad = async () => {
             nombre: `${ins.usuario?.persona?.nombres || 'Estudiante'} ${ins.usuario?.persona?.primer_apellido || ''}`,
             correo: ins.usuario.email,
             asistencia: '---', 
-            estado: ins.nota_principal >= 65 ? 'Excelente' : 'Regular'
+            estado: ins.nota_principal >= (data.min_nota ?? 51) ? 'Excelente' : 'Regular'
         }));
 
         // Extraer Sesiones

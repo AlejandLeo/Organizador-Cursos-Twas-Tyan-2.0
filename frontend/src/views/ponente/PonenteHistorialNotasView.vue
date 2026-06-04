@@ -89,7 +89,7 @@ onMounted(fetchHistorialCompleto);
                         </span>
                     </td>
                     <td class="px-8 py-6 text-center">
-                        <div :class="[h.nota >= 65 ? 'text-emerald-500' : 'text-rose-500']" class="text-lg font-black italic">
+                        <div :class="[h.nota >= 51 ? 'text-emerald-500' : 'text-rose-500']" class="text-lg font-black italic">
                             {{ h.nota }}<span class="text-[10px] ml-0.5 uppercase not-italic">pts</span>
                         </div>
                     </td>

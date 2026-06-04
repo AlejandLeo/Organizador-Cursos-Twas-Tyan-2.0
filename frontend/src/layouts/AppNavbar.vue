@@ -68,10 +68,7 @@ onMounted(async () => {
     document.documentElement.classList.add('dark');
   }
   
-  // Asegurar que tenemos la info de los eventos para el logo/contacto
-  console.log('AppNavbar mounted, checking eventos store...');
   if (eventoStore.eventosAplanados.length === 0) {
-    console.log('Store empty, fetching eventos info...');
     await eventoStore.fetchEventosInfo();
   }
 });

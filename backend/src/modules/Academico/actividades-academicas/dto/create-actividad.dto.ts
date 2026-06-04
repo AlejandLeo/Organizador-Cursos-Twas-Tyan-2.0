@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsDateString, IsInt, IsNotEmpty, IsNumber } from 'class-validator';
+import { IsOptional, IsString, IsDateString, IsInt, IsNotEmpty, IsNumber, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
 
@@ -74,13 +74,15 @@ export class CreateActividadDto {
   @IsString()
   modalidad?: string;
 
-  @ApiPropertyOptional({ example: 71 })
+  @ApiPropertyOptional({ example: 51 })
   @IsOptional()
   @Transform(({ value }) => {
     if (value === 'undefined' || value === 'null' || value === '') return undefined;
     return parseFloat(value);
   })
   @IsNumber()
+  @Min(0, { message: 'La nota mínima no puede ser menor a 0' })
+  @Max(100, { message: 'La nota mínima no puede ser mayor a 100' })
   min_nota?: number;
 
   @ApiPropertyOptional({ example: 80 })
@@ -90,6 +92,8 @@ export class CreateActividadDto {
     return parseInt(value, 10);
   })
   @IsInt()
+  @Min(0, { message: 'La asistencia mínima no puede ser menor a 0%' })
+  @Max(100, { message: 'La asistencia mínima no puede ser mayor a 100%' })
   min_asistencia?: number;
 
   @ApiPropertyOptional({ type: 'string', description: 'JSON string de sesiones' })

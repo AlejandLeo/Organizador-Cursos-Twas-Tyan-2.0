@@ -26,7 +26,7 @@ const editForm = ref({
     tipo: '',
     descripcion: '',
     modalidad: 'Presencial',
-    min_nota: 71,
+    min_nota: 51,
     min_asistencia: 80,
     fecha_inicio: '',
     fecha_fin: '',
@@ -171,7 +171,7 @@ const fetchData = async () => {
             tipo: actividad.value.tipo || '',
             descripcion: actividad.value.descripcion || '',
             modalidad: mod?.tipo || 'Presencial',
-            min_nota: mod?.min_nota ?? 71,
+            min_nota: mod?.min_nota ?? 51,
             min_asistencia: mod?.min_asistencia ?? 80,
             fecha_inicio: actividad.value.fecha_inicio || '',
             fecha_fin: actividad.value.fecha_fin || '',
@@ -270,6 +270,16 @@ const eliminarSesion = (idx: number) => {
 
 const guardarCambios = async () => {
     try {
+        if (editForm.value.min_nota === undefined || editForm.value.min_nota === null || editForm.value.min_nota < 0 || editForm.value.min_nota > 100) {
+            Swal.fire('Error', 'La nota mínima debe estar entre 0 y 100 y no puede ser negativa.', 'error');
+            return;
+        }
+
+        if (editForm.value.min_asistencia === undefined || editForm.value.min_asistencia === null || editForm.value.min_asistencia < 0 || editForm.value.min_asistencia > 100) {
+            Swal.fire('Error', 'La asistencia mínima debe estar entre 0 y 100 y no puede ser negativa.', 'error');
+            return;
+        }
+
         Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading() });
         const formData = new FormData();
         Object.entries(editForm.value).forEach(([key, val]) => {
@@ -784,7 +794,7 @@ const eliminarPonente = async (id: number) => {
                             <input type="number" v-model="ins.nota_principal" class="w-16 text-center bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-xs font-bold text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none">
                         </td>
                         <td class="px-4 py-6 text-center">
-                            <span :class="(ins.nota_principal || 0) >= 51 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'" class="px-3 py-1 rounded-lg font-black text-xs">
+                            <span :class="(ins.nota_principal || 0) >= (actividad?.modalidades?.[0]?.min_nota || 51) ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'" class="px-3 py-1 rounded-lg font-black text-xs">
                                 {{ ins.nota_principal || 0 }} / 100
                             </span>
                         </td>
@@ -948,7 +958,7 @@ const eliminarPonente = async (id: number) => {
                     <tbody class="divide-y divide-slate-100 dark:divide-gray-800">
                         <tr v-for="(sesion, index) in (actividad.modalidades?.[0]?.sesiones || [])" :key="sesion.id" class="hover:bg-slate-50 dark:hover:bg-gray-800/80 transition-colors">
                             <td class="px-8 py-6">
-                                <p class="font-black text-primary-dark dark:text-white text-sm uppercase">Sesión {{ index + 1 }}: {{ sesion.dia }}</p>
+                                <p class="font-black text-primary-dark dark:text-white text-sm uppercase">Sesión {{ Number(index) + 1 }}: {{ sesion.dia }}</p>
                                 <p class="text-[10px] text-slate-400 font-medium">
                                     {{ sesion.fecha ? formatDate(sesion.fecha) : 'Horario Recurrente' }} • {{ formatTime(sesion.hora_inicio) }} - {{ formatTime(sesion.hora_fin) }}
                                 </p>
@@ -1383,11 +1393,11 @@ const eliminarPonente = async (id: number) => {
                           <div class="grid grid-cols-2 gap-4 mb-10">
                               <div>
                                   <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Nota Mínima</label>
-                                  <input v-model="editForm.min_nota" type="number" class="w-full bg-white dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-center text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
+                                  <input v-model="editForm.min_nota" type="number" min="0" max="100" class="w-full bg-white dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-center text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
                               </div>
                               <div>
                                   <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Asistencia Mínima (%)</label>
-                                  <input v-model="editForm.min_asistencia" type="number" class="w-full bg-white dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-center text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
+                                  <input v-model="editForm.min_asistencia" type="number" min="0" max="100" class="w-full bg-white dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-center text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
                               </div>
                           </div>
 

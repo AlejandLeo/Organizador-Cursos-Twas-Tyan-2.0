@@ -61,7 +61,7 @@ const actividad = ref({
   tareas: [] as any[],
   certificadoRequisitos: {
     asistenciaMinima: 80,
-    notaMinima: 71,
+    notaMinima: 51,
     completado: false
   },
   requisitos: null as any
@@ -121,8 +121,8 @@ const loadActividad = async () => {
       })) : [],
       tareas: act.tareas || [],
       certificadoRequisitos: {
-        asistenciaMinima: 80,
-        notaMinima: 71,
+        asistenciaMinima: act.min_asistencia ?? 80,
+        notaMinima: act.min_nota ?? 51,
         completado: false
       },
       requisitos: act.requisitos
@@ -763,8 +763,8 @@ const goBack = () => {
                   <p v-if="myInscripcion?.nota_principal === null || myInscripcion?.nota_principal === undefined" class="text-xs text-slate-400 dark:text-gray-500 mt-2 font-medium">Calificación pendiente por el docente.</p>
               </div>
               <div class="flex-shrink-0">
-                  <div class="w-24 h-24 rounded-full flex items-center justify-center border-4 shadow-lg bg-white dark:bg-gray-900" :class="(myInscripcion?.nota_principal ?? 0) >= 71 ? 'border-emerald-500 text-emerald-500' : (myInscripcion?.nota_principal !== null && myInscripcion?.nota_principal !== undefined ? 'border-red-500 text-red-500' : 'border-slate-300 text-slate-400')">
-                     <span class="material-symbols-outlined text-4xl">{{ (myInscripcion?.nota_principal ?? 0) >= 71 ? 'verified' : (myInscripcion?.nota_principal !== null && myInscripcion?.nota_principal !== undefined ? 'cancel' : 'pending') }}</span>
+                  <div class="w-24 h-24 rounded-full flex items-center justify-center border-4 shadow-lg bg-white dark:bg-gray-900" :class="(myInscripcion?.nota_principal ?? 0) >= (actividad.certificadoRequisitos?.notaMinima ?? 51) ? 'border-emerald-500 text-emerald-500' : (myInscripcion?.nota_principal !== null && myInscripcion?.nota_principal !== undefined ? 'border-red-500 text-red-500' : 'border-slate-300 text-slate-400')">
+                     <span class="material-symbols-outlined text-4xl">{{ (myInscripcion?.nota_principal ?? 0) >= (actividad.certificadoRequisitos?.notaMinima ?? 51) ? 'verified' : (myInscripcion?.nota_principal !== null && myInscripcion?.nota_principal !== undefined ? 'cancel' : 'pending') }}</span>
                   </div>
               </div>
           </div>

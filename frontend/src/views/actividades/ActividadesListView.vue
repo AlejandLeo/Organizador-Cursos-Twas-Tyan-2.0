@@ -483,7 +483,7 @@ const nuevaActividad = ref({
     tipoPersonalizado: '',
     descripcion: '',
     id_evento: null as number | null,
-    min_nota: 71,
+    min_nota: 51,
     min_asistencia: 80,
     modalidad: 'Presencial',
     fecha_inicio: '',
@@ -522,7 +522,7 @@ const resetNuevaActividad = (eventoId: number) => {
         tipoPersonalizado: '',
         descripcion: '',
         id_evento: eventoId,
-        min_nota: 71,
+        min_nota: 51,
         min_asistencia: 80,
         modalidad: 'Presencial',
         fecha_inicio: '',
@@ -552,7 +552,7 @@ const editarActividad = async (act: any) => {
         isEditingActividad.value = true;
         editActividadId.value = act.id;
         
-        // Cargamos lo que ya tenemos
+        // Cargamos lo que ya tenemos (usamos ?? para evitar que 0 sea reemplazado por default)
         nuevaActividad.value = {
             nombre: act.title,
             tipo: act.type || 'Curso',
@@ -560,8 +560,8 @@ const editarActividad = async (act: any) => {
             descripcion: act.descripcion || '',
 
             id_evento: act.id_evento,
-            min_nota: act.min_nota || 71,
-            min_asistencia: act.min_asistencia || 80,
+            min_nota: act.min_nota ?? 51,
+            min_asistencia: act.min_asistencia ?? 80,
             modalidad: act.modalidad || 'Presencial',
             fecha_inicio: act.fecha_inicio_raw || '',
             fecha_fin: act.fecha_fin_raw || '',
@@ -579,6 +579,9 @@ const editarActividad = async (act: any) => {
         nuevaActividad.value.fecha_inicio = fullAct.fecha_inicio ? fullAct.fecha_inicio.split('T')[0] : '';
         nuevaActividad.value.fecha_fin = fullAct.fecha_fin ? fullAct.fecha_fin.split('T')[0] : '';
         nuevaActividad.value.id_evento = fullAct.evento?.id || act.id_evento;
+        nuevaActividad.value.min_nota = fullAct.min_nota ?? act.min_nota ?? 51;
+        nuevaActividad.value.min_asistencia = fullAct.min_asistencia ?? act.min_asistencia ?? 80;
+        nuevaActividad.value.modalidad = fullAct.modalidad ?? act.modalidad ?? 'Presencial';
         nuevaActividad.value.logistica_ids = fullAct.logistica_ids || [];
 
         imagenPreview.value = fullAct.imagen || null;
@@ -686,6 +689,16 @@ const publicarActividad = async () => {
             return;
         }
 
+        if (nuevaActividad.value.min_nota === undefined || nuevaActividad.value.min_nota === null || nuevaActividad.value.min_nota < 0 || nuevaActividad.value.min_nota > 100) {
+            Swal.fire('Error', 'La nota mínima debe estar entre 0 y 100 y no puede ser negativa.', 'error');
+            return;
+        }
+
+        if (nuevaActividad.value.min_asistencia === undefined || nuevaActividad.value.min_asistencia === null || nuevaActividad.value.min_asistencia < 0 || nuevaActividad.value.min_asistencia > 100) {
+            Swal.fire('Error', 'La asistencia mínima debe estar entre 0 y 100 y no puede ser negativa.', 'error');
+            return;
+        }
+
         isLoading.value = true;
         
         // --- ALERTA DE PROCESANDO (PREMIUM) ---
@@ -724,6 +737,16 @@ const publicarActividad = async () => {
         if (nuevaActividad.value.fecha_fin) formData.append('fecha_fin', nuevaActividad.value.fecha_fin);
         formData.append('requisitos', JSON.stringify(nuevaActividad.value.requisitos));
         formData.append('logistica_ids', JSON.stringify(nuevaActividad.value.logistica_ids || []));
+        
+        if (nuevaActividad.value.min_nota !== undefined && nuevaActividad.value.min_nota !== null) {
+            formData.append('min_nota', String(nuevaActividad.value.min_nota));
+        }
+        if (nuevaActividad.value.min_asistencia !== undefined && nuevaActividad.value.min_asistencia !== null) {
+            formData.append('min_asistencia', String(nuevaActividad.value.min_asistencia));
+        }
+        if (nuevaActividad.value.modalidad) {
+            formData.append('modalidad', nuevaActividad.value.modalidad);
+        }
         
         if (imagenArchivo.value) {
             formData.append('imagen', imagenArchivo.value);
@@ -947,18 +970,19 @@ const habilitarActividad = async (id: number, nombre: string) => {
 </script>
 
 <template>
-    <!-- PANEL DE DIAGNÓSTICO TEMPORAL -->
-    <div class="fixed top-20 right-4 z-[9999] bg-black/80 backdrop-blur-md text-white p-4 rounded-2xl border border-white/20 text-[10px] font-mono shadow-2xl pointer-events-none">
-       <div class="flex items-center gap-2 mb-2 text-umsa-gold font-bold uppercase tracking-widest border-b border-white/10 pb-2">
-          <span class="material-symbols-outlined text-sm">bug_report</span> DIAGNÓSTICO
-       </div>
-       <div class="space-y-1">
-          <p>EVENTOS CARGADOS: {{ eventosPublicados.length }}</p>
-          <p>LOCAL INHABILITADOS: {{ inhabilitadosLocal.length }}</p>
-          <p>LISTA LOCAL: {{ inhabilitadosLocal.join(', ') || 'VACÍA' }}</p>
-       </div>
-    </div>
   <div class="animate-in fade-in duration-500 max-w-7xl mx-auto space-y-8">
+        <!-- PANEL DE DIAGNÓSTICO TEMPORAL -->
+        <div class="fixed top-20 right-4 z-[9999] bg-black/80 backdrop-blur-md text-white p-4 rounded-2xl border border-white/20 text-[10px] font-mono shadow-2xl pointer-events-none">
+        <div class="flex items-center gap-2 mb-2 text-umsa-gold font-bold uppercase tracking-widest border-b border-white/10 pb-2">
+            <span class="material-symbols-outlined text-sm">bug_report</span> DIAGNÓSTICO
+        </div>
+            <div class="space-y-1">
+                <p>EVENTOS CARGADOS: {{ eventosPublicados.length }}</p>
+                <p>LOCAL INHABILITADOS: {{ inhabilitadosLocal.length }}</p>
+                <p>LISTA LOCAL: {{ inhabilitadosLocal.join(', ') || 'VACÍA' }}</p>
+            </div>
+        </div>
+    </div>
     
     <!-- VISTA: LISTADO -->
     <div v-show="!isCreating && !isCreatingEvento" id="view-listado" class="space-y-8">
@@ -1187,7 +1211,6 @@ const habilitarActividad = async (id: number, nombre: string) => {
           </div>
         </div>
       </div>
-    </div>
     
     <div v-show="isCreating" id="view-creacion" class="space-y-10 animate-in fade-in duration-500">
       
@@ -1340,12 +1363,13 @@ const habilitarActividad = async (id: number, nombre: string) => {
               <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div class="p-8 rounded-[2rem] border-2 border-slate-100 dark:border-gray-800 border-l-[8px] border-l-primary-dark bg-slate-50 dark:bg-gray-800">
                       <h4 class="font-black text-primary-dark dark:text-white mb-2 uppercase text-sm">Nota Mínima</h4>
-                      <input v-model="nuevaActividad.min_nota" type="number" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-xl text-center text-primary-dark dark:text-gray-200" />
+                      <input v-model="nuevaActividad.min_nota" type="number" min="0" max="100" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-xl text-center text-primary-dark dark:text-gray-200" />
                   </div>
                   <div class="p-8 rounded-[2rem] border-2 border-slate-100 dark:border-gray-800 border-l-[8px] border-l-umsa-gold bg-slate-50 dark:bg-gray-800">
                       <h4 class="font-black text-primary-dark dark:text-white mb-2 uppercase text-sm">Asistencia Mínima (%)</h4>
-                      <input v-model="nuevaActividad.min_asistencia" type="number" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-xl text-center text-primary-dark dark:text-gray-200" />
+                      <input v-model="nuevaActividad.min_asistencia" type="number" min="0" max="100" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-xl text-center text-primary-dark dark:text-gray-200" />
                   </div>
+              </div>
           </div>
 
           <!-- Asignación de Personal de Logística -->

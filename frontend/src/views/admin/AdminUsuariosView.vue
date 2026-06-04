@@ -99,10 +99,8 @@ const fetchUsuarios = async () => {
   try {
     isLoading.value = true;
     const res = await usuariosService.getAll({ soloActivos: 'false', limit: 1000 } as any);
-    console.log('AdminUsuariosView: Datos recibidos:', res.data);
     const data = (res.data as any)?.data ?? res.data;
     usuarios.value = Array.isArray(data) ? data : [];
-    console.log(`AdminUsuariosView: ${usuarios.value.length} usuarios cargados.`);
   } catch (error) {
     console.error('Error fetching usuarios:', error);
     Swal.fire('Error', 'No se pudo cargar la lista de usuarios', 'error');
@@ -214,7 +212,12 @@ const handleSaveUsuario = async () => {
 // ── Gestión de Múltiples Roles ─────────────────────────────────────────────
 const abrirGestionRoles = (user: any) => {
   usuarioSeleccionado.value = user;
-  rolesTemp.value = user.usuariosRoles?.map((ur: any) => ur.rol?.id) || [];
+  // Filtrar entradas con rol null (FK huérfana) antes de mapear
+  const rolesValidos = (user.usuariosRoles || []).filter((ur: any) => ur.rol != null && ur.rol.id != null);
+  rolesTemp.value = rolesValidos.map((ur: any) => ur.rol.id);
+  console.log('[PERMISOS] Abriendo gestión de roles para:', user.email);
+  console.log('[PERMISOS] usuariosRoles raw:', JSON.stringify(user.usuariosRoles));
+  console.log('[PERMISOS] rolesTemp cargados:', rolesTemp.value);
   notificarRoles.value = true;
   isGestionandoRoles.value = true;
 };
@@ -352,6 +355,58 @@ const guardarDetalles = async () => {
     Swal.fire('Error', error.response?.data?.message || 'Error al guardar los datos', 'error');
   } finally {
     isSavingDetails.value = false;
+  }
+};
+
+// ── Cambiar Contraseña del Usuario (Solo Super Usuario) ─────────────────────
+const cambiarPasswordUsuario = async () => {
+  if (!editForm.value.id) return;
+
+  const { value: formValues } = await Swal.fire({
+    title: 'Cambiar Contraseña',
+    html: `
+      <div class="space-y-4 text-left">
+        <div>
+          <label class="block text-xs font-black uppercase text-slate-500 mb-1">Nueva Contraseña *</label>
+          <input id="swal-new-pass" type="password" placeholder="••••••••" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500" />
+        </div>
+        <div>
+          <label class="block text-xs font-black uppercase text-slate-500 mb-1">Confirmar Contraseña *</label>
+          <input id="swal-confirm-pass" type="password" placeholder="••••••••" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500" />
+        </div>
+        <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-start gap-2">
+          <span class="material-symbols-outlined text-amber-500 text-[16px] mt-0.5">warning</span>
+          <p class="text-[11px] text-amber-700">Esta acción cambiará la contraseña del usuario de forma inmediata. Se recomienda notificar al usuario.</p>
+        </div>
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: 'Cambiar Contraseña',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#059669',
+    focusConfirm: false,
+    preConfirm: () => {
+      const pass = (document.getElementById('swal-new-pass') as HTMLInputElement).value;
+      const confirm = (document.getElementById('swal-confirm-pass') as HTMLInputElement).value;
+      if (!pass || pass.length < 4) {
+        Swal.showValidationMessage('La contraseña debe tener al menos 4 caracteres.');
+        return false;
+      }
+      if (pass !== confirm) {
+        Swal.showValidationMessage('Las contraseñas no coinciden.');
+        return false;
+      }
+      return { password: pass };
+    }
+  });
+
+  if (!formValues) return;
+
+  try {
+    await usuariosService.forzarReset(editForm.value.id, formValues.password);
+    Swal.fire({ icon: 'success', title: '¡Contraseña actualizada!', text: 'La contraseña del usuario ha sido cambiada correctamente.', confirmButtonColor: '#059669' });
+  } catch (error: any) {
+    Swal.fire('Error', error.response?.data?.message || 'No se pudo cambiar la contraseña.', 'error');
   }
 };
 
@@ -1004,6 +1059,25 @@ onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
                   <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Especialidad / Disciplina</label>
                   <input v-model="editForm.especialidad" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-emerald-500/50" />
                 </div>
+              </div>
+            </div>
+
+            <!-- Sección: Seguridad (Solo Super Usuario) -->
+            <div v-if="authStore.esSuperUsuario" class="space-y-4">
+              <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 pb-2">Seguridad</h3>
+              <div class="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-200 dark:border-amber-900/30">
+                <div class="flex items-center gap-3">
+                  <span class="material-symbols-outlined text-amber-500 text-[22px]">lock_reset</span>
+                  <div>
+                    <p class="text-xs font-black text-slate-700 dark:text-white uppercase">Cambiar Contraseña</p>
+                    <p class="text-[10px] text-slate-500 dark:text-slate-400">Restablecer la contraseña de acceso del usuario.</p>
+                  </div>
+                </div>
+                <button @click="cambiarPasswordUsuario"
+                        class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 shadow-md shadow-amber-500/20">
+                  <span class="material-symbols-outlined text-[16px]">lock_reset</span>
+                  Cambiar
+                </button>
               </div>
             </div>
 

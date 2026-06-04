@@ -909,7 +909,7 @@ const nuevaActividad = ref({
     tipoPersonalizado: '',
     descripcion: '',
     id_evento: null as number | null,
-    min_nota: 71,
+    min_nota: 51,
     min_asistencia: 80,
     modalidad: 'Presencial',
     fecha_inicio: '',
@@ -947,7 +947,7 @@ const resetNuevaActividad = (eventoId: number) => {
         tipoPersonalizado: '',
         descripcion: '',
         id_evento: eventoId,
-        min_nota: 71,
+        min_nota: 51,
         min_asistencia: 80,
         modalidad: 'Presencial',
         fecha_inicio: '',
@@ -988,8 +988,8 @@ const prepararEdicionActividad = async (actId: number) => {
             tipoPersonalizado: '',
             descripcion: act.descripcion || '',
             id_evento: act.evento?.id || act.id_evento,
-            min_nota: act.min_nota || 71,
-            min_asistencia: act.min_asistencia || 80,
+            min_nota: act.min_nota ?? 51,
+            min_asistencia: act.min_asistencia ?? 80,
             modalidad: act.modalidad || 'Presencial',
             fecha_inicio: act.fecha_inicio ? act.fecha_inicio.split('T')[0] : '',
             fecha_fin: act.fecha_fin ? act.fecha_fin.split('T')[0] : '',
@@ -1103,6 +1103,16 @@ const publicarActividad = async () => {
             return;
         }
 
+        if (nuevaActividad.value.min_nota === undefined || nuevaActividad.value.min_nota === null || nuevaActividad.value.min_nota < 0 || nuevaActividad.value.min_nota > 100) {
+            Swal.fire('Error', 'La nota mínima debe estar entre 0 y 100 y no puede ser negativa.', 'error');
+            return;
+        }
+
+        if (nuevaActividad.value.min_asistencia === undefined || nuevaActividad.value.min_asistencia === null || nuevaActividad.value.min_asistencia < 0 || nuevaActividad.value.min_asistencia > 100) {
+            Swal.fire('Error', 'La asistencia mínima debe estar entre 0 y 100 y no puede ser negativa.', 'error');
+            return;
+        }
+
         isLoading.value = true;
         
         Swal.fire({
@@ -1138,6 +1148,19 @@ const publicarActividad = async () => {
         if (nuevaActividad.value.fecha_inicio) formData.append('fecha_inicio', nuevaActividad.value.fecha_inicio);
         if (nuevaActividad.value.fecha_fin) formData.append('fecha_fin', nuevaActividad.value.fecha_fin);
         formData.append('requisitos', JSON.stringify(nuevaActividad.value.requisitos));
+        
+        if (nuevaActividad.value.min_nota !== undefined && nuevaActividad.value.min_nota !== null) {
+            formData.append('min_nota', String(nuevaActividad.value.min_nota));
+        }
+        if (nuevaActividad.value.min_asistencia !== undefined && nuevaActividad.value.min_asistencia !== null) {
+            formData.append('min_asistencia', String(nuevaActividad.value.min_asistencia));
+        }
+        if (nuevaActividad.value.modalidad) {
+            formData.append('modalidad', nuevaActividad.value.modalidad);
+        }
+        if (nuevaActividad.value.sesiones && nuevaActividad.value.sesiones.length > 0) {
+            formData.append('sesiones', JSON.stringify(nuevaActividad.value.sesiones));
+        }
         
         if (imagenArchivo.value) {
             formData.append('imagen', imagenArchivo.value);
@@ -1231,7 +1254,6 @@ const getStatusColor = (status: string) => {
 };
 
 onMounted(async () => {
-    console.log("DIAGNÓSTICO: Componente montado. Iniciando carga de datos...");
     await Promise.all([
         fetchEventos(),
         fetchPonentesYGrados(),
@@ -1646,11 +1668,11 @@ const changeStep = (delta: number) => {
               <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div class="p-8 rounded-[2rem] border-2 border-slate-100 dark:border-gray-800 border-l-[8px] border-l-primary-dark bg-slate-50 dark:bg-gray-800">
                       <h4 class="font-black text-primary-dark dark:text-white mb-2 uppercase text-sm">Nota Mínima</h4>
-                      <input v-model="nuevaActividad.min_nota" type="number" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-xl text-center text-primary-dark dark:text-gray-200" />
+                      <input v-model="nuevaActividad.min_nota" type="number" min="0" max="100" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-xl text-center text-primary-dark dark:text-gray-200" />
                   </div>
                   <div class="p-8 rounded-[2rem] border-2 border-slate-100 dark:border-gray-800 border-l-[8px] border-l-umsa-gold bg-slate-50 dark:bg-gray-800">
                       <h4 class="font-black text-primary-dark dark:text-white mb-2 uppercase text-sm">Asistencia Mínima (%)</h4>
-                      <input v-model="nuevaActividad.min_asistencia" type="number" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-xl text-center text-primary-dark dark:text-gray-200" />
+                      <input v-model="nuevaActividad.min_asistencia" type="number" min="0" max="100" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-xl text-center text-primary-dark dark:text-gray-200" />
                   </div>
               </div>
           </div>

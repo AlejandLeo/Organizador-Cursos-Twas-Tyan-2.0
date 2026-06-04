@@ -43,7 +43,7 @@ export class ActividadesAcademicasService {
       const firstMod = act.modalidades?.[0];
       return {
         ...act,
-        min_nota: firstMod ? firstMod.min_nota : 71,
+        min_nota: firstMod ? firstMod.min_nota : 51,
         min_asistencia: firstMod ? firstMod.min_asistencia : 80,
         modalidad: firstMod ? firstMod.tipo : 'Presencial',
         imagen: this.formatImageUrl(act.imagen)
@@ -60,7 +60,7 @@ export class ActividadesAcademicasService {
     const firstMod = act.modalidades?.[0];
     return {
       ...act,
-      min_nota: firstMod ? firstMod.min_nota : 71,
+      min_nota: firstMod ? firstMod.min_nota : 51,
       min_asistencia: firstMod ? firstMod.min_asistencia : 80,
       modalidad: firstMod ? firstMod.tipo : 'Presencial',
       imagen: this.formatImageUrl(act.imagen)
@@ -88,7 +88,7 @@ export class ActividadesAcademicasService {
       return {
         ...act,
         estado: Number(act.estado),
-        min_nota: firstMod ? firstMod.min_nota : 71,
+        min_nota: firstMod ? firstMod.min_nota : 51,
         min_asistencia: firstMod ? firstMod.min_asistencia : 80,
         modalidad: firstMod ? firstMod.tipo : 'Presencial',
         imagen: this.formatImageUrl(act.imagen)
@@ -101,7 +101,7 @@ export class ActividadesAcademicasService {
     if (usuario) {
       await this.verificarPropiedad(dto.id_evento, usuario);
     }
-    const { id_evento, modalidad, min_nota, min_asistencia, ...campos } = dto;
+    const { id_evento, modalidad, min_nota, min_asistencia, sesiones, ...campos } = dto;
     const data: any = {
       ...campos,
       evento: { id: id_evento },
@@ -112,10 +112,21 @@ export class ActividadesAcademicasService {
     const saved = await this.actividadRepository.save(actividad);
 
     // Guardar modalidad por defecto
-    await this.dataSource.query(
-      `INSERT INTO curso_modalidades (id_actividad_academica, tipo, min_nota, min_asistencia) VALUES ($1, $2, $3, $4)`,
+    const resMod = await this.dataSource.query(
+      `INSERT INTO curso_modalidades (id_actividad_academica, tipo, min_nota, min_asistencia) VALUES ($1, $2, $3, $4) RETURNING id`,
       [saved.id, modalidad || 'Presencial', min_nota || 0, min_asistencia || 0]
     );
+    const modId = resMod[0].id;
+
+    // Guardar sesiones
+    if (sesiones && Array.isArray(sesiones)) {
+      for (const s of sesiones) {
+        await this.dataSource.query(
+          `INSERT INTO sesiones_academicas (id_curso_modalidad, dia, hora_inicio, hora_fin) VALUES ($1, $2, $3, $4)`,
+          [modId, s.dia, s.hora_inicio, s.hora_fin]
+        );
+      }
+    }
 
     return this.findOne(saved.id);
   }

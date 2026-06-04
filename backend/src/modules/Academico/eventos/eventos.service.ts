@@ -52,11 +52,17 @@ export class EventosService {
       logo: this.formatImageUrl(evento.logo, 'logo'),
       imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
       actividades: (evento.actividades || [])
-        .map(act => ({
-          ...act,
-          estado: Number(act.estado),
-          imagen: this.formatImageUrl(act.imagen, 'cursos')
-        }))
+        .map(act => {
+          const firstMod = act.modalidades?.[0];
+          return {
+            ...act,
+            estado: Number(act.estado),
+            min_nota: firstMod ? firstMod.min_nota : 51,
+            min_asistencia: firstMod ? firstMod.min_asistencia : 80,
+            modalidad: firstMod ? firstMod.tipo : 'Presencial',
+            imagen: this.formatImageUrl(act.imagen, 'cursos')
+          };
+        })
     }));
   }
 
@@ -146,7 +152,18 @@ export class EventosService {
         'actividades.imparticiones.usuario.persona',
       ]
     });
-    return evento ? evento.actividades : [];
+    if (!evento || !evento.actividades) return [];
+    return evento.actividades.map(act => {
+      const firstMod = act.modalidades?.[0];
+      return {
+        ...act,
+        estado: Number(act.estado),
+        min_nota: firstMod ? firstMod.min_nota : 51,
+        min_asistencia: firstMod ? firstMod.min_asistencia : 80,
+        modalidad: firstMod ? firstMod.tipo : 'Presencial',
+        imagen: this.formatImageUrl(act.imagen, 'cursos')
+      };
+    });
   }
 
   // ══════════════════════════════════════════════════════════
@@ -192,11 +209,17 @@ export class EventosService {
       ...evento,
       logo: this.formatImageUrl(evento.logo, 'logo'),
       imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
-      actividades: (evento.actividades || []).map(act => ({
-        ...act,
-        estado: Number(act.estado),
-        imagen: this.formatImageUrl(act.imagen, 'cursos')
-      }))
+      actividades: (evento.actividades || []).map(act => {
+        const firstMod = act.modalidades?.[0];
+        return {
+          ...act,
+          estado: Number(act.estado),
+          min_nota: firstMod ? firstMod.min_nota : 51,
+          min_asistencia: firstMod ? firstMod.min_asistencia : 80,
+          modalidad: firstMod ? firstMod.tipo : 'Presencial',
+          imagen: this.formatImageUrl(act.imagen, 'cursos')
+        };
+      })
     }));
 
     return { data, total, page, limit };
