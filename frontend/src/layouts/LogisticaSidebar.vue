@@ -3,6 +3,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useUIStore } from '@/stores/ui';
 import { computed } from 'vue';
+import Swal from 'sweetalert2';
 
 const router = useRouter();
 const route = useRoute();
@@ -12,7 +13,6 @@ const uiStore = useUIStore();
 const menuItems = [
   { name: 'Inicio', icon: 'dashboard', path: '/logistica' },
   { name: 'Asistencias (QR/PIN)', icon: 'qr_code_scanner', path: '/logistica/asistencia' },
-  { name: 'Eventos Asignados', icon: 'event', path: '/logistica/eventos' },
   { name: 'Mis Certificados', icon: 'workspace_premium', path: '/logistica/certificados' },
 ];
 
@@ -27,14 +27,91 @@ const handleLogout = () => {
   router.push('/login');
 };
 
-const cambiarAEstudiante = () => {
-  if (authStore.esEstudiante) {
-    authStore.cambiarRolActivo('Estudiante');
-    router.push('/estudiante');
-  } else {
-    authStore.cambiarRolActivo('');
-    router.push(authStore.getRutaInicio());
+const cambiarRol = async () => {
+  const roles = authStore.userRoles;
+  if (roles.length <= 1) return;
+
+  let rolActual = '';
+  const path = router.currentRoute.value.path;
+  if (path.startsWith('/coordinador')) rolActual = 'Coordinador';
+  else if (path.startsWith('/estudiante')) rolActual = 'Estudiante';
+  else if (path.startsWith('/ponente')) rolActual = 'Ponente';
+  else if (path.startsWith('/logistica')) rolActual = 'Logística';
+  else if (path.startsWith('/admin')) rolActual = 'Super Usuario';
+
+  if (roles.length === 2) {
+    const otroRol = roles.find(r => r !== rolActual) || roles[0];
+    let targetPath = '/estudiante';
+    if (otroRol === 'Coordinador') targetPath = '/coordinador';
+    else if (otroRol === 'Ponente') targetPath = '/ponente';
+    else if (otroRol === 'Logística') targetPath = '/logistica';
+    else if (otroRol === 'Super Usuario') targetPath = '/admin';
+
+    authStore.cambiarRolActivo(otroRol);
+    router.push(targetPath);
+    uiStore.closeSidebar();
+    return;
   }
+
+  const rolConfig: Record<string, { label: string, path: string, icon: string, color: string }> = {
+    'Coordinador': { label: 'Coordinador', path: '/coordinador', icon: 'manage_accounts', color: '#0ea5e9' },
+    'Estudiante': { label: 'Estudiante', path: '/estudiante', icon: 'school', color: '#10b981' },
+    'Ponente': { label: 'Expositor / Ponente', path: '/ponente', icon: 'co_present', color: '#3b82f6' },
+    'Logística': { label: 'Personal de Apoyo', path: '/logistica', icon: 'support_agent', color: '#14b8a6' },
+    'Super Usuario': { label: 'Administrador', path: '/admin', icon: 'shield_person', color: '#ef4444' }
+  };
+
+  const htmlButtons = roles.map(r => {
+    const config = rolConfig[r] || { label: r, path: '/', icon: 'account_circle', color: '#64748b' };
+    const isCurrent = r === rolActual;
+    return `
+      <button data-role="${r}" data-path="${config.path}" class="swal-role-btn w-full flex items-center justify-between p-4 mb-2.5 rounded-2xl border-2 transition-all ${
+        isCurrent 
+          ? 'border-slate-300 bg-slate-50 dark:bg-gray-800 opacity-60 cursor-default' 
+          : 'border-slate-100 hover:border-blue-400 bg-white dark:bg-gray-900 cursor-pointer shadow-sm hover:shadow'
+      }">
+        <div class="flex items-center gap-3 text-left">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center text-white shrink-0" style="background-color: ${config.color}">
+            <span class="material-symbols-outlined text-[20px]">${config.icon}</span>
+          </div>
+          <span class="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-200">${config.label}</span>
+        </div>
+        ${isCurrent ? '<span class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-slate-100 dark:bg-gray-800 px-2 py-1 rounded">Activo</span>' : '<span class="material-symbols-outlined text-slate-300 text-sm">chevron_right</span>'}
+      </button>
+    `;
+  }).join('');
+
+  Swal.fire({
+    title: '<span class="text-[#003a70] dark:text-white uppercase font-black tracking-tight text-lg">Cambiar Portal de Acceso</span>',
+    html: `
+      <div class="text-left py-2">
+        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-4">Selecciona el rol con el que deseas trabajar:</p>
+        <div class="flex flex-col">${htmlButtons}</div>
+      </div>
+    `,
+    showConfirmButton: false,
+    showCancelButton: true,
+    cancelButtonText: 'Cancelar',
+    cancelButtonColor: '#64748b',
+    didOpen: () => {
+      const container = Swal.getHtmlContainer();
+      if (container) {
+        const buttons = container.querySelectorAll('.swal-role-btn');
+        buttons.forEach(btn => {
+          btn.addEventListener('click', () => {
+            const role = btn.getAttribute('data-role');
+            const targetPath = btn.getAttribute('data-path');
+            if (role && targetPath && role !== rolActual) {
+              authStore.cambiarRolActivo(role);
+              router.push(targetPath);
+              uiStore.closeSidebar();
+              Swal.close();
+            }
+          });
+        });
+      }
+    }
+  });
 };
 </script>
 
@@ -70,8 +147,8 @@ const cambiarAEstudiante = () => {
       </nav>
 
       <div class="mt-auto pt-6 border-t border-slate-100 dark:border-gray-800 space-y-3">
-        <button @click="cambiarAEstudiante" v-if="authStore.tieneMultiplesRoles"
-          class="w-full flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm text-slate-500 hover:bg-slate-50 dark:hover:bg-gray-800 transition-all border border-transparent group">
+        <button @click="cambiarRol" v-if="authStore.tieneMultiplesRoles"
+          class="w-full flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm text-slate-500 hover:bg-slate-50 dark:hover:bg-gray-900 transition-all border border-transparent group cursor-pointer">
           <span class="material-symbols-outlined text-teal-600">cached</span>
           <span class="uppercase tracking-widest text-[11px]">Cambiar Rol</span>
         </button>

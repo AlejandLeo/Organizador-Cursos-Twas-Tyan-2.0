@@ -53,7 +53,7 @@ export const useAuthStore = defineStore('auth', () => {
   /** True si el usuario es Super Usuario */
   const esSuperUsuario = computed(
     () => userRoles.value.includes('Super Usuario') ||
-      (user.value as any)?.usuariosRoles?.some((ur: any) => ur.rol?.id === 1)
+      (user.value as any)?.usuariosRoles?.some((ur: any) => ur.rol?.id === 6)
   );
 
   /** True si el usuario es Super Usuario o Coordinador (Permisos Admin) */
@@ -62,9 +62,9 @@ export const useAuthStore = defineStore('auth', () => {
   /** ID del rol principal (jerarquía: SU > Coord > Log > Ponente > Estudiante) */
   const id_rol = computed(() => {
     const roles = (user.value as any)?.usuariosRoles?.map((ur: any) => ur.rol?.id) || [];
-    if (roles.includes(1)) return 1;
-    if (roles.includes(2)) return 2;
-    if (roles.includes(3)) return 3;
+    if (roles.includes(6)) return 6;
+    if (roles.includes(7)) return 7;
+    if (roles.includes(8)) return 8;
     if (roles.includes(5)) return 5;
     if (roles.includes(4)) return 4;
     return null;
@@ -80,7 +80,8 @@ export const useAuthStore = defineStore('auth', () => {
    * Modificado: Ahora prioriza el portal de estudiante por defecto para usuarios mixtos.
    */
   function getRutaInicio(): string {
-    if (esSuperUsuario.value || userRoles.value.includes('Coordinador')) return '/admin';
+    if (esSuperUsuario.value) return '/admin';
+    if (userRoles.value.includes('Coordinador')) return '/coordinador';
     const roles = userRoles.value;
     const persona = user.value?.persona as any;
 

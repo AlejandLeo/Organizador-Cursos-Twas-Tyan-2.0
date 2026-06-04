@@ -112,6 +112,16 @@ const router = createRouter({
           name: 'coordinador-evento-nuevo',
           component: () => import('../views/eventos/EventoNuevoView.vue'),
         },
+        {
+          path: 'mail-templates',
+          name: 'coordinador-mail-templates',
+          component: () => import('../views/admin/AdminMailTemplatesView.vue'),
+        },
+        {
+          path: 'perfil',
+          name: 'coordinador-perfil',
+          component: () => import('../views/estudiante/EstudiantePerfilView.vue'),
+        },
       ]
     },
     // ─── RUTAS SUPER ADMINISTRADOR ───────────────────────────────────────────
@@ -395,8 +405,8 @@ router.beforeEach(async (to) => {
       return '/admin';
     }
 
-    if (to.path.startsWith('/admin') && !isSuperAdmin && !isCoordinador) {
-      return isLogistica ? '/logistica' : isPonente ? '/ponente' : '/estudiante';
+    if (to.path.startsWith('/admin') && !isSuperAdmin) {
+      return isCoordinador ? '/coordinador' : (isLogistica ? '/logistica' : isPonente ? '/ponente' : '/estudiante');
     }
 
     if (to.path.startsWith('/coordinador') && !isCoordinador && !isSuperAdmin) {
