@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth';
 const authStore = useAuthStore();
 const certificados = ref<any[]>([]);
 const loading = ref(true);
+const downloading = ref<number | null>(null);
 
 const fetchMisCertificados = async () => {
   try {
@@ -16,6 +17,24 @@ const fetchMisCertificados = async () => {
     console.error('Error fetching certificados', err);
   } finally {
     loading.value = false;
+  }
+};
+
+const downloadPdf = async (certId: number) => {
+  try {
+    downloading.value = certId;
+    const res = await api.get(`/me/certificados/${certId}/download`, { responseType: 'blob' });
+    const blob = new Blob([res.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `certificado_${certId}.pdf`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Error al descargar certificado:', error);
+  } finally {
+    downloading.value = null;
   }
 };
 
@@ -90,6 +109,13 @@ onMounted(fetchMisCertificados);
               <p class="text-[9px] font-black text-slate-400 uppercase">Emitido</p>
               <p class="text-[10px] font-mono text-slate-500">{{ cert.fecha_emision ? new Date(cert.fecha_emision).toLocaleDateString('es-BO') : '—' }}</p>
             </div>
+          </div>
+          
+          <div class="mt-4 pt-4 border-t border-slate-100 dark:border-gray-800">
+              <button @click="downloadPdf(cert.id)" :disabled="downloading === cert.id" class="w-full bg-teal-600 hover:bg-teal-700 text-white text-[10px] font-black uppercase py-2.5 rounded-xl tracking-widest transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer">
+                  <span class="material-symbols-outlined text-[16px]">{{ downloading === cert.id ? 'sync' : 'download' }}</span> 
+                  {{ downloading === cert.id ? 'Descargando...' : 'Descargar PDF' }}
+              </button>
           </div>
         </div>
       </div>

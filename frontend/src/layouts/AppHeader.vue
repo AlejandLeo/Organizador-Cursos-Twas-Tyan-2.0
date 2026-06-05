@@ -142,6 +142,7 @@ const closeDropdowns = (e: MouseEvent) => {
 
 onMounted(async () => {
   await eventoStore.fetchEventosInfo();
+  await fetchEventosAsignados();
   const savedTheme = localStorage.getItem('theme')
   if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
     isDark.value = true
@@ -169,6 +170,32 @@ watch(() => isStudent.value, (val) => {
     setInterval(fetchStudentNotifications, 60000);
   }
 }, { immediate: true });
+
+const asignadosIds = ref<number[]>([]);
+
+const fetchEventosAsignados = async () => {
+  if (isCoordinadorOrAdmin.value && !authStore.esSuperUsuario) {
+    try {
+      const res = await api.get('/admin/eventos/lista?limit=1000');
+      const data = res.data?.data || res.data || [];
+      asignadosIds.value = data.map((e: any) => e.id);
+    } catch (e) {
+      console.error('Error fetching assigned events:', e);
+    }
+  }
+};
+
+const esAsignado = (nombre: string) => {
+  if (authStore.esSuperUsuario) return true;
+  const match = eventoStore.eventosAplanados.filter(e => e.nombre === nombre);
+  return match.some(e => asignadosIds.value.includes(e.id));
+};
+
+const eventosFiltrados = computed(() => {
+  const todos = eventoStore.nombresEventos;
+  if (authStore.esSuperUsuario) return todos;
+  return todos.filter(nombre => esAsignado(nombre));
+});
 
 const onNombreChange = (event: Event) => {
   const target = event.target as HTMLSelectElement;
@@ -210,7 +237,7 @@ const goToProfile = () => {
           style="text-align: left !important; text-align-last: left !important;"
           :class="[(eventoStore.activeEvento?.estado === 1 || eventoStore.activeEvento?.estado === 2) ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-500 dark:border-emerald-600 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-gray-800 border-slate-300 dark:border-gray-700 text-slate-500 dark:text-gray-400']"
           class="w-full border text-[10px] font-black rounded-lg py-1.5 pl-2 pr-6 appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all truncate">
-          <option v-for="(nombre, idx) in eventoStore.nombresEventos" :key="idx" :value="nombre">{{ nombre }}</option>
+          <option v-for="(nombre, idx) in eventosFiltrados" :key="idx" :value="nombre">{{ nombre }}</option>
         </select>
         <span class="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">unfold_more</span>
       </div>
@@ -221,7 +248,7 @@ const goToProfile = () => {
           style="text-align: left !important; text-align-last: left !important;"
           :class="[(eventoStore.activeEvento?.estado === 1 || eventoStore.activeEvento?.estado === 2) ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-500 dark:border-emerald-600 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-gray-800 border-slate-300 dark:border-gray-700 text-slate-500 dark:text-gray-400']"
           class="w-full border text-[10px] font-black rounded-lg py-1.5 pl-2 pr-6 appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all truncate">
-          <option v-for="(nombre, idx) in eventoStore.nombresEventos" :key="idx" :value="nombre">{{ nombre }}</option>
+          <option v-for="(nombre, idx) in eventosFiltrados" :key="idx" :value="nombre">{{ nombre }}</option>
         </select>
         <span class="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">unfold_more</span>
       </div>
@@ -235,7 +262,7 @@ const goToProfile = () => {
               style="text-align: left !important; text-align-last: left !important;"
               :class="[(eventoStore.activeEvento?.estado === 1 || eventoStore.activeEvento?.estado === 2) ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-500 dark:border-emerald-600 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-gray-800 border-slate-300 dark:border-gray-700 text-slate-500 dark:text-gray-400']"
               class="border text-xs font-black rounded-xl py-2.5 pl-12 pr-10 appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:shadow-lg focus:shadow-emerald-500/10 w-80 truncate cursor-pointer transition-all">
-              <option v-for="(nombre, idx) in eventoStore.nombresEventos" :key="idx" :value="nombre">{{ nombre }}</option>
+              <option v-for="(nombre, idx) in eventosFiltrados" :key="idx" :value="nombre">{{ nombre }}</option>
             </select>
             <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-xl pointer-events-none transition-colors"
               :class="[(eventoStore.activeEvento?.estado === 1 || eventoStore.activeEvento?.estado === 2) ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400']">event_seat</span>

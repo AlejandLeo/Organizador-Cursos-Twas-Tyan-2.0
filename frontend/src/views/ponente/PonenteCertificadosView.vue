@@ -1,10 +1,58 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
+import api from '@/services/api';
+import Swal from 'sweetalert2';
 
-const certificados = ref([
-  { id: 1, evento: 'Programa de Especialidad en Biofertilizantes', version: 'V Edicion', rol: 'Expositor Magistral', emitido: '15/09/2026', codigo: 'CER-TW-001' },
-  { id: 2, evento: 'Congreso Internacional de Recursos Hídricos', version: 'Edicion Internacional', rol: 'Ponente', emitido: '15/10/2026', codigo: 'CER-TW-058' }
-]);
+const certificados = ref<any[]>([]);
+const loading = ref(false);
+
+const fetchCertificados = async () => {
+  loading.value = true;
+  try {
+    const response = await api.get('/me/certificados');
+    certificados.value = response.data.map((c: any) => {
+      const getRolText = (tipo: number) => {
+        if (tipo === 1) return 'Asistente';
+        if (tipo === 2) return 'Expositor';
+        if (tipo === 3) return 'Organizador';
+        if (tipo === 4) return 'Docente';
+        return 'Ponente';
+      };
+      
+      const ev = c.actividadAcademica?.evento || {};
+      return {
+        id: c.id,
+        evento: c.actividadAcademica?.nombre || 'Actividad Académica',
+        version: ev.sigla || ev.nombre || 'Evento',
+        rol: getRolText(c.tipo),
+        emitido: c.fecha_emision ? new Date(c.fecha_emision).toLocaleDateString() : 'Sin fecha',
+        codigo: c.codigo_certificado
+      };
+    });
+  } catch (error) {
+    console.error('Error al cargar certificados:', error);
+  } finally {
+    loading.value = false;
+  }
+};
+
+const downloadPdf = async (certId: number) => {
+  try {
+    const res = await api.get(`/me/certificados/${certId}/download`, { responseType: 'blob' });
+    const blob = new Blob([res.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `certificado_${certId}.pdf`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Error al descargar certificado:', error);
+    Swal.fire('Error', 'No se pudo descargar el certificado.', 'error');
+  }
+};
+
+onMounted(fetchCertificados);
 </script>
 
 <template>
@@ -17,7 +65,18 @@ const certificados = ref([
       <p class="text-sm text-slate-500 mt-2">Descarga y visualiza los certificados emitidos a tu nombre por tu participación académica.</p>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div v-if="loading" class="p-20 flex flex-col items-center justify-center gap-4 text-slate-400">
+      <span class="material-symbols-outlined animate-spin text-4xl">sync</span>
+      <p class="text-xs font-black uppercase tracking-widest">Cargando certificados...</p>
+    </div>
+
+    <div v-else-if="certificados.length === 0" class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-3xl p-20 text-center shadow-sm">
+      <span class="material-symbols-outlined text-6xl text-slate-200 dark:text-gray-800 mb-4 font-light">workspace_premium</span>
+      <h3 class="text-lg font-black text-slate-600 dark:text-gray-400 uppercase tracking-tighter mb-1">Sin certificados</h3>
+      <p class="text-xs text-slate-400 max-w-xs mx-auto">Aún no se han emitido certificados a tu nombre.</p>
+    </div>
+
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div v-for="cert in certificados" :key="cert.id" class="relative bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-3xl p-8 shadow-sm flex flex-col h-full group overflow-hidden">
         <!-- Decoracion dorada -->
         <div class="absolute top-0 right-0 w-32 h-32 bg-umsa-gold/10 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-umsa-gold/20 transition-all duration-500"></div>
@@ -46,7 +105,7 @@ const certificados = ref([
           </div>
         </div>
 
-        <button class="relative z-10 w-full mt-auto bg-primary-dark dark:bg-black text-white hover:bg-umsa-gold dark:hover:bg-umsa-gold font-bold text-xs uppercase tracking-widest py-3.5 rounded-xl transition-all border border-transparent shadow flex items-center justify-center gap-2">
+        <button @click="downloadPdf(cert.id)" class="relative z-10 w-full mt-auto bg-primary-dark dark:bg-black text-white hover:bg-umsa-gold dark:hover:bg-umsa-gold font-bold text-xs uppercase tracking-widest py-3.5 rounded-xl transition-all border border-transparent shadow flex items-center justify-center gap-2">
           <span class="material-symbols-outlined text-[18px]">download</span>
           Descargar PDF
         </button>

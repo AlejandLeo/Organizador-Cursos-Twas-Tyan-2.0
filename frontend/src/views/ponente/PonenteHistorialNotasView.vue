@@ -11,10 +11,7 @@ const historial = ref<any[]>([]);
 const fetchHistorialCompleto = async () => {
     loading.value = true;
     try {
-        // NOTA: Este endpoint debería devolver todas las inscripciones 
-        // donde el usuario logueado es el ponente.
-        // Mientras tanto, usamos datos de ejemplo premium.
-        const response = await api.get('/inscripciones/ponente/historial');
+        const response = await api.get('/ponente/inscripciones/historial');
         historial.value = response.data;
     } catch (error) {
         console.error('Error al cargar historial:', error);
@@ -92,7 +89,7 @@ onMounted(fetchHistorialCompleto);
                         </span>
                     </td>
                     <td class="px-8 py-6 text-center">
-                        <div :class="[h.nota >= 65 ? 'text-emerald-500' : 'text-rose-500']" class="text-lg font-black italic">
+                        <div :class="[h.nota >= 51 ? 'text-emerald-500' : 'text-rose-500']" class="text-lg font-black italic">
                             {{ h.nota }}<span class="text-[10px] ml-0.5 uppercase not-italic">pts</span>
                         </div>
                     </td>

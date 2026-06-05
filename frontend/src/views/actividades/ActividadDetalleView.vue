@@ -4,6 +4,9 @@ import { useRoute, useRouter } from 'vue-router';
 import api, { getImageUrl } from '@/services/api';
 import Swal from 'sweetalert2';
 import { useAuthStore } from '@/stores/auth';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 const route = useRoute();
 const router = useRouter();
@@ -23,20 +26,21 @@ const editForm = ref({
     tipo: '',
     descripcion: '',
     modalidad: 'Presencial',
-    min_nota: 71,
+    min_nota: 51,
     min_asistencia: 80,
     fecha_inicio: '',
     fecha_fin: '',
     horas: 0,
     id_evento: null as number | null,
     sesiones: [] as any[],
-    requisitos: {} as any
+    requisitos: {} as any,
+    logistica_ids: [] as number[]
 });
 const nuevaSesion = ref({ dia: 'Lunes', hora_inicio: '19:00', hora_fin: '21:00' });
 const imagenArchivo = ref<File | null>(null);
 const imagenPreview = ref<string | null>(null);
 
-// Estado para ponentes
+// Estado para ponentes y logística
 const ponentesExistentes = ref<any[]>([]);
 const ponenteSeleccionado = ref<string>('');
 const ponenteForm = ref({
@@ -45,6 +49,110 @@ const ponenteForm = ref({
     primer_apellido: '',
     tematica: ''
 });
+
+const logisticaExistentes = ref<any[]>([]);
+const filtroLogistica = ref('');
+
+const logisticaFiltrada = computed(() => {
+  if (!filtroLogistica.value) return logisticaExistentes.value;
+  const f = filtroLogistica.value.toLowerCase();
+  return logisticaExistentes.value.filter(u => 
+    u.displayName?.toLowerCase().includes(f) || 
+    (u.email || '').toLowerCase().includes(f)
+  );
+});
+
+// Computed: personal de logística realmente asignado a esta actividad
+const logisticaAsignada = computed(() => {
+  const ids: number[] = actividad.value?.logistica_ids || [];
+  return logisticaExistentes.value.filter(u => ids.includes(u.id));
+});
+
+const toggleLogisticaUsuario = (id: number) => {
+  if (!editForm.value.logistica_ids) {
+    editForm.value.logistica_ids = [];
+  }
+  const idx = editForm.value.logistica_ids.indexOf(id);
+  if (idx > -1) {
+    editForm.value.logistica_ids.splice(idx, 1);
+  } else {
+    editForm.value.logistica_ids.push(id);
+  }
+};
+
+const asistenciasActividad = ref<any[]>([]);
+const sesionSeleccionada = ref<any>(null);
+const asistenciaSesionForm = ref<Record<number, number>>({});
+const isSavingAsistencia = ref(false);
+
+const formatTime = (timeStr: string) => {
+    if (!timeStr) return '';
+    const parts = timeStr.split(':');
+    if (parts.length >= 2) {
+        return `${parts[0]}:${parts[1]}`;
+    }
+    return timeStr;
+};
+
+const formatDate = (dateStr: any) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    const userTimezoneOffset = d.getTimezoneOffset() * 60000;
+    const localDate = new Date(d.getTime() + userTimezoneOffset);
+    return localDate.toLocaleDateString();
+};
+
+const getAsistenciasSesionCount = (sesionId: number) => {
+    return asistenciasActividad.value.filter(a => a.sesionAcademica?.id === sesionId && Number(a.estado) === 1).length;
+};
+
+const verListaAsistenciaSesion = (sesion: any) => {
+    sesionSeleccionada.value = sesion;
+    const estados: Record<number, number> = {};
+    alumnosActivos.value.forEach(est => {
+        const inscModId = est.modalidades?.[0]?.id;
+        if (inscModId) {
+            const asis = asistenciasActividad.value.find(a => a.sesionAcademica?.id === sesion.id && a.inscripcionModalidad?.id === inscModId);
+            estados[inscModId] = asis ? Number(asis.estado) : 0;
+        }
+    });
+    asistenciaSesionForm.value = estados;
+    openModal('modal-lista-asistencia-dinamica');
+};
+
+const toggleAsistenciaLocal = (inscModId: number) => {
+    if (inscModId === undefined) return;
+    asistenciaSesionForm.value[inscModId] = asistenciaSesionForm.value[inscModId] === 1 ? 0 : 1;
+};
+
+const guardarAsistenciaSesion = async () => {
+    if (!sesionSeleccionada.value) return;
+    try {
+        isSavingAsistencia.value = true;
+        const payload = {
+            id_sesion_academica: sesionSeleccionada.value.id,
+            asistencias: Object.entries(asistenciaSesionForm.value).map(([id_inscripcion_modalidad, estado]) => ({
+                id_inscripcion_modalidad: Number(id_inscripcion_modalidad),
+                estado: Number(estado)
+            }))
+        };
+        
+        Swal.fire({ title: 'Registrando asistencias...', didOpen: () => Swal.showLoading() });
+        await api.post('/admin/asistencias/batch', payload);
+        
+        // Recargar asistencias
+        const asisRes = await api.get(`/admin/asistencias/actividad/${route.params.id}`);
+        asistenciasActividad.value = Array.isArray(asisRes.data) ? asisRes.data : (asisRes.data?.data || []);
+        
+        closeModal('modal-lista-asistencia-dinamica');
+        Swal.fire('Guardado', 'La asistencia de la sesión ha sido actualizada.', 'success');
+    } catch (error) {
+        console.error('Error al guardar asistencia:', error);
+        Swal.fire('Error', 'No se pudo registrar la asistencia.', 'error');
+    } finally {
+        isSavingAsistencia.value = false;
+    }
+};
 
 
 
@@ -63,14 +171,15 @@ const fetchData = async () => {
             tipo: actividad.value.tipo || '',
             descripcion: actividad.value.descripcion || '',
             modalidad: mod?.tipo || 'Presencial',
-            min_nota: mod?.min_nota ?? 71,
+            min_nota: mod?.min_nota ?? 51,
             min_asistencia: mod?.min_asistencia ?? 80,
             fecha_inicio: actividad.value.fecha_inicio || '',
             fecha_fin: actividad.value.fecha_fin || '',
             horas: actividad.value.horas || 0,
             id_evento: actividad.value.evento?.id || null,
             sesiones: Array.isArray(mod?.sesiones) ? JSON.parse(JSON.stringify(mod.sesiones)) : [],
-            requisitos: actividad.value.requisitos || { fields: [] }
+            requisitos: actividad.value.requisitos || { fields: [] },
+            logistica_ids: actividad.value.logistica_ids || []
         };
 
         // Carga de inscripciones (crítica - muestra solicitudes y alumnos)
@@ -100,7 +209,29 @@ const fetchData = async () => {
             ponentesExistentes.value = [];
         }
 
-        // Fetch certificates removed
+        // Carga de personal de logística existente (no crítica)
+        try {
+            const usersRes = await api.get('/usuarios?rol=Logistica,Logística&limit=100');
+            const dataU = usersRes.data?.data || usersRes.data || [];
+            logisticaExistentes.value = dataU.map((u: any) => {
+                const persona = u.persona || {};
+                const gaObj = u.afiliaciones?.[0]?.gradoAcademico || {};
+                const prefijo = gaObj.abreviacion ? `${gaObj.abreviacion}. ` : '';
+                return { ...u, displayName: `${prefijo}${persona.nombres || ''} ${persona.primer_apellido || ''}`.trim() };
+            });
+        } catch (e) {
+            console.warn('No se pudieron cargar los usuarios de logística:', e);
+            logisticaExistentes.value = [];
+        }
+
+        // Carga de asistencias de la actividad (no crítica)
+        try {
+            const asisRes = await api.get(`/admin/asistencias/actividad/${route.params.id}`);
+            asistenciasActividad.value = Array.isArray(asisRes.data) ? asisRes.data : (asisRes.data?.data || []);
+        } catch (e) {
+            console.warn('No se pudieron cargar las asistencias:', e);
+            asistenciasActividad.value = [];
+        }
 
     } catch (error) {
         console.error("Error al cargar la actividad:", error);
@@ -139,16 +270,39 @@ const eliminarSesion = (idx: number) => {
 
 const guardarCambios = async () => {
     try {
+        if (editForm.value.min_nota === undefined || editForm.value.min_nota === null || editForm.value.min_nota < 0 || editForm.value.min_nota > 100) {
+            Swal.fire('Error', 'La nota mínima debe estar entre 0 y 100 y no puede ser negativa.', 'error');
+            return;
+        }
+
+        if (editForm.value.min_asistencia === undefined || editForm.value.min_asistencia === null || editForm.value.min_asistencia < 0 || editForm.value.min_asistencia > 100) {
+            Swal.fire('Error', 'La asistencia mínima debe estar entre 0 y 100 y no puede ser negativa.', 'error');
+            return;
+        }
+
         Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading() });
         const formData = new FormData();
         Object.entries(editForm.value).forEach(([key, val]) => {
-            if (val === null || val === undefined || val === '') return; // Evitar enviar campos vacíos que fallen la validación (como fechas)
-            if (key === 'sesiones' || key === 'requisitos') {
+            // Omitir solo null/undefined/string vacío — NO arrays vacíos
+            if (val === null || val === undefined || val === '') return;
+            if (key === 'sesiones' || key === 'logistica_ids') {
                 formData.append(key, JSON.stringify(val));
+            } else if (key === 'requisitos') {
+                // Asegurarse de que es un objeto serializable
+                try {
+                    const parsed = typeof val === 'string' ? JSON.parse(val) : val;
+                    formData.append(key, JSON.stringify(parsed));
+                } catch {
+                    formData.append(key, JSON.stringify({ fields: [] }));
+                }
             } else {
                 formData.append(key, String(val));
             }
         });
+        // Siempre enviar logistica_ids aunque esté vacío
+        if (!formData.has('logistica_ids')) {
+            formData.append('logistica_ids', JSON.stringify([]));
+        }
         if (imagenArchivo.value) formData.append('imagen', imagenArchivo.value);
 
         console.log('Enviando datos de actualización para ID:', actividad.value.id);
@@ -163,6 +317,7 @@ const guardarCambios = async () => {
         Swal.fire('Éxito', 'Actividad actualizada correctamente', 'success');
     } catch (error: any) {
         console.error('Error al actualizar actividad:', error);
+        console.error('Detalle del error:', error.response?.data);
         
         // Formatear error de class-validator (array de strings) o string normal
         let errorMsg = 'No se pudo actualizar la actividad';
@@ -385,25 +540,179 @@ const editarTematica = async (imp: any) => {
 };
 
 
+// ── Reportes ─────────────────────────────────────────────────────────────
+const generarPDF = () => {
+  if (!actividad.value) return;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const nombreActividad = actividad.value.nombre || 'Actividad';
+
+  // Header
+  doc.setFillColor(0, 59, 113);
+  doc.rect(0, 0, 210, 38, 'F');
+  doc.setFontSize(18);
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.text('ACTA DE CALIFICACIONES', 105, 14, { align: 'center' });
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(nombreActividad.toUpperCase(), 105, 22, { align: 'center' });
+  doc.text(`Generado: ${new Date().toLocaleDateString('es-BO')}`, 105, 30, { align: 'center' });
+
+  // Info actividad
+  doc.setTextColor(40, 40, 40);
+  doc.setFontSize(9);
+  doc.text(`Tipo: ${actividad.value.tipo || '-'}    Modalidad: ${actividad.value.modalidades?.[0]?.tipo || '-'}    Horas: ${actividad.value.horas || '-'}`, 14, 48);
+  doc.text(`Período: ${actividad.value.fecha_inicio ? new Date(actividad.value.fecha_inicio).toLocaleDateString('es-BO') : '-'} → ${actividad.value.fecha_fin ? new Date(actividad.value.fecha_fin).toLocaleDateString('es-BO') : '-'}`, 14, 55);
+
+  // Tabla estudiantes
+  const rows = alumnosActivos.value.map((ins, idx) => [
+    (idx + 1).toString().padStart(2, '0'),
+    `${ins.usuario?.persona?.primer_apellido || ''} ${ins.usuario?.persona?.segundo_apellido || ''} ${ins.usuario?.persona?.nombres || ''}`.trim(),
+    ins.usuario?.persona?.documento_identidad || '-',
+    ins.nota_principal !== null && ins.nota_principal !== undefined ? String(ins.nota_principal) : '-',
+    (ins.nota_principal || 0) >= (actividad.value.modalidades?.[0]?.min_nota || 51) ? 'APROBADO' : 'REPROBADO'
+  ]);
+
+  autoTable(doc, {
+    startY: 62,
+    head: [['N°', 'Apellidos y Nombres', 'C.I.', 'Nota', 'Estado']],
+    body: rows,
+    styles: { fontSize: 8, cellPadding: 3 },
+    headStyles: { fillColor: [0, 59, 113], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [245, 247, 250] },
+    columnStyles: { 0: { halign: 'center', cellWidth: 12 }, 3: { halign: 'center' }, 4: { halign: 'center' } },
+  });
+
+  // Footer firma
+  const finalY = (doc as any).lastAutoTable?.finalY || 150;
+  doc.setDrawColor(180, 180, 180);
+  doc.line(14, finalY + 30, 90, finalY + 30);
+  doc.line(120, finalY + 30, 196, finalY + 30);
+  doc.setFontSize(8);
+  doc.setTextColor(120, 120, 120);
+  doc.text('Coordinador del Evento', 52, finalY + 36, { align: 'center' });
+  doc.text('V°B° Dirección TWAN', 158, finalY + 36, { align: 'center' });
+
+  doc.save(`Acta_${nombreActividad.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`);
+  Swal.fire({ title: 'PDF Generado', icon: 'success', toast: true, position: 'top-end', showConfirmButton: false, timer: 2500 });
+};
+
+const generarExcel = () => {
+  if (!actividad.value) return;
+  const nombreActividad = actividad.value.nombre || 'Actividad';
+  const sesiones = actividad.value.modalidades?.[0]?.sesiones || [];
+
+  // Hoja 1: Calificaciones
+  const dataNotas = [
+    ['N°', 'Apellidos y Nombres', 'C.I.', 'Nota', 'Estado'],
+    ...alumnosActivos.value.map((ins, idx) => [
+      idx + 1,
+      `${ins.usuario?.persona?.primer_apellido || ''} ${ins.usuario?.persona?.segundo_apellido || ''} ${ins.usuario?.persona?.nombres || ''}`.trim(),
+      ins.usuario?.persona?.documento_identidad || '',
+      ins.nota_principal ?? '',
+      (ins.nota_principal || 0) >= (actividad.value.modalidades?.[0]?.min_nota || 51) ? 'APROBADO' : 'REPROBADO'
+    ])
+  ];
+
+  // Hoja 2: Asistencias por sesión
+  const headerAsistencia = ['N°', 'Apellidos y Nombres', 'C.I.', ...sesiones.map((_: any, i: number) => `Sesión ${i+1}`), 'Total Asistencias', '% Asistencia'];
+  const dataAsistencia = [
+    headerAsistencia,
+    ...alumnosActivos.value.map((ins, idx) => {
+      const inscModId = ins.modalidades?.[0]?.id;
+      const asistPorSesion = sesiones.map((s: any) => {
+        const a = asistenciasActividad.value.find((x: any) => x.sesionAcademica?.id === s.id && x.inscripcionModalidad?.id === inscModId);
+        return a && Number(a.estado) === 1 ? 1 : 0;
+      });
+      const total = asistPorSesion.reduce((acc: number, v: number) => acc + v, 0);
+      const pct = sesiones.length > 0 ? Math.round((total / sesiones.length) * 100) : 0;
+      return [
+        idx + 1,
+        `${ins.usuario?.persona?.primer_apellido || ''} ${ins.usuario?.persona?.segundo_apellido || ''} ${ins.usuario?.persona?.nombres || ''}`.trim(),
+        ins.usuario?.persona?.documento_identidad || '',
+        ...asistPorSesion,
+        total,
+        `${pct}%`
+      ];
+    })
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const ws1 = XLSX.utils.aoa_to_sheet(dataNotas);
+  const ws2 = XLSX.utils.aoa_to_sheet(dataAsistencia);
+  XLSX.utils.book_append_sheet(wb, ws1, 'Calificaciones');
+  XLSX.utils.book_append_sheet(wb, ws2, 'Asistencias');
+  XLSX.writeFile(wb, `Reporte_${nombreActividad.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  Swal.fire({ title: 'Excel Generado', icon: 'success', toast: true, position: 'top-end', showConfirmButton: false, timer: 2500 });
+};
+
+// ── Modal dedicado de asignación de logística ──────────────────────────
+// Estado temporal mientras el modal está abierto
+const logisticaIdsTemp = ref<number[]>([]);
+const filtroLogisticaModal = ref('');
+const isSavingLogistica = ref(false);
+
+const logisticaFiltradaModal = computed(() => {
+  if (!filtroLogisticaModal.value) return logisticaExistentes.value;
+  const f = filtroLogisticaModal.value.toLowerCase();
+  return logisticaExistentes.value.filter(u =>
+    u.displayName?.toLowerCase().includes(f) ||
+    (u.email || '').toLowerCase().includes(f)
+  );
+});
+
+const abrirModalLogistica = () => {
+  // Clonar los IDs actuales para no mutar el estado hasta guardar
+  logisticaIdsTemp.value = [...(actividad.value?.logistica_ids || [])];
+  filtroLogisticaModal.value = '';
+  openModal('modal-asignar-logistica');
+};
+
+const toggleLogisticaTemp = (id: number) => {
+  const idx = logisticaIdsTemp.value.indexOf(id);
+  if (idx > -1) {
+    logisticaIdsTemp.value.splice(idx, 1);
+  } else {
+    logisticaIdsTemp.value.push(id);
+  }
+};
+
+const guardarLogistica = async () => {
+  try {
+    isSavingLogistica.value = true;
+    const formData = new FormData();
+    formData.append('logistica_ids', JSON.stringify(logisticaIdsTemp.value));
+    await api.put(`/actividades-academicas/${actividad.value.id}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    await fetchData();
+    closeModal('modal-asignar-logistica');
+    Swal.fire({ title: 'Personal asignado', icon: 'success', toast: true, position: 'top-end', showConfirmButton: false, timer: 2000 });
+  } catch (e: any) {
+    const msg = e.response?.data?.message;
+    Swal.fire('Error', Array.isArray(msg) ? msg.join(', ') : (msg || 'No se pudo guardar la asignación'), 'error');
+  } finally {
+    isSavingLogistica.value = false;
+  }
+};
 const eliminarPonente = async (id: number) => {
     try {
         const result = await Swal.fire({
-            title: '¿Remover docente?',
-            text: "Esta acción quitará al docente de la planilla de esta actividad.",
+            title: '\u00bfRemover docente?',
+            text: "Esta acci\u00f3n quitar\u00e1 al docente de la planilla de esta actividad.",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
-            confirmButtonText: 'Sí, remover',
+            confirmButtonText: 'S\u00ed, remover',
             cancelButtonText: 'Mantener'
         });
-
         if (result.isConfirmed) {
             await api.delete(`/imparticiones/${id}`);
             await fetchData();
             Swal.fire('Eliminado', 'Docente removido de la actividad.', 'success');
         }
     } catch (error) {
-        Swal.fire('Error', 'No se pudo completar la eliminación.', 'error');
+        Swal.fire('Error', 'No se pudo completar la eliminaci\u00f3n.', 'error');
     }
 };
 </script>
@@ -453,9 +762,11 @@ const eliminarPonente = async (id: number) => {
         <span class="material-symbols-outlined text-sm text-umsa-blue">how_to_reg</span> Solicitudes ({{ solicitudes.length }})
       </button>
       <button @click="switchTab('ponentes')" :class="activeTab === 'ponentes' ? 'border-b-4 border-umsa-gold text-primary-dark dark:text-white font-black' : 'text-slate-400 font-bold hover:text-primary-dark dark:hover:text-white'" class="pb-4 text-[11px] uppercase tracking-widest transition-colors whitespace-nowrap">Plantel Docente</button>
+      <button @click="switchTab('logistica')" :class="activeTab === 'logistica' ? 'border-b-4 border-umsa-gold text-primary-dark dark:text-white font-black' : 'text-slate-400 font-bold hover:text-primary-dark dark:hover:text-white'" class="pb-4 text-[11px] uppercase tracking-widest transition-colors flex items-center gap-1 whitespace-nowrap">
+        <span class="material-symbols-outlined text-sm text-emerald-500">support_agent</span> Logística ({{ logisticaAsignada.length }})
+      </button>
       <button @click="switchTab('asistencia')" :class="activeTab === 'asistencia' ? 'border-b-4 border-umsa-gold text-primary-dark dark:text-white font-black' : 'text-slate-400 font-bold hover:text-primary-dark dark:hover:text-white'" class="pb-4 text-[11px] uppercase tracking-widest transition-colors flex items-center gap-1 whitespace-nowrap"><span class="material-symbols-outlined text-sm">qr_code_scanner</span> Asistencia</button>
       <button @click="switchTab('reportes')" :class="activeTab === 'reportes' ? 'border-b-4 border-umsa-gold text-primary-dark dark:text-white font-black' : 'text-slate-400 font-bold hover:text-primary-dark dark:hover:text-white'" class="pb-4 text-[11px] uppercase tracking-widest transition-colors whitespace-nowrap">Reportes & Actas</button>
-
     </div>
 
     <!-- Tab 1: Estudiantes -->
@@ -483,7 +794,7 @@ const eliminarPonente = async (id: number) => {
                             <input type="number" v-model="ins.nota_principal" class="w-16 text-center bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg text-xs font-bold text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none">
                         </td>
                         <td class="px-4 py-6 text-center">
-                            <span :class="(ins.nota_principal || 0) >= 51 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'" class="px-3 py-1 rounded-lg font-black text-xs">
+                            <span :class="(ins.nota_principal || 0) >= (actividad?.modalidades?.[0]?.min_nota || 51) ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'" class="px-3 py-1 rounded-lg font-black text-xs">
                                 {{ ins.nota_principal || 0 }} / 100
                             </span>
                         </td>
@@ -581,13 +892,57 @@ const eliminarPonente = async (id: number) => {
         </div>
     </div>
 
+    <!-- Tab Logística -->
+    <div v-if="activeTab === 'logistica'" class="tab-content block space-y-6 animate-in fade-in">
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic">Personal de Logística</h3>
+                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Personal asignado a esta actividad</p>
+            </div>
+            <button @click="abrirModalLogistica" class="bg-emerald-500 text-primary-dark px-5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-md hover:brightness-110 transition-all flex items-center gap-2">
+                <span class="material-symbols-outlined text-sm">manage_accounts</span> Gestionar Asignación
+            </button>
+        </div>
+
+        <!-- Grid de cards del personal asignado -->
+        <div v-if="logisticaAsignada.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div v-for="user in logisticaAsignada" :key="user.id"
+                 class="bg-white dark:bg-gray-900 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-gray-800 flex items-center gap-5 hover:border-emerald-400 dark:hover:border-emerald-700 hover:shadow-md transition-all group">
+                <!-- Avatar inicial -->
+                <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center flex-shrink-0 shadow-lg group-hover:scale-105 transition-transform">
+                    <span class="text-white font-black text-xl uppercase">{{ user.displayName?.charAt(0) || 'L' }}</span>
+                </div>
+                <!-- Info -->
+                <div class="flex-1 min-w-0">
+                    <p class="font-black text-primary-dark dark:text-white text-sm uppercase leading-tight truncate">{{ user.displayName }}</p>
+                    <p class="text-[10px] text-blue-500 font-medium mt-0.5 truncate">{{ user.email }}</p>
+                    <span class="mt-2 inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wide">
+                        <span class="material-symbols-outlined text-xs">support_agent</span> Logística
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estado vacío -->
+        <div v-else class="bg-white dark:bg-gray-900 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-gray-700 p-16 text-center">
+            <span class="material-symbols-outlined text-5xl text-slate-300 dark:text-gray-600 mb-4 block">group_off</span>
+            <h4 class="font-black text-slate-400 dark:text-gray-500 uppercase text-sm mb-2">Sin Personal Asignado</h4>
+            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-6">Aún no se ha asignado personal de logística a esta actividad</p>
+            <button @click="abrirModalLogistica" class="bg-emerald-500 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center gap-2 mx-auto">
+                <span class="material-symbols-outlined text-sm">add</span> Asignar Personal
+            </button>
+        </div>
+    </div>
+
     <!-- Tab 3: Asistencia -->
     <div v-if="activeTab === 'asistencia'" class="tab-content block space-y-6 animate-in fade-in">
-        <!-- VISTA PARA COORDINADOR: HISTORIAL DE ASISTENCIA -->
-        <div v-if="authStore.rolActivo === 'Coordinador'" class="space-y-6">
+        <!-- VISTA PARA COORDINADOR/ADMINISTRADOR: HISTORIAL DE ASISTENCIA -->
+        <div v-if="authStore.rolActivo === 'Coordinador' || authStore.esSuperUsuario" class="space-y-6">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic">Historial de Asistencias</h3>
-                <span class="bg-blue-100 dark:bg-blue-900/30 text-umsa-blue px-3 py-1 text-[10px] font-black uppercase rounded-lg">Vista de Coordinador</span>
+                <span class="bg-blue-100 dark:bg-blue-900/30 text-umsa-blue px-3 py-1 text-[10px] font-black uppercase rounded-lg">
+                    {{ authStore.esSuperUsuario ? 'Vista de Administrador' : 'Vista de Coordinador' }}
+                </span>
             </div>
             
             <div class="bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden">
@@ -601,56 +956,31 @@ const eliminarPonente = async (id: number) => {
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-gray-800">
-                        <tr class="hover:bg-slate-50 dark:hover:bg-gray-800/80 transition-colors">
+                        <tr v-for="(sesion, index) in (actividad.modalidades?.[0]?.sesiones || [])" :key="sesion.id" class="hover:bg-slate-50 dark:hover:bg-gray-800/80 transition-colors">
                             <td class="px-8 py-6">
-                                <p class="font-black text-primary-dark dark:text-white text-sm uppercase">Sesión 1: Martes 14/Nov</p>
-                                <p class="text-[10px] text-slate-400 font-medium">Teoría • 08:00 AM</p>
+                                <p class="font-black text-primary-dark dark:text-white text-sm uppercase">Sesión {{ Number(index) + 1 }}: {{ sesion.dia }}</p>
+                                <p class="text-[10px] text-slate-400 font-medium">
+                                    {{ sesion.fecha ? formatDate(sesion.fecha) : 'Horario Recurrente' }} • {{ formatTime(sesion.hora_inicio) }} - {{ formatTime(sesion.hora_fin) }}
+                                </p>
                             </td>
                             <td class="px-8 py-6">
-                                <span class="bg-blue-100 dark:bg-blue-900/30 text-umsa-blue px-3 py-1 rounded-lg font-black text-[9px] uppercase">Por PIN</span>
+                                <span :class="sesion.cod_verificacion ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400' : 'bg-blue-100 text-umsa-blue dark:bg-blue-900/30'" class="px-3 py-1 rounded-lg font-black text-[9px] uppercase">
+                                    {{ sesion.cod_verificacion ? 'PIN / QR Proyectado' : 'Registro Manual' }}
+                                </span>
                             </td>
                             <td class="px-8 py-6 text-center">
-                                <span class="text-green-600 dark:text-green-400 font-black text-sm">32 / 45</span>
+                                <span class="text-green-600 dark:text-green-400 font-black text-sm">
+                                    {{ getAsistenciasSesionCount(sesion.id) }} / {{ alumnosActivos.length }}
+                                </span>
                             </td>
                             <td class="px-8 py-6 text-center">
-                                <button @click="openModal('modal-lista-asistencia')" class="bg-primary-dark text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all flex items-center gap-1 mx-auto">
+                                <button @click="verListaAsistenciaSesion(sesion)" class="bg-primary-dark text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all flex items-center gap-1 mx-auto">
                                     <span class="material-symbols-outlined text-sm">visibility</span> Ver Lista
                                 </button>
                             </td>
                         </tr>
-                        <tr class="hover:bg-slate-50 dark:hover:bg-gray-800/80 transition-colors">
-                            <td class="px-8 py-6">
-                                <p class="font-black text-primary-dark dark:text-white text-sm uppercase">Sesión 2: Jueves 16/Nov</p>
-                                <p class="text-[10px] text-slate-400 font-medium">Práctica • 02:00 PM</p>
-                            </td>
-                            <td class="px-8 py-6">
-                                <span class="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 px-3 py-1 rounded-lg font-black text-[9px] uppercase">QR Proyectado</span>
-                            </td>
-                            <td class="px-8 py-6 text-center">
-                                <span class="text-green-600 dark:text-green-400 font-black text-sm">40 / 45</span>
-                            </td>
-                            <td class="px-8 py-6 text-center">
-                                <button @click="openModal('modal-lista-asistencia')" class="bg-primary-dark text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all flex items-center gap-1 mx-auto">
-                                    <span class="material-symbols-outlined text-sm">visibility</span> Ver Lista
-                                </button>
-                            </td>
-                        </tr>
-                        <tr class="hover:bg-slate-50 dark:hover:bg-gray-800/80 transition-colors">
-                            <td class="px-8 py-6">
-                                <p class="font-black text-primary-dark dark:text-white text-sm uppercase">Sesión 3: Sábado 18/Nov</p>
-                                <p class="text-[10px] text-slate-400 font-medium">Evaluación • 10:00 AM</p>
-                            </td>
-                            <td class="px-8 py-6">
-                                <span class="bg-purple-100 dark:bg-purple-900/30 text-purple-600 px-3 py-1 rounded-lg font-black text-[9px] uppercase">QR Estudiante</span>
-                            </td>
-                            <td class="px-8 py-6 text-center">
-                                <span class="text-green-600 dark:text-green-400 font-black text-sm">45 / 45</span>
-                            </td>
-                            <td class="px-8 py-6 text-center">
-                                <button @click="openModal('modal-lista-asistencia')" class="bg-primary-dark text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all flex items-center gap-1 mx-auto">
-                                    <span class="material-symbols-outlined text-sm">visibility</span> Ver Lista
-                                </button>
-                            </td>
+                        <tr v-if="!(actividad.modalidades?.[0]?.sesiones?.length)">
+                            <td colspan="4" class="p-20 text-center text-slate-400 font-bold uppercase text-[10px]">No hay sesiones programadas para esta actividad</td>
                         </tr>
                     </tbody>
                 </table>
@@ -704,121 +1034,110 @@ const eliminarPonente = async (id: number) => {
 
     <!-- Tab 4: Reportes -->
     <div v-if="activeTab === 'reportes'" class="tab-content block space-y-6 animate-in fade-in">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div class="bg-white dark:bg-gray-900 p-10 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 flex flex-col items-center text-center group cursor-pointer hover:border-umsa-gold transition-colors">
-                <span class="material-symbols-outlined text-6xl text-primary-dark dark:text-white mb-4 group-hover:scale-110 transition-transform">description</span>
-                <h4 class="font-black text-primary-dark dark:text-white uppercase text-sm">Acta de Calificaciones</h4>
-                <button class="mt-6 w-full py-3 bg-primary-dark text-white text-[10px] font-black rounded-xl uppercase hover:bg-emerald-500 transition-colors">Generar PDF</button>
+        <div class="mb-6">
+            <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic">Reportes & Actas</h3>
+            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Genera documentos oficiales con datos reales de la actividad</p>
+        </div>
+
+        <!-- Resumen estadístico -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-slate-100 dark:border-gray-800 text-center">
+                <p class="text-3xl font-black text-primary-dark dark:text-white">{{ alumnosActivos.length }}</p>
+                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Total Inscritos</p>
             </div>
-            
-            <div class="bg-white dark:bg-gray-900 p-10 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 flex flex-col items-center text-center group cursor-pointer hover:border-umsa-gold transition-colors">
-                <span class="material-symbols-outlined text-6xl text-primary-dark dark:text-white mb-4 group-hover:scale-110 transition-transform">checklist</span>
-                <h4 class="font-black text-primary-dark dark:text-white uppercase text-sm">Reporte de Asistencias</h4>
-                <button class="mt-6 w-full py-3 bg-primary-dark text-white text-[10px] font-black rounded-xl uppercase hover:bg-emerald-500 transition-colors">Generar Excel</button>
+            <div class="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-slate-100 dark:border-gray-800 text-center">
+                <p class="text-3xl font-black text-emerald-500">{{ alumnosActivos.filter(i => (i.nota_principal||0) >= (actividad?.modalidades?.[0]?.min_nota||51)).length }}</p>
+                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Aprobados</p>
+            </div>
+            <div class="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-slate-100 dark:border-gray-800 text-center">
+                <p class="text-3xl font-black text-red-400">{{ alumnosActivos.filter(i => i.nota_principal !== null && i.nota_principal !== undefined && (i.nota_principal||0) < (actividad?.modalidades?.[0]?.min_nota||51)).length }}</p>
+                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Reprobados</p>
+            </div>
+            <div class="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-slate-100 dark:border-gray-800 text-center">
+                <p class="text-3xl font-black text-umsa-gold">{{ actividad?.modalidades?.[0]?.sesiones?.length || 0 }}</p>
+                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Sesiones</p>
             </div>
         </div>
-    <!-- Tab 5: Certificados removed -->
+
+        <!-- Acciones de descarga -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- PDF -->
+            <div class="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 flex flex-col hover:border-red-300 dark:hover:border-red-800 hover:shadow-lg transition-all group">
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="w-14 h-14 bg-red-50 dark:bg-red-900/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined text-3xl text-red-500">picture_as_pdf</span>
+                    </div>
+                    <div>
+                        <h4 class="font-black text-primary-dark dark:text-white uppercase text-sm">Acta de Calificaciones</h4>
+                        <p class="text-[9px] text-slate-400 font-bold uppercase mt-0.5">Formato PDF — {{ alumnosActivos.length }} estudiantes</p>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-gray-400 mb-6 flex-1">Genera un acta oficial con la nómina completa de estudiantes, sus calificaciones finales y estado de aprobación, lista para firmas.</p>
+                <button @click="generarPDF" class="w-full py-3 bg-red-500 text-white text-[10px] font-black rounded-2xl uppercase tracking-widest hover:bg-red-600 transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg active:scale-95">
+                    <span class="material-symbols-outlined text-sm">download</span> Descargar PDF
+                </button>
+            </div>
+
+            <!-- Excel -->
+            <div class="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-800 flex flex-col hover:border-emerald-300 dark:hover:border-emerald-800 hover:shadow-lg transition-all group">
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="w-14 h-14 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined text-3xl text-emerald-500">table_chart</span>
+                    </div>
+                    <div>
+                        <h4 class="font-black text-primary-dark dark:text-white uppercase text-sm">Reporte Completo</h4>
+                        <p class="text-[9px] text-slate-400 font-bold uppercase mt-0.5">Formato Excel — Calificaciones + Asistencias</p>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-gray-400 mb-6 flex-1">Exporta dos hojas: (1) Calificaciones finales y (2) Asistencia por sesión para cada estudiante, con porcentaje de asistencia calculado.</p>
+                <button @click="generarExcel" class="w-full py-3 bg-emerald-500 text-white text-[10px] font-black rounded-2xl uppercase tracking-widest hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg active:scale-95">
+                    <span class="material-symbols-outlined text-sm">download</span> Descargar Excel
+                </button>
+            </div>
+        </div>
     </div>
   </div>
 
-  <!-- Modal Lista de Asistencia (Vista Coordinador) -->
-  <div id="modal-lista-asistencia" class="fixed inset-0 bg-primary-dark/80 z-[200] hidden items-center justify-center backdrop-blur-sm">
-      <div class="bg-white dark:bg-gray-900 rounded-[2rem] w-full max-w-2xl p-10 shadow-2xl">
+  <!-- Modal Lista de Asistencia (Dinámica) -->
+  <div id="modal-lista-asistencia-dinamica" class="fixed inset-0 bg-primary-dark/80 z-[200] hidden items-center justify-center backdrop-blur-sm">
+      <div v-if="sesionSeleccionada" class="bg-white dark:bg-gray-900 rounded-[2rem] w-full max-w-2xl p-10 shadow-2xl animate-in zoom-in-95 duration-300">
           <div class="flex justify-between items-center mb-8 border-b border-slate-100 dark:border-gray-800 pb-4">
               <div>
                   <h3 class="text-2xl font-black text-primary-dark dark:text-white italic uppercase">Lista de Asistencia</h3>
-                  <p class="text-[10px] text-slate-400 font-bold uppercase mt-1">Sesión 1: Martes 14/Nov</p>
+                  <p class="text-[10px] text-slate-400 font-bold uppercase mt-1">
+                      Sesión: {{ sesionSeleccionada.dia }} • {{ formatTime(sesionSeleccionada.hora_inicio) }} - {{ formatTime(sesionSeleccionada.hora_fin) }}
+                  </p>
               </div>
-              <button @click="closeModal('modal-lista-asistencia')" class="text-slate-400 hover:text-red-500 transition-colors"><span class="material-symbols-outlined">close</span></button>
+              <button @click="closeModal('modal-lista-asistencia-dinamica')" class="text-slate-400 hover:text-red-500 transition-colors"><span class="material-symbols-outlined">close</span></button>
           </div>
-          <div class="space-y-4 max-h-[400px] overflow-y-auto">
-              <!-- Item Estudiante -->
-              <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-700 rounded-2xl">
+          <div class="space-y-4 max-h-[400px] overflow-y-auto pr-1" style="scrollbar-width: thin;">
+              <div v-for="ins in alumnosActivos" :key="ins.id" class="flex items-center justify-between p-4 bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-700 rounded-2xl">
                   <div class="flex items-center gap-4">
-                      <div class="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center"><span class="material-symbols-outlined text-sm font-bold">check</span></div>
+                      <div :class="asistenciaSesionForm[ins.modalidades?.[0]?.id] === 1 ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400' : 'bg-red-100 text-red-600 dark:bg-red-900/50 dark:text-red-400'" class="w-10 h-10 rounded-full flex items-center justify-center font-bold">
+                          <span class="material-symbols-outlined text-sm">{{ asistenciaSesionForm[ins.modalidades?.[0]?.id] === 1 ? 'check' : 'close' }}</span>
+                      </div>
                       <div>
-                          <p class="font-black text-primary-dark dark:text-white text-sm uppercase">PÉREZ NOGALES BRENDA</p>
-                          <p class="text-[10px] text-slate-400 font-medium">CI: 1234567</p>
+                          <p class="font-black text-primary-dark dark:text-white text-sm uppercase">
+                              {{ ins.usuario?.persona?.primer_apellido }} {{ ins.usuario?.persona?.segundo_apellido }} {{ ins.usuario?.persona?.nombres }}
+                          </p>
+                          <p class="text-[10px] text-slate-400 font-medium">CI: {{ ins.usuario?.persona?.documento_identidad }}</p>
                       </div>
                   </div>
-                  <span class="bg-green-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase">Presente</span>
+                  <div class="flex items-center gap-3">
+                      <button @click="toggleAsistenciaLocal(ins.modalidades?.[0]?.id)" :class="asistenciaSesionForm[ins.modalidades?.[0]?.id] === 1 ? 'bg-emerald-500 text-white shadow-sm' : 'bg-slate-200 text-slate-600 dark:bg-gray-700 dark:text-gray-300'" class="px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all">
+                          {{ asistenciaSesionForm[ins.modalidades?.[0]?.id] === 1 ? 'Presente' : 'Ausente' }}
+                      </button>
+                  </div>
               </div>
-              
-              <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-700 rounded-2xl">
-                  <div class="flex items-center gap-4">
-                      <div class="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center"><span class="material-symbols-outlined text-sm font-bold">check</span></div>
-                      <div>
-                          <p class="font-black text-primary-dark dark:text-white text-sm uppercase">GÓMEZ LÓPEZ CARLOS</p>
-                          <p class="text-[10px] text-slate-400 font-medium">CI: 7654321</p>
-                      </div>
-                  </div>
-                  <span class="bg-green-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase">Presente</span>
-              </div>
-              
-              <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-700 rounded-2xl">
-                  <div class="flex items-center gap-4">
-                      <div class="w-10 h-10 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center"><span class="material-symbols-outlined text-sm font-bold">close</span></div>
-                      <div>
-                          <p class="font-black text-primary-dark dark:text-white text-sm uppercase">MAMANI QUISPE JHOEL</p>
-                          <p class="text-[10px] text-slate-400 font-medium">CI: 9876543</p>
-                      </div>
-                  </div>
-                  <span class="bg-red-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase">Ausente</span>
+              <div v-if="alumnosActivos.length === 0" class="text-center p-8 text-slate-400 font-bold uppercase text-xs">
+                  No hay estudiantes activos inscritos en esta actividad
               </div>
           </div>
-          <div class="mt-8 flex justify-end pt-4 border-t border-slate-100 dark:border-gray-800">
-              <button @click="closeModal('modal-lista-asistencia')" class="px-8 py-3 bg-primary-dark text-white rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-500 shadow-lg transition-all">Cerrar</button>
-          </div>
-      </div>
-  </div>
-
-  <!-- Modal Lista de Asistencia (Vista Coordinador) -->
-  <div id="modal-lista-asistencia" class="fixed inset-0 bg-primary-dark/80 z-[200] hidden items-center justify-center backdrop-blur-sm">
-      <div class="bg-white dark:bg-gray-900 rounded-[2rem] w-full max-w-2xl p-10 shadow-2xl">
-          <div class="flex justify-between items-center mb-8 border-b border-slate-100 dark:border-gray-800 pb-4">
-              <div>
-                  <h3 class="text-2xl font-black text-primary-dark dark:text-white italic uppercase">Lista de Asistencia</h3>
-                  <p class="text-[10px] text-slate-400 font-bold uppercase mt-1">Sesión 1: Martes 14/Nov</p>
-              </div>
-              <button @click="closeModal('modal-lista-asistencia')" class="text-slate-400 hover:text-red-500 transition-colors"><span class="material-symbols-outlined">close</span></button>
-          </div>
-          <div class="space-y-4 max-h-[400px] overflow-y-auto">
-              <!-- Item Estudiante -->
-              <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-700 rounded-2xl">
-                  <div class="flex items-center gap-4">
-                      <div class="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center"><span class="material-symbols-outlined text-sm font-bold">check</span></div>
-                      <div>
-                          <p class="font-black text-primary-dark dark:text-white text-sm uppercase">PÉREZ NOGALES BRENDA</p>
-                          <p class="text-[10px] text-slate-400 font-medium">CI: 1234567</p>
-                      </div>
-                  </div>
-                  <span class="bg-green-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase">Presente</span>
-              </div>
-              
-              <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-700 rounded-2xl">
-                  <div class="flex items-center gap-4">
-                      <div class="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center"><span class="material-symbols-outlined text-sm font-bold">check</span></div>
-                      <div>
-                          <p class="font-black text-primary-dark dark:text-white text-sm uppercase">GÓMEZ LÓPEZ CARLOS</p>
-                          <p class="text-[10px] text-slate-400 font-medium">CI: 7654321</p>
-                      </div>
-                  </div>
-                  <span class="bg-green-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase">Presente</span>
-              </div>
-              
-              <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-700 rounded-2xl">
-                  <div class="flex items-center gap-4">
-                      <div class="w-10 h-10 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center"><span class="material-symbols-outlined text-sm font-bold">close</span></div>
-                      <div>
-                          <p class="font-black text-primary-dark dark:text-white text-sm uppercase">MAMANI QUISPE JHOEL</p>
-                          <p class="text-[10px] text-slate-400 font-medium">CI: 9876543</p>
-                      </div>
-                  </div>
-                  <span class="bg-red-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase">Ausente</span>
-              </div>
-          </div>
-          <div class="mt-8 flex justify-end pt-4 border-t border-slate-100 dark:border-gray-800">
-              <button @click="closeModal('modal-lista-asistencia')" class="px-8 py-3 bg-primary-dark text-white rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-500 shadow-lg transition-all">Cerrar</button>
+          <div class="mt-8 flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-gray-800">
+              <button @click="closeModal('modal-lista-asistencia-dinamica')" class="px-6 py-3 text-slate-500 font-black uppercase text-[10px] hover:bg-slate-50 dark:hover:bg-gray-800 rounded-xl">Cancelar</button>
+              <button @click="guardarAsistenciaSesion" :disabled="isSavingAsistencia" class="px-8 py-3 bg-primary-dark text-white rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-500 shadow-lg transition-all disabled:opacity-50">
+                  {{ isSavingAsistencia ? 'Guardando...' : 'Guardar Cambios' }}
+              </button>
           </div>
       </div>
   </div>
@@ -1074,11 +1393,11 @@ const eliminarPonente = async (id: number) => {
                           <div class="grid grid-cols-2 gap-4 mb-10">
                               <div>
                                   <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Nota Mínima</label>
-                                  <input v-model="editForm.min_nota" type="number" class="w-full bg-white dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-center text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
+                                  <input v-model="editForm.min_nota" type="number" min="0" max="100" class="w-full bg-white dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-center text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
                               </div>
                               <div>
                                   <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Asistencia Mínima (%)</label>
-                                  <input v-model="editForm.min_asistencia" type="number" class="w-full bg-white dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-center text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
+                                  <input v-model="editForm.min_asistencia" type="number" min="0" max="100" class="w-full bg-white dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-center text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
                               </div>
                           </div>
 
@@ -1112,15 +1431,51 @@ const eliminarPonente = async (id: number) => {
                           </div>
                       </div>
 
-                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-                        <div>
-                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Nota Mínima</label>
-                            <input v-model="editForm.min_nota" type="number" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-primary-dark dark:text-white">
-                        </div>
-                        <div>
-                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Asistencia %</label>
-                            <input v-model="editForm.min_asistencia" type="number" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3 px-4 font-bold text-primary-dark dark:text-white">
-                        </div>
+                      <!-- Asignación de Personal de Logística -->
+                      <div class="bg-slate-50 dark:bg-gray-800/30 p-8 rounded-[2rem] border border-slate-100 dark:border-gray-800 mt-6">
+                          <div class="flex items-center justify-between mb-6">
+                              <div>
+                                  <h4 class="text-xs font-black text-primary-dark dark:text-white uppercase tracking-widest">Personal de Logística Asignado</h4>
+                                  <p class="text-[9px] text-slate-400 dark:text-gray-500 font-bold uppercase mt-1">Selecciona el personal de logística para esta actividad</p>
+                              </div>
+                              <span class="material-symbols-outlined text-lg text-emerald-500">support_agent</span>
+                          </div>
+
+                          <!-- Buscador local -->
+                          <div class="relative w-full mb-4">
+                              <span class="absolute inset-y-0 left-3 flex items-center text-slate-400">
+                                  <span class="material-symbols-outlined text-sm">search</span>
+                              </span>
+                              <input v-model="filtroLogistica" type="text" placeholder="Buscar personal..." class="w-full pl-9 pr-4 py-2 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl text-xs font-bold focus:border-emerald-500 outline-none transition-all" />
+                          </div>
+
+                          <div v-if="logisticaFiltrada.length === 0" class="text-center py-4 border border-dashed border-slate-200 dark:border-gray-800 rounded-xl">
+                              <p class="text-[10px] text-slate-400 font-bold uppercase">No se encontró personal de logística</p>
+                          </div>
+
+                          <div v-else class="space-y-2 max-h-[180px] overflow-y-auto pr-1" style="scrollbar-width: thin;">
+                              <div v-for="user in logisticaFiltrada" :key="user.id"
+                                   @click="toggleLogisticaUsuario(user.id)"
+                                   :class="editForm.logistica_ids?.includes(user.id) 
+                                        ? 'border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/20 dark:border-emerald-800/80 shadow-sm ring-1 ring-emerald-500/10' 
+                                        : 'border-slate-100 dark:border-gray-800 hover:border-slate-200 dark:hover:border-gray-700 bg-white dark:bg-gray-900'"
+                                   class="p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between group">
+                                  <div class="flex items-center gap-2">
+                                      <div class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-gray-400 flex items-center justify-center font-black text-xs uppercase"
+                                           :class="{'bg-emerald-500 text-white dark:bg-emerald-600': editForm.logistica_ids?.includes(user.id)}">
+                                          {{ user.displayName?.charAt(0) || 'L' }}
+                                      </div>
+                                      <div>
+                                          <p class="text-xs font-black text-slate-700 dark:text-gray-200 uppercase leading-tight">{{ user.displayName }}</p>
+                                          <p class="text-[9px] text-slate-400 font-bold mt-0.5 font-mono select-all">{{ user.email }}</p>
+                                      </div>
+                                  </div>
+                                  <span class="material-symbols-outlined text-base"
+                                        :class="editForm.logistica_ids?.includes(user.id) ? 'text-emerald-500' : 'text-slate-300 dark:text-gray-700 group-hover:text-slate-400'">
+                                      {{ editForm.logistica_ids?.includes(user.id) ? 'check_circle' : 'radio_button_unchecked' }}
+                                  </span>
+                              </div>
+                          </div>
                       </div>
                   </div>
               </div>
@@ -1132,4 +1487,80 @@ const eliminarPonente = async (id: number) => {
           </div>
       </div>
   </div>
+
+  <!-- Modal dedicado: Asignar Personal de Logística -->
+  <div id="modal-asignar-logistica" class="fixed inset-0 bg-primary-dark/80 z-[250] hidden items-center justify-center backdrop-blur-sm p-4">
+      <div class="bg-white dark:bg-gray-900 rounded-[2rem] w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
+          <!-- Header -->
+          <div class="p-8 pb-4 flex justify-between items-start border-b border-slate-100 dark:border-gray-800">
+              <div>
+                  <h3 class="text-2xl font-black text-primary-dark dark:text-white italic uppercase">Asignar Logística</h3>
+                  <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Selecciona el personal para esta actividad</p>
+              </div>
+              <button @click="closeModal('modal-asignar-logistica')" class="text-slate-400 hover:text-red-500 transition-colors mt-1">
+                  <span class="material-symbols-outlined">close</span>
+              </button>
+          </div>
+
+          <!-- Buscador -->
+          <div class="px-8 pt-5 pb-3">
+              <div class="relative">
+                  <span class="absolute inset-y-0 left-3 flex items-center text-slate-400">
+                      <span class="material-symbols-outlined text-sm">search</span>
+                  </span>
+                  <input v-model="filtroLogisticaModal" type="text" placeholder="Buscar por nombre o correo..."
+                         class="w-full pl-9 pr-4 py-3 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl text-xs font-bold focus:border-emerald-500 outline-none transition-all" />
+              </div>
+              <!-- Contador seleccionados -->
+              <p class="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mt-2">
+                  {{ logisticaIdsTemp.length }} seleccionado(s)
+              </p>
+          </div>
+
+          <!-- Lista de usuarios -->
+          <div class="px-8 pb-4 flex-1 overflow-y-auto space-y-2" style="scrollbar-width: thin;">
+              <div v-if="logisticaFiltradaModal.length === 0" class="text-center py-10 border-2 border-dashed border-slate-200 dark:border-gray-700 rounded-2xl">
+                  <span class="material-symbols-outlined text-3xl text-slate-300 mb-2 block">group_off</span>
+                  <p class="text-[10px] font-black text-slate-400 uppercase">No se encontró personal</p>
+              </div>
+              <div v-for="user in logisticaFiltradaModal" :key="user.id"
+                   @click="toggleLogisticaTemp(user.id)"
+                   :class="logisticaIdsTemp.includes(user.id)
+                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 ring-1 ring-emerald-500/20'
+                        : 'border-slate-100 dark:border-gray-800 hover:border-slate-300 dark:hover:border-gray-600 bg-white dark:bg-gray-900'"
+                   class="p-4 rounded-2xl border cursor-pointer transition-all flex items-center justify-between group select-none">
+                  <div class="flex items-center gap-3">
+                      <!-- Avatar -->
+                      <div class="w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm uppercase flex-shrink-0 transition-all"
+                           :class="logisticaIdsTemp.includes(user.id) ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-gray-800 text-slate-500 dark:text-gray-400'">
+                          {{ user.displayName?.charAt(0) || 'L' }}
+                      </div>
+                      <!-- Nombre y email -->
+                      <div>
+                          <p class="text-xs font-black text-slate-700 dark:text-gray-200 uppercase leading-tight">{{ user.displayName }}</p>
+                          <p class="text-[9px] text-slate-400 font-medium mt-0.5">{{ user.email }}</p>
+                      </div>
+                  </div>
+                  <!-- Check indicator -->
+                  <span class="material-symbols-outlined text-xl transition-all"
+                        :class="logisticaIdsTemp.includes(user.id) ? 'text-emerald-500' : 'text-slate-200 dark:text-gray-700 group-hover:text-slate-400'">
+                      {{ logisticaIdsTemp.includes(user.id) ? 'check_circle' : 'radio_button_unchecked' }}
+                  </span>
+              </div>
+          </div>
+
+          <!-- Footer acciones -->
+          <div class="p-6 bg-slate-50 dark:bg-gray-800/50 border-t border-slate-100 dark:border-gray-800 flex gap-3 rounded-b-[2rem]">
+              <button @click="closeModal('modal-asignar-logistica')" class="flex-1 py-3 text-slate-500 font-black uppercase text-[10px] tracking-widest hover:bg-slate-200 dark:hover:bg-gray-700 rounded-xl transition-all">
+                  Cancelar
+              </button>
+              <button @click="guardarLogistica" :disabled="isSavingLogistica"
+                      class="flex-1 py-3 bg-emerald-500 text-white rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-600 shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                  <span v-if="isSavingLogistica" class="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                  {{ isSavingLogistica ? 'Guardando...' : 'Guardar Asignación' }}
+              </button>
+          </div>
+      </div>
+  </div>
+
 </template>

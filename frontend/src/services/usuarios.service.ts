@@ -93,6 +93,10 @@ export const usuariosService = {
     });
   },
 
+  forzarReset(id: number, password: string) {
+    return api.patch(`/usuarios/${id}/forzar-reset`, { password });
+  },
+
   /**
    * Obtiene el perfil completo de un usuario (para administradores).
    */

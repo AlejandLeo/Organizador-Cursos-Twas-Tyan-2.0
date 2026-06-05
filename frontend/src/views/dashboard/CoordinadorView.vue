@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '@/services/api';
 import StatCard from '@/components/dashboard/StatCard.vue';
+import { useEventoStore } from '@/stores/eventoStore';
 import {
     generarPdfEventos,     generarExcelEventos,
     generarPdfActividades, generarExcelActividades,
@@ -20,16 +21,9 @@ interface Stat {
 type TipoReporte = 'general' | 'eventos' | 'actividades';
 
 const router = useRouter();
+const eventoStore = useEventoStore();
 
 // ─────────────────────────────────────────────────────── Estado ──
-const stats = ref<Stat[]>([
-    { title: 'Eventos Activos',       value: '…', icon: 'event_available', variant: 'primary'  },
-    { title: 'Actividades Totales',   value: '…', icon: 'school',          variant: 'success'  },
-    { title: 'Usuarios Registrados',  value: '…', icon: 'group',           variant: 'info'     },
-    { title: 'Solicitudes Pendientes',value: '—', icon: 'pending_actions', variant: 'warning'  },
-]);
-
-const actividadesGrafico = ref<{ nombre: string; inscritos: number }[]>([]);
 const rawEventos         = ref<any[]>([]);
 const rawActividades     = ref<any[]>([]);
 const cargando           = ref(true);
@@ -39,63 +33,108 @@ const modal = ref(false);
 const tipoActivo = ref<TipoReporte>('general');
 const generando  = ref(false);
 
+const eventosFiltrados = computed(() => {
+    if (!eventoStore.selectedEventoId) return rawEventos.value;
+    return rawEventos.value.filter((e: any) => e.id === eventoStore.selectedEventoId);
+});
+
+const actividadesFiltradas = computed(() => {
+    if (!eventoStore.selectedEventoId) return rawActividades.value;
+    return rawActividades.value.filter((a: any) => a.id_evento === eventoStore.selectedEventoId || a.evento?.id === eventoStore.selectedEventoId);
+});
+
+const statsComputed = computed(() => {
+    const evts = eventosFiltrados.value;
+    const acts = actividadesFiltradas.value;
+    
+    const activosCount = evts.filter((e: any) => e.estado === 1).length.toString();
+    const actividadesCount = acts.length.toString();
+    
+    const inscritosIds = new Set();
+    let pendingInscripCount = 0;
+    acts.forEach((a: any) => {
+        if (Array.isArray(a.inscripciones)) {
+            a.inscripciones.forEach((i: any) => {
+                if (i.id_usuario) inscritosIds.add(i.id_usuario);
+                if (i.estado === 0) pendingInscripCount++;
+            });
+        }
+    });
+    const usuariosCount = inscritosIds.size.toString();
+    const pendingCount = pendingInscripCount.toString();
+    
+    return [
+        { title: 'Eventos Activos',       value: activosCount, icon: 'event_available', variant: 'primary'  },
+        { title: 'Actividades Totales',   value: actividadesCount, icon: 'school',          variant: 'success'  },
+        { title: 'Usuarios Registrados',  value: usuariosCount, icon: 'group',           variant: 'info'     },
+        { title: 'Solicitudes Pendientes',value: pendingCount, icon: 'pending_actions', variant: 'warning'  },
+    ];
+});
+
+const actividadesGrafico = computed(() => {
+    const acts = actividadesFiltradas.value;
+    return [...acts]
+        .sort((a, b) => (b.inscripciones?.length ?? 0) - (a.inscripciones?.length ?? 0))
+        .slice(0, 6)
+        .map((a: any) => ({
+            nombre:    a.nombre || 'Sin nombre',
+            inscritos: a.inscripciones?.length ?? 0,
+        }));
+});
+
+const barChartUrl = computed(() => {
+    const labels = actividadesGrafico.value.map((_, idx) => `#${idx + 1}`);
+    const data = actividadesGrafico.value.map(a => a.inscritos);
+    const config = {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Inscritos',
+                backgroundColor: '#0ea5e9',
+                maxBarThickness: 45,
+                data
+            }]
+        },
+        options: {
+            title: { display: true, text: 'Inscritos por Actividad', fontColor: '#64748b' },
+            scales: {
+                yAxes: [{ ticks: { beginAtZero: true } }]
+            }
+        }
+    };
+    return `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(config))}&w=500&h=250`;
+});
+
 // ─────────────────────────────────────────────── Carga de datos ──
 async function cargarDatos() {
     cargando.value = true;
     try {
-        const [resEv, resAct, resUsr, resIns] = await Promise.all([
+        const [resEv, resAct] = await Promise.allSettled([
             api.get('/admin/eventos/lista?limit=1000'),
             api.get('/actividades-academicas'),
-            api.get('/usuarios'),
-            api.get('/inscripciones'),
         ]);
 
-        const extractData = (res: any) => {
-            const d = res.data?.data ?? res.data;
-            return Array.isArray(d) ? d : [];
+        const extractData = (res: PromiseSettledResult<any>) => {
+            if (res.status === 'fulfilled') {
+                const d = res.value.data?.data ?? res.value.data;
+                return Array.isArray(d) ? d : [];
+            }
+            return [];
         };
 
-        const eventos      = extractData(resEv);
-        const actividades  = extractData(resAct);
-        const usuarios     = extractData(resUsr);
-        const inscrip      = extractData(resIns);
-
-        rawEventos.value     = eventos;
-        rawActividades.value = actividades;
-
-        // Eventos Activos
-        if (stats.value[0]) {
-            stats.value[0].value = eventos.filter((e: any) => e.estado === 1).length.toString();
-        }
-        // Actividades Totales
-        if (stats.value[1]) {
-            stats.value[1].value = actividades.length.toString();
-        }
-        // Usuarios Registrados
-        if (stats.value[2]) {
-            stats.value[2].value = usuarios.length.toString();
-        }
-        // Solicitudes Pendientes (Inscripciones a cursos + Cuentas nuevas)
-        if (stats.value[3]) {
-            const pendingInscrip = inscrip.filter((i: any) => i.estado === 0).length;
-            const pendingCuentas = usuarios.filter((u: any) => u.estado === 2).length;
-            stats.value[3].value = (pendingInscrip + pendingCuentas).toString();
-        }
-
-        // Ordenar por inscritos y tomar los primeros 6
-        actividadesGrafico.value = [...actividades]
-            .sort((a, b) => (b.inscripciones?.length ?? 0) - (a.inscripciones?.length ?? 0))
-            .slice(0, 6)
-            .map((a: any) => ({
-                nombre:    a.nombre || 'Sin nombre',
-                inscritos: a.inscripciones?.length ?? 0,
-            }));
+        rawEventos.value     = extractData(resEv);
+        rawActividades.value = extractData(resAct);
     } catch (err) {
         console.error('Error al cargar estadísticas:', err);
     } finally {
         cargando.value = false;
     }
 }
+
+watch(() => eventoStore.selectedEventoId, () => {
+    cargarDatos();
+});
 
 // ─────────────────────────────────────────────── Lógica modal ───
 function abrirModal(tipo: TipoReporte) {
@@ -113,14 +152,16 @@ async function descargar(formato: 'pdf' | 'excel') {
     generando.value = true;
     try {
         const tipo = tipoActivo.value;
+        const evts = eventosFiltrados.value;
+        const acts = actividadesFiltradas.value;
         if (formato === 'pdf') {
-            if (tipo === 'general')     generarPdfGeneral(rawEventos.value, rawActividades.value);
-            if (tipo === 'eventos')     generarPdfEventos(rawEventos.value);
-            if (tipo === 'actividades') generarPdfActividades(rawActividades.value);
+            if (tipo === 'general')     generarPdfGeneral(evts, acts);
+            if (tipo === 'eventos')     generarPdfEventos(evts);
+            if (tipo === 'actividades') generarPdfActividades(acts);
         } else {
-            if (tipo === 'general')     generarExcelGeneral(rawEventos.value, rawActividades.value);
-            if (tipo === 'eventos')     generarExcelEventos(rawEventos.value);
-            if (tipo === 'actividades') generarExcelActividades(rawActividades.value);
+            if (tipo === 'general')     generarExcelGeneral(evts, acts);
+            if (tipo === 'eventos')     generarExcelEventos(evts);
+            if (tipo === 'actividades') generarExcelActividades(acts);
         }
         modal.value = false;
     } catch (err) {
@@ -162,7 +203,7 @@ onMounted(cargarDatos);
 
     <!-- ══════════════════ STAT CARDS ══════════════════ -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-      <StatCard v-for="(s, i) in stats" :key="i"
+      <StatCard v-for="(s, i) in statsComputed" :key="i"
         :title="s.title" :value="s.value" :icon="s.icon" :variant="s.variant as any" />
     </div>
 
@@ -193,11 +234,11 @@ onMounted(cargarDatos);
         </div>
 
         <!-- Barras -->
-        <div v-if="cargando" class="flex items-center justify-center h-52 text-slate-300">
+        <div v-if="cargando" class="flex items-center justify-center h-64 text-slate-300">
           <div class="w-8 h-8 border-2 border-sky-400 border-t-transparent rounded-full animate-spin"></div>
         </div>
         
-        <div v-else-if="actividadesGrafico.length === 0" class="flex flex-col items-center justify-center h-52 text-center">
+        <div v-else-if="actividadesGrafico.length === 0" class="flex flex-col items-center justify-center h-64 text-center">
           <div class="w-16 h-16 bg-slate-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-3">
               <span class="material-symbols-outlined text-slate-300 text-3xl">inbox</span>
           </div>
@@ -205,21 +246,31 @@ onMounted(cargarDatos);
           <p class="text-[10px] text-slate-300 mt-1">Crea actividades en la gestión de eventos para ver estadísticas.</p>
         </div>
 
-        <div v-else class="flex items-end gap-4 h-52 relative z-10">
-          <div v-for="(a, i) in actividadesGrafico" :key="i"
-            class="flex flex-col items-center flex-1 group/bar relative">
-            <!-- Tooltip -->
-            <div class="absolute -top-9 left-1/2 -translate-x-1/2 bg-sky-700 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap shadow-lg z-20">
-              {{ a.inscritos }} inscrito{{ a.inscritos !== 1 ? 's' : '' }}
+        <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-8 items-center relative z-10 w-full">
+          <!-- Gráfico (col-span-2) -->
+          <div class="md:col-span-2 flex justify-center p-2 bg-slate-50 dark:bg-black/20 rounded-[2rem] border border-slate-100 dark:border-white/5">
+            <img :src="barChartUrl" alt="Top Participación" class="max-w-full h-auto rounded-xl hover:scale-105 transition-transform duration-700" />
+          </div>
+          
+          <!-- Ranking (col-span-1) -->
+          <div class="space-y-4 pr-2">
+            <h4 class="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Ranking de Inscritos</h4>
+            <div class="space-y-3">
+              <div v-for="(a, idx) in actividadesGrafico" :key="idx" class="flex items-center justify-between text-xs">
+                <div class="flex items-center gap-3 min-w-0">
+                  <span :class="[
+                    idx < 3 ? 'bg-sky-600 text-white font-black' : 'bg-slate-100 dark:bg-gray-850 text-slate-450 dark:text-slate-550',
+                    'w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[10px]'
+                  ]">
+                    {{ idx + 1 }}
+                  </span>
+                  <span class="font-bold text-slate-700 dark:text-slate-300 truncate" :title="a.nombre">
+                    {{ a.nombre }}
+                  </span>
+                </div>
+                <span class="font-black text-sky-600 dark:text-sky-400 shrink-0 ml-2">{{ a.inscritos }}</span>
+              </div>
             </div>
-            <!-- Barra -->
-            <div class="w-full rounded-t-xl bg-gradient-to-t from-sky-500 to-emerald-400 transition-all duration-700 group-hover/bar:brightness-110 shadow-sm"
-              :style="{ height: `${escala(a.inscritos)}%` }">
-            </div>
-            <!-- Etiqueta -->
-            <span class="text-[9px] font-bold text-slate-400 mt-2 text-center leading-tight w-full truncate px-1 uppercase">
-              {{ a.nombre }}
-            </span>
           </div>
         </div>
       </div>
@@ -242,7 +293,7 @@ onMounted(cargarDatos);
           <div class="absolute inset-0 rounded-full border-[10px] border-slate-50 dark:border-gray-800"></div>
           <div class="absolute inset-0 rounded-full border-[10px] border-transparent border-t-emerald-500 border-r-sky-500 rotate-45 transition-transform group-hover:rotate-[180deg] duration-1000"></div>
           <div class="absolute inset-0 flex flex-col items-center justify-center">
-            <p class="text-3xl font-black text-sky-600 dark:text-white italic leading-none">{{ stats[1]?.value || '0' }}</p>
+            <p class="text-3xl font-black text-sky-600 dark:text-white italic leading-none">{{ statsComputed[1]?.value || '0' }}</p>
             <p class="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">Actividades</p>
           </div>
         </div>
@@ -254,14 +305,14 @@ onMounted(cargarDatos);
               <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
               <span class="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">Eventos activos</span>
             </div>
-            <span class="text-[11px] font-black text-emerald-800 dark:text-white">{{ stats[0]?.value || '0' }}</span>
+            <span class="text-[11px] font-black text-emerald-800 dark:text-white">{{ statsComputed[0]?.value || '0' }}</span>
           </div>
           <div class="flex items-center justify-between px-4 py-2.5 bg-sky-50/60 dark:bg-sky-900/10 rounded-2xl border border-sky-100 dark:border-sky-800">
             <div class="flex items-center gap-2.5">
               <span class="w-2 h-2 rounded-full bg-sky-400 shrink-0"></span>
               <span class="text-[10px] font-black text-sky-700 dark:text-sky-400 uppercase tracking-wide">Usuarios totales</span>
             </div>
-            <span class="text-[11px] font-black text-sky-800 dark:text-white">{{ stats[2]?.value || '0' }}</span>
+            <span class="text-[11px] font-black text-sky-800 dark:text-white">{{ statsComputed[2]?.value || '0' }}</span>
           </div>
         </div>
       </div>
@@ -270,19 +321,19 @@ onMounted(cargarDatos);
     <!-- ══════════════════ ACCESOS RÁPIDOS ══════════════════ -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
       <!-- 1. Eventos -->
-      <button @click="router.push({ name: 'admin-eventos' })"
+      <button @click="router.push({ name: 'coordinador-gestion-eventos' })"
         class="p-6 bg-white dark:bg-gray-900 rounded-[2rem] border border-slate-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all flex items-center gap-4 group text-left">
         <div class="w-12 h-12 p-3 rounded-2xl bg-sky-50 dark:bg-sky-900/20 text-sky-500 group-hover:bg-sky-500 group-hover:text-white transition-colors shrink-0">
           <span class="material-symbols-outlined text-2xl">event_available</span>
         </div>
         <div>
           <p class="text-xs font-black text-sky-700 dark:text-sky-300 uppercase tracking-tight italic">Gestión de Eventos</p>
-          <p class="text-[10px] text-slate-400 mt-0.5">Crear y administrar eventos</p>
+          <p class="text-[10px] text-slate-400 mt-0.5">Administrar eventos asignados</p>
         </div>
       </button>
-
+ 
       <!-- 2. Solicitudes -->
-      <button @click="router.push({ name: 'admin-solicitudes' })"
+      <button @click="router.push({ name: 'coordinador-solicitudes' })"
         class="p-6 bg-white dark:bg-gray-900 rounded-[2rem] border border-slate-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all flex items-center gap-4 group text-left">
         <div class="w-12 h-12 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors shrink-0">
           <span class="material-symbols-outlined text-2xl">how_to_reg</span>
@@ -292,9 +343,9 @@ onMounted(cargarDatos);
           <p class="text-[10px] text-slate-400 mt-0.5">Aprobación de inscripciones</p>
         </div>
       </button>
-
+ 
       <!-- 3. Certificados -->
-      <button @click="router.push({ name: 'admin-certificados' })"
+      <button @click="router.push({ name: 'coordinador-certificados' })"
         class="p-6 bg-white dark:bg-gray-900 rounded-[2rem] border border-slate-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all flex items-center gap-4 group text-left">
         <div class="w-12 h-12 p-3 rounded-2xl bg-amber-50 dark:bg-amber-900/20 text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-colors shrink-0">
           <span class="material-symbols-outlined text-2xl">workspace_premium</span>

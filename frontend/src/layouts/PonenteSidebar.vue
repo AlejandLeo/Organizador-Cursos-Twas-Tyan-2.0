@@ -2,6 +2,7 @@
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useUIStore } from '@/stores/ui';
+import Swal from 'sweetalert2';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -11,9 +12,91 @@ const navigate = (routeName: string) => {
   router.push({ name: routeName });
 };
 
-const cambiarAEstudiante = () => {
-  authStore.cambiarRolActivo('Estudiante');
-  router.push('/estudiante');
+const cambiarRol = async () => {
+  const roles = authStore.userRoles;
+  if (roles.length <= 1) return;
+
+  let rolActual = '';
+  const path = router.currentRoute.value.path;
+  if (path.startsWith('/coordinador')) rolActual = 'Coordinador';
+  else if (path.startsWith('/estudiante')) rolActual = 'Estudiante';
+  else if (path.startsWith('/ponente')) rolActual = 'Ponente';
+  else if (path.startsWith('/logistica')) rolActual = 'Logística';
+  else if (path.startsWith('/admin')) rolActual = 'Super Usuario';
+
+  if (roles.length === 2) {
+    const otroRol = roles.find(r => r !== rolActual) || roles[0];
+    let targetPath = '/estudiante';
+    if (otroRol === 'Coordinador') targetPath = '/coordinador';
+    else if (otroRol === 'Ponente') targetPath = '/ponente';
+    else if (otroRol === 'Logística') targetPath = '/logistica';
+    else if (otroRol === 'Super Usuario') targetPath = '/admin';
+
+    authStore.cambiarRolActivo(otroRol);
+    router.push(targetPath);
+    uiStore.closeSidebar();
+    return;
+  }
+
+  const rolConfig: Record<string, { label: string, path: string, icon: string, color: string }> = {
+    'Coordinador': { label: 'Coordinador', path: '/coordinador', icon: 'manage_accounts', color: '#0ea5e9' },
+    'Estudiante': { label: 'Estudiante', path: '/estudiante', icon: 'school', color: '#10b981' },
+    'Ponente': { label: 'Expositor / Ponente', path: '/ponente', icon: 'co_present', color: '#3b82f6' },
+    'Logística': { label: 'Personal de Apoyo', path: '/logistica', icon: 'support_agent', color: '#14b8a6' },
+    'Super Usuario': { label: 'Administrador', path: '/admin', icon: 'shield_person', color: '#ef4444' }
+  };
+
+  const htmlButtons = roles.map(r => {
+    const config = rolConfig[r] || { label: r, path: '/', icon: 'account_circle', color: '#64748b' };
+    const isCurrent = r === rolActual;
+    return `
+      <button data-role="${r}" data-path="${config.path}" class="swal-role-btn w-full flex items-center justify-between p-4 mb-2.5 rounded-2xl border-2 transition-all ${
+        isCurrent 
+          ? 'border-slate-300 bg-slate-50 dark:bg-gray-800 opacity-60 cursor-default' 
+          : 'border-slate-100 hover:border-blue-400 bg-white dark:bg-gray-900 cursor-pointer shadow-sm hover:shadow'
+      }">
+        <div class="flex items-center gap-3 text-left">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center text-white shrink-0" style="background-color: ${config.color}">
+            <span class="material-symbols-outlined text-[20px]">${config.icon}</span>
+          </div>
+          <span class="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-200">${config.label}</span>
+        </div>
+        ${isCurrent ? '<span class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-slate-100 dark:bg-gray-800 px-2 py-1 rounded">Activo</span>' : '<span class="material-symbols-outlined text-slate-300 text-sm">chevron_right</span>'}
+      </button>
+    `;
+  }).join('');
+
+  Swal.fire({
+    title: '<span class="text-[#003a70] dark:text-white uppercase font-black tracking-tight text-lg">Cambiar Portal de Acceso</span>',
+    html: `
+      <div class="text-left py-2">
+        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-4">Selecciona el rol con el que deseas trabajar:</p>
+        <div class="flex flex-col">${htmlButtons}</div>
+      </div>
+    `,
+    showConfirmButton: false,
+    showCancelButton: true,
+    cancelButtonText: 'Cancelar',
+    cancelButtonColor: '#64748b',
+    didOpen: () => {
+      const container = Swal.getHtmlContainer();
+      if (container) {
+        const buttons = container.querySelectorAll('.swal-role-btn');
+        buttons.forEach(btn => {
+          btn.addEventListener('click', () => {
+            const role = btn.getAttribute('data-role');
+            const targetPath = btn.getAttribute('data-path');
+            if (role && targetPath && role !== rolActual) {
+              authStore.cambiarRolActivo(role);
+              router.push(targetPath);
+              uiStore.closeSidebar();
+              Swal.close();
+            }
+          });
+        });
+      }
+    }
+  });
 };
 </script>
 
@@ -39,22 +122,13 @@ const cambiarAEstudiante = () => {
     </div>
 
     <nav class="space-y-1 flex-1">
-      <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 mt-2 pl-2 border-b border-slate-100 dark:border-gray-800 pb-2">Descubrimiento</p>
-
-      <button @click="navigate('ponente-catalogo'); uiStore.closeSidebar()"
-        :class="[ $route.name === 'ponente-catalogo' ? 'nav-active bg-umsa-blue text-white shadow-lg shadow-umsa-blue/30' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500 hover:text-umsa-blue hover:translate-x-1' ]"
-        class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group font-medium">
-        <span class="text-[11px] uppercase tracking-widest font-bold">Actividades Académicas</span>
-        <span class="material-symbols-outlined text-[18px] transition-colors" :class="[ $route.name === 'ponente-catalogo' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">grid_view</span>
-      </button>
-
-      <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 mt-6 pl-2 border-b border-slate-100 dark:border-gray-800 pb-2">Mi área de Trabajo</p>
+      <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 mt-2 pl-2 border-b border-slate-100 dark:border-gray-800 pb-2">Mi área de Trabajo</p>
 
       <button @click="navigate('ponente-eventos'); uiStore.closeSidebar()"
         :class="[ $route.name === 'ponente-eventos' || $route.name === 'ponente-evento-detalle' ? 'nav-active bg-umsa-blue text-white shadow-lg shadow-umsa-blue/30' : 'hover:bg-slate-50 dark:hover:bg-gray-900 text-slate-500 hover:text-umsa-blue hover:translate-x-1' ]"
         class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group mt-1">
-        <span class="text-xs uppercase tracking-widest font-bold">Mis Cursos Asignados</span>
-        <span class="material-symbols-outlined text-[18px] transition-colors" :class="[ $route.name === 'ponente-eventos' || $route.name === 'ponente-evento-detalle' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">collections_bookmark</span>
+        <span class="text-xs uppercase tracking-widest font-bold">Mis Eventos Asignados</span>
+        <span class="material-symbols-outlined text-[18px] transition-colors" :class="[ $route.name === 'ponente-eventos' || $route.name === 'ponente-evento-detalle' ? 'text-white' : 'text-slate-400 group-hover:text-umsa-blue' ]">event</span>
       </button>
 
       <button @click="navigate('ponente-historial-notas'); uiStore.closeSidebar()"
@@ -73,18 +147,12 @@ const cambiarAEstudiante = () => {
       </button>
     </nav>
 
-    <!-- CAMBIO DE CONTEXTO DE ROL (Solo si también es Estudiante) -->
-    <div v-if="authStore.esEstudiante" class="mt-6 pt-4 border-t border-slate-100 dark:border-gray-800">
-      <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 pl-2">Cambiar Vista</p>
-      <button @click="cambiarAEstudiante"
-              class="w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-slate-500 hover:text-emerald-600 group border border-dashed border-slate-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-800">
-        <div class="flex items-center gap-3">
-          <div class="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center">
-            <span class="material-symbols-outlined text-[16px]">school</span>
-          </div>
-          <span class="text-[11px] uppercase tracking-widest font-black">Vista Estudiante</span>
-        </div>
-        <span class="material-symbols-outlined text-[18px] text-slate-400 group-hover:text-emerald-500 transition-colors">swap_horiz</span>
+    <!-- CAMBIO DE CONTEXTO DE ROL -->
+    <div v-if="authStore.tieneMultiplesRoles" class="mt-6 pt-4 border-t border-slate-100 dark:border-gray-800">
+      <button @click="cambiarRol"
+        class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all font-bold text-slate-500 hover:bg-slate-50 dark:hover:bg-gray-900 border border-transparent">
+        <span class="text-[10px] uppercase tracking-widest">Cambiar Rol</span>
+        <span class="material-symbols-outlined text-[18px]">cached</span>
       </button>
     </div>
 

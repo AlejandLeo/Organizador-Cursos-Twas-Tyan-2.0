@@ -62,6 +62,20 @@ export class ActividadAcademica {
   @Column({ type: 'jsonb', nullable: true })
   requisitos: any;
 
+  /**
+   * Materiales didácticos de la actividad (Enlaces y archivos cargados).
+   * Almacenado como JSON.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  materiales: any;
+
+  /**
+   * IDs de personal de logística asignados a esta actividad académica.
+   * Almacenado como JSON.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  logistica_ids: number[];
+
   // ── Relaciones ────────────────────────────────────────────────────────────
 
   /** La actividad pertenece a un evento. */

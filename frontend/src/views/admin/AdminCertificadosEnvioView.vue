@@ -70,12 +70,17 @@ const isFetchingTemplates = ref(false);
 const filteredCertificados = computed(() => {
   return certificados.value.filter(c => {
     // Filtrar por evento seleccionado en el select dropdown
-    const matchEventSelected = !selectedEventId.value || c.actividadAcademica?.evento.id === selectedEventId.value;
+    const matchEventSelected = !selectedEventId.value || c.actividadAcademica?.evento?.id === selectedEventId.value;
     
     // Filtrar por texto de búsqueda libre
+    const query = filterEvent.value.toLowerCase();
     const matchEvent = !filterEvent.value ||
-      c.actividadAcademica?.evento.nombre.toLowerCase().includes(filterEvent.value.toLowerCase()) ||
-      c.actividadAcademica?.nombre.toLowerCase().includes(filterEvent.value.toLowerCase());
+      (c.actividadAcademica?.evento?.nombre && c.actividadAcademica.evento.nombre.toLowerCase().includes(query)) ||
+      (c.actividadAcademica?.nombre && c.actividadAcademica.nombre.toLowerCase().includes(query)) ||
+      (c.usuario?.persona?.nombres && c.usuario.persona.nombres.toLowerCase().includes(query)) ||
+      (c.usuario?.persona?.primer_apellido && c.usuario.persona.primer_apellido.toLowerCase().includes(query)) ||
+      (c.usuario?.email && c.usuario.email.toLowerCase().includes(query)) ||
+      (c.codigo_certificado && c.codigo_certificado.toLowerCase().includes(query));
       
     // Filtrar por estado
     const matchStatus = !filterStatus.value || c.estado_envio === filterStatus.value;
@@ -581,7 +586,7 @@ onMounted(() => {
     </div>
 
     <!-- TAB NAVIGATION -->
-    <div class="flex gap-2">
+    <div class="flex flex-wrap gap-2">
       <button @click="activeTab = 'trazabilidad'" :class="activeTab === 'trazabilidad' ? 'bg-slate-800 text-white shadow-lg shadow-slate-900/20' : 'bg-white dark:bg-gray-900 text-slate-500 border border-slate-200 dark:border-gray-800 hover:bg-slate-50'" class="flex items-center gap-2 px-5 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all">
         <span class="material-symbols-outlined text-sm">mail</span>
         Trazabilidad y Envío
@@ -601,14 +606,14 @@ onMounted(() => {
 
       <!-- FILTROS DE BÚSQUEDA LIBRE -->
       <div class="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-        <div class="flex flex-wrap items-center gap-4">
-          <div class="flex-1 min-w-[250px] relative">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div class="flex-1 relative">
             <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[20px]">search</span>
-            <input v-model="filterEvent" type="text" placeholder="Buscar por evento o actividad..."
+            <input v-model="filterEvent" type="text" placeholder="Buscar por usuario, email, evento, actividad o código..."
                    class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-slate-400 transition-all" />
           </div>
           <select v-model="filterStatus"
-                  class="px-4 py-2.5 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700 rounded-xl text-xs font-bold uppercase outline-none cursor-pointer">
+                  class="px-4 py-2.5 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700 rounded-xl text-xs font-bold uppercase outline-none cursor-pointer w-full sm:w-auto">
             <option value="">Todos los estados</option>
             <option value="pendiente">Pendiente</option>
             <option value="enviado">Enviado</option>
@@ -618,20 +623,20 @@ onMounted(() => {
         </div>
 
         <!-- SELECTOR DE PLANTILLA DE CORREO -->
-        <div class="flex items-center gap-3 px-1 py-3 border-t border-slate-100 dark:border-gray-800/60">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3 px-1 py-4 border-t border-slate-100 dark:border-gray-800/60">
           <div class="flex items-center gap-2 shrink-0">
             <span class="material-symbols-outlined text-[18px] text-amber-500">mail_outline</span>
             <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Plantilla del Mensaje de Correo:</span>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 w-full sm:w-auto">
             <select v-model="selectedTemplateId"
-                    class="px-4 py-2 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700 rounded-xl text-xs font-bold outline-none cursor-pointer focus:border-amber-400 transition-all min-w-[280px]">
+                    class="px-4 py-2 bg-slate-50 dark:bg-gray-800/50 border border-slate-200 dark:border-gray-700 rounded-xl text-xs font-bold outline-none cursor-pointer focus:border-amber-400 transition-all w-full sm:min-w-[280px]">
               <option :value="null">⚙ Plantilla predeterminada del sistema (.hbs)</option>
               <option v-for="tpl in certTemplates" :key="tpl.id" :value="tpl.id">
                 📧 {{ tpl.nombre }} — {{ tpl.asunto }}
               </option>
             </select>
-            <button @click="abrirPreviewCorreo" class="w-8 h-8 flex items-center justify-center text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all border border-blue-200 dark:border-blue-900/50" title="Previsualizar mensaje de correo">
+            <button @click="abrirPreviewCorreo" class="w-8 h-8 shrink-0 flex items-center justify-center text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all border border-blue-200 dark:border-blue-900/50" title="Previsualizar mensaje de correo">
               <span class="material-symbols-outlined text-[18px]">visibility</span>
             </button>
           </div>
