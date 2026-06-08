@@ -510,9 +510,11 @@ const fetchEventos = async () => {
             return {
             ...ev,
             nombreCorto: ev.nombre || 'Sin nombre',
-            version: ev.gestion || '2025',
+            // BUG FIX: No sobreescribir ev.version (slogan) con ev.gestion (año).
+            // Se usa gestionLabel para mostrar en UI sin destruir el campo original.
+            gestionLabel: ev.gestion || '2025',
             imagen: getImageUrl('fondos', ev.imagen_fondo, 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80'),
-            estado: ev.estado === 1 ? 'Activo' : (ev.estado === 2 ? 'Planificación' : 'Cerrado'),
+            estadoLabel: ev.estado === 1 ? 'Activo' : (ev.estado === 2 ? 'Planificación' : 'Cerrado'),
             colorEstado: ev.estado === 1 ? 'bg-emerald-500 text-white' : (ev.estado === 2 ? 'bg-blue-500 text-white' : 'bg-slate-500 text-white'),
             mostrarActividades: true,
             mostrarInhabilitadas: false, // Nueva variable para controlar el despliegue
@@ -681,7 +683,8 @@ const handleSaveEvento = async () => {
 };
 
 const editarEvento = (evento: any) => {
-    if (!authStore.esSuperUsuario && (evento.estado === 0 || evento.estado === 'Cerrado' || evento.estado === 'Concluido')) {
+    // BUG FIX: evento.estado es ahora el número crudo (via spread ...ev), evento.estadoLabel es el string mapeado
+    if (!authStore.esSuperUsuario && (evento.estado === 0 || evento.estadoLabel === 'Cerrado' || evento.estadoLabel === 'Concluido')) {
         Swal.fire({
             icon: 'info',
             title: 'Modo de Solo Lectura',
@@ -706,11 +709,14 @@ const editarEvento = (evento: any) => {
         mostrarCorreos = mcParts[1]?.trim() === 'true';
     }
     
+    // BUG FIX: Se leen directamente los campos del objeto crudo (no del objeto mapeado con
+    // campos sobreescritos). El objeto ya incluye todos los campos del backend via spread.
     formEvento.value = {
-        nombre: evento.nombreCorto,
+        nombre: evento.nombre || evento.nombreCorto || '',
         descripcion: baseDesc || '',
-        gestion: (evento.gestion || evento.version)?.toString(),
-        version: evento.version_slogan || evento.version || '',
+        gestion: evento.gestion?.toString() || new Date().getFullYear().toString(),
+        // BUG FIX: version real del backend (slogan/edición), no el gestion-label sobreescrito
+        version: evento.version || '',
         fecha_inicio: evento.fecha_inicio ? evento.fecha_inicio.split('T')[0] : '',
         fecha_fin: evento.fecha_fin ? evento.fecha_fin.split('T')[0] : '',
         ubicacion: evento.ubicacion || '',
@@ -730,7 +736,12 @@ const editarEvento = (evento: any) => {
         color_badge_institucion: evento.color_badge_institucion || '#0070b4',
         color_badge_fecha: evento.color_badge_fecha || '#0070b4',
         institucion_badge: evento.institucion_badge || 'Evento Oficial OEA/TYAN',
-        estado: evento.estado === 'Activo' ? 1 : (evento.estado === 'Cerrado' ? 0 : 2),
+        // BUG FIX: mapeo completo de estados incluyendo Planificación (2)
+        estado: evento.estadoLabel === 'Activo' ? 1
+              : evento.estadoLabel === 'Planificación' ? 2
+              : evento.estadoLabel === 'Cerrado' ? 0
+              : typeof evento.estado === 'number' ? evento.estado
+              : 2,
         fondo_img: null,
         logo_img: null,
         ponentes_seleccionados: parts[1]
@@ -740,16 +751,17 @@ const editarEvento = (evento: any) => {
           : [],
         cronograma: '',
         cronograma_lista: [],
+        // BUG FIX: nombre_2 leído directamente del objeto (que preserva el campo vía spread)
         nombre_2: evento.nombre_2 || '',
         contacto_donde: evento.direccion || '',
         contacto_telefono: evento.telefono || '',
         contacto_email: evento.email || '',
         auspicios: [],
-        prioridad: evento.prioridad || '3',
+        // BUG FIX: prioridad convertida a string para coincidir con los value del <select>
+        prioridad: String(evento.prioridad ?? '3'),
         visibilidad_al_finalizar: evento.visibilidad_al_finalizar || 'visible',
         fase: evento.fase || 1,
         mostrar_correos: mostrarCorreos,
-        // Filtramos para pre-seleccionar los usuarios que son Coordinadores o Logística
         coordinadores_ids: (evento.coordinaciones || [])
           .filter((c: any) => c.usuario?.usuariosRoles?.some((ur: any) => 
               ur.rol?.nombre_rol?.toLowerCase() === 'coordinador' || 
@@ -1353,11 +1365,11 @@ const changeStep = (delta: number) => {
           
           <div class="absolute bottom-0 left-0 right-0 p-8 pt-24 z-20 flex flex-col">
             <span class="mb-3" :class="[evento.colorEstado, 'text-[8px] font-black uppercase px-3 py-1 rounded-full tracking-widest w-fit shadow-lg backdrop-blur-md border']">
-              {{ evento.estado }}
+              {{ evento.estadoLabel }}
             </span>
             <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
               <div>
-                <p class="text-xs font-bold text-umsa-gold dark:text-blue-400 uppercase tracking-widest mb-2">{{ evento.version }}</p>
+                <p class="text-xs font-bold text-umsa-gold dark:text-blue-400 uppercase tracking-widest mb-2">{{ evento.gestionLabel }}</p>
                 <h1 class="text-3xl md:text-5xl font-black text-white tracking-tighter leading-none mb-4">{{ evento.nombreCorto }}</h1>
                 <p class="text-sm font-medium text-gray-300 max-w-2xl line-clamp-2 leading-relaxed">{{ evento.descripcion }}</p>
               </div>

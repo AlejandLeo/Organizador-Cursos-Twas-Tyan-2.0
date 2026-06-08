@@ -163,7 +163,7 @@ export class InscripcionesExcelService implements OnModuleInit {
       for (let i = 0; i < filas.length; i++) {
         const fila = filas[i];
         const numFila = i + 2;
-        const email = (this.getFilaVal(fila, ['email', 'correo', 'mail']) || String(fila['email'] || '')).trim().toLowerCase();
+        const email = this.sanitizeInput(this.getFilaVal(fila, ['email', 'correo', 'mail']) || fila['email'], 'email');
 
         if (!email) {
           detalle.push({ fila: numFila, estado: 'error', mensaje: 'Email vacío o inválido.' });
@@ -171,7 +171,7 @@ export class InscripcionesExcelService implements OnModuleInit {
           continue;
         }
 
-        const password = String(fila['password'] || '').trim();
+        const password = this.sanitizeInput(fila['password']);
         if (!password || password.length < 6) {
           detalle.push({ fila: numFila, email, estado: 'error', mensaje: 'Contraseña ausente o menor a 6 caracteres.' });
           errores++;
@@ -198,24 +198,24 @@ export class InscripcionesExcelService implements OnModuleInit {
           });
           const usuarioGuardado = await queryRunner.manager.save(usuario);
 
-          const nombres = (this.getFilaVal(fila, ['nombres', 'nombre']) || String(fila['nombres'] || '')).trim();
-          const primerApellido = (this.getFilaVal(fila, ['primerapellido', 'apellidos', 'apellido']) || String(fila['primer_apellido'] || '')).trim();
+          const nombres = this.sanitizeInput(this.getFilaVal(fila, ['nombres', 'nombre']) || fila['nombres'], 'name');
+          const primerApellido = this.sanitizeInput(this.getFilaVal(fila, ['primerapellido', 'apellidos', 'apellido']) || fila['primer_apellido'], 'name');
 
           const persona = queryRunner.manager.create(Persona, {
             nombres: nombres || undefined,
             primer_apellido: primerApellido || undefined,
-            segundo_apellido: (this.getFilaVal(fila, ['segundoapellido']) || String(fila['segundo_apellido'] || '')).trim() || undefined,
-            documento_identidad: (this.getFilaVal(fila, ['documentoidentidad', 'ci', 'documento', 'identidad']) || String(fila['documento_identidad'] || '')).trim() || undefined,
-            celular: (this.getFilaVal(fila, ['celular', 'telefono', 'movil']) || String(fila['celular'] || '')).trim() || undefined,
-            grado_academico: this.getGradoAcademicoValue(fila) || undefined,
+            segundo_apellido: this.sanitizeInput(this.getFilaVal(fila, ['segundoapellido']) || fila['segundo_apellido'], 'name') || undefined,
+            documento_identidad: this.sanitizeInput(this.getFilaVal(fila, ['documentoidentidad', 'ci', 'documento', 'identidad']) || fila['documento_identidad'], 'document') || undefined,
+            celular: this.sanitizeInput(this.getFilaVal(fila, ['celular', 'telefono', 'movil']) || fila['celular']) || undefined,
+            grado_academico: this.sanitizeInput(this.getGradoAcademicoValue(fila), 'sentence') || undefined,
             usuario: usuarioGuardado,
           });
           await queryRunner.manager.save(persona);
 
           // Guardar Afiliación si viene institución, disciplina o área temática
-          const instVal = this.getInstitucionValue(fila);
-          const discVal = this.getDisciplinaValue(fila);
-          const areaVal = this.getAreaValue(fila);
+          const instVal = this.sanitizeInput(this.getInstitucionValue(fila), 'title');
+          const discVal = this.sanitizeInput(this.getDisciplinaValue(fila), 'title');
+          const areaVal = this.sanitizeInput(this.getAreaValue(fila), 'title');
 
           if (instVal || discVal || areaVal) {
             const newAf = queryRunner.manager.create(Afiliacion, {
@@ -322,8 +322,8 @@ export class InscripcionesExcelService implements OnModuleInit {
       for (let i = 0; i < filas.length; i++) {
         const fila = filas[i];
         const numFila = i + 2;
-        const email = (this.getFilaVal(fila, ['email', 'correo', 'mail']) || String(fila['email'] || '')).trim().toLowerCase();
-        const nombreActividad = (this.getFilaVal(fila, ['actividad', 'curso', 'nombreactividad']) || String(fila['nombre_actividad_academica'] || '')).trim();
+        const email = this.sanitizeInput(this.getFilaVal(fila, ['email', 'correo', 'mail']) || fila['email'], 'email');
+        const nombreActividad = this.sanitizeInput(this.getFilaVal(fila, ['actividad', 'curso', 'nombreactividad']) || fila['nombre_actividad_academica'], 'sentence');
 
         if (!email) {
           detalle.push({ fila: numFila, estado: 'error', mensaje: 'Email vacío.' });
@@ -346,17 +346,17 @@ export class InscripcionesExcelService implements OnModuleInit {
           if (!usuario) {
             if (!crearUsuarios) throw new Error(`Usuario "${email}" no encontrado. Activa "Registrar usuarios nuevos".`);
 
-            passwordTemporal = String(fila['password'] || fila['documento_identidad'] || 'Usuario123!').trim();
+            passwordTemporal = this.sanitizeInput(fila['password'] || fila['documento_identidad'] || 'Usuario123!');
             const hash = await bcrypt.hash(passwordTemporal, 10);
             usuario = queryRunner.manager.create(Usuario, { email, password: hash, estado: 1, requiere_cambio_password: true });
             const userSaved = await queryRunner.manager.save(usuario);
 
             const persona = queryRunner.manager.create(Persona, {
-              nombres: (this.getFilaVal(fila, ['nombres', 'nombre']) || String(fila['nombres'] || '')).trim() || 'Estudiante',
-              primer_apellido: (this.getFilaVal(fila, ['primerapellido', 'apellidos', 'apellido']) || String(fila['primer_apellido'] || '')).trim() || 'Nuevo',
-              segundo_apellido: (this.getFilaVal(fila, ['segundoapellido']) || String(fila['segundo_apellido'] || '')).trim() || undefined,
-              documento_identidad: (this.getFilaVal(fila, ['documentoidentidad', 'ci', 'documento', 'identidad']) || String(fila['documento_identidad'] || '')).trim() || undefined,
-              grado_academico: this.getGradoAcademicoValue(fila) || undefined,
+              nombres: this.sanitizeInput(this.getFilaVal(fila, ['nombres', 'nombre']) || fila['nombres'], 'name') || 'Estudiante',
+              primer_apellido: this.sanitizeInput(this.getFilaVal(fila, ['primerapellido', 'apellidos', 'apellido']) || fila['primer_apellido'], 'name') || 'Nuevo',
+              segundo_apellido: this.sanitizeInput(this.getFilaVal(fila, ['segundoapellido']) || fila['segundo_apellido'], 'name') || undefined,
+              documento_identidad: this.sanitizeInput(this.getFilaVal(fila, ['documentoidentidad', 'ci', 'documento', 'identidad']) || fila['documento_identidad'], 'document') || undefined,
+              grado_academico: this.sanitizeInput(this.getGradoAcademicoValue(fila), 'sentence') || undefined,
               usuario: userSaved,
             });
             await queryRunner.manager.save(persona);
@@ -366,7 +366,7 @@ export class InscripcionesExcelService implements OnModuleInit {
             usuario = { ...userSaved, persona };
             fueCreado = true;
           } else {
-            const excelGrado = this.getGradoAcademicoValue(fila);
+            const excelGrado = this.sanitizeInput(this.getGradoAcademicoValue(fila), 'sentence');
             if (excelGrado && usuario.persona && !usuario.persona.grado_academico) {
               usuario.persona.grado_academico = excelGrado;
               await queryRunner.manager.save(usuario.persona);
@@ -374,9 +374,9 @@ export class InscripcionesExcelService implements OnModuleInit {
           }
 
           // Guardar o actualizar Afiliación
-          const instVal = this.getInstitucionValue(fila);
-          const discVal = this.getDisciplinaValue(fila);
-          const areaVal = this.getAreaValue(fila);
+          const instVal = this.sanitizeInput(this.getInstitucionValue(fila), 'title');
+          const discVal = this.sanitizeInput(this.getDisciplinaValue(fila), 'title');
+          const areaVal = this.sanitizeInput(this.getAreaValue(fila), 'title');
 
           if (instVal || discVal || areaVal) {
             let af = await queryRunner.manager.findOne(Afiliacion, {
@@ -504,9 +504,9 @@ export class InscripcionesExcelService implements OnModuleInit {
       for (let i = 0; i < filas.length; i++) {
         const fila = filas[i];
         const numFila = i + 2;
-        const email = (this.getFilaVal(fila, ['email', 'correo', 'mail']) || String(fila['email'] || '')).trim().toLowerCase();
-        const nombreActividad = (this.getFilaVal(fila, ['actividad', 'curso', 'nombreactividad']) || String(fila['nombre_actividad_academica'] || '')).trim();
-        const tematica = (this.getFilaVal(fila, ['tematica', 'tema']) || String(fila['tematica'] || '')).trim();
+        const email = this.sanitizeInput(this.getFilaVal(fila, ['email', 'correo', 'mail']) || fila['email'], 'email');
+        const nombreActividad = this.sanitizeInput(this.getFilaVal(fila, ['actividad', 'curso', 'nombreactividad']) || fila['nombre_actividad_academica'], 'sentence');
+        const tematica = this.sanitizeInput(this.getFilaVal(fila, ['tematica', 'tema']) || fila['tematica'], 'sentence');
 
         if (!email || !nombreActividad) {
           detalle.push({ fila: numFila, estado: 'error', mensaje: 'Email o nombre de actividad vacío.' });
@@ -529,16 +529,16 @@ export class InscripcionesExcelService implements OnModuleInit {
           if (!usuario) {
             if (!crearUsuarios) throw new Error(`Ponente "${email}" no encontrado. Activa el registro automático.`);
 
-            passwordTemporal = String(fila['password'] || fila['documento_identidad'] || 'Ponente123!').trim();
+            passwordTemporal = this.sanitizeInput(fila['password'] || fila['documento_identidad'] || 'Ponente123!');
             const hash = await bcrypt.hash(passwordTemporal, 10);
             usuario = queryRunner.manager.create(Usuario, { email, password: hash, estado: 1, requiere_cambio_password: true });
             const userSaved = await queryRunner.manager.save(usuario);
             const persona = queryRunner.manager.create(Persona, {
-              nombres: (this.getFilaVal(fila, ['nombres', 'nombre']) || String(fila['nombres'] || '')).trim() || 'Ponente',
-              primer_apellido: (this.getFilaVal(fila, ['primerapellido', 'apellidos', 'apellido']) || String(fila['primer_apellido'] || '')).trim() || 'Nuevo',
-              segundo_apellido: (this.getFilaVal(fila, ['segundoapellido']) || String(fila['segundo_apellido'] || '')).trim() || undefined,
-              documento_identidad: (this.getFilaVal(fila, ['documentoidentidad', 'ci', 'documento', 'identidad']) || String(fila['documento_identidad'] || '')).trim() || undefined,
-              grado_academico: this.getGradoAcademicoValue(fila) || undefined,
+              nombres: this.sanitizeInput(this.getFilaVal(fila, ['nombres', 'nombre']) || fila['nombres'], 'name') || 'Ponente',
+              primer_apellido: this.sanitizeInput(this.getFilaVal(fila, ['primerapellido', 'apellidos', 'apellido']) || fila['primer_apellido'], 'name') || 'Nuevo',
+              segundo_apellido: this.sanitizeInput(this.getFilaVal(fila, ['segundoapellido']) || fila['segundo_apellido'], 'name') || undefined,
+              documento_identidad: this.sanitizeInput(this.getFilaVal(fila, ['documentoidentidad', 'ci', 'documento', 'identidad']) || fila['documento_identidad'], 'document') || undefined,
+              grado_academico: this.sanitizeInput(this.getGradoAcademicoValue(fila), 'sentence') || undefined,
               usuario: userSaved,
             });
             await queryRunner.manager.save(persona);
@@ -547,7 +547,7 @@ export class InscripcionesExcelService implements OnModuleInit {
             usuario = { ...userSaved, persona };
             fueCreado = true;
           } else {
-            const excelGrado = this.getGradoAcademicoValue(fila);
+            const excelGrado = this.sanitizeInput(this.getGradoAcademicoValue(fila), 'sentence');
             if (excelGrado && usuario.persona && !usuario.persona.grado_academico) {
               usuario.persona.grado_academico = excelGrado;
               await queryRunner.manager.save(usuario.persona);
@@ -555,9 +555,9 @@ export class InscripcionesExcelService implements OnModuleInit {
           }
 
           // Guardar o actualizar Afiliación
-          const instVal = this.getInstitucionValue(fila);
-          const discVal = this.getDisciplinaValue(fila);
-          const areaVal = this.getAreaValue(fila);
+          const instVal = this.sanitizeInput(this.getInstitucionValue(fila), 'title');
+          const discVal = this.sanitizeInput(this.getDisciplinaValue(fila), 'title');
+          const areaVal = this.sanitizeInput(this.getAreaValue(fila), 'title');
 
           if (instVal || discVal || areaVal) {
             let af = await queryRunner.manager.findOne(Afiliacion, {
@@ -660,10 +660,81 @@ export class InscripcionesExcelService implements OnModuleInit {
     return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
   }
 
+  private sanitizeInput(val: any, format: 'email' | 'name' | 'document' | 'title' | 'sentence' | 'none' = 'none'): string {
+    if (val === undefined || val === null) return '';
+    
+    let str = String(val)
+      .replace(/[\u200B-\u200D\uFEFF]/g, '') // Elimina zero-width spaces
+      .replace(/[\u00A0\u1680\u180E\u2000-\u200B\u202F\u205F\u3000]/g, ' ') // Normaliza espacios no separables
+      .trim()
+      .normalize('NFC');
+
+    if (format === 'email') {
+      return str.toLowerCase();
+    }
+    
+    if (format === 'name') {
+      return str.split(/\s+/)
+        .map(word => {
+          if (word.length === 0) return '';
+          return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        })
+        .join(' ');
+    }
+    
+    if (format === 'document') {
+      return str.toUpperCase().replace(/\s+/g, '');
+    }
+
+    if (format === 'title') {
+      return str.split(/\s+/)
+        .map(word => {
+          if (word.length === 0) return '';
+          return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        })
+        .join(' ');
+    }
+    
+    if (format === 'sentence') {
+      if (str.length === 0) return '';
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+    
+    return str;
+  }
+
   private parsearExcel(buffer: Buffer): Record<string, any>[] {
     const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
     const primerHoja = workbook.SheetNames[0];
+    if (!primerHoja) return [];
     const ws = workbook.Sheets[primerHoja];
-    return XLSX.utils.sheet_to_json(ws, { defval: '' });
+    if (!ws) return [];
+
+    const rawData = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+    if (rawData.length === 0) return [];
+
+    // Limpiar y obtener los headers
+    const headers = rawData[0].map(h => String(h || '').trim());
+
+    const rows: Record<string, any>[] = [];
+    for (let i = 1; i < rawData.length; i++) {
+      const row = rawData[i];
+      if (!row) continue;
+      
+      // Saltar si la fila está completamente vacía
+      if (row.length === 0 || row.every(cell => cell === undefined || cell === null || String(cell).trim() === '')) {
+        continue;
+      }
+
+      const rowObj: Record<string, any> = {};
+      headers.forEach((header, index) => {
+        if (header) {
+          rowObj[header] = row[index] !== undefined && row[index] !== null ? row[index] : '';
+        }
+      });
+      rows.push(rowObj);
+    }
+
+    return rows;
   }
 }

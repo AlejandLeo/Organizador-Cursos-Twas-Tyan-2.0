@@ -19,14 +19,14 @@ export default class CatalogosSeeder implements Seeder {
       { id: 10, descripcion: 'Pasante', abreviacion: 'Pas.' },
     ];
 
-    for (const g of grados) {
-      const exists = await repository.findOneBy({ id: g.id });
-      if (!exists) {
-        await repository.save(repository.create(g));
-        console.log(`Grado guardado: ${g.descripcion}`);
-      }
-    }
+    /**
+     * Upsert atómico: inserta o actualiza en una sola operación (1 query).
+     * Consistente con RoleSeeder. Si se añaden nuevos grados o se corrige
+     * la abreviación de uno existente, se aplica automáticamente al re-ejecutar.
+     */
+    await repository.upsert(grados, ['id']);
 
+    console.log('✅ Grados académicos sincronizados (upsert completo).');
     console.log('Todos los grados académicos asegurados.');
   }
 }
