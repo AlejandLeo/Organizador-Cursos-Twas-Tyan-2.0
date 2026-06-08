@@ -32,7 +32,7 @@ const cambiarRol = async () => {
     else if (otroRol === 'Logística') targetPath = '/logistica';
     else if (otroRol === 'Super Usuario') targetPath = '/admin';
 
-    authStore.cambiarRolActivo(otroRol);
+    authStore.cambiarRolActivo(otroRol as string);
     router.push(targetPath);
     uiStore.closeSidebar();
     return;
