@@ -43,7 +43,7 @@ export class ActividadesAcademicasService {
       const firstMod = act.modalidades?.[0];
       return {
         ...act,
-        min_nota: firstMod ? firstMod.min_nota : 71,
+        min_nota: firstMod ? firstMod.min_nota : 51,
         min_asistencia: firstMod ? firstMod.min_asistencia : 80,
         modalidad: firstMod ? firstMod.tipo : 'Presencial',
         imagen: this.formatImageUrl(act.imagen)
@@ -60,7 +60,7 @@ export class ActividadesAcademicasService {
     const firstMod = act.modalidades?.[0];
     return {
       ...act,
-      min_nota: firstMod ? firstMod.min_nota : 71,
+      min_nota: firstMod ? firstMod.min_nota : 51,
       min_asistencia: firstMod ? firstMod.min_asistencia : 80,
       modalidad: firstMod ? firstMod.tipo : 'Presencial',
       imagen: this.formatImageUrl(act.imagen)
@@ -88,7 +88,7 @@ export class ActividadesAcademicasService {
       return {
         ...act,
         estado: Number(act.estado),
-        min_nota: firstMod ? firstMod.min_nota : 71,
+        min_nota: firstMod ? firstMod.min_nota : 51,
         min_asistencia: firstMod ? firstMod.min_asistencia : 80,
         modalidad: firstMod ? firstMod.tipo : 'Presencial',
         imagen: this.formatImageUrl(act.imagen)
@@ -101,7 +101,7 @@ export class ActividadesAcademicasService {
     if (usuario) {
       await this.verificarPropiedad(dto.id_evento, usuario);
     }
-    const { id_evento, modalidad, min_nota, min_asistencia, ...campos } = dto;
+    const { id_evento, modalidad, min_nota, min_asistencia, sesiones, ...campos } = dto;
     const data: any = {
       ...campos,
       evento: { id: id_evento },
@@ -112,10 +112,21 @@ export class ActividadesAcademicasService {
     const saved = await this.actividadRepository.save(actividad);
 
     // Guardar modalidad por defecto
-    await this.dataSource.query(
-      `INSERT INTO curso_modalidades (id_actividad_academica, tipo, min_nota, min_asistencia) VALUES ($1, $2, $3, $4)`,
+    const resMod = await this.dataSource.query(
+      `INSERT INTO curso_modalidades (id_actividad_academica, tipo, min_nota, min_asistencia) VALUES ($1, $2, $3, $4) RETURNING id`,
       [saved.id, modalidad || 'Presencial', min_nota || 0, min_asistencia || 0]
     );
+    const modId = resMod[0].id;
+
+    // Guardar sesiones
+    if (sesiones && Array.isArray(sesiones)) {
+      for (const s of sesiones) {
+        await this.dataSource.query(
+          `INSERT INTO sesiones_academicas (id_curso_modalidad, dia, hora_inicio, hora_fin) VALUES ($1, $2, $3, $4)`,
+          [modId, s.dia, s.hora_inicio, s.hora_fin]
+        );
+      }
+    }
 
     return this.findOne(saved.id);
   }
@@ -297,6 +308,51 @@ export class ActividadesAcademicasService {
     act.descripcion = (act.descripcion || '').replace('[SOLICITUD_ACTIVACION]\n', '').replace('[SOLICITUD_ACTIVACION]', '');
     
     return await this.actividadRepository.save(act);
+  }
+
+  async verificarPermisosEdicion(actividadId: number, usuario: any) {
+    if (!usuario) return;
+    if (usuario.roles?.includes('Super Usuario')) return;
+
+    // Obtener la actividad
+    const act = await this.actividadRepository.findOne({
+      where: { id: actividadId },
+      relations: ['evento'],
+    });
+    if (!act) throw new NotFoundException(`Actividad ${actividadId} no encontrada.`);
+
+    // Verificar si es coordinador del evento
+    const coord = await this.dataSource.query(
+      `SELECT 1 FROM coordinacion_eventos WHERE id_evento = $1 AND id_usuario = $2`,
+      [act.evento.id, usuario.id]
+    );
+
+    if (coord.length > 0) return; // Es coordinador
+
+    // Verificar si es ponente asignado
+    const isImpartidor = await this.dataSource.query(
+      `SELECT 1 FROM imparticiones WHERE id_actividad_academica = $1 AND id_usuario = $2`,
+      [actividadId, usuario.id]
+    );
+
+    if (isImpartidor.length > 0) return; // Es ponente asignado
+
+    throw new ForbiddenException('No tienes permisos sobre esta actividad académica.');
+  }
+
+  async actualizarMateriales(actividadId: number, materiales: any[], usuario: any) {
+    await this.verificarPermisosEdicion(actividadId, usuario);
+
+    const act = await this.actividadRepository.findOneBy({ id: actividadId });
+    if (!act) throw new NotFoundException(`Actividad ${actividadId} no encontrada.`);
+
+    act.materiales = materiales;
+    await this.actividadRepository.save(act);
+
+    return { 
+      message: 'Materiales actualizados correctamente.', 
+      materiales: act.materiales 
+    };
   }
 
   // Métodos legacy

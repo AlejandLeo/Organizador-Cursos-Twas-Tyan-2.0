@@ -40,7 +40,9 @@ const fetchData = async () => {
         descripcion: ev.descripcion || 'Gestiona las actividades a tu cargo.',
         estado: ev.estado === 1 ? 'En Progreso' : (ev.estado === 2 ? 'Finalizado' : 'Próximamente'),
         colorEstado: 'bg-primary-dark text-white border-blue-900',
-        imagen: getImageUrl('eventos', ev.logo || ev.imagen_fondo, 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=1600&q=80'),
+        imagen: ev.imagen_fondo 
+          ? getImageUrl('fondos', ev.imagen_fondo)
+          : getImageUrl('eventos', ev.logo, 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=1600&q=80'),
         mostrarActividades: true,
         actividadesAsignadas: imparticionesEvento
           .filter((imp: any) => imp?.actividadAcademica && Number(imp.actividadAcademica?.estado) !== -1)
@@ -85,6 +87,10 @@ const getStatusColor = (status: string) => {
   if (status === 'Próximamente') return 'text-umsa-blue bg-blue-50 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800';
   return 'text-slate-500 bg-slate-100 dark:bg-gray-800 dark:text-gray-400 border border-slate-200 dark:border-gray-700';
 };
+
+const handleImageError = (e: Event, fallbackUrl: string) => {
+  (e.target as HTMLImageElement).src = fallbackUrl;
+};
 </script>
 
 <template>
@@ -101,7 +107,7 @@ const getStatusColor = (status: string) => {
     <div class="w-full bg-white dark:bg-gray-900 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 dark:border-gray-800 flex flex-col group/card mb-8">
         
         <div class="relative w-full h-[240px] md:h-[320px] overflow-hidden">
-          <img :src="eventoData.imagen" alt="Banner" class="w-full h-full object-cover object-center group-hover/card:scale-105 transition-transform duration-[1.5s] ease-out">
+          <img :src="eventoData.imagen" @error="handleImageError($event, 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=1600&q=80')" alt="Banner" class="w-full h-full object-cover object-center group-hover/card:scale-105 transition-transform duration-[1.5s] ease-out">
           <div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent"></div>
           <div class="absolute bottom-0 left-0 right-0 p-6 md:p-8 pt-24 z-20 flex flex-col">
             <span class="mb-3" :class="[eventoData.colorEstado, 'text-[8px] font-black uppercase px-3 py-1 rounded-full tracking-widest w-fit shadow-lg backdrop-blur-md border']">
@@ -129,15 +135,15 @@ const getStatusColor = (status: string) => {
                 
                 <!-- Badge de Asignado -->
                 <div class="absolute top-4 left-4 z-30">
-                  <span class="bg-umsa-blue text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-full shadow-xl flex items-center gap-1 border border-white/20 backdrop-blur-md">
-                    <span class="material-symbols-outlined text-[12px]">verified_user</span>
-                    DOCENTE ASIGNADO
+                  <span class="bg-umsa-gold text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-full shadow-xl flex items-center gap-1 border border-white/20 backdrop-blur-md">
+                    <span class="material-symbols-outlined text-[12px]">assignment_ind</span>
+                    ASIGNADO
                   </span>
                 </div>
 
                 <!-- Imagen Predominante -->
                 <div class="relative h-64 w-full overflow-hidden">
-                  <img :src="act.image" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000">   
+                  <img :src="act.image" @error="handleImageError($event, 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=800&q=80')" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000">   
                   <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
                   
                   <span class="absolute top-4 right-4 z-20 text-[9px] font-black uppercase px-3 py-1.5 rounded-full tracking-widest shadow-lg backdrop-blur-md border border-white/10" :class="getStatusColor(act.status)">

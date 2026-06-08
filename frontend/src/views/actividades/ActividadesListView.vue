@@ -6,7 +6,7 @@ import { useEventoStore } from '@/stores/eventoStore';
 import { useAdminHistorialStore } from '@/stores/adminHistorial';
 import { useAuthStore } from '@/stores/auth';
 
-import api from '@/services/api';
+import api, { getImageUrl } from '@/services/api';
 import Swal from 'sweetalert2';
 
 const router = useRouter();
@@ -49,6 +49,8 @@ const logoPreview = ref<string | null>(null);
 const fondoPreview = ref<string | null>(null);
 const showRegistroRapidoPonente = ref(false);
 const filtroPonente = ref('');
+const logisticaDB = ref<any[]>([]);
+const filtroLogistica = ref('');
 
 const formEvento = ref({
   nombre: '',
@@ -73,7 +75,8 @@ const formEvento = ref({
   ponentes_seleccionados: [] as number[],
   cronograma: '',
   cronograma_lista: [] as any[],
-  version: ''
+  version: '',
+  mostrar_correos: true
 });
 
 const formatDate = (dateStr: string) => {
@@ -89,6 +92,27 @@ const ponentesFiltrados = computed(() => {
   return ponentesDB.value.filter(p => p.displayName.toLowerCase().includes(f));
 });
 
+const logisticaFiltrada = computed(() => {
+  if (!filtroLogistica.value) return logisticaDB.value;
+  const f = filtroLogistica.value.toLowerCase();
+  return logisticaDB.value.filter(p => 
+    p.displayName.toLowerCase().includes(f) || 
+    (p.email || '').toLowerCase().includes(f)
+  );
+});
+
+const toggleLogisticaUsuario = (id: number) => {
+  if (!nuevaActividad.value.logistica_ids) {
+    nuevaActividad.value.logistica_ids = [];
+  }
+  const idx = nuevaActividad.value.logistica_ids.indexOf(id);
+  if (idx > -1) {
+    nuevaActividad.value.logistica_ids.splice(idx, 1);
+  } else {
+    nuevaActividad.value.logistica_ids.push(id);
+  }
+};
+
 const resetFormEvento = () => {
     formEvento.value = {
         nombre: '', descripcion: '', gestion: new Date().getFullYear().toString(),
@@ -97,8 +121,17 @@ const resetFormEvento = () => {
         sobre_evento_1: '', sobre_evento_2: '', frase_destacada: '',
         link_facebook: '', link_web: '', sigla: '', color_principal: '#0070b4',
         institucion_badge: 'Evento Oficial OEA/TYAN',
-        ponentes_seleccionados: [], cronograma: '', cronograma_lista: [], version: ''
+        ponentes_seleccionados: [], cronograma: '', cronograma_lista: [], version: '',
+        mostrar_correos: true
     };
+};
+
+const seleccionarTodosPonentes = () => {
+    formEvento.value.ponentes_seleccionados = ponentesDB.value.map(p => p.id);
+};
+
+const deseleccionarTodosPonentes = () => {
+    formEvento.value.ponentes_seleccionados = [];
 };
 
 const agregarDiaEvento = () => {
@@ -136,10 +169,11 @@ const registrarPonenteQuick = async () => {
 
 const fetchPonentesYGrados = async () => {
     try {
-        const [resP, resC, resG] = await Promise.all([
+        const [resP, resC, resG, resL] = await Promise.all([
             api.get('/usuarios?rol=Ponente&limit=200'),
             api.get('/usuarios?rol=Coordinador&limit=200'),
-            api.get('/grados-academicos')
+            api.get('/grados-academicos'),
+            api.get('/usuarios?rol=Logistica,Logística&limit=200')
         ]);
         const mapUser = (u: any, role: string) => {
             const persona = u.persona || {};
@@ -149,6 +183,7 @@ const fetchPonentesYGrados = async () => {
         };
         ponentesDB.value = [...(resP.data?.data || resP.data || []).map((u:any) => mapUser(u, 'Ponente')), ...(resC.data?.data || resC.data || []).map((u:any) => mapUser(u, 'Coordinador'))];
         gradosAcademicosDB.value = resG.data?.data || resG.data || [];
+        logisticaDB.value = (resL.data?.data || resL.data || []).map((u: any) => mapUser(u, 'Logística'));
     } catch (e) { console.error(e); }
 };
 
@@ -229,7 +264,7 @@ const fetchEventos = async () => {
             ...ev,
             nombreCorto: ev.nombre,
             version: ev.gestion,
-            imagen: ev.imagen_fondo || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80',
+            imagen: getImageUrl('fondos', ev.imagen_fondo, 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80'),
             estado: ev.estado === 1 ? 'Activo' : (ev.estado === 2 ? 'Planificación' : 'Cerrado'),
             colorEstado: ev.estado === 1 ? 'bg-emerald-500 text-white' : (ev.estado === 2 ? 'bg-blue-500 text-white' : 'bg-slate-500 text-white'),
             mostrarActividades: true,
@@ -242,7 +277,7 @@ const fetchEventos = async () => {
                 date: act.fecha_inicio ? new Date(act.fecha_inicio).toLocaleDateString() : 'Pendiente',
                 students: act.inscripciones?.length || 0,
                 modules: 1,
-                image: act.imagen || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80',
+                image: getImageUrl('cursos', act.imagen, 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80'),
                 id_evento: ev.id,
                 status_raw: act.estado,
                 min_nota: act.min_nota,
@@ -290,7 +325,21 @@ const handleSaveEvento = async () => {
         })).filter(d => d.events.length > 0);
         formData.append('cronograma', JSON.stringify(cleanedCronograma));
 
-        formData.append('descripcion', formEvento.value.descripcion);
+        let finalDescripcion = formEvento.value.descripcion;
+        finalDescripcion += `\n[MOSTRAR_CORREOS]:${formEvento.value.mostrar_correos ? 'true' : 'false'}`;
+
+        const ponentesStr = formEvento.value.ponentes_seleccionados
+            .map(id => {
+                const found = ponentesDB.value.find((p: any) => p.id === id);
+                return found ? found.displayName : '';
+            })
+            .filter(s => s)
+            .join(', ');
+
+        if (ponentesStr) {
+            finalDescripcion += `\n[PONENTES_METADATA]:${ponentesStr}`;
+        }
+        formData.append('descripcion', finalDescripcion);
 
         if (formEvento.value.fondo_img instanceof File) {
             formData.append('imagen_fondo', formEvento.value.fondo_img);
@@ -331,10 +380,19 @@ const editarEvento = (evento: any) => {
     editEventoId.value = evento.id;
     const rawDesc = evento.descripcion || '';
     const parts = rawDesc.split('\n[PONENTES_METADATA]:');
+    const descPart = parts[0] || '';
+    
+    let baseDesc = descPart;
+    let mostrarCorreos = true;
+    if (descPart.includes('\n[MOSTRAR_CORREOS]:')) {
+        const mcParts = descPart.split('\n[MOSTRAR_CORREOS]:');
+        baseDesc = mcParts[0];
+        mostrarCorreos = mcParts[1]?.trim() === 'true';
+    }
     
     formEvento.value = {
         nombre: evento.nombreCorto,
-        descripcion: parts[0] || '',
+        descripcion: baseDesc || '',
         gestion: (evento.gestion || evento.version)?.toString(),
         version: evento.version_slogan || evento.version || '',
         fecha_inicio: evento.fecha_inicio ? evento.fecha_inicio.split('T')[0] : '',
@@ -353,9 +411,14 @@ const editarEvento = (evento: any) => {
         estado: evento.estado === 'Activo' ? 1 : (evento.estado === 'Cerrado' ? 0 : 2),
         fondo_img: null,
         logo_img: null,
-        ponentes_seleccionados: [],
+        ponentes_seleccionados: parts[1]
+          ? ponentesDB.value
+              .filter((p: any) => parts[1].split(',').map((s: string) => s.trim()).includes(p.displayName))
+              .map((p: any) => p.id)
+          : [],
         cronograma: '',
-        cronograma_lista: []
+        cronograma_lista: [],
+        mostrar_correos: mostrarCorreos
     };
 
     if (evento.cronograma) {
@@ -420,7 +483,7 @@ const nuevaActividad = ref({
     tipoPersonalizado: '',
     descripcion: '',
     id_evento: null as number | null,
-    min_nota: 71,
+    min_nota: 51,
     min_asistencia: 80,
     modalidad: 'Presencial',
     fecha_inicio: '',
@@ -443,7 +506,8 @@ const nuevaActividad = ref({
             { label: 'Matrícula / Título / Aval (Documento de Respaldo)', type: 'file', mandatory: true }
         ] as any[]
     },
-    lockTipo: false as boolean
+    lockTipo: false as boolean,
+    logistica_ids: [] as number[]
 });
 
 // Lista local de IDs inhabilitados (usaremos Strings para máxima compatibilidad)
@@ -458,7 +522,7 @@ const resetNuevaActividad = (eventoId: number) => {
         tipoPersonalizado: '',
         descripcion: '',
         id_evento: eventoId,
-        min_nota: 71,
+        min_nota: 51,
         min_asistencia: 80,
         modalidad: 'Presencial',
         fecha_inicio: '',
@@ -475,7 +539,8 @@ const resetNuevaActividad = (eventoId: number) => {
                 { label: 'Matrícula / Título / Aval (Documento de Respaldo)', type: 'file', mandatory: true }
             ] as any[]
         },
-        lockTipo: false as boolean
+        lockTipo: false as boolean,
+        logistica_ids: [] as number[]
     };
     imagenArchivo.value = null;
     imagenPreview.value = null;
@@ -487,7 +552,7 @@ const editarActividad = async (act: any) => {
         isEditingActividad.value = true;
         editActividadId.value = act.id;
         
-        // Cargamos lo que ya tenemos
+        // Cargamos lo que ya tenemos (usamos ?? para evitar que 0 sea reemplazado por default)
         nuevaActividad.value = {
             nombre: act.title,
             tipo: act.type || 'Curso',
@@ -495,14 +560,15 @@ const editarActividad = async (act: any) => {
             descripcion: act.descripcion || '',
 
             id_evento: act.id_evento,
-            min_nota: act.min_nota || 71,
-            min_asistencia: act.min_asistencia || 80,
+            min_nota: act.min_nota ?? 51,
+            min_asistencia: act.min_asistencia ?? 80,
             modalidad: act.modalidad || 'Presencial',
             fecha_inicio: act.fecha_inicio_raw || '',
             fecha_fin: act.fecha_fin_raw || '',
             sesiones: [],
             lockTipo: false as boolean,
-            requisitos: act.requisitos || { base: {}, custom: [] }
+            requisitos: act.requisitos || { base: {}, custom: [] },
+            logistica_ids: act.logistica_ids || []
         };
         
         // Intentar obtener descripción completa y campos extras si no están
@@ -513,6 +579,10 @@ const editarActividad = async (act: any) => {
         nuevaActividad.value.fecha_inicio = fullAct.fecha_inicio ? fullAct.fecha_inicio.split('T')[0] : '';
         nuevaActividad.value.fecha_fin = fullAct.fecha_fin ? fullAct.fecha_fin.split('T')[0] : '';
         nuevaActividad.value.id_evento = fullAct.evento?.id || act.id_evento;
+        nuevaActividad.value.min_nota = fullAct.min_nota ?? act.min_nota ?? 51;
+        nuevaActividad.value.min_asistencia = fullAct.min_asistencia ?? act.min_asistencia ?? 80;
+        nuevaActividad.value.modalidad = fullAct.modalidad ?? act.modalidad ?? 'Presencial';
+        nuevaActividad.value.logistica_ids = fullAct.logistica_ids || [];
 
         imagenPreview.value = fullAct.imagen || null;
         isCreating.value = true;
@@ -619,6 +689,16 @@ const publicarActividad = async () => {
             return;
         }
 
+        if (nuevaActividad.value.min_nota === undefined || nuevaActividad.value.min_nota === null || nuevaActividad.value.min_nota < 0 || nuevaActividad.value.min_nota > 100) {
+            Swal.fire('Error', 'La nota mínima debe estar entre 0 y 100 y no puede ser negativa.', 'error');
+            return;
+        }
+
+        if (nuevaActividad.value.min_asistencia === undefined || nuevaActividad.value.min_asistencia === null || nuevaActividad.value.min_asistencia < 0 || nuevaActividad.value.min_asistencia > 100) {
+            Swal.fire('Error', 'La asistencia mínima debe estar entre 0 y 100 y no puede ser negativa.', 'error');
+            return;
+        }
+
         isLoading.value = true;
         
         // --- ALERTA DE PROCESANDO (PREMIUM) ---
@@ -656,6 +736,17 @@ const publicarActividad = async () => {
         if (nuevaActividad.value.fecha_inicio) formData.append('fecha_inicio', nuevaActividad.value.fecha_inicio);
         if (nuevaActividad.value.fecha_fin) formData.append('fecha_fin', nuevaActividad.value.fecha_fin);
         formData.append('requisitos', JSON.stringify(nuevaActividad.value.requisitos));
+        formData.append('logistica_ids', JSON.stringify(nuevaActividad.value.logistica_ids || []));
+        
+        if (nuevaActividad.value.min_nota !== undefined && nuevaActividad.value.min_nota !== null) {
+            formData.append('min_nota', String(nuevaActividad.value.min_nota));
+        }
+        if (nuevaActividad.value.min_asistencia !== undefined && nuevaActividad.value.min_asistencia !== null) {
+            formData.append('min_asistencia', String(nuevaActividad.value.min_asistencia));
+        }
+        if (nuevaActividad.value.modalidad) {
+            formData.append('modalidad', nuevaActividad.value.modalidad);
+        }
         
         if (imagenArchivo.value) {
             formData.append('imagen', imagenArchivo.value);
@@ -879,18 +970,19 @@ const habilitarActividad = async (id: number, nombre: string) => {
 </script>
 
 <template>
-    <!-- PANEL DE DIAGNÓSTICO TEMPORAL -->
-    <div class="fixed top-20 right-4 z-[9999] bg-black/80 backdrop-blur-md text-white p-4 rounded-2xl border border-white/20 text-[10px] font-mono shadow-2xl pointer-events-none">
-       <div class="flex items-center gap-2 mb-2 text-umsa-gold font-bold uppercase tracking-widest border-b border-white/10 pb-2">
-          <span class="material-symbols-outlined text-sm">bug_report</span> DIAGNÓSTICO
-       </div>
-       <div class="space-y-1">
-          <p>EVENTOS CARGADOS: {{ eventosPublicados.length }}</p>
-          <p>LOCAL INHABILITADOS: {{ inhabilitadosLocal.length }}</p>
-          <p>LISTA LOCAL: {{ inhabilitadosLocal.join(', ') || 'VACÍA' }}</p>
-       </div>
-    </div>
   <div class="animate-in fade-in duration-500 max-w-7xl mx-auto space-y-8">
+        <!-- PANEL DE DIAGNÓSTICO TEMPORAL -->
+        <div class="fixed top-20 right-4 z-[9999] bg-black/80 backdrop-blur-md text-white p-4 rounded-2xl border border-white/20 text-[10px] font-mono shadow-2xl pointer-events-none">
+        <div class="flex items-center gap-2 mb-2 text-umsa-gold font-bold uppercase tracking-widest border-b border-white/10 pb-2">
+            <span class="material-symbols-outlined text-sm">bug_report</span> DIAGNÓSTICO
+        </div>
+            <div class="space-y-1">
+                <p>EVENTOS CARGADOS: {{ eventosPublicados.length }}</p>
+                <p>LOCAL INHABILITADOS: {{ inhabilitadosLocal.length }}</p>
+                <p>LISTA LOCAL: {{ inhabilitadosLocal.join(', ') || 'VACÍA' }}</p>
+            </div>
+        </div>
+    </div>
     
     <!-- VISTA: LISTADO -->
     <div v-show="!isCreating && !isCreatingEvento" id="view-listado" class="space-y-8">
@@ -1119,18 +1211,22 @@ const habilitarActividad = async (id: number, nombre: string) => {
           </div>
         </div>
       </div>
-    </div>
     
     <div v-show="isCreating" id="view-creacion" class="space-y-10 animate-in fade-in duration-500">
       
       <div class="flex items-center justify-between border-b border-slate-200 dark:border-gray-800 pb-6">
           <div>
-              <h2 class="text-3xl font-black text-primary-dark dark:text-white tracking-tighter uppercase italic">Configurar Nueva Actividad</h2>
+              <h2 class="text-3xl font-black text-primary-dark dark:text-white tracking-tighter uppercase italic">{{ isEditingActividad ? 'Editar Actividad' : 'Configurar Nueva Actividad' }}</h2>
               <p class="text-slate-400 dark:text-gray-500 font-medium mt-1 text-sm">Diseño, reglas y horarios del curso.</p>
           </div>
-          <button @click="isCreating = false" class="flex items-center gap-2 px-6 py-2.5 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 font-black text-[10px] uppercase rounded-xl hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-200 transition-all shadow-sm">
-              <span class="material-symbols-outlined text-sm">arrow_back</span> Volver al Listado
-          </button>
+          <div class="flex items-center gap-3">
+              <button v-if="isEditingActividad" @click="publicarActividad" :disabled="isLoading" class="flex items-center gap-2 px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[10px] uppercase rounded-xl transition-all shadow-sm">
+                  <span class="material-symbols-outlined text-sm">save</span> Guardar Cambios
+              </button>
+              <button @click="isCreating = false" class="flex items-center gap-2 px-6 py-2.5 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 font-black text-[10px] uppercase rounded-xl hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-200 transition-all shadow-sm">
+                  <span class="material-symbols-outlined text-sm">arrow_back</span> Volver al Listado
+              </button>
+          </div>
       </div>
 
       <div class="max-w-4xl mx-auto mb-10">
@@ -1267,11 +1363,60 @@ const habilitarActividad = async (id: number, nombre: string) => {
               <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div class="p-8 rounded-[2rem] border-2 border-slate-100 dark:border-gray-800 border-l-[8px] border-l-primary-dark bg-slate-50 dark:bg-gray-800">
                       <h4 class="font-black text-primary-dark dark:text-white mb-2 uppercase text-sm">Nota Mínima</h4>
-                      <input v-model="nuevaActividad.min_nota" type="number" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-xl text-center text-primary-dark dark:text-gray-200" />
+                      <input v-model="nuevaActividad.min_nota" type="number" min="0" max="100" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-xl text-center text-primary-dark dark:text-gray-200" />
                   </div>
                   <div class="p-8 rounded-[2rem] border-2 border-slate-100 dark:border-gray-800 border-l-[8px] border-l-umsa-gold bg-slate-50 dark:bg-gray-800">
                       <h4 class="font-black text-primary-dark dark:text-white mb-2 uppercase text-sm">Asistencia Mínima (%)</h4>
-                      <input v-model="nuevaActividad.min_asistencia" type="number" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-xl text-center text-primary-dark dark:text-gray-200" />
+                      <input v-model="nuevaActividad.min_asistencia" type="number" min="0" max="100" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-xl text-center text-primary-dark dark:text-gray-200" />
+                  </div>
+              </div>
+          </div>
+
+          <!-- Asignación de Personal de Logística -->
+          <div class="bg-white dark:bg-gray-900 p-8 rounded-[2rem] shadow-sm border border-slate-100 dark:border-gray-800 mt-6">
+              <div class="flex items-center justify-between mb-6">
+                  <div>
+                      <h3 class="text-lg font-black text-primary-dark dark:text-white uppercase italic">Personal de Logística Asignado</h3>
+                      <p class="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mt-1">Selecciona el personal que gestionará la asistencia de esta actividad</p>
+                  </div>
+                  <div class="h-10 w-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 flex items-center justify-center border border-emerald-100 dark:border-emerald-800 shadow-sm">
+                      <span class="material-symbols-outlined text-lg">support_agent</span>
+                  </div>
+              </div>
+
+              <!-- Buscador de logística local -->
+              <div class="relative w-full mb-6">
+                  <span class="absolute inset-y-0 left-4 flex items-center text-slate-400">
+                      <span class="material-symbols-outlined text-lg">search</span>
+                  </span>
+                  <input v-model="filtroLogistica" type="text" placeholder="Buscar personal de logística..." class="w-full pl-11 pr-4 py-2.5 bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl text-xs font-bold focus:border-emerald-500 outline-none transition-all" />
+              </div>
+
+              <div v-if="logisticaFiltrada.length === 0" class="text-center py-6 border border-dashed border-slate-200 dark:border-gray-800 rounded-2xl">
+                  <p class="text-xs text-slate-400 font-bold uppercase">No se encontró personal de logística</p>
+              </div>
+
+              <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[250px] overflow-y-auto pr-2" style="scrollbar-width: thin;">
+                  <div v-for="user in logisticaFiltrada" :key="user.id"
+                       @click="toggleLogisticaUsuario(user.id)"
+                       :class="nuevaActividad.logistica_ids.includes(user.id) 
+                            ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-800/80 shadow-md ring-2 ring-emerald-500/20' 
+                            : 'border-slate-100 dark:border-gray-800 hover:border-slate-200 dark:hover:border-gray-700 bg-white dark:bg-gray-900'"
+                       class="p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between group">
+                      <div class="flex items-center gap-3">
+                          <div class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-gray-400 flex items-center justify-center font-black text-xs uppercase group-hover:scale-105 transition-transform"
+                               :class="{'bg-emerald-500 text-white dark:bg-emerald-600': nuevaActividad.logistica_ids.includes(user.id)}">
+                              {{ user.displayName.charAt(0) }}
+                          </div>
+                          <div>
+                              <p class="text-xs font-black text-slate-700 dark:text-gray-200 uppercase leading-tight">{{ user.displayName }}</p>
+                              <p class="text-[9px] text-slate-400 font-bold mt-1 font-mono select-all">{{ user.email }}</p>
+                          </div>
+                      </div>
+                      <span class="material-symbols-outlined text-lg"
+                            :class="nuevaActividad.logistica_ids.includes(user.id) ? 'text-emerald-500' : 'text-slate-300 dark:text-gray-700 group-hover:text-slate-400'">
+                          {{ nuevaActividad.logistica_ids.includes(user.id) ? 'check_circle' : 'radio_button_unchecked' }}
+                      </span>
                   </div>
               </div>
           </div>
@@ -1567,15 +1712,22 @@ const habilitarActividad = async (id: number, nombre: string) => {
               <span class="material-symbols-outlined text-[18px]">arrow_back</span> Regresar
           </button>
           
-          <button v-if="currentStep < 5" @click="changeStep(1)" 
-            class="px-8 py-3 bg-primary-dark dark:bg-blue-600 text-white font-black text-[11px] uppercase rounded-xl hover:bg-umsa-blue dark:hover:bg-blue-500 flex items-center gap-2 transition-all shadow-xl hover:-translate-y-0.5">
-              Continuar <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
-          </button>
+          <div class="flex items-center gap-3">
+              <button v-if="isEditingActividad" @click="publicarActividad" :disabled="isLoading"
+                class="px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[11px] uppercase rounded-xl flex items-center gap-2 transition-all shadow-xl hover:-translate-y-0.5">
+                  <span class="material-symbols-outlined text-[18px]">save</span> Guardar Cambios
+              </button>
+              
+              <button v-if="currentStep < 5" @click="changeStep(1)" 
+                class="px-8 py-3 bg-primary-dark dark:bg-blue-600 text-white font-black text-[11px] uppercase rounded-xl hover:bg-umsa-blue dark:hover:bg-blue-500 flex items-center gap-2 transition-all shadow-xl hover:-translate-y-0.5">
+                  Continuar <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+              </button>
 
-          <button v-else @click="publicarActividad" :disabled="isLoading"
-            class="px-8 py-3 bg-umsa-gold hover:bg-yellow-600 text-white font-black text-[11px] uppercase rounded-xl flex items-center gap-2 transition-all shadow-xl hover:-translate-y-0.5 disabled:opacity-50">
-              <span class="material-symbols-outlined text-[18px]">publish</span> Publicar Actividad
-          </button>
+              <button v-else @click="publicarActividad" :disabled="isLoading"
+                class="px-8 py-3 bg-umsa-gold hover:bg-yellow-600 text-white font-black text-[11px] uppercase rounded-xl flex items-center gap-2 transition-all shadow-xl hover:-translate-y-0.5 disabled:opacity-50">
+                  <span class="material-symbols-outlined text-[18px]">publish</span> {{ isEditingActividad ? 'Guardar Cambios' : 'Publicar Actividad' }}
+              </button>
+          </div>
       </div>
 
     </div>
@@ -1739,6 +1891,24 @@ const habilitarActividad = async (id: number, nombre: string) => {
                                 <h4 class="text-sm font-black text-primary-dark dark:text-white uppercase italic">Paso 3: Directorio del Evento</h4>
                             </div>
                             <button @click.prevent="showRegistroRapidoPonente = true" class="text-[9px] font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg">REGISTRAR NUEVO</button>
+                        </div>
+
+                        <!-- Controles de selección y privacidad -->
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50 dark:bg-gray-800/40 p-4 rounded-xl border border-slate-100 dark:border-gray-800">
+                            <!-- Selector Mostrar Correos -->
+                            <label class="flex items-center gap-2 cursor-pointer select-none bg-white dark:bg-gray-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-gray-700">
+                                <input type="checkbox" v-model="formEvento.mostrar_correos" class="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer" />
+                                <span class="text-[9px] font-black uppercase text-slate-500 dark:text-gray-400 tracking-wider">Mostrar Correos</span>
+                            </label>
+                            <!-- Botones Seleccionar Todo -->
+                            <div class="flex items-center gap-3">
+                                <button @click.prevent="seleccionarTodosPonentes" class="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all shadow-sm cursor-pointer">
+                                    <span class="material-symbols-outlined text-[12px]">done_all</span> Seleccionar Todos
+                                </button>
+                                <button @click.prevent="deseleccionarTodosPonentes" class="inline-flex items-center gap-1 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-900/40 text-rose-500 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all shadow-sm cursor-pointer">
+                                    <span class="material-symbols-outlined text-[12px]">close</span> Deseleccionar Todos
+                                </button>
+                            </div>
                         </div>
                         <div class="space-y-4">
                             <div class="relative">

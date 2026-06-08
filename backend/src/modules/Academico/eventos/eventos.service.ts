@@ -52,11 +52,17 @@ export class EventosService {
       logo: this.formatImageUrl(evento.logo, 'logo'),
       imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
       actividades: (evento.actividades || [])
-        .map(act => ({
-          ...act,
-          estado: Number(act.estado),
-          imagen: this.formatImageUrl(act.imagen, 'cursos')
-        }))
+        .map(act => {
+          const firstMod = act.modalidades?.[0];
+          return {
+            ...act,
+            estado: Number(act.estado),
+            min_nota: firstMod ? firstMod.min_nota : 51,
+            min_asistencia: firstMod ? firstMod.min_asistencia : 80,
+            modalidad: firstMod ? firstMod.tipo : 'Presencial',
+            imagen: this.formatImageUrl(act.imagen, 'cursos')
+          };
+        })
     }));
   }
 
@@ -146,7 +152,18 @@ export class EventosService {
         'actividades.imparticiones.usuario.persona',
       ]
     });
-    return evento ? evento.actividades : [];
+    if (!evento || !evento.actividades) return [];
+    return evento.actividades.map(act => {
+      const firstMod = act.modalidades?.[0];
+      return {
+        ...act,
+        estado: Number(act.estado),
+        min_nota: firstMod ? firstMod.min_nota : 51,
+        min_asistencia: firstMod ? firstMod.min_asistencia : 80,
+        modalidad: firstMod ? firstMod.tipo : 'Presencial',
+        imagen: this.formatImageUrl(act.imagen, 'cursos')
+      };
+    });
   }
 
   // ══════════════════════════════════════════════════════════
@@ -170,37 +187,39 @@ export class EventosService {
     const query = this.eventoRepository.createQueryBuilder('evento')
       .leftJoinAndSelect('evento.actividades', 'actividad')
       .leftJoinAndSelect('actividad.modalidades', 'modalidad')
-      .leftJoinAndSelect('actividad.inscripciones', 'inscripcion');
+      .leftJoinAndSelect('actividad.inscripciones', 'inscripcion')
+      .leftJoinAndSelect('evento.coordinaciones', 'coordinacion')
+      .leftJoinAndSelect('coordinacion.usuario', 'usuarioRel')
+      .leftJoinAndSelect('usuarioRel.persona', 'persona')
+      .leftJoinAndSelect('coordinacion.gradoAdministrativo', 'gradoAdministrativo');
 
     // 1. Aislamiento por Coordinación (SOLO si no es Super Usuario)
     if (usuario && !esSuper) {
-      query.innerJoin('evento.coordinaciones', 'coordinacion', 'coordinacion.id_usuario = :userId', { userId: usuario.id });
+      query.innerJoin('evento.coordinaciones', 'coordinacionFiltro', 'coordinacionFiltro.id_usuario = :userId', { userId: usuario.id });
     }
 
-    const [eventos, total] = await this.eventoRepository.findAndCount({
-      relations: [
-        'actividades',
-        'actividades.modalidades',
-        'actividades.inscripciones',
-        'coordinaciones',
-        'coordinaciones.usuario',
-        'coordinaciones.usuario.persona',
-        'coordinaciones.gradoAdministrativo'
-      ],
-      order: { prioridad: 'ASC', fecha_creacion: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const [eventos, total] = await query
+      .orderBy('evento.prioridad', 'ASC')
+      .addOrderBy('evento.fecha_creacion', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
 
     const data = eventos.map((evento) => ({
       ...evento,
       logo: this.formatImageUrl(evento.logo, 'logo'),
       imagen_fondo: this.formatImageUrl(evento.imagen_fondo, 'fondos'),
-      actividades: (evento.actividades || []).map(act => ({
-        ...act,
-        estado: Number(act.estado),
-        imagen: this.formatImageUrl(act.imagen, 'cursos')
-      }))
+      actividades: (evento.actividades || []).map(act => {
+        const firstMod = act.modalidades?.[0];
+        return {
+          ...act,
+          estado: Number(act.estado),
+          min_nota: firstMod ? firstMod.min_nota : 51,
+          min_asistencia: firstMod ? firstMod.min_asistencia : 80,
+          modalidad: firstMod ? firstMod.tipo : 'Presencial',
+          imagen: this.formatImageUrl(act.imagen, 'cursos')
+        };
+      })
     }));
 
     return { data, total, page, limit };
@@ -328,31 +347,39 @@ export class EventosService {
     // Unificamos a todos en coordinacion_eventos para que tengan permisos de gestión
     const todosLosIds = Array.from(new Set([...coordIds, ...logIds]));
 
-    if (todosLosIds.length > 0) {
-      for (const uid of todosLosIds) {
-        // Verificar si ya está asignado
-        const existe = await coordinacionRepo.findOne({
-          where: { evento: { id: eventoId }, usuario: { id: uid } },
-          relations: ['gradoAdministrativo']
+    // 1. Obtener todas las coordinaciones actuales del evento
+    const coordinacionesActuales = await coordinacionRepo.find({
+      where: { evento: { id: eventoId } },
+      relations: ['usuario']
+    });
+
+    // 2. Eliminar las coordinaciones que ya no están en todosLosIds
+    const idsActuales = coordinacionesActuales.map(c => (c as any).usuario?.id).filter(id => id);
+    const idsParaEliminar = idsActuales.filter(id => !todosLosIds.includes(id));
+
+    if (idsParaEliminar.length > 0) {
+      const coordsAEliminar = coordinacionesActuales.filter(c => idsParaEliminar.includes((c as any).usuario?.id));
+      await coordinacionRepo.remove(coordsAEliminar);
+    }
+
+    // 3. Agregar o actualizar las coordinaciones que sí están en todosLosIds
+    for (const uid of todosLosIds) {
+      const existe = coordinacionesActuales.find(c => (c as any).usuario?.id === uid);
+      const gradoId = coordinadoresGrados[uid] || null;
+
+      if (!existe) {
+        await coordinacionRepo.save({
+          evento: { id: eventoId },
+          usuario: { id: uid },
+          estado: 1,
+          gradoAdministrativo: gradoId ? { id: gradoId } : null
         });
-
-        const gradoId = coordinadoresGrados[uid] || null;
-
-        if (!existe) {
-          await coordinacionRepo.save({
-            evento: { id: eventoId },
-            usuario: { id: uid },
-            estado: 1,
+      } else {
+        const currentGradoId = (existe as any).gradoAdministrativo?.id || null;
+        if (currentGradoId !== gradoId) {
+          await coordinacionRepo.update(existe.id, {
             gradoAdministrativo: gradoId ? { id: gradoId } : null
           });
-        } else {
-          // Actualizar grado administrativo si cambió
-          const currentGradoId = (existe as any).gradoAdministrativo?.id || null;
-          if (currentGradoId !== gradoId) {
-            await coordinacionRepo.update(existe.id, {
-              gradoAdministrativo: gradoId ? { id: gradoId } : null
-            });
-          }
         }
       }
     }

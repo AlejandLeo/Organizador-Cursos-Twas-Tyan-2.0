@@ -444,7 +444,15 @@ const exportarPDFGlobal = async () => {
   }
 };
 
-
+const handleNavigation = (card: any) => {
+  if (card.route === 'admin-eventos') {
+    router.push({ name: 'admin-gestion', query: { tab: 'eventos' } });
+  } else if (card.route === 'admin-actividades') {
+    router.push({ name: 'admin-gestion', query: { tab: 'actividades' } });
+  } else {
+    router.push({ name: card.route });
+  }
+};
 
 </script>
 
@@ -500,7 +508,7 @@ const exportarPDFGlobal = async () => {
     <!-- STAT CARDS -->
     <div class="grid grid-cols-2 lg:grid-cols-6 gap-4">
       <div v-for="card in statCards" :key="card.label"
-           @click="router.push({ name: card.route })"
+           @click="handleNavigation(card)"
            class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-2xl p-5 cursor-pointer hover:border-red-500/50 hover:-translate-y-1 transition-all duration-300 group shadow-sm dark:shadow-none">
         <div :class="`w-10 h-10 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform`">
           <span class="material-symbols-outlined text-white text-[20px]">{{ card.icon }}</span>
@@ -592,12 +600,12 @@ const exportarPDFGlobal = async () => {
             <h2 class="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest italic">Accesos Rápidos</h2>
           </div>
           <div class="space-y-3">
-            <button @click="router.push('/admin/eventos')"
+            <button @click="router.push({ name: 'admin-gestion', query: { tab: 'eventos' } })"
                     class="w-full flex items-center gap-3 p-4 bg-slate-50 dark:bg-black/30 border border-slate-200 dark:border-white/5 rounded-2xl hover:border-red-500/50 hover:bg-slate-100 dark:hover:bg-red-900/10 transition-all group text-left">
               <span class="material-symbols-outlined text-slate-400 dark:text-slate-600 group-hover:text-red-600 transition-colors">corporate_fare</span>
               <span class="text-[10px] font-black text-slate-700 dark:text-slate-400 uppercase tracking-widest">Gestionar Eventos</span>
             </button>
-            <button @click="router.push('/admin/actividades')"
+            <button @click="router.push({ name: 'admin-gestion', query: { tab: 'actividades' } })"
                     class="w-full flex items-center gap-3 p-4 bg-slate-50 dark:bg-black/30 border border-slate-200 dark:border-white/5 rounded-2xl hover:border-red-500/50 hover:bg-slate-100 dark:hover:bg-red-900/10 transition-all group text-left">
               <span class="material-symbols-outlined text-slate-400 dark:text-slate-600 group-hover:text-red-600 transition-colors">school</span>
               <span class="text-[10px] font-black text-slate-700 dark:text-slate-400 uppercase tracking-widest">Actividades Académicas</span>

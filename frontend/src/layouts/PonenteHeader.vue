@@ -227,9 +227,9 @@ onUnmounted(() => {
         <span class="material-symbols-outlined text-3xl">menu</span>
       </button>
 
-      <div class="hidden sm:flex flex-col flex-shrink-0 cursor-pointer border-r border-slate-200 dark:border-gray-800 pr-4 md:pr-6 ml-2" @click="$router.push('/ponente')">
-        <h2 class="text-primary-dark dark:text-white font-black italic text-xl md:text-2xl tracking-tighter leading-none">twas</h2>
-        <p class="text-[6px] leading-tight text-primary-dark/60 dark:text-gray-400 uppercase font-bold tracking-tighter">The World Academy of Sciences</p>
+      <div class="hidden sm:flex flex-col flex-shrink-0 cursor-pointer border-r border-slate-200 dark:border-gray-800 pr-4 md:pr-6 ml-2 justify-center" @click="$router.push('/ponente')">
+        <h2 class="text-black dark:text-white font-clarendon font-black text-[10px] md:text-xs tracking-tighter leading-none">Sistema de Gestión de Eventos</h2>
+        <p class="text-[8px] text-slate-500 dark:text-gray-400 font-clarendon mt-0.5">Plataforma Académica</p>
       </div>
 
       <h1 class="text-xs md:text-lg font-black text-umsa-blue dark:text-blue-500 tracking-widest uppercase italic truncate ml-4 lg:ml-6 border-r border-slate-200 dark:border-gray-800 pr-4 md:pr-6">
@@ -317,7 +317,7 @@ onUnmounted(() => {
               Ver Perfil de Datos
             </button>
 
-            <button @click="cambiarAEstudiante" class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold text-slate-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800 hover:text-umsa-blue transition-colors flex items-center gap-2">
+            <button v-if="authStore.tieneMultiplesRoles && authStore.esEstudiante" @click="cambiarAEstudiante" class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold text-slate-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800 hover:text-umsa-blue transition-colors flex items-center gap-2">
               <span class="material-symbols-outlined text-[18px] text-blue-500">swap_horiz</span>
               Cambiar a Estudiante
             </button>

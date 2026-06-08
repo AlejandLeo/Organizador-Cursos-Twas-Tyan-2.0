@@ -36,6 +36,21 @@ const cargarEventos = async () => {
         
         // Procesamos los eventos y cargamos sus ponentes reales
         const eventosProcesados = await Promise.all(filtrados.map(async (ev: any, index: number) => {
+            const rawDesc = ev.descripcion || '';
+            let mostrarCorreos = true;
+            let cleanedDesc = rawDesc;
+            
+            // Separar metadatos de ponentes si existen
+            const partsP = cleanedDesc.split('\n[PONENTES_METADATA]:');
+            cleanedDesc = partsP[0] || '';
+            
+            // Separar metadatos de mostrar correos si existen
+            if (cleanedDesc.includes('\n[MOSTRAR_CORREOS]:')) {
+                const partsMC = cleanedDesc.split('\n[MOSTRAR_CORREOS]:');
+                cleanedDesc = partsMC[0] || '';
+                mostrarCorreos = partsMC[1]?.trim() === 'true';
+            }
+
             let ponentesArr: any[] = [];
             
             try {
@@ -47,7 +62,7 @@ const cargarEventos = async () => {
                     id: p.id,
                     name: `${p.grado_abreviacion} ${p.nombres} ${p.primer_apellido}`.trim(),
                     topic: p.profesion || 'Expositor',
-                    country: p.email, // Podríamos usar país si existiera en el modelo
+                    country: mostrarCorreos ? p.email : 'Expositor',
                     img: resolveMediaUrl(p.foto, 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&q=80')
                 }));
             } catch (e) {
@@ -62,7 +77,7 @@ const cargarEventos = async () => {
                 gestion: ev.gestion || 'Actual',
                 date: `${ev.fecha_inicio || 'TBD'} - ${ev.fecha_fin || 'TBD'}`,
                 dateShort: formatDate(ev.fecha_inicio) || 'Fechas por definir',
-                description: (ev.descripcion || 'Sin descripción').split('\n[PONENTES_METADATA]:')[0],
+                description: cleanedDesc || 'Sin descripción',
                 version: ev.version || '',
                 color: colors[index % colors.length],
                 icon: icons[index % icons.length],
@@ -389,7 +404,10 @@ const abrirMapa = (url: string) => {
                      <!-- Floating Badge País / Correo -->
                      <div class="absolute top-4 right-4 z-20">
                         <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-black/60 dark:bg-black/80 backdrop-blur-md text-white border border-white/10 text-[9px] font-black uppercase tracking-widest rounded-lg">
-                           <span class="material-symbols-outlined text-[12px] text-emerald-400">location_on</span> {{ spk.country || 'Expositor' }}
+                           <span class="material-symbols-outlined text-[12px]" :class="spk.country && spk.country.includes('@') ? 'text-emerald-400' : 'text-blue-400'">
+                              {{ spk.country && spk.country.includes('@') ? 'mail' : 'person' }}
+                           </span>
+                           {{ spk.country || 'Expositor' }}
                         </span>
                      </div>
                      

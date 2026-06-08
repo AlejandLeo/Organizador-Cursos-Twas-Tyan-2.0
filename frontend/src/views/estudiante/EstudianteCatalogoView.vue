@@ -24,9 +24,9 @@ const fetchEventos = async () => {
       descripcion: evento.descripcion || 'Sin descripción',
       imagen: (evento.imagen_fondo && evento.imagen_fondo.startsWith('http')) 
         ? evento.imagen_fondo 
-        : ((evento.logo && evento.logo.startsWith('http')) 
-            ? evento.logo 
-            : getImageUrl('eventos', evento.imagen_fondo || evento.logo, 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80')),
+        : (evento.imagen_fondo 
+            ? getImageUrl('fondos', evento.imagen_fondo)
+            : getImageUrl('eventos', evento.logo, 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80')),
       estado: evento.estado == 1 ? 'Activo' : 'Próximamente',
       colorEstado: evento.estado == 1 ? 'bg-emerald-500 text-white border-emerald-400/30' : 'bg-slate-500 text-white border-slate-400/30',
       mostrarActividades: true,
