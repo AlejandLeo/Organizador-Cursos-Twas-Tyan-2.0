@@ -275,7 +275,7 @@ onUnmounted(() => stopScanner());
                 </div>
                 <!-- Active session info badge -->
                 <span class="text-[9px] font-black bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-400 px-3 py-1 rounded-full uppercase tracking-wider">
-                  Sesión Activa: {{ actividadSeleccionada.sesiones?.find(s => s.id === selectedSessionId)?.fecha }}
+                  Sesión Activa: {{ actividadSeleccionada.sesiones?.find((s: any) => s.id === selectedSessionId)?.fecha }}
                 </span>
               </div>
 
