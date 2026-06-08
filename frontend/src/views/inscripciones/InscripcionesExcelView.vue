@@ -129,13 +129,37 @@ watch(activeTab, () => {
 });
 
 // --- Previsualización ---
-const previewData = ref<any[]>([]);
+const previewHeaders = ref<string[]>([]);
+const previewRows = ref<any[]>([]);
+const previewSearch = ref('');
+const currentPage = ref(1);
+const itemsPerPage = ref(10);
+const previewData = ref<any[]>([]); // Por compatibilidad
 const selectedFile = ref<File | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 
 // --- Resultados de la importación ---
 const results = ref<any>(null);
 const ultimoModo = ref<'verificar' | 'guardar' | null>(null);
+
+// Computeds para la previsualización del Excel
+const filteredPreviewRows = computed(() => {
+  if (!previewSearch.value) return previewRows.value;
+  const q = previewSearch.value.toLowerCase();
+  return previewRows.value.filter(row => {
+    return Object.values(row).some(val => String(val).toLowerCase().includes(q));
+  });
+});
+
+const paginatedPreviewRows = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage.value;
+  const end = start + itemsPerPage.value;
+  return filteredPreviewRows.value.slice(start, end);
+});
+
+const totalPages = computed(() => {
+  return Math.ceil(filteredPreviewRows.value.length / itemsPerPage.value) || 1;
+});
 
 // --- Métodos ---
 const onFileChange = (e: any) => {
@@ -154,25 +178,54 @@ const handleFile = (file: File) => {
   const reader = new FileReader();
   reader.onload = (e: any) => {
     const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data, { type: 'array' });
+    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
     const firstSheetName = workbook.SheetNames[0];
     if (!firstSheetName) return;
     const worksheet = workbook.Sheets[firstSheetName];
     if (!worksheet) return;
-    const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
-    
-    previewData.value = jsonData.slice(0, 5); // Mostrar solo las primeras 5 filas
+
+    // Parseo robusto de XLSX
+    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+    const firstRow = rawData[0];
+    if (rawData.length === 0 || !firstRow) {
+      previewHeaders.value = [];
+      previewRows.value = [];
+      previewData.value = [];
+      return;
+    }
+
+    const headers = firstRow.map(h => String(h || '').trim());
+    previewHeaders.value = headers.filter(h => h !== '');
+
+    const rows = rawData.slice(1)
+      .filter(row => row.some(cell => cell !== undefined && cell !== null && String(cell).trim() !== ''))
+      .map(row => {
+        const rowObj: any = {};
+        previewHeaders.value.forEach((header, index) => {
+          rowObj[header] = row[index] !== undefined && row[index] !== null ? String(row[index]).trim() : '';
+        });
+        return rowObj;
+      });
+
+    previewRows.value = rows;
+    previewData.value = rows.slice(0, 5); // Por retrocompatibilidad
     selectedFile.value = file;
-    results.value = null; // Limpiar resultados anteriores
+    results.value = null;
+    currentPage.value = 1;
+    previewSearch.value = '';
   };
   reader.readAsArrayBuffer(file);
 };
 
 const clearFile = () => {
   selectedFile.value = null;
+  previewHeaders.value = [];
+  previewRows.value = [];
   previewData.value = [];
   results.value = null;
   ultimoModo.value = null;
+  currentPage.value = 1;
+  previewSearch.value = '';
 };
 
 const descargarPlantilla = async () => {
@@ -532,21 +585,76 @@ const getStatusIcon = (status: string) => {
               </button>
             </div>
 
-            <div v-if="previewData.length > 0" class="space-y-3">
-              <p class="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">Previsualización (Primeras 5 filas)</p>
-              <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-white/10">
-                <table class="w-full text-left text-xs">
-                  <thead class="bg-slate-50 dark:bg-white/5 text-slate-500 font-black uppercase tracking-wider">
+            <div v-if="previewRows.length > 0" class="space-y-4">
+              <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div>
+                  <p class="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">
+                    Previsualización del Excel ({{ filteredPreviewRows.length }} de {{ previewRows.length }} filas)
+                  </p>
+                </div>
+                <div class="flex items-center gap-4 w-full sm:w-auto">
+                  <!-- Buscador en la previsualización -->
+                  <div class="relative w-full sm:w-64">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[18px]">search</span>
+                    <input 
+                      v-model="previewSearch" 
+                      type="text" 
+                      placeholder="Buscar en la vista previa..." 
+                      class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl pl-10 pr-4 py-2 text-xs font-bold outline-none focus:border-umsa-blue transition-all"
+                    />
+                  </div>
+                  <!-- Tamaño de Página -->
+                  <div class="flex items-center gap-2 shrink-0">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase">Filas:</span>
+                    <select v-model="itemsPerPage" class="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-2 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 outline-none">
+                      <option :value="10">10</option>
+                      <option :value="20">20</option>
+                      <option :value="50">50</option>
+                      <option :value="100">100</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tabla de previsualización completa y scrollable -->
+              <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-white/10 max-h-[400px] overflow-y-auto custom-scrollbar">
+                <table class="w-full text-left text-xs table-auto">
+                  <thead class="bg-slate-50 dark:bg-white/5 text-slate-500 font-black uppercase tracking-wider sticky top-0 z-10 backdrop-blur-md">
                     <tr>
-                      <th v-for="(val, key) in previewData[0]" :key="key" class="px-4 py-3">{{ key }}</th>
+                      <th class="px-4 py-3 w-12 bg-slate-50 dark:bg-gray-900">#</th>
+                      <th v-for="header in previewHeaders" :key="header" class="px-4 py-3 bg-slate-50 dark:bg-gray-900">{{ header }}</th>
                     </tr>
                   </thead>
-                  <tbody class="divide-y divide-slate-100 dark:divide-white/5">
-                    <tr v-for="(row, idx) in previewData" :key="idx" class="text-slate-600 dark:text-slate-300">
-                      <td v-for="(val, key) in row" :key="key" class="px-4 py-3 whitespace-nowrap">{{ val }}</td>
+                  <tbody class="divide-y divide-slate-100 dark:divide-white/5 bg-white dark:bg-transparent">
+                    <tr v-for="(row, idx) in paginatedPreviewRows" :key="idx" class="text-slate-600 dark:text-slate-300 hover:bg-slate-50/50 dark:hover:bg-white/5">
+                      <td class="px-4 py-3 whitespace-nowrap text-slate-400 font-bold">{{ (currentPage - 1) * itemsPerPage + idx + 1 }}</td>
+                      <td v-for="header in previewHeaders" :key="header" class="px-4 py-3 whitespace-nowrap">{{ row[header] }}</td>
                     </tr>
                   </tbody>
                 </table>
+              </div>
+
+              <!-- Controles de Paginación -->
+              <div v-if="totalPages > 1" class="flex items-center justify-between px-2 py-1 border-t border-slate-100 dark:border-white/5 pt-3">
+                <p class="text-[10px] text-slate-400 font-bold uppercase">
+                  Página {{ currentPage }} de {{ totalPages }}
+                </p>
+                <div class="flex items-center gap-2">
+                  <button 
+                    @click="currentPage > 1 && currentPage--" 
+                    :disabled="currentPage === 1"
+                    class="p-2 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-all disabled:opacity-40"
+                  >
+                    <span class="material-symbols-outlined text-[16px] block">navigate_before</span>
+                  </button>
+                  <button 
+                    @click="currentPage < totalPages && currentPage++" 
+                    :disabled="currentPage === totalPages"
+                    class="p-2 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-all disabled:opacity-40"
+                  >
+                    <span class="material-symbols-outlined text-[16px] block">navigate_next</span>
+                  </button>
+                </div>
               </div>
             </div>
 

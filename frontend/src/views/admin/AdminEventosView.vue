@@ -143,7 +143,9 @@ const formEvento = ref({
   telefono: '',
   email: '',
   organizadores: '',
-  logo: null as any,
+  // BUG FIX: renombrado de 'logo' a 'logo_file' para evitar conflicto con el campo string 'logo'
+  // del backend. El archivo se enviará como 'imagen_portada' al hacer PUT/POST.
+  logo_file: null as File | null,
   fase: 1
 });
 
@@ -189,7 +191,7 @@ const abrirCrear = () => {
     telefono: '',
     email: '',
     organizadores: '',
-    logo: null,
+    logo_file: null,
     fase: 1
   };
   showModal.value = true;
@@ -210,7 +212,7 @@ const abrirEditar = (evento: any) => {
     telefono: evento.telefono || '',
     email: evento.email || '',
     organizadores: evento.organizadores || '',
-    logo: null,
+    logo_file: null,
     fase: evento.fase || 1
   };
   showModal.value = true;
@@ -220,21 +222,28 @@ const abrirEditar = (evento: any) => {
 const guardar = async () => {
   try {
     const formData = new FormData();
-    Object.entries(formEvento.value).forEach(([key, value]) => {
-      if (value !== null && value !== undefined) {
-        formData.append(key, value);
+    // BUG FIX: Se construye el FormData manualmente para:
+    // 1. Excluir logo_file (se agrega por separado como 'imagen_portada').
+    // 2. Convertir todos los valores a string (FormData requiere string o Blob).
+    const { logo_file, ...camposTexto } = formEvento.value;
+    Object.entries(camposTexto).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== '') {
+        formData.append(key, String(value));
       }
     });
+    // BUG FIX: El FileFieldsInterceptor del backend solo procesa 'imagen_portada',
+    // no 'logo'. Por eso se envía el archivo con el nombre correcto.
+    if (logo_file instanceof File) {
+      formData.append('imagen_portada', logo_file);
+    }
 
     if (isEditing.value && editId.value) {
-      // Cambio de ruta: /admin/eventos/
       await api.put(`/admin/eventos/${editId.value}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       historialStore.registrar('evento', 'editar', `Editó el evento: ${formEvento.value.nombre}`, { entidadId: String(editId.value), entidadNombre: formEvento.value.nombre });
       Swal.fire({ toast: true, icon: 'success', title: 'Evento actualizado', timer: 2000, showConfirmButton: false, position: 'top-end' });
     } else {
-      // Cambio de ruta: /admin/eventos
       await api.post('/admin/eventos', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
@@ -262,8 +271,9 @@ const inhabilitarEvento = async (evento: any) => {
   if (!isConfirmed) return;
 
   try {
-    // Cambio de ruta: /admin/eventos/
-    await api.patch(`/admin/eventos/${evento.id}/estado`, { activo: false });
+    // BUG FIX: La ruta /admin/eventos/:id/estado no existe en el backend.
+    // El endpoint correcto es PATCH /admin/eventos/:id con { estado: 0 } para inhabilitar.
+    await api.patch(`/admin/eventos/${evento.id}`, { estado: 0 });
     historialStore.registrar('evento', 'eliminar', `Inhabilitó el evento: ${evento.nombre}`, { entidadId: String(evento.id), entidadNombre: evento.nombre });
     Swal.fire({ toast: true, icon: 'info', title: 'Evento inhabilitado', timer: 2000, showConfirmButton: false, position: 'top-end' });
     fetchEventos();
@@ -489,7 +499,7 @@ onMounted(fetchEventos);
 
               <div class="space-y-1">
                 <label class="text-[10px] font-black text-red-600 uppercase ml-2">Logo del Evento (Imagen)</label>
-                <input type="file" @change="(e: any) => formEvento.logo = e.target.files[0]" accept="image/*"
+                <input type="file" @change="(e: any) => formEvento.logo_file = e.target.files[0]" accept="image/*"
                        class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-red-50 file:text-red-700 hover:file:bg-red-100 transition-all cursor-pointer" />
               </div>
             </div>

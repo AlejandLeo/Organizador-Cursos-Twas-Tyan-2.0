@@ -15,7 +15,8 @@ const filterStatus = ref('todos'); // todos, aprobados, reprobados, pendientes
 
 const actividadInfo = ref({
   nombre: 'Cargando...',
-  evento: '...'
+  evento: '...',
+  min_nota: 51
 });
 
 // Estudiantes reales vendrán del backend
@@ -35,13 +36,14 @@ const fetchEstudiantes = async () => {
                 text: 'No se pueden gestionar calificaciones para una actividad inhabilitada.',
                 confirmButtonColor: '#003B71'
             });
-            router.push({ name: 'ponente-catalogo' });
+            router.push({ name: 'ponente-eventos' });
             return;
         }
 
         // Cargar información de la actividad
         actividadInfo.value.nombre = actRes.data.nombre;
         actividadInfo.value.evento = actRes.data.evento?.nombre || 'Evento';
+        actividadInfo.value.min_nota = actRes.data.min_nota ?? 51;
 
         // Cargar estudiantes
         const response = await api.get(`/inscripciones/ponente/${actividadId.value}`);
@@ -76,6 +78,14 @@ const guardarNotas = async () => {
     saving.value = true;
     const modificados = estudiantes.value.filter(e => e.nota !== e.originalNota);
     
+    for (const est of modificados) {
+        if (est.nota === undefined || est.nota === null || est.nota < 0 || est.nota > 100) {
+            Swal.fire('Error', 'La calificación debe estar entre 0 y 100.', 'error');
+            saving.value = false;
+            return;
+        }
+    }
+
     if (modificados.length === 0) {
         Swal.fire('Sin cambios', 'No hay notas nuevas para guardar.', 'info');
         saving.value = false;
@@ -111,8 +121,8 @@ const filteredEstudiantes = computed(() => {
         const matchesSearch = e.nombre.toLowerCase().includes(searchQuery.value.toLowerCase()) || 
                              e.correo.toLowerCase().includes(searchQuery.value.toLowerCase());
         
-        if (filterStatus.value === 'aprobados') return matchesSearch && e.nota >= 65;
-        if (filterStatus.value === 'reprobados') return matchesSearch && e.nota < 65 && e.nota > 0;
+        if (filterStatus.value === 'aprobados') return matchesSearch && e.nota >= actividadInfo.value.min_nota;
+        if (filterStatus.value === 'reprobados') return matchesSearch && e.nota < actividadInfo.value.min_nota && e.nota > 0;
         if (filterStatus.value === 'pendientes') return matchesSearch && (e.nota === 0 || !e.nota);
         
         return matchesSearch;
@@ -123,7 +133,7 @@ onMounted(fetchEstudiantes);
 
 const getNotaClass = (nota: number) => {
     if (nota === 0) return 'text-slate-400';
-    return nota >= 65 ? 'text-emerald-600' : 'text-rose-600';
+    return nota >= actividadInfo.value.min_nota ? 'text-emerald-600' : 'text-rose-600';
 };
 </script>
 
@@ -169,7 +179,7 @@ const getNotaClass = (nota: number) => {
                 </div>
                 <div class="bg-emerald-50 dark:bg-emerald-900/10 px-6 py-4 rounded-2xl border border-emerald-100 dark:border-emerald-900/20">
                     <p class="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-1">Aprobados</p>
-                    <p class="text-xl font-black text-emerald-700 dark:text-emerald-500">{{ estudiantes.filter(e => e.nota >= 65).length }}</p>
+                    <p class="text-xl font-black text-emerald-700 dark:text-emerald-500">{{ estudiantes.filter(e => e.nota >= actividadInfo.min_nota).length }}</p>
                 </div>
             </div>
         </div>
@@ -235,8 +245,8 @@ const getNotaClass = (nota: number) => {
                         </div>
                     </td>
                     <td class="px-8 py-6 text-center">
-                        <div v-if="est.nota > 0" :class="[est.nota >= 65 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100']" class="inline-flex px-4 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest shadow-sm">
-                            {{ est.nota >= 65 ? 'Aprobado' : 'Reprobado' }}
+                        <div v-if="est.nota > 0" :class="[est.nota >= actividadInfo.min_nota ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100']" class="inline-flex px-4 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest shadow-sm">
+                            {{ est.nota >= actividadInfo.min_nota ? 'Aprobado' : 'Reprobado' }}
                         </div>
                         <div v-else class="inline-flex px-4 py-2 bg-slate-100 text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200">
                             Pendiente
@@ -269,7 +279,7 @@ const getNotaClass = (nota: number) => {
         <div class="flex items-center gap-6">
             <div class="flex items-center gap-2">
                 <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
-                <span class="text-[10px] font-black uppercase tracking-widest">Aprobación >= 65 Pts</span>
+                <span class="text-[10px] font-black uppercase tracking-widest">Aprobación >= {{ actividadInfo.min_nota }} Pts</span>
             </div>
             <div class="flex items-center gap-2">
                 <div class="w-3 h-3 rounded-full bg-umsa-gold"></div>

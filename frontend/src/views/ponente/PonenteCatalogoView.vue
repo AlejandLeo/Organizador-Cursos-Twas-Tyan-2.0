@@ -139,8 +139,8 @@ const getStatusColor = (status: string) => {
               
               <!-- Badge de Asignado (Simulado: ID 1 y 3 son del ponente) -->
               <div v-if="act.id === 1 || act.id === 3" class="absolute top-4 left-4 z-30">
-                <span class="bg-umsa-blue text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-full shadow-xl flex items-center gap-1 border border-white/20 backdrop-blur-md">
-                  <span class="material-symbols-outlined text-[12px]">verified_user</span>
+                <span class="bg-umsa-gold text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-full shadow-xl flex items-center gap-1 border border-white/20 backdrop-blur-md">
+                  <span class="material-symbols-outlined text-[12px]">assignment_ind</span>
                   ASIGNADO
                 </span>
               </div>

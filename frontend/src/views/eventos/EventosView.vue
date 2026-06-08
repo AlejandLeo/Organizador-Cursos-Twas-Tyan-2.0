@@ -19,7 +19,7 @@ const ponentesFiltrados = computed(() => {
 
 const fetchEventos = async () => {
   try {
-    const res = await api.get('/eventos/admin/lista');
+    const res = await api.get('/admin/eventos/lista?limit=1000');
     eventosPlanoDB.value = res.data.data || [];
   } catch (error) {
     console.error("Error fetching eventos:", error);
@@ -108,7 +108,8 @@ const nuevoEvento = ref({
   ponentes_seleccionados: [] as number[],
   cronograma: '',
   cronograma_lista: [] as any[],
-  version: ''
+  version: '',
+  mostrar_correos: true
 });
 
 const agregarDia = () => {
@@ -307,7 +308,7 @@ const inhabilitarEvento = async (gestion: any) => {
     if (motivo) {
         try {
             // Mandamos -1 como estado de inhabilitado y el motivo
-            await api.patch(`/eventos/${gestion.id}`, { 
+            await api.patch(`/admin/eventos/${gestion.id}`, { 
                 estado: -1, 
                 descripcion: `${gestion.descripcion}\n[INHABILITACION_MOTIVO]:${motivo}\n[FECHA_INHABILITACION]:${new Date().toLocaleString()}`
             });
@@ -349,6 +350,8 @@ const handleCreateEvento = async () => {
       formData.append('link_web', nuevoEvento.value.link_web || '');
 
       let finalDescripcion = nuevoEvento.value.descripcion;
+      finalDescripcion += `\n[MOSTRAR_CORREOS]:${nuevoEvento.value.mostrar_correos ? 'true' : 'false'}`;
+      
       const ponentesStr = nuevoEvento.value.ponentes_seleccionados.map(id => {
          const found = ponentesDB.value.find((p:any) => p.id === id);
          return found ? found.displayName : '';
@@ -438,7 +441,8 @@ const handleCreateEvento = async () => {
          link_web: '',
          ponentes_seleccionados: [],
          cronograma: '',
-         cronograma_lista: []
+         cronograma_lista: [],
+         mostrar_correos: true
       };
       logoPreview.value = null;
       fondoPreview.value = null;
@@ -471,6 +475,13 @@ const editarGestion = (gestion: any) => {
         ponentesSaved = parts[1];
     }
     
+    let mostrarCorreos = true;
+    if (baseDesc.includes('\n[MOSTRAR_CORREOS]:')) {
+        const mcParts = baseDesc.split('\n[MOSTRAR_CORREOS]:');
+        baseDesc = mcParts[0];
+        mostrarCorreos = mcParts[1]?.trim() === 'true';
+    }
+    
     nuevoEvento.value = {
         nombre: gestion.nombre,
         descripcion: baseDesc,
@@ -494,7 +505,8 @@ const editarGestion = (gestion: any) => {
         logo_img: null,
         ponentes_seleccionados: [],
         cronograma: '',
-        cronograma_lista: []
+        cronograma_lista: [],
+        mostrar_correos: mostrarCorreos
     };
     
     // Reverse cronograma serialization to structured list

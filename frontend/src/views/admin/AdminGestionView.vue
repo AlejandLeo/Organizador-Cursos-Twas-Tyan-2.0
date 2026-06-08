@@ -32,6 +32,7 @@ const tabActivo = ref<'eventos' | 'actividades' | 'solicitudes' | 'soporte' | 'r
 const isLoading = ref(false);
 const filtroTexto = ref('');
 const filtroEstado = ref('');
+const filtroEventoId = ref<string | number>('');
 
 
 // ─── Estado de Eventos ────────────────────────────────────
@@ -82,6 +83,7 @@ const eventosFiltrados = computed(() => {
 const limpiarFiltros = () => {
   filtroTexto.value = '';
   filtroEstado.value = '';
+  filtroEventoId.value = '';
 };
 
 const abrirCrearEvento = () => {
@@ -252,9 +254,11 @@ const fetchActividades = async () => {
 };
 
 const actividadesFiltradas = computed(() =>
-  actividades.value.filter(a =>
-    (a.nombre || '').toLowerCase().includes(filtroTexto.value.toLowerCase())
-  )
+  actividades.value.filter(a => {
+    const matchesTexto = (a.nombre || '').toLowerCase().includes(filtroTexto.value.toLowerCase());
+    const matchesEvento = filtroEventoId.value === '' || Number(a.id_evento || a.evento?.id) === Number(filtroEventoId.value);
+    return matchesTexto && matchesEvento;
+  })
 );
 
 const abrirCrearActividad = async () => {
@@ -660,6 +664,20 @@ const exportarPDFSegmentado = async (categoria: string) => {
         </template>
 
         <template v-if="tabActivo === 'actividades'">
+          <div class="relative min-w-[200px] max-w-xs">
+            <select v-model="filtroEventoId"
+                    class="w-full px-4 py-2.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm outline-none focus:border-amber-500/50 text-slate-700 dark:text-slate-350 cursor-pointer appearance-none">
+              <option value="">Todos los eventos</option>
+              <option v-for="ev in eventos" :key="ev.id" :value="ev.id">{{ ev.nombre }}</option>
+            </select>
+            <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">unfold_more</span>
+          </div>
+
+          <button v-if="filtroEventoId || filtroTexto" @click="limpiarFiltros"
+                  class="px-3 py-1.5 text-[9px] font-black uppercase rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition-all border border-amber-100">
+            Limpiar Filtros
+          </button>
+
           <div class="flex items-center gap-2 ml-auto">
             <button @click="generarReporteGeneral('actividades', 'excel')" title="Reporte Excel de Actividades" class="bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1 transition-all">
               <span class="material-symbols-outlined text-[16px]">grid_on</span> Excel

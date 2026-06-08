@@ -23,10 +23,10 @@
     "migration:generate": "npm run typeorm -- -d ./typeorm.config.ts migration:generate ./src/database/migrations/%npm_config_name%",
     "migration:create": "npm run typeorm -- migration:create ./src/database/migrations",
     "migration:revert": "npm run typeorm -- migration:revert -d ./typeorm.config.ts",
-    "db:reset": "npm run typeorm -- schema:drop -d ./typeorm.config.ts && npm run migration:run && npm run seed:config",
-    "seed:config": "ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./typeorm.config.ts -n RoleSeeder && ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./typeorm.config.ts -n CatalogosSeeder && ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./typeorm.config.ts -n SuperAdminSeeder",
-    "seed:dev": "ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./typeorm.config.ts",
-    "seed:eventos": "ts-node -r tsconfig-paths/register src/database/seeds/run-eventos-seed.ts"
+    "seed:config": "cross-env NODE_ENV=production ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./typeorm.config.ts",
+    "seed:dev": "cross-env NODE_ENV=development ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./typeorm.config.ts",
+    "seed:clean": "node scripts/guard-dev-only.js && cross-env NODE_ENV=development ts-node -r tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./typeorm.config.ts -n CleanUsersSeeder",
+    "db:reset": "node scripts/guard-dev-only.js && npm run typeorm -- schema:drop -d ./typeorm.config.ts && npm run migration:run && npm run seed:config"
   },
   "dependencies": {
     "@nestjs-modules/mailer": "^2.3.4",
@@ -79,6 +79,7 @@
     "@types/qrcode": "^1.5.6",
     "@types/supertest": "^6.0.2",
     "@types/uuid": "^10.0.0",
+    "cross-env": "^10.1.0",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",

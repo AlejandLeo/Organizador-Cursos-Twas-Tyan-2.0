@@ -87,6 +87,26 @@ const cambiarAPonente = async () => {
   }
 };
 
+const cambiarALogistica = async () => {
+  // Confirmación simple para cambiar al portal de logística
+  const result = await Swal.fire({
+    title: 'Cambiar de Portal',
+    text: '¿Está seguro que desea acceder al Portal de Logística?',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Sí, cambiar',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#0d9488',
+    cancelButtonColor: '#64748b',
+    reverseButtons: true
+  });
+
+  if (result.isConfirmed) {
+    authStore.cambiarRolActivo('Logística');
+    router.push('/logistica');
+  }
+};
+
 
 const handleLogout = () => {
   authStore.logout();
@@ -374,10 +394,17 @@ onUnmounted(() => {
               Ver Perfil
             </button>
             <!-- Cambiar a modo Ponente (solo si tiene ese rol) -->
-            <button v-if="authStore.esPonente" @click="cambiarAPonente"
+            <button v-if="authStore.tieneMultiplesRoles && authStore.esPonente" @click="cambiarAPonente"
                     class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold text-slate-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-umsa-blue transition-colors flex items-center gap-2 border border-dashed border-transparent hover:border-blue-200 dark:hover:border-blue-800">
               <span class="material-symbols-outlined text-[18px] text-blue-500">swap_horiz</span>
               Cambiar a Ponente
+            </button>
+
+            <!-- Cambiar a modo Logística (solo si tiene ese rol) -->
+            <button v-if="authStore.tieneMultiplesRoles && authStore.esLogistica" @click="cambiarALogistica"
+                    class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold text-slate-600 dark:text-gray-300 hover:bg-teal-50 dark:hover:bg-teal-900/20 hover:text-teal-600 transition-colors flex items-center gap-2 border border-dashed border-transparent hover:border-teal-200 dark:hover:border-teal-800">
+              <span class="material-symbols-outlined text-[18px] text-teal-500">swap_horiz</span>
+              Cambiar a Logística
             </button>
 
             <button @click="abrirSoporte"
