@@ -1,11 +1,9 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan } from 'typeorm';
 import { MailQueue } from './entities/mail-queue.entity';
 import { MailLog } from './entities/mail-log.entity';
-import { SchedulerRegistry, CronExpression } from '@nestjs/schedule';
-import { ConfigService } from '@nestjs/config';
-import { CronJob } from 'cron';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { MailService } from './mail.service';
 import { MailTemplateService } from './mail-template.service';
 import { SistemaConfigService } from '../sistema-config/sistema-config.service';
@@ -16,7 +14,7 @@ import * as path from 'path';
 const MAX_INTENTOS = 3;
 
 @Injectable()
-export class MailQueueService implements OnModuleInit {
+export class MailQueueService {
   private readonly logger = new Logger(MailQueueService.name);
   private isProcessing = false;
 
@@ -28,20 +26,7 @@ export class MailQueueService implements OnModuleInit {
     private readonly mailService: MailService,
     private readonly templateService: MailTemplateService,
     private readonly configService: SistemaConfigService,
-    private readonly nestConfigService: ConfigService,
-    private readonly schedulerRegistry: SchedulerRegistry,
   ) { }
-
-  onModuleInit() {
-    const cronTime = this.nestConfigService.get<string>('MAIL_QUEUE_CRON') || CronExpression.EVERY_MINUTE;
-    const job = new CronJob(cronTime, async () => {
-      await this.processQueue();
-    });
-
-    this.schedulerRegistry.addCronJob('mail_queue_job', job);
-    job.start();
-    this.logger.log(`Cron job 'mail_queue_job' dynamically registered with pattern: ${cronTime}`);
-  }
 
   // ─────────────────────────────────────────────────────────────────────────
   // ENCOLADO
@@ -114,12 +99,13 @@ export class MailQueueService implements OnModuleInit {
    * - Cancela definitivamente tras MAX_INTENTOS fallidos.
    * - Registra todo en mail_logs para auditoría.
    */
+  @Cron(process.env.MAIL_QUEUE_CRON || CronExpression.EVERY_MINUTE)
   async processQueue() {
     if (this.isProcessing) return;
     this.isProcessing = true;
 
-    const batchSize = parseInt(this.nestConfigService.get<string>('MAIL_QUEUE_BATCH_SIZE') || '10', 10);
-    const delayMs = parseInt(this.nestConfigService.get<string>('MAIL_QUEUE_DELAY_MS') || '1000', 10);
+    const batchSize = parseInt(process.env.MAIL_QUEUE_BATCH_SIZE || '10', 10);
+    const delayMs = parseInt(process.env.MAIL_QUEUE_DELAY_MS || '1000', 10);
 
     try {
       const pending = await this.mailQueueRepository.find({
