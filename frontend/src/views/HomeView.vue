@@ -3,8 +3,6 @@ import { ref, onMounted } from 'vue';
 import api, { resolveMediaUrl } from '@/services/api';
 import { useEventoStore } from '@/stores/eventoStore';
 
-const defaultAvatar = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%2394a3b8"><rect width="24" height="24" fill="%23e2e8f0"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`;
-
 const eventoStore = useEventoStore();
 
 const eventosActivos = ref<any[]>([]);
@@ -65,7 +63,7 @@ const cargarEventos = async () => {
                     name: `${p.grado_abreviacion} ${p.nombres} ${p.primer_apellido}`.trim(),
                     topic: p.profesion || 'Expositor',
                     country: mostrarCorreos ? p.email : 'Expositor',
-                    img: resolveMediaUrl(p.foto, defaultAvatar)
+                    img: resolveMediaUrl(p.foto, 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&q=80')
                 }));
             } catch (e) {
                 console.error(`Error cargando ponentes para evento ${ev.id}`, e);
@@ -414,7 +412,7 @@ const abrirMapa = (url: string) => {
                      </div>
                      
                      <!-- Foto de Expositor -->
-                     <img v-if="spk.img" :src="spk.img" class="w-full h-full object-cover filter grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700 z-0" :onerror="`this.src='${defaultAvatar}'; this.onerror=null`" />
+                     <img v-if="spk.img" :src="spk.img" class="w-full h-full object-cover filter grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700 z-0" onerror="this.src='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&q=80'; this.onerror=null" />
                      
                      <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent z-10"></div>
                   </div>

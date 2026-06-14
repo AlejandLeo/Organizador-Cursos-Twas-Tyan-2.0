@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,9 +11,7 @@ import { Inscripcion } from '../../Inscripciones/inscripciones/entities/inscripc
 import { Imparticion } from '../../Academico/imparticiones/entities/imparticion.entity';
 import { CoordinacionEvento } from '../../Academico/coordinaciones/entities/coordinacion.entity';
 import { ActividadAcademica } from '../../Academico/actividades-academicas/entities/actividad-academica.entity';
-import { SchedulerRegistry, CronExpression } from '@nestjs/schedule';
-import { ConfigService } from '@nestjs/config';
-import { CronJob } from 'cron';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 /**
  * Worker de envíos de certificados usando base de datos.
@@ -23,7 +21,7 @@ import { CronJob } from 'cron';
  *  - Procesa un máximo de 10 por minuto para no saturar el SMTP.
  */
 @Injectable()
-export class CertificadosQueueService implements OnModuleInit {
+export class CertificadosQueueService {
   private readonly logger = new Logger(CertificadosQueueService.name);
 
   /** Evita que dos workers corran en paralelo */
@@ -35,20 +33,7 @@ export class CertificadosQueueService implements OnModuleInit {
 
     @InjectRepository(Certificado)
     private readonly certificadoRepository: Repository<Certificado>,
-    private readonly configService: ConfigService,
-    private readonly schedulerRegistry: SchedulerRegistry,
   ) {}
-
-  onModuleInit() {
-    const cronTime = this.configService.get<string>('CERT_QUEUE_CRON') || CronExpression.EVERY_MINUTE;
-    const job = new CronJob(cronTime, async () => {
-      await this.procesarColaDB();
-    });
-
-    this.schedulerRegistry.addCronJob('certificados_queue_job', job);
-    job.start();
-    this.logger.log(`Cron job 'certificados_queue_job' dynamically registered with pattern: ${cronTime}`);
-  }
 
   // ── API pública ──────────────────────────────────────────────
 
@@ -359,12 +344,13 @@ export class CertificadosQueueService implements OnModuleInit {
 
   // ── Worker interno (Cron Job) ───────────────────────────────────────────
 
+  @Cron(process.env.CERT_QUEUE_CRON || CronExpression.EVERY_MINUTE)
   async procesarColaDB(): Promise<void> {
     if (this.isProcessing) return;
     this.isProcessing = true;
 
-    const batchSize = parseInt(this.configService.get<string>('CERT_QUEUE_BATCH_SIZE') || '10', 10);
-    const delayMs = parseInt(this.configService.get<string>('CERT_QUEUE_DELAY_MS') || '1000', 10);
+    const batchSize = parseInt(process.env.CERT_QUEUE_BATCH_SIZE || '10', 10);
+    const delayMs = parseInt(process.env.CERT_QUEUE_DELAY_MS || '1000', 10);
 
     try {
       const pendientes = await this.certificadoRepository.createQueryBuilder('cert')
