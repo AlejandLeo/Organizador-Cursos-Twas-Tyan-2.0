@@ -80,6 +80,11 @@ const eventosFiltrados = computed(() => {
   });
 });
 
+const eventosActivos = computed(() => {
+  const data = Array.isArray(eventos.value) ? eventos.value : [];
+  return data.filter(e => e.estado !== 0 && e.estado !== -1 && e.fase !== 4 && e.fase !== 5);
+});
+
 const limpiarFiltros = () => {
   filtroTexto.value = '';
   filtroEstado.value = '';
@@ -1084,7 +1089,7 @@ const exportarPDFSegmentado = async (categoria: string) => {
               <select v-model="formActividad.id_evento"
                       class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-amber-500/50">
                 <option value="">Seleccionar evento padre...</option>
-                <option v-for="ev in eventos" :key="ev.id" :value="ev.id">{{ ev.nombre }}</option>
+                 <option v-for="ev in eventosActivos" :key="ev.id" :value="ev.id">{{ ev.nombre }}</option>
               </select>
             </div>
 
