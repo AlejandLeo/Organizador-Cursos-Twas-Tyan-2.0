@@ -485,6 +485,7 @@ const nuevaActividad = ref({
     id_evento: null as number | null,
     min_nota: 51,
     min_asistencia: 80,
+    horas: null as number | null,
     modalidad: 'Presencial',
     fecha_inicio: '',
     fecha_fin: '',
@@ -524,6 +525,7 @@ const resetNuevaActividad = (eventoId: number) => {
         id_evento: eventoId,
         min_nota: 51,
         min_asistencia: 80,
+        horas: null,
         modalidad: 'Presencial',
         fecha_inicio: '',
         fecha_fin: '',
@@ -562,6 +564,7 @@ const editarActividad = async (act: any) => {
             id_evento: act.id_evento,
             min_nota: act.min_nota ?? 51,
             min_asistencia: act.min_asistencia ?? 80,
+            horas: act.horas ?? null,
             modalidad: act.modalidad || 'Presencial',
             fecha_inicio: act.fecha_inicio_raw || '',
             fecha_fin: act.fecha_fin_raw || '',
@@ -581,6 +584,7 @@ const editarActividad = async (act: any) => {
         nuevaActividad.value.id_evento = fullAct.evento?.id || act.id_evento;
         nuevaActividad.value.min_nota = fullAct.min_nota ?? act.min_nota ?? 51;
         nuevaActividad.value.min_asistencia = fullAct.min_asistencia ?? act.min_asistencia ?? 80;
+        nuevaActividad.value.horas = fullAct.horas ?? act.horas ?? null;
         nuevaActividad.value.modalidad = fullAct.modalidad ?? act.modalidad ?? 'Presencial';
         nuevaActividad.value.logistica_ids = fullAct.logistica_ids || [];
 
@@ -743,6 +747,11 @@ const publicarActividad = async () => {
         }
         if (nuevaActividad.value.min_asistencia !== undefined && nuevaActividad.value.min_asistencia !== null) {
             formData.append('min_asistencia', String(nuevaActividad.value.min_asistencia));
+        }
+        if (nuevaActividad.value.horas !== undefined && nuevaActividad.value.horas !== null && String(nuevaActividad.value.horas) !== '') {
+            formData.append('horas', String(nuevaActividad.value.horas));
+        } else {
+            formData.append('horas', '');
         }
         if (nuevaActividad.value.modalidad) {
             formData.append('modalidad', nuevaActividad.value.modalidad);
@@ -1048,7 +1057,7 @@ const habilitarActividad = async (id: number, nombre: string) => {
 
                 <div class="h-8 w-px bg-white/20 mx-1"></div>
 
-                <button @click="resetNuevaActividad(evento.id); isCreating = true" class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 font-black text-[10px] uppercase tracking-widest cursor-pointer">
+                <button v-if="evento.estado !== 0 && evento.estado !== -1 && evento.fase !== 4 && evento.fase !== 5" @click="resetNuevaActividad(evento.id); isCreating = true" class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 font-black text-[10px] uppercase tracking-widest cursor-pointer">
                    <span class="material-symbols-outlined text-[18px]">add_circle</span> Nueva Actividad
                 </button>
 
@@ -1081,7 +1090,7 @@ const habilitarActividad = async (id: number, nombre: string) => {
                 <h3 class="text-xl md:text-2xl font-black text-primary-dark dark:text-white uppercase tracking-tighter">{{ categoria }}</h3>
                 <p class="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest mt-1">Explorar {{ (acts as any[]).length }} disponibles</p>
               </div>
-              <button @click="resetNuevaActividad(evento.id); isCreating = true; nuevaActividad.tipo = String(categoria); nuevaActividad.lockTipo = true; currentStep = 1;" class="text-[10px] font-black uppercase tracking-widest bg-white dark:bg-gray-800 hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 border border-slate-200 dark:border-gray-700 px-4 py-2 rounded-xl transition-all flex items-center gap-2 relative z-20 cursor-pointer shadow-sm hover:shadow-md">
+              <button v-if="evento.estado !== 0 && evento.estado !== -1 && evento.fase !== 4 && evento.fase !== 5" @click="resetNuevaActividad(evento.id); isCreating = true; nuevaActividad.tipo = String(categoria); nuevaActividad.lockTipo = true; currentStep = 1;" class="text-[10px] font-black uppercase tracking-widest bg-white dark:bg-gray-800 hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 border border-slate-200 dark:border-gray-700 px-4 py-2 rounded-xl transition-all flex items-center gap-2 relative z-20 cursor-pointer shadow-sm hover:shadow-md">
                 <span class="material-symbols-outlined text-[14px]">add</span> Crear {{ categoria }}
               </button>
             </div>
@@ -1360,7 +1369,7 @@ const habilitarActividad = async (id: number, nombre: string) => {
       <div v-show="currentStep === 2" class="space-y-8 animate-in slide-in-from-right-8 duration-500">
           <div class="bg-white dark:bg-gray-900 p-8 rounded-[2rem] shadow-sm border border-slate-100 dark:border-gray-800">
               <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic mb-8">2. Parámetros de Aprobación</h3>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <div class="p-8 rounded-[2rem] border-2 border-slate-100 dark:border-gray-800 border-l-[8px] border-l-primary-dark bg-slate-50 dark:bg-gray-800">
                       <h4 class="font-black text-primary-dark dark:text-white mb-2 uppercase text-sm">Nota Mínima</h4>
                       <input v-model="nuevaActividad.min_nota" type="number" min="0" max="100" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-xl text-center text-primary-dark dark:text-gray-200" />
@@ -1368,6 +1377,10 @@ const habilitarActividad = async (id: number, nombre: string) => {
                   <div class="p-8 rounded-[2rem] border-2 border-slate-100 dark:border-gray-800 border-l-[8px] border-l-umsa-gold bg-slate-50 dark:bg-gray-800">
                       <h4 class="font-black text-primary-dark dark:text-white mb-2 uppercase text-sm">Asistencia Mínima (%)</h4>
                       <input v-model="nuevaActividad.min_asistencia" type="number" min="0" max="100" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-xl text-center text-primary-dark dark:text-gray-200" />
+                  </div>
+                  <div class="p-8 rounded-[2rem] border-2 border-slate-100 dark:border-gray-800 border-l-[8px] border-l-umsa-blue bg-slate-50 dark:bg-gray-800">
+                      <h4 class="font-black text-primary-dark dark:text-white mb-2 uppercase text-sm">Carga Horaria (Hrs Académicas)</h4>
+                      <input v-model="nuevaActividad.horas" type="number" min="1" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-xl text-center text-primary-dark dark:text-gray-200" />
                   </div>
               </div>
           </div>
