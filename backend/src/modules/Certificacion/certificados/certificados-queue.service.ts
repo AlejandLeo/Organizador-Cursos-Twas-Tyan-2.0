@@ -144,7 +144,8 @@ export class CertificadosQueueService implements OnModuleInit {
         if (!ins.usuario) continue;
 
         // Evaluar aprobación en base a las modalidades registradas
-        let esAprobado = false;
+        let esAprobadoParaCertificado = false;
+        let esParaExcelencia = false;
         let notaEstudiante = 0;
 
         if (ins.modalidades && ins.modalidades.length > 0) {
@@ -152,24 +153,33 @@ export class CertificadosQueueService implements OnModuleInit {
             const minNota = im.cursoModalidad?.min_nota ?? 0;
             const minAsistencia = im.cursoModalidad?.min_asistencia ?? 0;
             
-            const imAprobado = im.aprobado === 1 || (im.nota >= minNota && im.num_asistencia >= minAsistencia);
-            if (imAprobado) {
-              esAprobado = true;
+            const cumpleAsistencia = im.num_asistencia >= minAsistencia;
+            const cumpleNota = im.nota >= minNota;
+
+            // Recibe certificado regular (Asistencia) si cumple la asistencia o fue aprobado manualmente
+            if (im.aprobado === 1 || cumpleAsistencia) {
+              esAprobadoParaCertificado = true;
+              
               if (im.nota > notaEstudiante) {
                 notaEstudiante = im.nota;
+              }
+
+              // Recibe certificado de excelencia (Aprobación) si cumple ambos
+              if (im.aprobado === 1 || (cumpleAsistencia && cumpleNota)) {
+                esParaExcelencia = true;
               }
             }
           }
         } else if (ins.nota_principal !== null && ins.nota_principal >= 51) {
-          esAprobado = true;
+          esAprobadoParaCertificado = true;
+          esParaExcelencia = true;
           notaEstudiante = ins.nota_principal;
         }
 
-        if (!esAprobado) continue;
+        if (!esAprobadoParaCertificado) continue;
 
-        // Determinar excelencia académica (calificación >= 90)
-        const requiereExcelencia = notaEstudiante >= 90;
-        const plantillaDestino = requiereExcelencia 
+        // Determinar excelencia académica usando la nota mínima de la BD
+        const plantillaDestino = esParaExcelencia 
           ? (plantillaEstudianteExcelencia || plantillaEstudianteRegular) 
           : plantillaEstudianteRegular;
 

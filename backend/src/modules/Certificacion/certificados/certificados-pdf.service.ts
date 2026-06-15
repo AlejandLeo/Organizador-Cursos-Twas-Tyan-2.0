@@ -39,7 +39,8 @@ export class CertificadosPdfService {
     const doc = new jsPDF({
       orientation: 'landscape', // Certificados horizontales por defecto
       unit: 'pt', // Usaremos puntos para que coincida con px/percentages
-      format: 'letter' // 792 x 612 pt
+      format: 'letter', // 792 x 612 pt
+      compress: true
     });
 
     const pdfWidth = doc.internal.pageSize.getWidth();
@@ -54,7 +55,7 @@ export class CertificadosPdfService {
         if (fs.existsSync(localFondoPath)) {
           const ext = (localFondoPath.split('.').pop() || 'JPG').toUpperCase();
           const imgData = fs.readFileSync(localFondoPath).toString('base64');
-          doc.addImage(imgData, ext as any, 0, 0, pdfWidth, pdfHeight);
+          doc.addImage(imgData, ext as any, 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
         } else {
           console.warn(`No se encontró la imagen de fondo localmente: ${localFondoPath}`);
         }
@@ -78,6 +79,14 @@ export class CertificadosPdfService {
     // Apellido1 Apellido2 Nombres
     const nombreCompleto1 = persona
       ? `${grado ? grado + ' ' : ''}${primerApellido} ${segundoApellido} ${nombres}`.replace(/\s+/g, ' ').trim()
+      : 'Usuario Desconocido';
+
+    const nombresApellidosSinGrado = persona
+      ? `${nombres} ${primerApellido} ${segundoApellido}`.replace(/\s+/g, ' ').trim()
+      : 'Usuario Desconocido';
+      
+    const apellidosNombresSinGrado = persona
+      ? `${primerApellido} ${segundoApellido} ${nombres}`.replace(/\s+/g, ' ').trim()
       : 'Usuario Desconocido';
 
     const afiliacion = certificado.usuario?.afiliaciones?.[0];
@@ -111,6 +120,8 @@ export class CertificadosPdfService {
       '{NOMBRE_ESTUDIANTE}': nombreCompleto2,
       '{NOMBRE_COMPLETO_1}': nombreCompleto1,
       '{NOMBRE_COMPLETO_2}': nombreCompleto2,
+      '{NOMBRES_APELLIDOS_SIN_GRADO}': nombresApellidosSinGrado,
+      '{APELLIDOS_NOMBRES_SIN_GRADO}': apellidosNombresSinGrado,
       '{NOMBRE}': nombreCompleto2,
       '{NOMBRES}': nombreCompleto2,
       '{PRIMER_APELLIDO}': primerApellido,
@@ -148,6 +159,14 @@ export class CertificadosPdfService {
           const varClean = variable.replace(/[\{\}]/g, '');
           textoFinal = textoFinal.split(`[${varClean}]`).join(valor);
           textoFinal = textoFinal.split(`{{${varClean}}}`).join(valor);
+        }
+
+        if (el.textTransform) {
+          if (el.textTransform === 'uppercase') textoFinal = textoFinal.toUpperCase();
+          else if (el.textTransform === 'lowercase') textoFinal = textoFinal.toLowerCase();
+          else if (el.textTransform === 'capitalize') {
+             textoFinal = textoFinal.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+          }
         }
 
         const fontSize = el.fontSize || 12;
