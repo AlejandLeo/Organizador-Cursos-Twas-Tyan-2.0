@@ -312,7 +312,8 @@ const importar = async (modo: 'verificar' | 'guardar') => {
     
     results.value = response.data;
     ultimoModo.value = modo;
-    const hasMailWarnings = response.data.advertenciasCorreo > 0;
+    // Solo contar advertencias de correo como problema si el usuario activó las notificaciones
+    const hasMailWarnings = notificar.value && response.data.advertenciasCorreo > 0;
     
     let textMsg = '';
     if (modo === 'verificar') {
@@ -320,9 +321,13 @@ const importar = async (modo: 'verificar' | 'guardar') => {
         ? `Se verificaron los datos pero hay ${response.data.errores} errores. Corrige el archivo antes de guardar.`
         : 'Verificación exitosa. Todos los datos son válidos. Ahora puedes Guardar.';
     } else {
-      textMsg = hasMailWarnings 
-        ? `Se procesaron y guardaron los datos, pero hubo ${response.data.advertenciasCorreo} errores al encolar los correos.` 
-        : 'Se han procesado y guardado los datos correctamente. Los correos han sido encolados para su envío.';
+      if (hasMailWarnings) {
+        textMsg = `Se procesaron y guardaron los datos, pero hubo ${response.data.advertenciasCorreo} errores al encolar los correos.`;
+      } else if (notificar.value) {
+        textMsg = 'Se han procesado y guardado los datos correctamente. Los correos han sido encolados para su envío.';
+      } else {
+        textMsg = 'Se han procesado y guardado los datos correctamente.';
+      }
     }
 
     Swal.fire({
