@@ -143,8 +143,8 @@ export class CertificadosQueueService implements OnModuleInit {
       for (const ins of inscripciones) {
         if (!ins.usuario) continue;
 
-        // Evaluar aprobación en base a las modalidades registradas
-        let esAprobadoParaCertificado = false;
+        // Todo inscrito (estado=1) recibe al menos el certificado regular (Asistencia)
+        let esAprobadoParaCertificado = true;
         let esParaExcelencia = false;
         let notaEstudiante = 0;
 
@@ -153,27 +153,28 @@ export class CertificadosQueueService implements OnModuleInit {
             const minNota = im.cursoModalidad?.min_nota ?? 0;
             const minAsistencia = im.cursoModalidad?.min_asistencia ?? 0;
             
-            const cumpleAsistencia = im.num_asistencia >= minAsistencia;
-            const cumpleNota = im.nota >= minNota;
+            const nota = im.nota ?? 0;
+            const asistencia = im.num_asistencia ?? 0;
 
-            // Recibe certificado regular (Asistencia) si cumple la asistencia o fue aprobado manualmente
-            if (im.aprobado === 1 || cumpleAsistencia) {
-              esAprobadoParaCertificado = true;
-              
-              if (im.nota > notaEstudiante) {
-                notaEstudiante = im.nota;
-              }
+            const cumpleAsistencia = asistencia >= minAsistencia;
+            const cumpleNota = nota >= minNota;
 
-              // Recibe certificado de excelencia (Aprobación) si cumple ambos
-              if (im.aprobado === 1 || (cumpleAsistencia && cumpleNota)) {
-                esParaExcelencia = true;
-              }
+            if (nota > notaEstudiante) {
+              notaEstudiante = nota;
+            }
+
+            // Recibe certificado de excelencia (Aprobación) si cumple ambos
+            if (im.aprobado === 1 || (cumpleAsistencia && cumpleNota)) {
+              esParaExcelencia = true;
             }
           }
-        } else if (ins.nota_principal !== null && ins.nota_principal >= 51) {
-          esAprobadoParaCertificado = true;
-          esParaExcelencia = true;
-          notaEstudiante = ins.nota_principal;
+        } else {
+          // Fallback si no tiene modalidades
+          const nota = ins.nota_principal ?? 0;
+          if (nota >= 51) {
+            esParaExcelencia = true;
+            notaEstudiante = nota;
+          }
         }
 
         if (!esAprobadoParaCertificado) continue;
