@@ -265,8 +265,8 @@ const fetchEventos = async () => {
             nombreCorto: ev.nombre,
             version: ev.gestion,
             estado_raw: ev.estado,
-            estado: ev.estado === -1 ? 'Inhabilitado' : (ev.fase === 4 || ev.estado === 0 ? 'Finalizado' : (ev.estado === 2 ? 'Planificación' : 'Activo')),
-            colorEstado: ev.estado === -1 ? 'bg-red-600 text-white border-red-700/30' : (ev.fase === 4 || ev.estado === 0 ? 'bg-slate-500 text-white border-slate-600/30' : (ev.estado === 2 ? 'bg-blue-500 text-white border-blue-600/30' : 'bg-emerald-500 text-white border-emerald-600/30')),
+            estado: ev.estado === -1 ? 'Inhabilitado' : (ev.fase === 4 || ev.estado === 0 ? 'Finalizado' : (ev.estado === 2 ? 'Planificación' : (ev.estado === 3 ? 'Borrador' : 'Activo'))),
+            colorEstado: ev.estado === -1 ? 'bg-red-600 text-white border-red-700/30' : (ev.fase === 4 || ev.estado === 0 ? 'bg-slate-500 text-white border-slate-600/30' : (ev.estado === 2 ? 'bg-blue-500 text-white border-blue-600/30' : (ev.estado === 3 ? 'bg-amber-500 text-white border-amber-600/30' : 'bg-emerald-500 text-white border-emerald-600/30'))),
             mostrarActividades: true,
             actividades: (ev.actividades || []).map((act: any) => ({
                 id: act.id,
@@ -408,11 +408,12 @@ const editarEvento = (evento: any) => {
         sigla: evento.sigla || '',
         color_principal: evento.color_principal || '#0070b4',
         institucion_badge: evento.institucion_badge || 'Evento Oficial OEA/TYAN',
-        estado: evento.estado === 'Activo' ? 1 
+        estado: evento.estado_raw !== undefined ? evento.estado_raw
+              : evento.estado === 'Activo' ? 1 
               : evento.estado === 'Planificación' ? 2 
               : (evento.estado === 'Cerrado' || evento.estado === 'Finalizado') ? 0 
               : evento.estado === 'Inhabilitado' ? -1 
-              : typeof evento.estado_raw === 'number' ? evento.estado_raw 
+              : evento.estado === 'Borrador' ? 3
               : 2,
         fondo_img: null,
         logo_img: null,
@@ -1071,7 +1072,7 @@ const habilitarActividad = async (id: number, nombre: string) => {
 
                 <div class="h-8 w-px bg-white/20 mx-1"></div>
 
-                <button v-if="evento.estado !== 0 && evento.estado !== -1 && evento.fase !== 4 && evento.fase !== 5" @click="resetNuevaActividad(evento.id); isCreating = true" class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 font-black text-[10px] uppercase tracking-widest cursor-pointer">
+                <button v-if="evento.estado_raw !== 0 && evento.estado_raw !== -1 && evento.fase !== 4 && evento.fase !== 5" @click="resetNuevaActividad(evento.id); isCreating = true" class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 font-black text-[10px] uppercase tracking-widest cursor-pointer">
                    <span class="material-symbols-outlined text-[18px]">add_circle</span> Nueva Actividad
                 </button>
 
@@ -1104,7 +1105,7 @@ const habilitarActividad = async (id: number, nombre: string) => {
                 <h3 class="text-xl md:text-2xl font-black text-primary-dark dark:text-white uppercase tracking-tighter">{{ categoria }}</h3>
                 <p class="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest mt-1">Explorar {{ (acts as any[]).length }} disponibles</p>
               </div>
-              <button v-if="evento.estado !== 0 && evento.estado !== -1 && evento.fase !== 4 && evento.fase !== 5" @click="resetNuevaActividad(evento.id); isCreating = true; nuevaActividad.tipo = String(categoria); nuevaActividad.lockTipo = true; currentStep = 1;" class="text-[10px] font-black uppercase tracking-widest bg-white dark:bg-gray-800 hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 border border-slate-200 dark:border-gray-700 px-4 py-2 rounded-xl transition-all flex items-center gap-2 relative z-20 cursor-pointer shadow-sm hover:shadow-md">
+              <button v-if="evento.estado_raw !== 0 && evento.estado_raw !== -1 && evento.fase !== 4 && evento.fase !== 5" @click="resetNuevaActividad(evento.id); isCreating = true; nuevaActividad.tipo = String(categoria); nuevaActividad.lockTipo = true; currentStep = 1;" class="text-[10px] font-black uppercase tracking-widest bg-white dark:bg-gray-800 hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 border border-slate-200 dark:border-gray-700 px-4 py-2 rounded-xl transition-all flex items-center gap-2 relative z-20 cursor-pointer shadow-sm hover:shadow-md">
                 <span class="material-symbols-outlined text-[14px]">add</span> Crear {{ categoria }}
               </button>
             </div>
@@ -1977,6 +1978,7 @@ const habilitarActividad = async (id: number, nombre: string) => {
                                  <option :value="1">Activo / Publicado</option>
                                  <option :value="0">Concluido / Histórico</option>
                                  <option :value="3">Borrador / Invisible</option>
+                                 <option :value="-1">Inhabilitado / Inactivo</option>
                              </select>
                         </div>
                     </div>
