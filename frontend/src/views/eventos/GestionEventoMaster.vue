@@ -513,9 +513,9 @@ const fetchEventos = async () => {
             // BUG FIX: No sobreescribir ev.version (slogan) con ev.gestion (año).
             // Se usa gestionLabel para mostrar en UI sin destruir el campo original.
             gestionLabel: ev.gestion || '2025',
-            estado_raw: ev.estado,
-            estadoLabel: ev.estado === -1 ? 'Inhabilitado' : (ev.fase === 4 || ev.estado === 0 ? 'Finalizado' : (ev.estado === 2 ? 'Planificación' : (ev.estado === 3 ? 'Borrador' : 'Activo'))),
-            colorEstado: ev.estado === -1 ? 'bg-red-600 text-white border-red-700/30' : (ev.fase === 4 || ev.estado === 0 ? 'bg-slate-500 text-white border-slate-600/30' : (ev.estado === 2 ? 'bg-blue-500 text-white border-blue-600/30' : (ev.estado === 3 ? 'bg-amber-500 text-white border-amber-600/30' : 'bg-emerald-500 text-white border-emerald-600/30'))),
+            imagen: getImageUrl('fondos', ev.imagen_fondo, 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80'),
+            estadoLabel: ev.estado === 1 ? 'Activo' : (ev.estado === 2 ? 'Planificación' : 'Cerrado'),
+            colorEstado: ev.estado === 1 ? 'bg-emerald-500 text-white' : (ev.estado === 2 ? 'bg-blue-500 text-white' : 'bg-slate-500 text-white'),
             mostrarActividades: true,
             mostrarInhabilitadas: false, // Nueva variable para controlar el despliegue
             actividades: (ev.actividades || []).map((act: any) => {
@@ -736,12 +736,11 @@ const editarEvento = (evento: any) => {
         color_badge_institucion: evento.color_badge_institucion || '#0070b4',
         color_badge_fecha: evento.color_badge_fecha || '#0070b4',
         institucion_badge: evento.institucion_badge || 'Evento Oficial OEA/TYAN',
-        estado: evento.estado_raw !== undefined ? evento.estado_raw
-              : evento.estadoLabel === 'Activo' ? 1
+        // BUG FIX: mapeo completo de estados incluyendo Planificación (2)
+        estado: evento.estadoLabel === 'Activo' ? 1
               : evento.estadoLabel === 'Planificación' ? 2
-              : (evento.estadoLabel === 'Cerrado' || evento.estadoLabel === 'Finalizado') ? 0
-              : evento.estadoLabel === 'Inhabilitado' ? -1
-              : evento.estadoLabel === 'Borrador' ? 3
+              : evento.estadoLabel === 'Cerrado' ? 0
+              : typeof evento.estado === 'number' ? evento.estado
               : 2,
         fondo_img: null,
         logo_img: null,
@@ -868,17 +867,10 @@ const eventosFiltrados = computed(() => {
         list = list.filter(ev => ev.id === eventoStore.selectedEventoId);
     }
 
-    // Ordenar: eventos con estado === -1 o estado === 0 o fase === 4 o fase === 5 van al final (abajo)
-    const sorted = [...list].sort((a, b) => {
-        const aInactive = (a.estado_raw === -1 || a.estado_raw === 0 || a.fase === 4 || a.fase === 5) ? 1 : 0;
-        const bInactive = (b.estado_raw === -1 || b.estado_raw === 0 || b.fase === 4 || b.fase === 5) ? 1 : 0;
-        return aInactive - bInactive;
-    });
-
     const search = (filtroBusqueda.value || '').toLowerCase();
-    if (!search) return sorted;
+    if (!search) return list;
 
-    return sorted.map(ev => ({
+    return list.map(ev => ({
         ...ev,
         actividades: (ev.actividades || []).filter((a: any) => 
             a.title.toLowerCase().includes(search) || 
@@ -1372,9 +1364,7 @@ const changeStep = (delta: number) => {
       </div>
 
       
-      <div v-for="evento in eventosFiltrados" :key="evento.id"
-           :class="{'opacity-60 grayscale-[30%] border-red-500/20 dark:border-red-900/20': evento.estado_raw === -1 || evento.estado_raw === 0 || evento.fase === 4 || evento.fase === 5}"
-           class="w-full bg-white dark:bg-gray-900 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 dark:border-gray-800 mb-12 flex flex-col group/card transition-all duration-300">
+      <div v-for="evento in eventosFiltrados" :key="evento.id" class="w-full bg-white dark:bg-gray-900 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 dark:border-gray-800 mb-12 flex flex-col group/card">
         
         <!-- Header Evento Banner (Estilo Netflix) -->
         <div class="relative w-full h-[320px] overflow-hidden">
@@ -1402,7 +1392,7 @@ const changeStep = (delta: number) => {
 
                 <div class="h-6 w-px bg-white/20 mx-1 hidden sm:block"></div>
 
-                <button v-if="evento.estado_raw !== 0 && evento.estado_raw !== -1 && evento.fase !== 4 && evento.fase !== 5" @click="resetNuevaActividad(evento.id); isCreating = true" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-xl transition-all shadow-lg flex items-center gap-2 font-black text-[10px] uppercase tracking-widest cursor-pointer">
+                <button v-if="evento.estado !== 0 && evento.estado !== -1 && evento.fase !== 4 && evento.fase !== 5" @click="resetNuevaActividad(evento.id); isCreating = true" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-xl transition-all shadow-lg flex items-center gap-2 font-black text-[10px] uppercase tracking-widest cursor-pointer">
                    <span class="material-symbols-outlined text-[18px]">add_circle</span>
                    <span class="hidden sm:inline">Nueva Actividad</span>
                 </button>
@@ -1485,7 +1475,7 @@ const changeStep = (delta: number) => {
                 <h3 class="text-xl md:text-2xl font-black text-primary-dark dark:text-white uppercase tracking-tighter">{{ categoria }}</h3>
                 <p class="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-widest mt-1">Explorar {{ (acts as any[]).length }} disponibles</p>
               </div>
-              <button v-if="evento.estado_raw !== 0 && evento.estado_raw !== -1 && evento.fase !== 4 && evento.fase !== 5" @click="resetNuevaActividad(evento.id); isCreating = true; nuevaActividad.tipo = String(categoria); nuevaActividad.lockTipo = true; currentStep = 1;" class="text-[10px] font-black uppercase tracking-widest bg-white dark:bg-gray-800 hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 border border-slate-200 dark:border-gray-700 px-4 py-2 rounded-xl transition-all flex items-center gap-2 relative z-20 cursor-pointer shadow-sm hover:shadow-md">
+              <button v-if="evento.estado !== 0 && evento.estado !== -1 && evento.fase !== 4 && evento.fase !== 5" @click="resetNuevaActividad(evento.id); isCreating = true; nuevaActividad.tipo = String(categoria); nuevaActividad.lockTipo = true; currentStep = 1;" class="text-[10px] font-black uppercase tracking-widest bg-white dark:bg-gray-800 hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 border border-slate-200 dark:border-gray-700 px-4 py-2 rounded-xl transition-all flex items-center gap-2 relative z-20 cursor-pointer shadow-sm hover:shadow-md">
                 <span class="material-symbols-outlined text-[14px]">add</span> Crear {{ categoria }}
               </button>
             </div>
@@ -2243,7 +2233,6 @@ const changeStep = (delta: number) => {
                                         <option :value="1">Activo / Público</option>
                                         <option :value="3">Borrador</option>
                                         <option :value="0">Concluido / Cerrado</option>
-                                        <option :value="-1">Inhabilitado / Inactivo</option>
                                     </select>
                                     <p class="text-[8px] text-slate-400 mt-2 italic font-bold">Controla la visibilidad y permisos globales.</p>
                                 </div>

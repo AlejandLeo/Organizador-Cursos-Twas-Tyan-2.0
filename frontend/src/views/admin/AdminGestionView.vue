@@ -51,7 +51,6 @@ const formEvento = ref({
 });
 
 const estadoEventoConfig: Record<number, { label: string; color: string; bg: string }> = {
-  [-1]: { label: 'Inhabilitado', color: 'text-red-700 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
   0: { label: 'Concluido', color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-100 dark:bg-slate-800' },
   1: { label: 'Activo',    color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
   2: { label: 'Planificación', color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
@@ -474,7 +473,7 @@ const exportarExcelSegmentado = (categoria: string) => {
     contentHtml = `
       <tr><td colspan="5" style="background-color: #003B71; color: white; font-weight: bold; font-size: 16pt; text-align: center;">REPORTE DE EVENTOS INSTITUCIONALES</td></tr>
       <tr style="background-color: #f1f5f9; font-weight: bold;"><td>ID</td><td>Nombre del Evento</td><td>Gestión</td><td>Modalidad</td><td>Estado</td></tr>
-      ${eventos.value.map(e => `<tr><td>${e.id}</td><td>${e.nombre}</td><td>${e.gestion}</td><td>${e.modalidad || 'Presencial'}</td><td>${estadoEventoConfig[e.estado]?.label || 'Planificación'}</td></tr>`).join('')}
+      ${eventos.value.map(e => `<tr><td>${e.id}</td><td>${e.nombre}</td><td>${e.gestion}</td><td>${e.modalidad || 'Presencial'}</td><td>${e.estado === 1 ? 'Activo' : 'Planificación'}</td></tr>`).join('')}
     `;
   } else if (categoria === 'actividades') {
     contentHtml = `
@@ -541,7 +540,7 @@ const exportarPDFSegmentado = async (categoria: string) => {
 
     if (categoria === 'eventos') {
       head = [['ID', 'NOMBRE', 'GESTIÓN', 'MODALIDAD', 'ESTADO']];
-      body = eventos.value.map(e => [e.id, e.nombre, e.gestion, e.modalidad || 'Presencial', estadoEventoConfig[e.estado]?.label || 'Planificación']);
+      body = eventos.value.map(e => [e.id, e.nombre, e.gestion, e.modalidad || 'Presencial', e.estado === 1 ? 'Activo' : 'Planificación']);
     } else if (categoria === 'actividades') {
       head = [['ID', 'ACTIVIDAD', 'TIPO', 'HORAS', 'FECHA']];
       body = actividades.value.map(a => [a.id, a.nombre, a.tipo, a.horas_academicas || 0, a.fecha_inicio || '—']);
