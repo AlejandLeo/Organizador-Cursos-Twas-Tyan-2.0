@@ -17,6 +17,8 @@ const defaultVariables = {
     '{NOMBRE_COMPLETO_2}': 'Lic. Alejandro Leonardo Nogales Ticona',
     '{NOMBRE}': 'Lic. Alejandro Leonardo Nogales Ticona',
     '{NOMBRES}': 'Lic. Alejandro Leonardo Nogales Ticona',
+    '{NOMBRES_APELLIDOS_SIN_GRADO}': 'Alejandro Leonardo Nogales Ticona',
+    '{APELLIDOS_NOMBRES_SIN_GRADO}': 'Nogales Ticona Alejandro Leonardo',
     '{PRIMER_APELLIDO}': 'Nogales',
     '{SEGUNDO_APELLIDO}': 'Ticona',
     '{AREA_TEMATICA}': 'CIENCIAS DE LA VIDA Y DE LA TIERRA',
@@ -101,13 +103,13 @@ const canvasH = computed(() => props.height || 724);
                  </div>
                  
                  <!-- Tipo: Texto (Variables) -->
-                 <div v-else-if="el.tipo === 'texto'" class="font-bold leading-none whitespace-pre-line w-full flex flex-col pt-[0.1em]">
+                 <div v-else-if="el.tipo === 'texto'" class="font-bold leading-none whitespace-pre-line w-full flex flex-col pt-[0.1em]" :style="{ textTransform: el.textTransform || 'none' }">
                     {{ resolveVariables(el.valor) }}
                  </div>
                  
                  <!-- Tipo: QR -->
-                 <div v-else-if="el.tipo === 'qr'" class="w-full h-full bg-white flex items-center justify-center shrink-0 overflow-hidden">
-                    <span class="material-symbols-outlined text-[100px] text-slate-800 select-none scale-[1.2]">qr_code_2</span>
+                 <div v-else-if="el.tipo === 'qr'" class="bg-white flex items-center justify-center shrink-0 overflow-hidden" :style="{ width: el.width ? `${el.width}px` : '100px', height: el.height ? `${el.height}px` : (el.width ? `${el.width}px` : '100px') }">
+                    <span class="material-symbols-outlined text-slate-800 select-none" :style="{ fontSize: el.width ? `${el.width}px` : '100px' }">qr_code_2</span>
                  </div>
                  
                  <!-- Tipo: Firma (Bloque) -->
