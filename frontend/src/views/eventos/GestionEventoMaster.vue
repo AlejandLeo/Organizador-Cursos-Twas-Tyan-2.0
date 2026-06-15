@@ -513,9 +513,9 @@ const fetchEventos = async () => {
             // BUG FIX: No sobreescribir ev.version (slogan) con ev.gestion (año).
             // Se usa gestionLabel para mostrar en UI sin destruir el campo original.
             gestionLabel: ev.gestion || '2025',
-            imagen: getImageUrl('fondos', ev.imagen_fondo, 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80'),
-            estadoLabel: ev.estado === 1 ? 'Activo' : (ev.estado === 2 ? 'Planificación' : 'Cerrado'),
-            colorEstado: ev.estado === 1 ? 'bg-emerald-500 text-white' : (ev.estado === 2 ? 'bg-blue-500 text-white' : 'bg-slate-500 text-white'),
+            estado_raw: ev.estado,
+            estadoLabel: ev.estado === -1 ? 'Inhabilitado' : (ev.fase === 4 || ev.estado === 0 ? 'Finalizado' : (ev.estado === 2 ? 'Planificación' : 'Activo')),
+            colorEstado: ev.estado === -1 ? 'bg-red-600 text-white border-red-700/30' : (ev.fase === 4 || ev.estado === 0 ? 'bg-slate-500 text-white border-slate-600/30' : (ev.estado === 2 ? 'bg-blue-500 text-white border-blue-600/30' : 'bg-emerald-500 text-white border-emerald-600/30')),
             mostrarActividades: true,
             mostrarInhabilitadas: false, // Nueva variable para controlar el despliegue
             actividades: (ev.actividades || []).map((act: any) => {
@@ -867,10 +867,17 @@ const eventosFiltrados = computed(() => {
         list = list.filter(ev => ev.id === eventoStore.selectedEventoId);
     }
 
-    const search = (filtroBusqueda.value || '').toLowerCase();
-    if (!search) return list;
+    // Ordenar: eventos con estado === -1 o estado === 0 o fase === 4 o fase === 5 van al final (abajo)
+    const sorted = [...list].sort((a, b) => {
+        const aInactive = (a.estado_raw === -1 || a.estado_raw === 0 || a.fase === 4 || a.fase === 5) ? 1 : 0;
+        const bInactive = (b.estado_raw === -1 || b.estado_raw === 0 || b.fase === 4 || b.fase === 5) ? 1 : 0;
+        return aInactive - bInactive;
+    });
 
-    return list.map(ev => ({
+    const search = (filtroBusqueda.value || '').toLowerCase();
+    if (!search) return sorted;
+
+    return sorted.map(ev => ({
         ...ev,
         actividades: (ev.actividades || []).filter((a: any) => 
             a.title.toLowerCase().includes(search) || 
@@ -1364,7 +1371,9 @@ const changeStep = (delta: number) => {
       </div>
 
       
-      <div v-for="evento in eventosFiltrados" :key="evento.id" class="w-full bg-white dark:bg-gray-900 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 dark:border-gray-800 mb-12 flex flex-col group/card">
+      <div v-for="evento in eventosFiltrados" :key="evento.id"
+           :class="{'opacity-60 grayscale-[30%] border-red-500/20 dark:border-red-900/20': evento.estado_raw === -1 || evento.estado_raw === 0 || evento.fase === 4 || evento.fase === 5}"
+           class="w-full bg-white dark:bg-gray-900 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 dark:border-gray-800 mb-12 flex flex-col group/card transition-all duration-300">
         
         <!-- Header Evento Banner (Estilo Netflix) -->
         <div class="relative w-full h-[320px] overflow-hidden">
