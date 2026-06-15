@@ -37,7 +37,7 @@ export class CertificadosQueueService implements OnModuleInit {
     private readonly certificadoRepository: Repository<Certificado>,
     private readonly configService: ConfigService,
     private readonly schedulerRegistry: SchedulerRegistry,
-  ) {}
+  ) { }
 
   onModuleInit() {
     const cronTime = this.configService.get<string>('CERT_QUEUE_CRON') || CronExpression.EVERY_MINUTE;
@@ -152,7 +152,7 @@ export class CertificadosQueueService implements OnModuleInit {
           for (const im of ins.modalidades) {
             const minNota = im.cursoModalidad?.min_nota ?? 0;
             const minAsistencia = im.cursoModalidad?.min_asistencia ?? 0;
-            
+
             const nota = im.nota ?? 0;
             const asistencia = im.num_asistencia ?? 0;
 
@@ -180,8 +180,8 @@ export class CertificadosQueueService implements OnModuleInit {
         if (!esAprobadoParaCertificado) continue;
 
         // Determinar excelencia académica usando la nota mínima de la BD
-        const plantillaDestino = esParaExcelencia 
-          ? (plantillaEstudianteExcelencia || plantillaEstudianteRegular) 
+        const plantillaDestino = esParaExcelencia
+          ? (plantillaEstudianteExcelencia || plantillaEstudianteRegular)
           : plantillaEstudianteRegular;
 
         if (!plantillaDestino) continue;
@@ -287,7 +287,7 @@ export class CertificadosQueueService implements OnModuleInit {
           for (const coord of coordinaciones) {
             if (!coord.usuario) continue;
 
-            const esLogistica = coord.usuario.usuariosRoles?.some(ur => 
+            const esLogistica = coord.usuario.usuariosRoles?.some(ur =>
               ur.rol && (ur.rol.id === 3 || ur.rol.nombre_rol.toLowerCase().includes('logis'))
             );
 
@@ -393,7 +393,7 @@ export class CertificadosQueueService implements OnModuleInit {
           // El servicio se encarga de guardar en DB el éxito (enviado) o fracaso (error) y los reintentos
           await this.envioService.enviarCertificado(cert.id);
           this.logger.log(`[Worker DB] ✓ Certificado #${cert.id} enviado.`);
-          
+
           // Pausa configurada entre correos
           if (delayMs > 0) {
             await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
