@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router';
 import { certificadosService } from '@/services/certificados.service';
 import api from '@/services/api';
 import Swal from 'sweetalert2';
+import CertificadoRender from '@/components/common/CertificadoRender.vue';
 
 const route = useRoute();
 
@@ -526,6 +527,74 @@ const toggleEmisionSelectAll = (event: any) => {
     : [];
 };
 
+const showDisenoPreviewModal = ref(false);
+const previewDisenoZoom = ref(0.8);
+const previewElementosLienzo = ref<any[]>([]);
+const previewFondoUrl = ref<string | null>(null);
+const previewVariables = ref<Record<string, string>>({});
+
+const abrirPreviewDiseno = () => {
+  if (!emisionInfoCertId.value) {
+    Swal.fire('Atención', 'Selecciona una plantilla de certificado.', 'warning');
+    return;
+  }
+  
+  const infoCert = emisionInfoCerts.value.find(ic => ic.id === emisionInfoCertId.value);
+  if (!infoCert) return;
+
+  previewFondoUrl.value = infoCert.fondo_url || null;
+  try {
+    previewElementosLienzo.value = typeof infoCert.configuracion === 'string' 
+      ? JSON.parse(infoCert.configuracion) 
+      : (infoCert.configuracion || []);
+  } catch (e) {
+    previewElementosLienzo.value = [];
+  }
+
+  // Generate variables from the first candidate or generic if none selected
+  const candidatoId = emisionSelectedIds.value.length > 0 ? emisionSelectedIds.value[0] : (emisionCandidatos.value.length > 0 ? emisionCandidatos.value[0].id : null);
+  const candidato = emisionCandidatos.value.find(c => c.id === candidatoId);
+  
+  if (candidato) {
+    const grado = candidato.grado || candidato.grado_academico || '';
+    const nombres = candidato.nombres || '';
+    const primerApellido = candidato.primer_apellido || '';
+    const segundoApellido = candidato.segundo_apellido || '';
+    
+    const nombreCompleto2 = `${grado ? grado + ' ' : ''}${nombres} ${primerApellido} ${segundoApellido}`.replace(/\s+/g, ' ').trim();
+    const nombreCompleto1 = `${grado ? grado + ' ' : ''}${primerApellido} ${segundoApellido} ${nombres}`.replace(/\s+/g, ' ').trim();
+    const nombresApellidosSinGrado = `${nombres} ${primerApellido} ${segundoApellido}`.replace(/\s+/g, ' ').trim();
+    const apellidosNombresSinGrado = `${primerApellido} ${segundoApellido} ${nombres}`.replace(/\s+/g, ' ').trim();
+    
+    const eventoName = emisionEventos.value.find(e => e.id === emisionEventoId.value)?.nombre || 'Evento';
+    const actividadName = emisionActividades.value.find(a => a.id === emisionActividadId.value)?.nombre || 'Actividad';
+
+    previewVariables.value = {
+      '{NOMBRE_ESTUDIANTE}': nombreCompleto2,
+      '{NOMBRE_COMPLETO_1}': nombreCompleto1,
+      '{NOMBRE_COMPLETO_2}': nombreCompleto2,
+      '{NOMBRES_APELLIDOS_SIN_GRADO}': nombresApellidosSinGrado,
+      '{APELLIDOS_NOMBRES_SIN_GRADO}': apellidosNombresSinGrado,
+      '{NOMBRE}': nombreCompleto2,
+      '{NOMBRES}': nombreCompleto2,
+      '{PRIMER_APELLIDO}': primerApellido,
+      '{SEGUNDO_APELLIDO}': segundoApellido,
+      '{EVENTO}': eventoName,
+      '{ACTIVIDAD}': actividadName,
+      '{CI_USUARIO}': candidato.documento_identidad || '1234567',
+      '{FECHA_EMISION}': new Date().toLocaleDateString('es-BO'),
+      '{CODIGO_CERTIFICADO}': 'CERT-PREVIEW-1234',
+      '{GESTION}': new Date().getFullYear().toString(),
+      '{ROL}': tipoLabels[emisionTipo.value] || 'Participante'
+    };
+  } else {
+    // defaults from CertificadoRender will be used
+    previewVariables.value = {};
+  }
+
+  showDisenoPreviewModal.value = true;
+};
+
 onMounted(() => {
   if (route.query.search) {
     filterEvent.value = String(route.query.search);
@@ -1009,10 +1078,16 @@ onMounted(() => {
       <div v-if="emisionCandidatos.length > 0" class="bg-white dark:bg-gray-900 rounded-3xl border border-slate-200 dark:border-gray-800 shadow-sm overflow-hidden">
         <div class="p-5 border-b border-slate-100 dark:border-gray-800 flex items-center justify-between">
           <p class="text-sm font-black text-slate-800 dark:text-white uppercase">{{ emisionCandidatos.length }} candidatos encontrados</p>
-          <button @click="handleEmitirLote" :disabled="emisionSelectedIds.length === 0 || emisionLoading" class="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all disabled:opacity-50">
-            <span class="material-symbols-outlined text-sm">{{ emisionLoading ? 'progress_activity' : 'workspace_premium' }}</span>
-            Emitir Seleccionados ({{ emisionSelectedIds.length }})
-          </button>
+          <div class="flex items-center gap-3">
+            <button @click="abrirPreviewDiseno" :disabled="!emisionInfoCertId" class="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 transition-all disabled:opacity-50">
+              <span class="material-symbols-outlined text-sm">visibility</span>
+              Previsualizar Diseño
+            </button>
+            <button @click="handleEmitirLote" :disabled="emisionSelectedIds.length === 0 || emisionLoading" class="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all disabled:opacity-50">
+              <span class="material-symbols-outlined text-sm">{{ emisionLoading ? 'progress_activity' : 'workspace_premium' }}</span>
+              Emitir Seleccionados ({{ emisionSelectedIds.length }})
+            </button>
+          </div>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-left">
@@ -1223,6 +1298,43 @@ onMounted(() => {
             <div class="p-4 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 text-center">
               <p class="text-[10px] text-slate-400 font-medium">※ Los datos mostrados (Juan Carlos Pérez, etc.) son de ejemplo para la previsualización.</p>
             </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+    <!-- MODAL: Previsualización de Diseño Certificado -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="showDisenoPreviewModal"
+             class="fixed inset-0 z-[70] flex flex-col items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm"
+             @click.self="showDisenoPreviewModal = false">
+             
+          <!-- Header -->
+          <div class="bg-white dark:bg-gray-900 p-4 rounded-t-3xl w-full max-w-[1024px] flex items-center justify-between border-b border-slate-200 dark:border-gray-800 shadow-xl">
+            <h2 class="text-sm font-black uppercase text-slate-800 dark:text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-blue-500">visibility</span>
+              Previsualización de Diseño
+            </h2>
+            <div class="flex items-center gap-4">
+              <div class="flex items-center bg-slate-100 dark:bg-gray-800 rounded-lg p-1">
+                <button @click="previewDisenoZoom = Math.max(0.3, previewDisenoZoom - 0.1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-800 dark:hover:text-white"><span class="material-symbols-outlined text-[18px]">remove</span></button>
+                <span class="text-xs font-bold w-12 text-center text-slate-600 dark:text-gray-300">{{ Math.round(previewDisenoZoom * 100) }}%</span>
+                <button @click="previewDisenoZoom = Math.min(2.0, previewDisenoZoom + 0.1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-800 dark:hover:text-white"><span class="material-symbols-outlined text-[18px]">add</span></button>
+              </div>
+              <button @click="showDisenoPreviewModal = false" class="p-2 bg-slate-100 dark:bg-gray-800 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-slate-600 dark:text-gray-300 hover:text-rose-600 rounded-xl transition-all">
+                <span class="material-symbols-outlined">close</span>
+              </button>
+            </div>
+          </div>
+          
+          <!-- Contenedor del lienzo -->
+          <div class="bg-slate-100/50 dark:bg-black/50 w-full max-w-[1024px] rounded-b-3xl overflow-auto flex items-center justify-center p-8 border border-t-0 border-slate-200 dark:border-gray-800 max-h-[80vh]">
+            <CertificadoRender 
+               :elementos="previewElementosLienzo" 
+               :fondoUrl="previewFondoUrl"
+               :variables="previewVariables"
+               :zoom="previewDisenoZoom"
+            />
           </div>
         </div>
       </Transition>
