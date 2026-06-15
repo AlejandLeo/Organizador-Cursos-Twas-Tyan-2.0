@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { existsSync, unlinkSync } from 'fs';
@@ -98,6 +98,18 @@ export class ActividadesAcademicasService {
 
   /** Crea una actividad asignándola al evento indicado en el DTO */
   async crear(dto: CreateActividadDto, usuario?: any, file?: Express.Multer.File) {
+    const evento = await this.dataSource.query(
+      `SELECT estado, fase FROM eventos WHERE id = $1`,
+      [dto.id_evento]
+    );
+    if (evento.length === 0) {
+      throw new NotFoundException(`El evento con ID ${dto.id_evento} no existe.`);
+    }
+    const ev = evento[0];
+    if (ev.estado === 0 || ev.estado === -1 || ev.fase === 4 || ev.fase === 5) {
+      throw new BadRequestException('No se pueden agregar actividades académicas a un evento finalizado, inhabilitado o archivado.');
+    }
+
     if (usuario) {
       await this.verificarPropiedad(dto.id_evento, usuario);
     }

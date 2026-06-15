@@ -23,6 +23,9 @@ import { SistemaConfigModule } from '../sistema-config/sistema-config.module';
     MailerModule.forRootAsync({
       useFactory: async (config: ConfigService) => ({
         transport: {
+          pool: true,
+          maxConnections: 5,
+          maxMessages: 100,
           host: config.get('MAIL_HOST'),
           port: config.get('MAIL_PORT'),
           secure: config.get('MAIL_PORT') === '465',
