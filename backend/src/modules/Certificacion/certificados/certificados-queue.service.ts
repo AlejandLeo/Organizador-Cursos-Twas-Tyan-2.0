@@ -37,7 +37,7 @@ export class CertificadosQueueService implements OnModuleInit {
     private readonly certificadoRepository: Repository<Certificado>,
     private readonly configService: ConfigService,
     private readonly schedulerRegistry: SchedulerRegistry,
-  ) {}
+  ) { }
 
   onModuleInit() {
     const cronTime = this.configService.get<string>('CERT_QUEUE_CRON') || CronExpression.EVERY_MINUTE;
@@ -143,8 +143,8 @@ export class CertificadosQueueService implements OnModuleInit {
       for (const ins of inscripciones) {
         if (!ins.usuario) continue;
 
-        // Evaluar aprobación en base a las modalidades registradas
-        let esAprobadoParaCertificado = false;
+        // Todo inscrito (estado=1) recibe al menos el certificado regular (Asistencia)
+        let esAprobadoParaCertificado = true;
         let esParaExcelencia = false;
         let notaEstudiante = 0;
 
@@ -152,35 +152,36 @@ export class CertificadosQueueService implements OnModuleInit {
           for (const im of ins.modalidades) {
             const minNota = im.cursoModalidad?.min_nota ?? 0;
             const minAsistencia = im.cursoModalidad?.min_asistencia ?? 0;
-            
-            const cumpleAsistencia = im.num_asistencia >= minAsistencia;
-            const cumpleNota = im.nota >= minNota;
 
-            // Recibe certificado regular (Asistencia) si cumple la asistencia o fue aprobado manualmente
-            if (im.aprobado === 1 || cumpleAsistencia) {
-              esAprobadoParaCertificado = true;
-              
-              if (im.nota > notaEstudiante) {
-                notaEstudiante = im.nota;
-              }
+            const nota = im.nota ?? 0;
+            const asistencia = im.num_asistencia ?? 0;
 
-              // Recibe certificado de excelencia (Aprobación) si cumple ambos
-              if (im.aprobado === 1 || (cumpleAsistencia && cumpleNota)) {
-                esParaExcelencia = true;
-              }
+            const cumpleAsistencia = asistencia >= minAsistencia;
+            const cumpleNota = nota >= minNota;
+
+            if (nota > notaEstudiante) {
+              notaEstudiante = nota;
+            }
+
+            // Recibe certificado de excelencia (Aprobación) si cumple ambos
+            if (im.aprobado === 1 || (cumpleAsistencia && cumpleNota)) {
+              esParaExcelencia = true;
             }
           }
-        } else if (ins.nota_principal !== null && ins.nota_principal >= 51) {
-          esAprobadoParaCertificado = true;
-          esParaExcelencia = true;
-          notaEstudiante = ins.nota_principal;
+        } else {
+          // Fallback si no tiene modalidades
+          const nota = ins.nota_principal ?? 0;
+          if (nota >= 51) {
+            esParaExcelencia = true;
+            notaEstudiante = nota;
+          }
         }
 
         if (!esAprobadoParaCertificado) continue;
 
         // Determinar excelencia académica usando la nota mínima de la BD
-        const plantillaDestino = esParaExcelencia 
-          ? (plantillaEstudianteExcelencia || plantillaEstudianteRegular) 
+        const plantillaDestino = esParaExcelencia
+          ? (plantillaEstudianteExcelencia || plantillaEstudianteRegular)
           : plantillaEstudianteRegular;
 
         if (!plantillaDestino) continue;
@@ -286,7 +287,7 @@ export class CertificadosQueueService implements OnModuleInit {
           for (const coord of coordinaciones) {
             if (!coord.usuario) continue;
 
-            const esLogistica = coord.usuario.usuariosRoles?.some(ur => 
+            const esLogistica = coord.usuario.usuariosRoles?.some(ur =>
               ur.rol && (ur.rol.id === 3 || ur.rol.nombre_rol.toLowerCase().includes('logis'))
             );
 
@@ -392,7 +393,7 @@ export class CertificadosQueueService implements OnModuleInit {
           // El servicio se encarga de guardar en DB el éxito (enviado) o fracaso (error) y los reintentos
           await this.envioService.enviarCertificado(cert.id);
           this.logger.log(`[Worker DB] ✓ Certificado #${cert.id} enviado.`);
-          
+
           // Pausa configurada entre correos
           if (delayMs > 0) {
             await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
