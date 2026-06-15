@@ -923,6 +923,7 @@ const nuevaActividad = ref({
     id_evento: null as number | null,
     min_nota: 51,
     min_asistencia: 80,
+    horas: null as number | null,
     modalidad: 'Presencial',
     fecha_inicio: '',
     fecha_fin: '',
@@ -961,6 +962,7 @@ const resetNuevaActividad = (eventoId: number) => {
         id_evento: eventoId,
         min_nota: 51,
         min_asistencia: 80,
+        horas: null,
         modalidad: 'Presencial',
         fecha_inicio: '',
         fecha_fin: '',
@@ -1002,6 +1004,7 @@ const prepararEdicionActividad = async (actId: number) => {
             id_evento: act.evento?.id || act.id_evento,
             min_nota: act.min_nota ?? 51,
             min_asistencia: act.min_asistencia ?? 80,
+            horas: act.horas ?? null,
             modalidad: act.modalidad || 'Presencial',
             fecha_inicio: act.fecha_inicio ? act.fecha_inicio.split('T')[0] : '',
             fecha_fin: act.fecha_fin ? act.fecha_fin.split('T')[0] : '',
@@ -1166,6 +1169,11 @@ const publicarActividad = async () => {
         }
         if (nuevaActividad.value.min_asistencia !== undefined && nuevaActividad.value.min_asistencia !== null) {
             formData.append('min_asistencia', String(nuevaActividad.value.min_asistencia));
+        }
+        if (nuevaActividad.value.horas !== undefined && nuevaActividad.value.horas !== null && String(nuevaActividad.value.horas) !== '') {
+            formData.append('horas', String(nuevaActividad.value.horas));
+        } else {
+            formData.append('horas', '');
         }
         if (nuevaActividad.value.modalidad) {
             formData.append('modalidad', nuevaActividad.value.modalidad);
@@ -1677,7 +1685,7 @@ const changeStep = (delta: number) => {
       <div v-show="currentStep === 2" class="space-y-8 animate-in slide-in-from-right-8 duration-500">
           <div class="bg-white dark:bg-gray-900 p-8 rounded-[2rem] shadow-sm border border-slate-100 dark:border-gray-800">
               <h3 class="text-xl font-black text-primary-dark dark:text-white uppercase italic mb-8">2. Parámetros de Aprobación</h3>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <div class="p-8 rounded-[2rem] border-2 border-slate-100 dark:border-gray-800 border-l-[8px] border-l-primary-dark bg-slate-50 dark:bg-gray-800">
                       <h4 class="font-black text-primary-dark dark:text-white mb-2 uppercase text-sm">Nota Mínima</h4>
                       <input v-model="nuevaActividad.min_nota" type="number" min="0" max="100" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-xl text-center text-primary-dark dark:text-gray-200" />
@@ -1685,6 +1693,10 @@ const changeStep = (delta: number) => {
                   <div class="p-8 rounded-[2rem] border-2 border-slate-100 dark:border-gray-800 border-l-[8px] border-l-umsa-gold bg-slate-50 dark:bg-gray-800">
                       <h4 class="font-black text-primary-dark dark:text-white mb-2 uppercase text-sm">Asistencia Mínima (%)</h4>
                       <input v-model="nuevaActividad.min_asistencia" type="number" min="0" max="100" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-xl text-center text-primary-dark dark:text-gray-200" />
+                  </div>
+                  <div class="p-8 rounded-[2rem] border-2 border-slate-100 dark:border-gray-800 border-l-[8px] border-l-umsa-blue bg-slate-50 dark:bg-gray-800">
+                      <h4 class="font-black text-primary-dark dark:text-white mb-2 uppercase text-sm">Carga Horaria (Hrs Académicas)</h4>
+                      <input v-model="nuevaActividad.horas" type="number" min="1" class="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 font-black text-xl text-center text-primary-dark dark:text-gray-200" />
                   </div>
               </div>
           </div>
