@@ -38,3 +38,10 @@ __screenshots__/
 # Vite
 *.timestamp-*-*.mjs 
 .vite
+
+# Archivos de entorno
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
