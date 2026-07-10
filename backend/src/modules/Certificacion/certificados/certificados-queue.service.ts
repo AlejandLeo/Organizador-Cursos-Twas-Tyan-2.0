@@ -125,6 +125,21 @@ export class CertificadosQueueService implements OnModuleInit {
 
       let creadosCount = 0;
 
+      // 0. Precargar configuraciones mínimas de modalidades por actividad académica
+      const actividadesConfig = await queryRunner.manager.find(ActividadAcademica, {
+        where: { evento: { id: eventoId } },
+        relations: ['modalidades']
+      });
+      const actividadConfigMap = new Map<number, { minNota: number, minAsistencia: number }>();
+      for (const act of actividadesConfig) {
+        if (act.modalidades && act.modalidades.length > 0) {
+          actividadConfigMap.set(act.id, {
+            minNota: act.modalidades[0].min_nota ?? 0,
+            minAsistencia: act.modalidades[0].min_asistencia ?? 0
+          });
+        }
+      }
+
       // ─── A) PROCESAR ESTUDIANTES (INSCRIPCIONES) ─────────────────
       const inscripciones = await queryRunner.manager.find(Inscripcion, {
         where: {
@@ -135,6 +150,7 @@ export class CertificadosQueueService implements OnModuleInit {
           'usuario',
           'usuario.persona',
           'actividadAcademica',
+          'actividadAcademica.modalidades',
           'modalidades',
           'modalidades.cursoModalidad',
         ],
@@ -171,7 +187,20 @@ export class CertificadosQueueService implements OnModuleInit {
         } else {
           // Fallback si no tiene modalidades
           const nota = ins.nota_principal ?? 0;
-          if (nota >= 51) {
+          const asistencia = 0; // Inscripción base no tiene registro global de asistencia
+          let minNota = 51;
+          let minAsistencia = 0;
+
+          const configMap = actividadConfigMap.get(ins.actividadAcademica.id);
+          if (configMap) {
+            minNota = configMap.minNota;
+            minAsistencia = configMap.minAsistencia;
+          } else if (ins.actividadAcademica?.modalidades?.length > 0) {
+            minNota = ins.actividadAcademica.modalidades[0].min_nota ?? 0;
+            minAsistencia = ins.actividadAcademica.modalidades[0].min_asistencia ?? 0;
+          }
+
+          if (nota >= minNota && asistencia >= minAsistencia) {
             esParaExcelencia = true;
             notaEstudiante = nota;
           }
@@ -203,7 +232,7 @@ export class CertificadosQueueService implements OnModuleInit {
             infoCertificado: { id: plantillaDestino.id },
             actividadAcademica: { id: ins.actividadAcademica.id },
             usuario: { id: ins.usuario.id },
-            tipo: 4, // Asistente (Estudiante)
+            tipo: 1, // Asistente (Estudiante)
             codigo_certificado: codigoCertificado,
             uuid_archivo: uuidArchivo,
             hash_integridad: 'PENDIENTE',
@@ -309,7 +338,7 @@ export class CertificadosQueueService implements OnModuleInit {
                 infoCertificado: { id: plantillaLogistica.id },
                 actividadAcademica: { id: unaActividad.id },
                 usuario: { id: coord.usuario.id },
-                tipo: 1, // Logística
+                tipo: 3, // Logística
                 codigo_certificado: codigoCertificado,
                 uuid_archivo: uuidArchivo,
                 hash_integridad: 'PENDIENTE',
