@@ -99,7 +99,7 @@ export class CertificadosPdfService {
       || (certificado.actividadAcademica as any)?.nombre
       || 'Evento Desconocido';
 
-    const tiposStr = { 1: 'Asistente', 2: 'Ponente', 3: 'Logística', 4: 'Docente' };
+    const tiposStr: Record<number, string> = { 1: 'Asistente', 2: 'Expositor', 3: 'Logística' };
     const rolParticipacion = tiposStr[certificado.tipo] || 'Participante';
 
     const fechaEmision = certificado.fecha_emision
@@ -214,6 +214,12 @@ export class CertificadosPdfService {
         }
 
         let textoFinal = el.valor || '';
+        if (el.tipo === 'cabecera' && info.cabecera !== undefined) {
+          textoFinal = info.cabecera || '';
+        } else if (el.tipo === 'tenor' && info.tenor !== undefined) {
+          textoFinal = info.tenor || '';
+        }
+        
         // Reemplazar variables dinámicas usando split.join de forma segura
         for (const [variable, valor] of Object.entries(variablesReales)) {
           textoFinal = textoFinal.split(variable).join(valor);

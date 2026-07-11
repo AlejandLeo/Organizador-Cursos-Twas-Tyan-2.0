@@ -68,8 +68,7 @@ export class CertificadosEnvioService {
       const tiposMap: Record<number, string> = {
         1: 'Asistente',
         2: 'Expositor',
-        3: 'Organizador',
-        4: 'Docente',
+        3: 'Logística',
       };
       const tipoLabel = tiposMap[cert.tipo] ?? 'Participante';
 

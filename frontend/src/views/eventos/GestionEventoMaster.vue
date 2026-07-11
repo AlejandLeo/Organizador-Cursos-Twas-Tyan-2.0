@@ -2524,10 +2524,10 @@ const changeStep = (delta: number) => {
                                 <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Configurar para (Rol)</label>
                                 <select v-model="tipoCertificado" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3.5 px-5 font-bold text-xs text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none transition-all cursor-pointer shadow-sm">
                                     <option :value="null" disabled>-- Selecciona un Rol para Configurar Certificado --</option>
-                                    <option :value="1">Logística</option>
+                                    <option :value="1">Asistente</option>
                                     <option :value="2">Expositor</option>
-                                    <option :value="3">Organizador</option>
-                                    <option :value="4">Asistente</option>
+                                    <option :value="3">Logística</option>
+                                    <option :value="4">Docente</option>
                                 </select>
                             </div>
 
@@ -3009,7 +3009,7 @@ const changeStep = (delta: number) => {
                                     <div class="flex items-center gap-2 mb-1">
                                         <div class="h-1 w-4 bg-umsa-gold rounded-full"></div>
                                         <span class="text-[8px] font-black text-umsa-gold uppercase tracking-widest">
-                                            Certificado para: {{ tipoCertificado === null ? 'Ninguno' : (tipoCertificado === 1 ? 'Logística' : tipoCertificado === 2 ? 'Expositor' : tipoCertificado === 3 ? 'Organizador' : 'Asistente') }}
+                                            Certificado para: {{ tipoCertificado === null ? 'Ninguno' : (tipoCertificado === 1 ? 'Asistente' : tipoCertificado === 2 ? 'Expositor' : tipoCertificado === 3 ? 'Logística' : 'Docente') }}
                                         </span>
                                         <div class="h-1 w-4 bg-umsa-gold rounded-full"></div>
                                     </div>
@@ -3072,7 +3072,7 @@ const changeStep = (delta: number) => {
                                 
                                 <div class="mt-6 bg-slate-50 dark:bg-gray-900/50 p-4 rounded-2xl border border-slate-100 dark:border-gray-800">
                                     <p class="text-[8px] font-bold text-slate-500 uppercase tracking-widest text-center leading-tight">
-                                        <span class="text-umsa-gold">Nota:</span> Estás editando la versión para <span class="text-primary-dark dark:text-white underline">{{ tipoCertificado === null ? 'Ninguno' : (tipoCertificado === 1 ? 'Logística' : tipoCertificado === 2 ? 'Expositor' : tipoCertificado === 3 ? 'Organizador' : 'Asistente') }}</span>. Los cambios se guardan por separado para cada rol.
+                                        <span class="text-umsa-gold">Nota:</span> Estás editando la versión para <span class="text-primary-dark dark:text-white underline">{{ tipoCertificado === null ? 'Ninguno' : (tipoCertificado === 1 ? 'Asistente' : tipoCertificado === 2 ? 'Expositor' : tipoCertificado === 3 ? 'Logística' : 'Docente') }}</span>. Los cambios se guardan por separado para cada rol.
                                     </p>
                                 </div>
                              </div>

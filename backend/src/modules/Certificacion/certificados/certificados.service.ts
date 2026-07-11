@@ -405,11 +405,83 @@ export class CertificadosService {
         const uuidArchivo = uuidv4();
         const codigoCertificado = crypto.randomBytes(8).toString('hex').toUpperCase();
 
+        let dbTipo = tipo; // 1: Asistente, 2: Expositor, 3: Logística
+
+        let finalInfoCertId = id_info_certificado;
+
+        // Lógica de excelencia automática si el usuario seleccionó un asistente
+        if (dbTipo === 1 && id_actividad_academica) {
+          const ins: any = await queryRunner.manager.findOne('Inscripcion', {
+            where: {
+              usuario: { id: idUsuario },
+              actividadAcademica: { id: id_actividad_academica }
+            },
+            relations: ['modalidades', 'modalidades.cursoModalidad']
+          });
+
+          if (ins) {
+            let esParaExcelencia = false;
+
+            if (ins.modalidades && ins.modalidades.length > 0) {
+              for (const im of ins.modalidades) {
+                const minNota = im.cursoModalidad?.min_nota ?? 0;
+                const minAsistencia = im.cursoModalidad?.min_asistencia ?? 0;
+                const nota = im.nota ?? 0;
+                const asistencia = im.num_asistencia ?? 0;
+                
+                const cumpleAsistencia = asistencia >= minAsistencia;
+                const cumpleNota = nota >= minNota;
+
+                if (im.aprobado === 1 || (cumpleAsistencia && cumpleNota)) {
+                  esParaExcelencia = true;
+                }
+              }
+            } else {
+              // Fallback map check
+              const config: any = await queryRunner.manager.findOne('ActividadAcademica', {
+                where: { id: id_actividad_academica },
+                relations: ['modalidades']
+              });
+              let minNota = 51;
+              let minAsistencia = 0;
+              if (config && config.modalidades && config.modalidades.length > 0) {
+                minNota = config.modalidades[0].min_nota ?? 0;
+                minAsistencia = config.modalidades[0].min_asistencia ?? 0;
+              }
+              const nota = ins.nota_principal ?? 0;
+              const asistencia = 0;
+              console.log('FALLBACK CHECK:', { nota, minNota, asistencia, minAsistencia });
+              if (nota >= minNota && asistencia >= minAsistencia) {
+                esParaExcelencia = true;
+              }
+              console.log('esParaExcelencia final:', esParaExcelencia, 'dbTipo:', dbTipo, 'id_evento:', id_evento);
+            }
+
+            if (esParaExcelencia) {
+              // Buscar plantilla de excelencia para este evento
+              const excelTemplate: any = await queryRunner.manager.findOne('InfoCertificado', {
+                where: { evento: { id: id_evento }, tipo: dbTipo, es_excelencia: 1 }
+              });
+              if (excelTemplate) {
+                finalInfoCertId = excelTemplate.id;
+              }
+            } else {
+              // Buscar plantilla normal
+              const normalTemplate: any = await queryRunner.manager.findOne('InfoCertificado', {
+                where: { evento: { id: id_evento }, tipo: dbTipo, es_excelencia: 0 }
+              });
+              if (normalTemplate) {
+                finalInfoCertId = normalTemplate.id;
+              }
+            }
+          }
+        }
+
         const certificado = queryRunner.manager.create(Certificado, {
-          infoCertificado: { id: id_info_certificado },
+          infoCertificado: { id: finalInfoCertId },
           ...(id_actividad_academica ? { actividadAcademica: { id: id_actividad_academica } } : {}),
           usuario: { id: idUsuario },
-          tipo,
+          tipo: dbTipo,
           codigo_certificado: codigoCertificado,
           uuid_archivo: uuidArchivo,
           hash_integridad: 'PENDIENTE',

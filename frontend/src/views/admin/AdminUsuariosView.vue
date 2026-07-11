@@ -98,7 +98,7 @@ const formUsuario = ref({
 const fetchUsuarios = async () => {
   try {
     isLoading.value = true;
-    const res = await usuariosService.getAll({ soloActivos: 'false', limit: 1000 } as any);
+    const res = await usuariosService.getAll({ soloActivos: 'false', limit: 1000 });
     const data = (res.data as any)?.data ?? res.data;
     usuarios.value = Array.isArray(data) ? data : [];
   } catch (error) {

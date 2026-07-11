@@ -547,6 +547,12 @@ const abrirPreviewDiseno = () => {
     previewElementosLienzo.value = typeof infoCert.configuracion === 'string' 
       ? JSON.parse(infoCert.configuracion) 
       : (infoCert.configuracion || []);
+      
+    // Inject dynamic texts into canvas elements
+    previewElementosLienzo.value.forEach(el => {
+      if (el.tipo === 'cabecera' && infoCert.cabecera !== undefined) el.valor = infoCert.cabecera || '';
+      if (el.tipo === 'tenor' && infoCert.tenor !== undefined) el.valor = infoCert.tenor || '';
+    });
   } catch (e) {
     previewElementosLienzo.value = [];
   }
