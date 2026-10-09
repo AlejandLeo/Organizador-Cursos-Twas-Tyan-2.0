@@ -32,7 +32,7 @@ const fetchPonentes = async () => {
     try {
         loading.value = true;
         // Backend enriquecido con imparticiones->actividad->evento
-        const response = await api.get('/usuarios', { params: { rol: 'Ponente', limit: 100 } });
+        const response = await api.get('/usuarios', { params: { rol: 'Ponente', limit: 2000 } });
         ponentes.value = response.data.data || response.data;
     } catch (error) {
         Swal.fire('Error', 'No se pudo cargar el plantel de ponentes', 'error');

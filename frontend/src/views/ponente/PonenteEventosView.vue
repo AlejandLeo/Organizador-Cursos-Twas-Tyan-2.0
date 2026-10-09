@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import api, { getImageUrl } from '@/services/api';
+import api, { imagenActividad, imagenEvento } from '@/services/api';
 
 const router = useRouter();
 
@@ -31,9 +31,7 @@ const fetchData = async () => {
           imagenFondo: ev.imagen_fondo,
           fechaInicio: ev.fecha_inicio ? new Date(ev.fecha_inicio).toLocaleDateString() : '',
           fechaFin: ev.fecha_fin ? new Date(ev.fecha_fin).toLocaleDateString() : '',
-          image: ev.imagen_fondo 
-            ? getImageUrl('fondos', ev.imagen_fondo)
-            : getImageUrl('eventos', ev.logo, 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80'),
+          image: imagenEvento(ev),
           gestion: ev.fecha_inicio ? new Date(ev.fecha_inicio).getFullYear().toString() : '2026',
           actividades: []
         });
@@ -46,7 +44,7 @@ const fetchData = async () => {
         date: act.fecha_inicio ? `${new Date(act.fecha_inicio).toLocaleDateString()} - ${new Date(act.fecha_fin).toLocaleDateString()}` : 'Fechas por definir',
         students: act.inscripciones?.length || 0,
         type: act.tipo || 'Actividad',
-        image: getImageUrl('cursos', act.imagen, 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80')
+        image: imagenActividad({ ...act, evento: ev })
       });
     });
 
@@ -82,9 +80,6 @@ const openActividadDetalle = (actividadId: any) => {
   router.push({ name: 'ponente-curso-detalle', params: { id: actividadId } });
 };
 
-const handleImageError = (e: Event, fallbackUrl: string) => {
-  (e.target as HTMLImageElement).src = fallbackUrl;
-};
 </script>
 
 <template>
@@ -133,7 +128,7 @@ const handleImageError = (e: Event, fallbackUrl: string) => {
         
         <!-- Banner del Evento -->
         <div class="relative h-48 md:h-64 w-full overflow-hidden shrink-0">
-          <img :src="evento.image" @error="handleImageError($event, 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80')" class="w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-[1.5s] ease-out">   
+          <img :src="evento.image" class="w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-[1.5s] ease-out">   
           <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
           
           <div class="absolute bottom-4 left-6 right-6 z-20 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
@@ -165,7 +160,7 @@ const handleImageError = (e: Event, fallbackUrl: string) => {
               
               <!-- Imagen Predominante -->
               <div class="relative h-60 w-full overflow-hidden shrink-0">
-                <img :src="actividad.image" @error="handleImageError($event, 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=800&q=80')" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 ease-out">   
+                <img :src="actividad.image" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 ease-out">   
                 <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent"></div>
                 
                 <!-- Badge de Asignado -->

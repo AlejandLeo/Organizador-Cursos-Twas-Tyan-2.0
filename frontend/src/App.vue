@@ -15,7 +15,7 @@ const isDashboard = computed(() =>
   route.path.startsWith('/logistica')
 )
 
-const showFooter = computed(() => route.path === '/' || route.path.startsWith('/verificar-certificado'))
+const showFooter = computed(() => route.path === '/')
 </script>
 
 <template>

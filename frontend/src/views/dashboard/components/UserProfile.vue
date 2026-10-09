@@ -17,7 +17,6 @@ const isEditing = ref(false);
 const saveProfile = () => {
   // Lógica para guardar (PUT /usuarios/1)
   isEditing.value = false;
-  console.log('Perfil guardado:', user.value);
 };
 </script>
 
