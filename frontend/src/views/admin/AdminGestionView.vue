@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useAdminHistorialStore } from '@/stores/adminHistorial';
-import api, { getImageUrl } from '@/services/api';
+import api, { getImageUrl, resolveMediaUrl } from '@/services/api';
 import { coordinacionesService } from '@/services/coordinaciones.service';
 import { usuariosService } from '@/services/usuarios.service';
 import Swal from 'sweetalert2';
@@ -11,7 +11,7 @@ import Swal from 'sweetalert2';
 const usuariosDetalle = ref<any[]>([]);
 const fetchUsuariosPersonal = async () => {
   try {
-    const res = await usuariosService.getAll({ soloActivos: 'false', limit: 1000 } as any);
+    const res = await usuariosService.getAll({ soloActivos: 'false', limit: 5000 } as any);
     const rawUsers = Array.isArray(res.data) ? res.data : (res.data?.data || []);
     usuariosDetalle.value = rawUsers.map((u: any) => ({
       ...u,
@@ -84,6 +84,140 @@ const eventosActivos = computed(() => {
   const data = Array.isArray(eventos.value) ? eventos.value : [];
   return data.filter(e => e.estado !== 0 && e.estado !== -1 && e.fase !== 4 && e.fase !== 5);
 });
+
+const certificadosEmitidos = ref<any[]>([]);
+const panelEvento = ref<Record<number, 'certificados' | 'usuarios' | ''>>({});
+const panelActividad = ref<Record<number, 'certificados' | 'usuarios' | ''>>({});
+const actividadesVisibles = ref<Record<number, boolean>>({});
+
+const fetchCertificados = async () => {
+  try {
+    const res = await api.get('/admin/certificados');
+    certificadosEmitidos.value = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+  } catch {
+    certificadosEmitidos.value = [];
+  }
+};
+
+const imagenEvento = (ev: any) =>
+  resolveMediaUrl(ev.imagen_fondo || ev.logo, 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?w=1600&q=80');
+
+const fechaCorta = (value: unknown) => {
+  if (!value) return '—';
+  const texto = String(value);
+  return texto.length >= 10 ? texto.substring(0, 10) : texto;
+};
+
+const estadoActividadLabel = (estado: number) =>
+  estado === 1 ? 'En curso' : estado === 0 ? 'Concluida' : estado === -1 ? 'Inhabilitada' : 'Borrador';
+
+const nombrePersona = (usuario: any) => {
+  const persona = usuario?.persona;
+  const nombre = `${persona?.nombres || ''} ${persona?.primer_apellido || ''}`.trim();
+  return nombre || usuario?.email || 'Sin nombre';
+};
+
+const usuariosDeActividad = (act: any) => {
+  const vistos = new Map<number, any>();
+  for (const ins of act.inscripciones || []) {
+    const usuario = ins.usuario;
+    if (!usuario?.id || vistos.has(usuario.id)) continue;
+    vistos.set(usuario.id, {
+      id: usuario.id,
+      nombre: nombrePersona(usuario),
+      email: usuario.email,
+      estado: ins.estado,
+    });
+  }
+  if (vistos.size) return Array.from(vistos.values());
+
+  for (const usuario of usuariosDetalle.value) {
+    const coincide = (usuario.inscripciones || []).some(
+      (ins: any) => Number(ins.actividadAcademica?.id) === Number(act.id),
+    );
+    if (!coincide || vistos.has(usuario.id)) continue;
+    vistos.set(usuario.id, {
+      id: usuario.id,
+      nombre: usuario.nombre || nombrePersona(usuario),
+      email: usuario.email,
+      estado: 1,
+    });
+  }
+  return Array.from(vistos.values());
+};
+
+const usuariosDeEvento = (ev: any) => {
+  const vistos = new Map<number, any>();
+  for (const act of ev.actividades || []) {
+    for (const usuario of usuariosDeActividad(act)) {
+      if (!vistos.has(usuario.id)) vistos.set(usuario.id, { ...usuario, actividad: act.nombre });
+    }
+  }
+  return Array.from(vistos.values());
+};
+
+const certsDeActividad = (actId: number) =>
+  certificadosEmitidos.value.filter((cert) => cert.actividadAcademica?.id === actId);
+
+const certsDeEvento = (ev: any) => {
+  const ids = new Set((ev.actividades || []).map((act: any) => act.id));
+  return certificadosEmitidos.value.filter((cert) => ids.has(cert.actividadAcademica?.id));
+};
+
+const togglePanelEvento = (id: number, panel: 'certificados' | 'usuarios') => {
+  panelEvento.value = { ...panelEvento.value, [id]: panelEvento.value[id] === panel ? '' : panel };
+};
+
+const togglePanelActividad = (id: number, panel: 'certificados' | 'usuarios') => {
+  panelActividad.value = { ...panelActividad.value, [id]: panelActividad.value[id] === panel ? '' : panel };
+};
+
+const nuevaActividadEnEvento = (ev: any) => {
+  router.push({
+    name: 'admin-gestion-eventos',
+    query: { eventoId: ev.id, newAct: 'true' },
+  });
+};
+
+const toggleActividadesEvento = (id: number) => {
+  actividadesVisibles.value = { ...actividadesVisibles.value, [id]: !actividadesVisibles.value[id] };
+};
+
+const todasLasActividadesAbiertas = computed(() => {
+  const lista = eventosFiltrados.value.filter((ev) => (ev.actividades || []).length > 0);
+  return lista.length > 0 && lista.every((ev) => actividadesVisibles.value[ev.id]);
+});
+
+const toggleTodasLasActividades = () => {
+  const abrir = !todasLasActividadesAbiertas.value;
+  const next: Record<number, boolean> = { ...actividadesVisibles.value };
+  for (const ev of eventosFiltrados.value) next[ev.id] = abrir;
+  actividadesVisibles.value = next;
+};
+
+const verCertificado = async (cert: any) => {
+  const abrirPdf = (blob: Blob) => {
+    const url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+    window.open(url, '_blank', 'noopener');
+  };
+  const esPdf = async (blob: Blob) => {
+    if (blob.type.includes('pdf')) return true;
+    const inicio = await blob.slice(0, 5).text();
+    return inicio.startsWith('%PDF');
+  };
+  for (const ruta of [`/admin/certificados/${cert.id}/pdf`, `/me/certificados/${cert.id}/download`]) {
+    try {
+      const res = await api.get(ruta, { responseType: 'blob' });
+      if (await esPdf(res.data)) {
+        abrirPdf(res.data);
+        return;
+      }
+    } catch {
+      /* el diseño aún no existe o la ruta no está disponible */
+    }
+  }
+  Swal.fire('Sin certificado', 'No se pudo generar el PDF de este certificado.', 'error');
+};
 
 const limpiarFiltros = () => {
   filtroTexto.value = '';
@@ -434,7 +568,8 @@ const habilitarEdicion = async (usuario: any, ticketId: number, emailSugerido: s
 };
 
 onMounted(() => { 
-  fetchEventos(); 
+  fetchEventos();
+  fetchCertificados();
   fetchActividades(); 
   fetchSolicitudes();
   fetchTickets();
@@ -575,7 +710,7 @@ const exportarPDFSegmentado = async (categoria: string) => {
     <!-- HEADER -->
     <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
       <div>
-        <p class="text-[10px] font-black text-red-600 dark:text-red-500 uppercase tracking-widest mb-1">Panel Unificado</p>
+        <p class="text-[10px] font-black text-umsa-blue dark:text-sky-400 uppercase tracking-widest mb-1">Panel Unificado</p>
         <h1 class="text-xl sm:text-2xl font-black text-slate-800 dark:text-white uppercase italic tracking-tight">Gestión Académica</h1>
         <p class="text-slate-500 text-xs sm:text-sm mt-1">Administra eventos, actividades y soporte desde un solo lugar</p>
       </div>
@@ -584,7 +719,7 @@ const exportarPDFSegmentado = async (categoria: string) => {
         <!-- Barra de Tabs -->
         <div class="flex flex-wrap bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-slate-200 dark:border-white/10 gap-0.5">
           <button @click="tabActivo = 'eventos'; filtroTexto = ''; filtroEstado = ''"
-                  :class="tabActivo === 'eventos' ? 'bg-white dark:bg-red-600 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'"
+                  :class="tabActivo === 'eventos' ? 'bg-white dark:bg-umsa-blue text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'"
                   class="flex items-center gap-1.5 px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg text-[9px] sm:text-[10px] font-black uppercase transition-all">
             <span class="material-symbols-outlined text-[14px] sm:text-[16px]">corporate_fare</span>
             Eventos
@@ -613,7 +748,7 @@ const exportarPDFSegmentado = async (categoria: string) => {
 
         <!-- Botón de acción -->
         <button v-if="tabActivo === 'eventos'" @click="abrirCrearEvento()"
-                class="flex items-center justify-center gap-2 px-5 py-3 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg shadow-red-600/20 hover:bg-red-700 transition-all group">
+                class="flex items-center justify-center gap-2 px-5 py-3 bg-umsa-blue text-white rounded-xl text-[10px] font-black uppercase shadow-lg shadow-[#0070BB]/20 hover:bg-[#005a96] transition-all group">
           <span class="material-symbols-outlined text-[16px] group-hover:rotate-90 transition-transform">add</span>
           Nuevo Evento
         </button>
@@ -643,7 +778,7 @@ const exportarPDFSegmentado = async (categoria: string) => {
         <div class="flex-1 min-w-[200px] relative">
           <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[18px]">search</span>
           <input v-model="filtroTexto" type="text" :placeholder="`Buscar ${tabActivo === 'eventos' ? 'evento' : 'actividad'}...`"
-                 class="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm outline-none focus:border-red-600/50 text-slate-800 dark:text-white transition-all" />
+                 class="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm outline-none focus:border-umsa-blue/50 text-slate-800 dark:text-white transition-all" />
         </div>
         <template v-if="tabActivo === 'eventos'">
           <div class="flex gap-1.5 flex-wrap items-center">
@@ -656,6 +791,10 @@ const exportarPDFSegmentado = async (categoria: string) => {
             <button v-if="filtroEstado || filtroTexto" @click="limpiarFiltros"
                     class="px-3 py-1.5 text-[9px] font-black uppercase rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all border border-red-100">
               Limpiar Filtros
+            </button>
+            <button @click="toggleTodasLasActividades"
+                    class="px-3 py-1.5 text-[9px] font-black uppercase rounded-lg bg-sky-50 text-[#003B71] hover:bg-sky-100 transition-all border border-sky-100">
+              {{ todasLasActividadesAbiertas ? 'Cerrar actividades' : 'Abrir todas las actividades' }}
             </button>
           </div>
           <div class="flex items-center gap-2 ml-auto">
@@ -704,104 +843,160 @@ const exportarPDFSegmentado = async (categoria: string) => {
         <span class="material-symbols-outlined text-6xl mb-2 opacity-20">corporate_fare</span>
         <p class="text-xs font-black uppercase tracking-widest">No hay eventos que mostrar</p>
       </div>
-      <div v-else class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] overflow-hidden shadow-sm">
-        <div class="overflow-x-auto">
-          <table class="w-full">
-            <thead class="bg-slate-50 dark:bg-white/5">
-              <tr class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                <th class="px-6 py-4 text-left">Evento</th>
-                <th class="px-6 py-4 text-left">Gestión</th>
-                <th class="px-6 py-4 text-left">Fechas</th>
-                <th class="px-6 py-4 text-left">Ubicación</th>
-                <th class="px-6 py-4 text-center">Estado</th>
-                <th class="px-6 py-4 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100 dark:divide-white/5">
-              <tr v-for="ev in eventosFiltrados" :key="ev.id"
-                  class="hover:bg-slate-50 dark:hover:bg-white/3 transition-colors group">
-                <td class="px-6 py-4">
-                  <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl overflow-hidden bg-red-50 dark:bg-red-900/20 shrink-0 border border-red-200/50 dark:border-red-900/30">
-                      <img v-if="ev.imagen_fondo" 
-                           :src="ev.imagen_fondo.startsWith('http') ? ev.imagen_fondo : getImageUrl('eventos', ev.imagen_fondo)" 
-                           class="w-full h-full object-cover" :alt="ev.nombre"
-                           @error="($event.target as HTMLImageElement).style.display = 'none'">
-                      <img v-else-if="ev.logo" 
-                           :src="ev.logo.startsWith('http') ? ev.logo : getImageUrl('logo', ev.logo)" 
-                           class="w-full h-full object-cover" :alt="ev.nombre"
-                           @error="($event.target as HTMLImageElement).style.display = 'none'">
-                      <div v-if="!ev.imagen_fondo && !ev.logo" class="w-full h-full flex items-center justify-center">
-                        <span class="material-symbols-outlined text-red-500 text-[18px]">corporate_fare</span>
-                      </div>
+      <div v-else class="space-y-10">
+        <article v-for="ev in eventosFiltrados" :key="ev.id"
+                 class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2rem] overflow-hidden shadow-sm">
+          <div class="relative h-72 md:h-80 overflow-hidden">
+            <img :src="imagenEvento(ev)" :alt="ev.nombre" class="absolute inset-0 w-full h-full object-cover">
+            <div class="absolute inset-0 bg-gradient-to-t from-[#003B71] via-[#003B71]/70 to-transparent"></div>
+            <div class="absolute inset-x-0 bottom-0 p-6 md:p-8 text-white">
+              <div class="flex flex-wrap items-center gap-2 mb-3">
+                <span v-if="estadoEventoConfig[ev.estado]" class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-white/15 border border-white/20">
+                  {{ estadoEventoConfig[ev.estado].label }}
+                </span>
+                <span class="text-[10px] font-bold uppercase tracking-widest text-sky-100">Gestión {{ ev.gestion || '—' }}</span>
+                <span v-if="ev.version" class="text-[10px] font-bold uppercase tracking-widest text-sky-200">{{ ev.version }}</span>
+              </div>
+              <h2 class="text-3xl md:text-4xl font-black uppercase tracking-tight leading-none">{{ ev.nombre }}</h2>
+              <p class="mt-3 text-sm text-sky-100/90 flex flex-wrap gap-x-4 gap-y-1">
+                <span>{{ fechaCorta(ev.fecha_inicio) }} → {{ fechaCorta(ev.fecha_fin) }}</span>
+                <span>{{ ev.ubicacion || 'Sin ubicación' }}</span>
+              </p>
+              <div class="mt-5 flex flex-wrap items-center gap-2">
+                <button @click="togglePanelEvento(ev.id, 'certificados')"
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white text-[#003B71] text-[10px] font-black uppercase tracking-widest">
+                  <span class="material-symbols-outlined text-[16px]">workspace_premium</span>
+                  Certificados
+                  <span class="px-2 py-0.5 rounded-full bg-[#0070BB] text-white">{{ certsDeEvento(ev).length }}</span>
+                </button>
+                <button @click="togglePanelEvento(ev.id, 'usuarios')"
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sky-300 text-[#003B71] text-[10px] font-black uppercase tracking-widest">
+                  <span class="material-symbols-outlined text-[16px]">groups</span>
+                  Usuarios del evento
+                  <span class="px-2 py-0.5 rounded-full bg-[#003B71] text-white">{{ usuariosDeEvento(ev).length }}</span>
+                </button>
+                <button @click="router.push({ name: 'admin-inscripciones-excel', query: { eventoId: ev.id } })" title="Inscripción masiva"
+                        class="p-2.5 rounded-xl bg-white/15 border border-white/20 hover:bg-white hover:text-[#003B71]">
+                  <span class="material-symbols-outlined text-[18px]">grid_on</span>
+                </button>
+                <button @click="abrirCoordinadores(ev)" title="Responsables"
+                        class="p-2.5 rounded-xl bg-white/15 border border-white/20 hover:bg-white hover:text-[#003B71]">
+                  <span class="material-symbols-outlined text-[18px]">group_add</span>
+                </button>
+                <button @click="ev.fase === 4 ? router.push({ name: 'admin-certificados-envio', query: { search: ev.nombre } }) : Swal.fire('Aviso', 'Solo se pueden emitir certificados de eventos en fase FINALIZADO.', 'info')"
+                        title="Emitir certificados"
+                        class="p-2.5 rounded-xl bg-white/15 border border-white/20 hover:bg-white hover:text-[#003B71]">
+                  <span class="material-symbols-outlined text-[18px]">verified_user</span>
+                </button>
+                <button @click="nuevaActividadEnEvento(ev)" title="Nueva actividad"
+                        class="p-2.5 rounded-xl bg-emerald-400 text-[#003B71]">
+                  <span class="material-symbols-outlined text-[18px]">add</span>
+                </button>
+                <button @click="abrirEditarEvento(ev)" title="Editar evento"
+                        class="p-2.5 rounded-xl bg-white/15 border border-white/20 hover:bg-white hover:text-[#003B71]">
+                  <span class="material-symbols-outlined text-[18px]">edit</span>
+                </button>
+                <button @click="confirmarEliminarEvento(ev)" title="Inhabilitar"
+                        class="p-2.5 rounded-xl bg-white/15 border border-white/20 hover:bg-rose-500">
+                  <span class="material-symbols-outlined text-[18px]">do_not_disturb_on</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="panelEvento[ev.id] === 'certificados'" class="px-6 md:px-8 py-5 border-b border-slate-100 dark:border-white/5 bg-sky-50/60 dark:bg-sky-950/20">
+            <p class="text-[10px] font-black uppercase tracking-widest text-[#003B71] dark:text-sky-300 mb-3">Certificados de todo el evento</p>
+            <p v-if="certsDeEvento(ev).length === 0" class="text-sm text-slate-500">Todavía no hay certificados emitidos en este evento.</p>
+            <ul v-else class="grid md:grid-cols-2 gap-2">
+              <li v-for="cert in certsDeEvento(ev)" :key="cert.id" class="flex items-center justify-between gap-3 bg-white dark:bg-[#13131f] rounded-xl px-4 py-3 border border-sky-100 dark:border-white/10">
+                <div>
+                  <p class="text-sm font-black text-slate-800 dark:text-white">{{ nombrePersona(cert.usuario) }}</p>
+                  <p class="text-[10px] text-slate-500">{{ cert.actividadAcademica?.nombre || 'Actividad' }} · {{ cert.codigo_certificado }}</p>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <span class="text-[9px] font-black uppercase text-[#0070BB]">{{ cert.estado === 1 ? 'Válido' : 'Revocado' }}</span>
+                  <button @click="verCertificado(cert)" class="px-3 py-1.5 rounded-lg bg-[#003B71] text-white text-[10px] font-black uppercase">Ver</button>
+                  <button v-if="cert.uuid_archivo" @click="window.open(router.resolve({ name: 'verificar-certificado', params: { uuid: cert.uuid_archivo } }).href, '_blank', 'noopener')" class="px-3 py-1.5 rounded-lg border border-emerald-200 text-emerald-700 text-[10px] font-black uppercase">Verificar</button>
+                </div>
+              </li>
+            </ul>
+          </div>
+          <div v-if="panelEvento[ev.id] === 'usuarios'" class="px-6 md:px-8 py-5 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5">
+            <p class="text-[10px] font-black uppercase tracking-widest text-[#003B71] dark:text-sky-300 mb-3">Usuarios de todo el evento</p>
+            <p v-if="usuariosDeEvento(ev).length === 0" class="text-sm text-slate-500">No hay inscritos en las actividades de este evento.</p>
+            <ul v-else class="grid md:grid-cols-2 gap-2">
+              <li v-for="usuario in usuariosDeEvento(ev)" :key="usuario.id" class="bg-white dark:bg-[#13131f] rounded-xl px-4 py-3 border border-slate-200 dark:border-white/10">
+                <p class="text-sm font-black text-slate-800 dark:text-white">{{ usuario.nombre }}</p>
+                <p class="text-[10px] text-slate-500">{{ usuario.email }} · {{ usuario.actividad }}</p>
+              </li>
+            </ul>
+          </div>
+
+          <div class="px-6 md:px-8 py-6">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h3 class="text-xs font-black uppercase tracking-widest text-slate-400">Actividades del evento</h3>
+              <button v-if="(ev.actividades || []).length" @click="toggleActividadesEvento(ev.id)"
+                      class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-100 dark:bg-white/10 text-[#003B71] dark:text-sky-200 text-[10px] font-black uppercase tracking-widest">
+                <span class="material-symbols-outlined text-[16px]">{{ actividadesVisibles[ev.id] ? 'expand_less' : 'expand_more' }}</span>
+                {{ actividadesVisibles[ev.id] ? 'Ocultar actividades' : 'Ver actividades' }}
+                <span class="px-2 py-0.5 rounded-full bg-[#0070BB] text-white">{{ (ev.actividades || []).length }}</span>
+              </button>
+            </div>
+            <p v-if="!(ev.actividades || []).length" class="text-sm text-slate-500">Este evento todavía no tiene actividades.</p>
+            <div v-else-if="actividadesVisibles[ev.id]" class="space-y-4">
+              <div v-for="act in ev.actividades" :key="act.id" class="rounded-2xl border border-slate-200 dark:border-white/10 overflow-hidden">
+                <div class="flex flex-col md:flex-row gap-4 p-4">
+                  <div class="w-full md:w-40 h-28 rounded-xl overflow-hidden bg-gradient-to-br from-[#003B71] to-[#0070BB] shrink-0">
+                    <img v-if="act.imagen" :src="resolveMediaUrl(act.imagen)" :alt="act.nombre" class="w-full h-full object-cover">
+                    <span v-else class="material-symbols-outlined text-sky-100 text-4xl w-full h-full flex items-center justify-center">image</span>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <p class="text-base font-black text-slate-800 dark:text-white">{{ act.nombre }}</p>
+                      <span class="text-[9px] font-black uppercase px-2 py-1 rounded-full bg-sky-50 text-[#0070BB]">{{ act.tipo || act.modalidad || 'Actividad' }}</span>
+                      <span class="text-[9px] font-black uppercase px-2 py-1 rounded-full" :class="act.estado === 0 ? 'bg-slate-100 text-slate-600' : act.estado === -1 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'">
+                        {{ estadoActividadLabel(Number(act.estado)) }}
+                      </span>
                     </div>
-                    <div>
-                      <p class="text-sm font-black text-slate-800 dark:text-white">{{ ev.nombre }}</p>
-                      <p v-if="ev.version" class="text-[10px] text-red-500 font-bold uppercase italic">{{ ev.version }}</p>
+                    <p class="mt-2 text-sm font-bold text-slate-600 dark:text-slate-300">{{ fechaCorta(act.fecha_inicio) }} → {{ fechaCorta(act.fecha_fin) }}</p>
+                    <p class="mt-1 text-[11px] text-slate-500">
+                      {{ act.horas ? `${act.horas} horas` : 'Sin carga horaria' }}
+                      · nota mínima {{ act.min_nota ?? '—' }}
+                      · asistencia {{ act.min_asistencia ?? '—' }}%
+                      · {{ usuariosDeActividad(act).length }} inscritos
+                    </p>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                      <button @click="togglePanelActividad(act.id, 'usuarios')" class="px-3 py-1.5 rounded-lg bg-[#0070BB] text-white text-[10px] font-black uppercase">Usuarios</button>
+                      <button @click="togglePanelActividad(act.id, 'certificados')" class="px-3 py-1.5 rounded-lg bg-sky-100 text-[#003B71] text-[10px] font-black uppercase">Certificados</button>
+                      <button @click="abrirEditarActividad({ ...act, id_evento: ev.id, evento: ev })" class="px-3 py-1.5 rounded-lg border border-slate-200 text-[10px] font-black uppercase text-slate-600">Editar</button>
+                      <router-link :to="{ name: 'admin-gestion-eventos-detalle', params: { id: act.id } }" class="px-3 py-1.5 rounded-lg border border-slate-200 text-[10px] font-black uppercase text-slate-600">Detalle</router-link>
                     </div>
                   </div>
-                </td>
-                <td class="px-6 py-4">
-                  <span class="text-sm font-black text-slate-700 dark:text-slate-300">{{ ev.gestion || '—' }}</span>
-                </td>
-                <td class="px-6 py-4">
-                  <p class="text-[10px] font-bold text-slate-500">
-                    {{ ev.fecha_inicio?.substring(0, 10) || '—' }}
-                    <span v-if="ev.fecha_fin"> → {{ ev.fecha_fin?.substring(0, 10) }}</span>
-                  </p>
-                </td>
-                <td class="px-6 py-4">
-                  <p class="text-[10px] font-bold text-slate-500 truncate max-w-[150px]">{{ ev.ubicacion || '—' }}</p>
-                </td>
-                <td class="px-6 py-4 text-center">
-                   <div class="flex flex-col items-center gap-1">
-                      <span v-if="ev.estado !== undefined && estadoEventoConfig[ev.estado]" 
-                            :class="[estadoEventoConfig[ev.estado]?.bg, estadoEventoConfig[ev.estado]?.color]"
-                            class="px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest border border-current opacity-80">
-                        {{ estadoEventoConfig[ev.estado]?.label }}
-                      </span>
-                      <span v-if="ev.fase" class="text-[7px] font-black text-slate-400 uppercase tracking-tighter">
-                         {{ ev.fase === 4 ? '🏁 Finalizado' : ev.fase === 1 ? '📝 Planificación' : ev.fase === 2 ? '👥 Inscripciones' : ev.fase === 3 ? '⚡ Ejecución' : '📁 Archivado' }}
-                      </span>
-                   </div>
-                </td>
-                <td class="px-6 py-4 text-right">
-                  <div class="flex justify-end items-center gap-2">
-                    <!-- Inscripción Masiva (Excel) -->
-                    <button @click="router.push({ name: 'admin-inscripciones-excel', query: { eventoId: ev.id } })"
-                            title="Inscripción Masiva (Excel)"
-                            class="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-sm">
-                      <span class="material-symbols-outlined text-[18px]">grid_on</span>
-                    </button>
-
-                    <!-- Gestionar Coordinadores -->
-                    <button @click="abrirCoordinadores(ev)"
-                            title="Gestionar Responsables"
-                            class="p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 text-slate-600 hover:bg-slate-800 hover:text-white transition-all shadow-sm">
-                      <span class="material-symbols-outlined text-[18px]">group_add</span>
-                    </button>
-
-                    <!-- Emitir Certificados -->
-                    <button @click="ev.fase === 4 ? router.push({ name: 'admin-certificados-envio', query: { search: ev.nombre } }) : Swal.fire('Aviso', 'Solo se pueden emitir certificados de eventos en fase FINALIZADO.', 'info')"
-                            title="Emitir Certificados"
-                            :class="ev.fase === 4 ? 'bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white' : 'bg-slate-50 text-slate-300 cursor-not-allowed'"
-                            class="p-2.5 rounded-xl dark:bg-amber-900/20 transition-all shadow-sm">
-                      <span class="material-symbols-outlined text-[18px]">verified_user</span>
-                    </button>
-                    <button @click="abrirEditarEvento(ev)" title="Editar"
-                            class="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm">
-                      <span class="material-symbols-outlined text-[18px]">edit</span>
-                    </button>
-                    <button @click="confirmarEliminarEvento(ev)" title="Inhabilitar"
-                            class="p-2.5 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm">
-                      <span class="material-symbols-outlined text-[18px]">do_not_disturb_on</span>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                </div>
+                <div v-if="panelActividad[act.id] === 'usuarios'" class="px-4 pb-4">
+                  <p v-if="usuariosDeActividad(act).length === 0" class="text-sm text-slate-500">Sin inscritos en esta actividad.</p>
+                  <ul v-else class="grid md:grid-cols-2 gap-2">
+                    <li v-for="usuario in usuariosDeActividad(act)" :key="usuario.id" class="rounded-xl bg-slate-50 dark:bg-white/5 px-3 py-2">
+                      <p class="text-sm font-black text-slate-800 dark:text-white">{{ usuario.nombre }}</p>
+                      <p class="text-[10px] text-slate-500">{{ usuario.email }}</p>
+                    </li>
+                  </ul>
+                </div>
+                <div v-if="panelActividad[act.id] === 'certificados'" class="px-4 pb-4">
+                  <p v-if="certsDeActividad(act.id).length === 0" class="text-sm text-slate-500">Esta actividad no tiene certificados emitidos.</p>
+                  <ul v-else class="grid md:grid-cols-2 gap-2">
+                    <li v-for="cert in certsDeActividad(act.id)" :key="cert.id" class="rounded-xl bg-sky-50 dark:bg-sky-950/30 px-3 py-2">
+                      <p class="text-sm font-black text-slate-800 dark:text-white">{{ nombrePersona(cert.usuario) }}</p>
+                      <p class="text-[10px] text-slate-500">{{ cert.codigo_certificado }} · {{ cert.estado === 1 ? 'Válido' : 'Revocado' }}</p>
+                      <button @click="verCertificado(cert)" class="mt-2 px-3 py-1.5 rounded-lg bg-[#003B71] text-white text-[10px] font-black uppercase">Ver certificado</button>
+                      <button v-if="cert.uuid_archivo" @click="window.open(router.resolve({ name: 'verificar-certificado', params: { uuid: cert.uuid_archivo } }).href, '_blank', 'noopener')" class="mt-2 ml-2 px-3 py-1.5 rounded-lg border border-emerald-200 text-emerald-700 text-[10px] font-black uppercase">Verificar</button>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
       </div>
     </div>
 
@@ -832,9 +1027,9 @@ const exportarPDFSegmentado = async (categoria: string) => {
                   class="hover:bg-slate-50 dark:hover:bg-white/3 transition-colors group">
                 <td class="px-6 py-4">
                   <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 overflow-hidden border border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-800">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 overflow-hidden border border-slate-200 dark:border-gray-700 bg-gradient-to-br from-[#003B71] to-[#0070BB]">
                       <img v-if="act.imagen" :src="getImageUrl('cursos', act.imagen)" class="w-full h-full object-cover" :alt="act.nombre">
-                      <span v-else class="material-symbols-outlined text-amber-600 text-[18px]">school</span>
+                      <span v-else class="material-symbols-outlined text-sky-100 text-[18px]">image</span>
                     </div>
                     <div>
                       <p class="text-sm font-black text-slate-800 dark:text-white">{{ act.nombre }}</p>
@@ -1031,7 +1226,7 @@ const exportarPDFSegmentado = async (categoria: string) => {
               
               <template v-if="ticket.estado === 0">
                 <button @click="resetearPassword(ticket.usuario, ticket.id, ticket.email)"
-                  class="bg-red-600 hover:bg-red-700 text-white px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[8px] sm:text-[9px] font-black uppercase tracking-widest transition-colors flex items-center gap-1 shadow-sm">
+                  class="bg-umsa-blue hover:bg-[#005a96] text-white px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[8px] sm:text-[9px] font-black uppercase tracking-widest transition-colors flex items-center gap-1 shadow-sm">
                   <span class="material-symbols-outlined text-[12px] sm:text-[14px]">key</span>
                   Clave
                 </button>

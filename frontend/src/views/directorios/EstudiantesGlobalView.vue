@@ -33,7 +33,7 @@ const fetchEstudiantes = async () => {
     try {
         loading.value = true;
         // El backend enriquecido devolverá inscripciones->actividad->evento
-        const response = await api.get('/usuarios', { params: { rol: 'Estudiante', limit: 100 } });
+        const response = await api.get('/usuarios', { params: { rol: 'Estudiante', limit: 2000 } });
         estudiantes.value = response.data.data || response.data;
     } catch (error) {
         Swal.fire('Error', 'No se pudo cargar el directorio de estudiantes', 'error');

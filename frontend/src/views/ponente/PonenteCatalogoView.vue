@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import api from '@/services/api';
+import api, { imagenActividad, imagenEvento } from '@/services/api';
 
 const router = useRouter();
 const loading = ref(true);
@@ -23,7 +23,7 @@ const loadCatalog = async () => {
         nombreLargo: evento.nombre || 'Nombre del Evento',
         version: evento.version || 'Gestión ' + evento.gestion,
         descripcion: evento.descripcion || 'Sin descripción disponible.',
-        imagen: evento.imagen_fondo || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80',
+        imagen: imagenEvento(evento),
         estado: 'Evento Activo',
         colorEstado: 'bg-emerald-500 text-white border-emerald-400/30',
         inscripcionesAbiertas: true,
@@ -42,7 +42,7 @@ const loadCatalog = async () => {
             date: act.fecha_inicio ? `${new Date(act.fecha_inicio).toLocaleDateString()}` : 'Por definir',
             students: act.inscripciones?.length || 0,
             modules: act.modalidades?.length || 1,
-            image: act.imagen || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80'
+            image: imagenActividad({ ...act, evento })
           };
         })
       };

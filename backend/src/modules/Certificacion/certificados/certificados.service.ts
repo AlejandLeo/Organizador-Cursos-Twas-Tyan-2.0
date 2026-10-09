@@ -269,9 +269,51 @@ export class CertificadosService {
     return this.certificadoRepository.save(this.certificadoRepository.create(data));
   }
 
-  findAll() {
-    return this.certificadoRepository.find({
-      relations: ['usuario', 'usuario.persona', 'actividadAcademica'],
+  async findAll() {
+    const certs = await this.certificadoRepository.find({
+      relations: ['usuario', 'usuario.persona', 'actividadAcademica', 'actividadAcademica.evento'],
+      order: { fecha_emision: 'DESC' },
+    });
+
+    const logs = await this.mailLogRepository
+      .createQueryBuilder('log')
+      .select('LOWER(log.destinatario)', 'destinatario')
+      .addSelect('LOWER(log.asunto)', 'asunto')
+      .addSelect('COUNT(*)', 'total')
+      .where('log.estado = :estado', { estado: 'enviado' })
+      .andWhere('log.asunto ILIKE :prefijo', { prefijo: 'Tu Certificado:%' })
+      .groupBy('LOWER(log.destinatario)')
+      .addGroupBy('LOWER(log.asunto)')
+      .getRawMany<{ destinatario: string; asunto: string; total: string }>();
+
+    const enviadosPorCorreo = new Map<string, number>();
+    for (const row of logs) {
+      enviadosPorCorreo.set(`${row.destinatario}|${row.asunto}`, Number(row.total) || 0);
+    }
+
+    const clave = (cert: Certificado) => {
+      const email = cert.usuario?.email?.toLowerCase() || '';
+      const asunto = `tu certificado: ${(cert.actividadAcademica?.nombre || '').toLowerCase()}`;
+      return `${email}|${asunto}`;
+    };
+    const enviadosPorClave = new Map<string, number>();
+    for (const cert of certs) {
+      if (cert.estado_envio !== 'enviado') continue;
+      const key = clave(cert);
+      enviadosPorClave.set(key, (enviadosPorClave.get(key) || 0) + 1);
+    }
+
+    return certs.map((cert) => {
+      const key = clave(cert);
+      const desdeHistorial = enviadosPorCorreo.get(key) || 0;
+      const guardados = cert.envios || 0;
+      const unicoEnviado = cert.estado_envio === 'enviado' && enviadosPorClave.get(key) === 1;
+      const envios = unicoEnviado
+        ? Math.max(guardados, desdeHistorial, 1)
+        : cert.estado_envio === 'enviado'
+          ? Math.max(guardados, 1)
+          : guardados;
+      return { ...cert, envios };
     });
   }
 
@@ -405,11 +447,83 @@ export class CertificadosService {
         const uuidArchivo = uuidv4();
         const codigoCertificado = crypto.randomBytes(8).toString('hex').toUpperCase();
 
+        let dbTipo = tipo; // 1: Asistente, 2: Expositor, 3: Logística
+
+        let finalInfoCertId = id_info_certificado;
+
+        // Lógica de excelencia automática si el usuario seleccionó un asistente
+        if (dbTipo === 1 && id_actividad_academica) {
+          const ins: any = await queryRunner.manager.findOne('Inscripcion', {
+            where: {
+              usuario: { id: idUsuario },
+              actividadAcademica: { id: id_actividad_academica }
+            },
+            relations: ['modalidades', 'modalidades.cursoModalidad']
+          });
+
+          if (ins) {
+            let esParaExcelencia = false;
+
+            if (ins.modalidades && ins.modalidades.length > 0) {
+              for (const im of ins.modalidades) {
+                const minNota = im.cursoModalidad?.min_nota ?? 0;
+                const minAsistencia = im.cursoModalidad?.min_asistencia ?? 0;
+                const nota = im.nota ?? 0;
+                const asistencia = im.num_asistencia ?? 0;
+                
+                const cumpleAsistencia = asistencia >= minAsistencia;
+                const cumpleNota = nota >= minNota;
+
+                if (im.aprobado === 1 || (cumpleAsistencia && cumpleNota)) {
+                  esParaExcelencia = true;
+                }
+              }
+            } else {
+              // Fallback map check
+              const config: any = await queryRunner.manager.findOne('ActividadAcademica', {
+                where: { id: id_actividad_academica },
+                relations: ['modalidades']
+              });
+              let minNota = 51;
+              let minAsistencia = 0;
+              if (config && config.modalidades && config.modalidades.length > 0) {
+                minNota = config.modalidades[0].min_nota ?? 0;
+                minAsistencia = config.modalidades[0].min_asistencia ?? 0;
+              }
+              const nota = ins.nota_principal ?? 0;
+              const asistencia = 0;
+              console.log('FALLBACK CHECK:', { nota, minNota, asistencia, minAsistencia });
+              if (nota >= minNota && asistencia >= minAsistencia) {
+                esParaExcelencia = true;
+              }
+              console.log('esParaExcelencia final:', esParaExcelencia, 'dbTipo:', dbTipo, 'id_evento:', id_evento);
+            }
+
+            if (esParaExcelencia) {
+              // Buscar plantilla de excelencia para este evento
+              const excelTemplate: any = await queryRunner.manager.findOne('InfoCertificado', {
+                where: { evento: { id: id_evento }, tipo: dbTipo, es_excelencia: 1 }
+              });
+              if (excelTemplate) {
+                finalInfoCertId = excelTemplate.id;
+              }
+            } else {
+              // Buscar plantilla normal
+              const normalTemplate: any = await queryRunner.manager.findOne('InfoCertificado', {
+                where: { evento: { id: id_evento }, tipo: dbTipo, es_excelencia: 0 }
+              });
+              if (normalTemplate) {
+                finalInfoCertId = normalTemplate.id;
+              }
+            }
+          }
+        }
+
         const certificado = queryRunner.manager.create(Certificado, {
-          infoCertificado: { id: id_info_certificado },
+          infoCertificado: { id: finalInfoCertId },
           ...(id_actividad_academica ? { actividadAcademica: { id: id_actividad_academica } } : {}),
           usuario: { id: idUsuario },
-          tipo,
+          tipo: dbTipo,
           codigo_certificado: codigoCertificado,
           uuid_archivo: uuidArchivo,
           hash_integridad: 'PENDIENTE',

@@ -3,7 +3,8 @@ import { ref, onMounted, computed, nextTick, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useCertificadosStore } from '@/stores/certificados';
-import api, { getImageUrl, resolveMediaUrl } from '@/services/api';
+import api, { imagenActividad, resolveMediaUrl } from '@/services/api';
+import { certificadoDelPortal } from '@/utils/certificadoRol';
 import Swal from 'sweetalert2';
 import QrcodeVue from 'qrcode.vue';
 import { Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
@@ -16,8 +17,75 @@ const user = computed(() => authStore.user);
 const actividadId = Number(route.params.id);
 const loading = ref(true);
 
-const miCertificado = computed(() => {
-    return certificadosStore.misCertificados.find((c: any) => c.actividadAcademica?.id === actividadId);
+const vistaCertificados = ref<{ id: number; titulo: string; url: string }[]>([]);
+
+const certificadosDeLaActividad = computed(() => {
+  const eventoId = Number((actividad.value as any).eventoId || 0);
+  return certificadosStore.misCertificados.filter((c: any) => {
+    if (!certificadoDelPortal(c.tipo, route.path)) return false;
+    const actId = Number(c.actividadAcademica?.id || c.actividad?.id || 0);
+    const evId = Number(c.evento?.id || c.actividadAcademica?.evento?.id || c.actividad?.evento?.id || 0);
+    return actId === actividadId || (eventoId > 0 && evId === eventoId);
+  });
+});
+
+const miCertificado = computed(() => certificadosDeLaActividad.value[0] || null);
+
+const cargarVistaCertificados = async () => {
+  vistaCertificados.value.forEach((item) => URL.revokeObjectURL(item.url));
+  vistaCertificados.value = [];
+  const cargados: { id: number; titulo: string; url: string }[] = [];
+  for (const cert of certificadosDeLaActividad.value) {
+    try {
+      const response = await api.get(`/me/certificados/${cert.id}/download`, { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      cargados.push({
+        id: cert.id,
+        titulo: cert.actividadAcademica?.nombre || cert.actividad?.nombre || cert.evento?.nombre || 'Certificado',
+        url: URL.createObjectURL(blob),
+      });
+    } catch (error) {
+      console.error('No se pudo mostrar el certificado', cert.id, error);
+    }
+  }
+  vistaCertificados.value = cargados;
+};
+
+const fechaYaPaso = (fecha?: string | null) => {
+  if (!fecha) return false;
+  const fin = String(fecha).slice(0, 10);
+  const hoy = new Date();
+  const iso = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+  return fin < iso;
+};
+
+const actividadCerrada = computed(() => {
+  const a = actividad.value;
+  return Number(a.estadoActividad) === 0
+    || Number(a.estadoEvento) === 0
+    || Number(a.faseEvento) >= 4
+    || !!miCertificado.value
+    || fechaYaPaso(a.fechaFin);
+});
+
+const documentosSubidos = computed(() => {
+  const docs: { titulo: string; url: string; tipo: string }[] = [];
+  const extra = myInscripcion.value?.datos_adicionales;
+  if (extra && typeof extra === 'object') {
+    for (const [label, value] of Object.entries(extra)) {
+      if (typeof value === 'string' && (value.startsWith('/uploads/') || value.startsWith('http'))) {
+        docs.push({ titulo: label, url: value, tipo: 'Enviado' });
+      }
+    }
+  }
+  for (const mat of actividad.value.materiales || []) {
+    docs.push({
+      titulo: mat.titulo || mat.nombre || 'Documento',
+      url: mat.url || '',
+      tipo: mat.tipo || 'Material',
+    });
+  }
+  return docs;
 });
 
 const openMaterial = (mat: any) => {
@@ -55,7 +123,7 @@ const actividad = ref({
   horas: 0,
   docente: 'Sin asignar',
   descripcion: 'Cargando detalle...',
-  imagen: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=1200&q=80',
+  imagen: '',
   materiales: [] as any[],
   ponentes: [] as any[],
   tareas: [] as any[],
@@ -64,7 +132,12 @@ const actividad = ref({
     notaMinima: 51,
     completado: false
   },
-  requisitos: null as any
+  requisitos: null as any,
+  eventoId: null as number | null,
+  estadoActividad: 1,
+  estadoEvento: 1,
+  faseEvento: 1,
+  fechaFin: '' as string,
 });
 
 // Lógica QR Estudiante
@@ -110,8 +183,7 @@ const loadActividad = async () => {
       horas: act.horas || 40,
       docente: act.imparticiones && act.imparticiones.length > 0 ? `${act.imparticiones[0].usuario.persona.nombres} ${act.imparticiones[0].usuario.persona.primer_apellido}` : 'Sin Docente',
       descripcion: act.descripcion || 'Sin descripción detallada.',
-      imagen: getImageUrl('cursos', act.imagen) || 
-              (act.evento ? (act.evento.imagen_fondo || act.evento.logo) : 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=1200&q=80'),
+      imagen: imagenActividad(act),
       materiales: act.materiales || [],
       ponentes: act.imparticiones ? act.imparticiones.map((imp: any) => ({
         id: imp.usuario.id,
@@ -125,7 +197,12 @@ const loadActividad = async () => {
         notaMinima: act.min_nota ?? 51,
         completado: false
       },
-      requisitos: act.requisitos
+      requisitos: act.requisitos,
+      eventoId: act.evento?.id || null,
+      estadoActividad: Number(act.estado),
+      estadoEvento: Number(act.evento?.estado ?? 1),
+      faseEvento: Number(act.evento?.fase ?? 1),
+      fechaFin: act.fecha_fin || act.evento?.fecha_fin || '',
     };
 
     if (!actividad.value.requisitos || !actividad.value.requisitos.base || Object.keys(actividad.value.requisitos.base).length === 0) {
@@ -208,9 +285,14 @@ const checkInscripcionStatus = async () => {
         await loadAsistenciasReales();
       }
     } else {
-      myInscripcion.value = null; 
-      actividad.value.estado = 'Disponible';
-      actividad.value.progreso = 0;
+      myInscripcion.value = null;
+      actividad.value.estado = actividadCerrada.value ? 'Finalizado' : 'Disponible';
+      actividad.value.progreso = actividadCerrada.value ? 100 : 0;
+    }
+    if (actividadCerrada.value) {
+      actividad.value.estado = 'Finalizado';
+      actividad.value.progreso = 100;
+      actividad.value.certificadoRequisitos.completado = true;
     }
   } catch (e) {
     console.error('Error checando pre-inscripcion', e);
@@ -222,11 +304,20 @@ onMounted(async () => {
   await loadActividad();
   await checkInscripcionStatus();
   await certificadosStore.fetchMisCertificados();
+  await cargarVistaCertificados();
+  if (actividadCerrada.value) {
+    actividad.value.estado = 'Finalizado';
+    actividad.value.progreso = 100;
+    if (!['resumen', 'documentos', 'certificados'].includes(activeTab.value)) {
+      activeTab.value = 'resumen';
+    }
+  }
   loading.value = false;
 });
 
 onUnmounted(() => {
     stopScanner();
+    vistaCertificados.value.forEach((item) => URL.revokeObjectURL(item.url));
 });
 
 const handleFileReqChange = (e: any, label: string) => {
@@ -416,8 +507,16 @@ const onScanFailure = (error: any) => {
 };
 
 const tabs = computed(() => {
+  if (actividadCerrada.value) {
+    return [
+      { id: 'resumen', label: 'Resumen', icon: 'info' },
+      { id: 'documentos', label: 'Documentos', icon: 'folder_open' },
+      { id: 'certificados', label: 'Certificado', icon: 'workspace_premium' },
+    ];
+  }
+
   const isAprobado = myInscripcion.value && (myInscripcion.value.estado === 1 || myInscripcion.value.estado === 3);
-  
+
   const baseTabs = [
     { id: 'resumen', label: 'Resumen', icon: 'info' },
     { id: 'ponentes', label: 'Ponentes', icon: 'group' }
@@ -431,7 +530,7 @@ const tabs = computed(() => {
       { id: 'certificados', label: 'Certificados', icon: 'workspace_premium' }
     );
   }
-  
+
   return baseTabs;
 });
 
@@ -478,7 +577,8 @@ const goBack = () => {
           <template v-if="myInscripcion">
             <div :class="myInscripcion.estado === 1 ? 'bg-emerald-500' : (myInscripcion.estado === 2 ? 'bg-red-500' : (myInscripcion.estado === 3 ? 'bg-blue-500' : 'bg-amber-500'))"
                   class="backdrop-blur-xl border border-white/20 dark:border-gray-800 rounded-2xl p-6 flex flex-col items-center justify-center min-w-[180px] shadow-2xl transition-all">
-              <div v-if="myInscripcion.estado === 1" class="flex flex-col items-center"><span class="material-symbols-outlined text-white mb-2 text-3xl">check_circle</span><span class="text-white text-base font-black uppercase text-center w-full block">Aprobado</span></div>
+              <div v-if="actividadCerrada || myInscripcion.estado === 3" class="flex flex-col items-center"><span class="material-symbols-outlined text-white mb-2 text-3xl">event_available</span><span class="text-white text-base font-black uppercase text-center w-full block">Finalizado</span></div>
+              <div v-else-if="myInscripcion.estado === 1" class="flex flex-col items-center"><span class="material-symbols-outlined text-white mb-2 text-3xl">check_circle</span><span class="text-white text-base font-black uppercase text-center w-full block">Aprobado</span></div>
               <div v-else-if="myInscripcion.estado === 2" class="flex flex-col items-center"><span class="material-symbols-outlined text-white mb-2 text-3xl">cancel</span><span class="text-white text-base font-black uppercase text-center w-full block">Rechazado</span></div>
               <div v-else-if="myInscripcion.estado === 3" class="flex flex-col items-center"><span class="material-symbols-outlined text-white mb-2 text-3xl">school</span><span class="text-white text-base font-black uppercase text-center w-full block">Finalizado</span></div>
               <div v-else class="flex flex-col items-center"><span class="material-symbols-outlined text-white mb-2 text-3xl">hourglass_empty</span><span class="text-white text-xs font-black uppercase text-center w-full block mt-1 tracking-tight">Pendiente de<br>Aprobación</span></div>
@@ -486,6 +586,13 @@ const goBack = () => {
             </div>
             <div v-if="myInscripcion.estado === 0" class="text-xs font-bold text-amber-500 dark:text-amber-400 mt-2 text-center max-w-[200px]">Tu pre-inscripción fue enviada y está en revisión</div>
             <div v-if="myInscripcion.estado === 2" class="text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-xl mt-2 text-center max-w-[200px] border border-red-200 dark:border-red-900/50"><strong>No se pudo habilitar su inscripción debido a:</strong><br>{{ myInscripcion.observacion || myInscripcion.razon_rechazo || 'No se cumplieron los requisitos requeridos por la coordinadora.' }}</div>
+          </template>
+          <template v-else-if="actividadCerrada">
+            <div class="bg-slate-800 backdrop-blur-xl border border-white/20 rounded-2xl p-6 flex flex-col items-center justify-center min-w-[180px] shadow-2xl">
+              <span class="material-symbols-outlined text-white mb-2 text-3xl">event_available</span>
+              <span class="text-white text-base font-black uppercase text-center">Finalizado</span>
+            </div>
+            <span class="text-xs text-slate-300 font-bold text-center mt-2 max-w-[220px]">Esta actividad ya concluyó. Revisa el resumen, los documentos y tu certificado.</span>
           </template>
           <template v-else>
             <button @click="preinscripcionMenu = true" class="bg-umsa-blue hover:bg-blue-600 text-white px-8 py-5 rounded-2xl font-black uppercase tracking-widest transition-all shadow-[0_0_40px_-5px_rgba(37,99,235,0.5)] flex items-center justify-center gap-3 min-w-[180px] border border-blue-400/50 hover:scale-105">
@@ -564,6 +671,23 @@ const goBack = () => {
                            </div>
                        </div>
                    </div>
+              </div>
+          </div>
+      </div>
+
+      <div v-if="activeTab === 'documentos'" class="animate-in slide-in-from-bottom-4 duration-500 fade-in">
+          <h3 class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight mb-6">Documentos</h3>
+          <div v-if="documentosSubidos.length === 0" class="text-sm font-bold text-slate-500 bg-slate-50 dark:bg-gray-800 p-8 rounded-2xl border border-slate-200 dark:border-gray-700 text-center">No hay documentos cargados para esta actividad.</div>
+          <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div v-for="(doc, index) in documentosSubidos" :key="index" @click="doc.url && openMaterial(doc)" class="border border-slate-200 dark:border-gray-800 hover:border-umsa-blue rounded-2xl p-5 hover:shadow-lg transition-all group dark:bg-gray-950 flex flex-col justify-between min-h-[140px]" :class="doc.url ? 'cursor-pointer' : ''">
+                  <div>
+                      <div class="flex justify-between items-start mb-4">
+                          <span class="material-symbols-outlined text-3xl text-umsa-blue">description</span>
+                          <span class="text-[10px] bg-slate-100 dark:bg-gray-800 px-2 py-1 rounded font-bold uppercase tracking-widest text-slate-500 dark:text-gray-400">{{ doc.tipo }}</span>
+                      </div>
+                      <h4 class="font-bold text-slate-800 dark:text-white mb-1 line-clamp-2 group-hover:text-umsa-blue transition-colors">{{ doc.titulo }}</h4>
+                  </div>
+                  <p class="text-xs text-slate-500 font-medium mt-2">{{ doc.url ? 'Abrir documento' : 'Sin archivo' }}</p>
               </div>
           </div>
       </div>
@@ -771,8 +895,30 @@ const goBack = () => {
       </div>
 
       <!-- Tab: Certificados -->
-      <div v-if="activeTab === 'certificados'" class="animate-in slide-in-from-bottom-4 duration-500 fade-in flex flex-col items-center justify-center py-12 md:py-20 text-center max-w-2xl mx-auto">
-        <template v-if="myInscripcion?.estado === 3 || actividad.estado === 'Finalizado'">
+      <div v-if="activeTab === 'certificados'" class="animate-in slide-in-from-bottom-4 duration-500 fade-in flex flex-col items-center py-8 md:py-12 text-center w-full">
+        <template v-if="vistaCertificados.length">
+            <div class="relative w-24 h-24 mb-6 group">
+              <div class="absolute inset-0 bg-umsa-gold/20 dark:bg-yellow-500/10 rounded-full blur-xl"></div>
+              <div class="w-full h-full bg-gradient-to-br from-umsa-gold to-yellow-600 rounded-full flex items-center justify-center shadow-2xl border-4 border-white dark:border-gray-900 relative z-10">
+                 <span class="material-symbols-outlined text-white text-4xl">workspace_premium</span>
+              </div>
+            </div>
+            <h3 class="text-3xl font-black text-slate-800 dark:text-white uppercase tracking-tight mb-2 text-balance">¡Felicidades por completar el {{ actividad.tipo.toLowerCase() }}!</h3>
+            <p class="text-slate-600 dark:text-gray-400 leading-relaxed mb-8">Este es el certificado emitido para este evento.</p>
+            <div class="w-full space-y-8 text-left">
+              <div v-for="pdf in vistaCertificados" :key="pdf.id" class="space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-sm font-black uppercase tracking-widest text-slate-700 dark:text-white">{{ pdf.titulo }}</p>
+                  <button @click="certificadosStore.descargarCertificado(pdf.id)" class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-slate-800 transition-all flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[16px]">download</span>
+                    Descargar
+                  </button>
+                </div>
+                <iframe :src="pdf.url" class="w-full h-[720px] rounded-2xl border border-slate-200 dark:border-gray-700 bg-white" title="Certificado"></iframe>
+              </div>
+            </div>
+        </template>
+        <template v-else-if="actividadCerrada || myInscripcion?.estado === 3 || actividad.estado === 'Finalizado'">
             <div class="relative w-32 h-32 mb-8 group">
               <div class="absolute inset-0 bg-umsa-gold/20 dark:bg-yellow-500/10 rounded-full blur-xl group-hover:blur-2xl transition-all duration-500"></div>
               <div class="w-full h-full bg-gradient-to-br from-umsa-gold to-yellow-600 rounded-full flex items-center justify-center shadow-2xl border-4 border-white dark:border-gray-900 relative z-10 transform group-hover:scale-105 transition-transform">
@@ -780,24 +926,14 @@ const goBack = () => {
               </div>
             </div>
             <h3 class="text-3xl font-black text-slate-800 dark:text-white uppercase tracking-tight mb-4 text-balance">¡Felicidades por completar el {{ actividad.tipo.toLowerCase() }}!</h3>
-            
-            <template v-if="miCertificado">
-                <p class="text-slate-600 dark:text-gray-400 leading-relaxed mb-8">Has cumplido con todos los requisitos académicos. Tu certificado de participación ya está disponible para descargar.</p>
-                <button @click="certificadosStore.descargarCertificado(miCertificado.id)" class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-8 py-4 rounded-xl font-black uppercase tracking-widest text-sm hover:bg-slate-800 dark:hover:bg-gray-100 transition-all shadow-lg flex items-center gap-3">
-                  <span class="material-symbols-outlined text-[20px]">download</span>
-                  Descargar Certificado
-                </button>
-            </template>
-            <template v-else>
-                <p class="text-slate-500 dark:text-gray-400 leading-relaxed mb-4">Has aprobado satisfactoriamente la actividad académica.</p>
-                <div class="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/50 p-6 rounded-2xl max-w-md flex items-start gap-3 text-left">
-                    <span class="material-symbols-outlined text-amber-500 mt-0.5">info</span>
-                    <div>
-                        <h4 class="text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-wider mb-1">Certificado en Proceso</h4>
-                        <p class="text-xs font-medium text-amber-700 dark:text-amber-500 leading-relaxed">Tu certificado está siendo firmado digitalmente por los coordinadores y ponentes asignados. Estará disponible para descarga en esta pestaña muy pronto.</p>
-                    </div>
+            <p class="text-slate-500 dark:text-gray-400 leading-relaxed mb-4">Has aprobado satisfactoriamente la actividad académica.</p>
+            <div class="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/50 p-6 rounded-2xl max-w-md flex items-start gap-3 text-left">
+                <span class="material-symbols-outlined text-amber-500 mt-0.5">info</span>
+                <div>
+                    <h4 class="text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-wider mb-1">Certificado en Proceso</h4>
+                    <p class="text-xs font-medium text-amber-700 dark:text-amber-500 leading-relaxed">Tu certificado está siendo firmado digitalmente por los coordinadores y ponentes asignados. Estará disponible para descarga en esta pestaña muy pronto.</p>
                 </div>
-            </template>
+            </div>
         </template>
         <template v-else>
             <div class="relative w-24 h-24 mb-6 opacity-60 grayscale">
@@ -814,7 +950,7 @@ const goBack = () => {
   </div>
 
   <!-- Modal Pre-inscripción -->
-  <div v-if="preinscripcionMenu" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div v-if="preinscripcionMenu && !actividadCerrada" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white dark:bg-gray-900 rounded-[2rem] p-8 max-w-md w-full shadow-2xl relative border border-slate-200/50 dark:border-gray-800">
         <button @click="preinscripcionMenu = false" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 dark:hover:text-white transition-colors">
             <span class="material-symbols-outlined">close</span>

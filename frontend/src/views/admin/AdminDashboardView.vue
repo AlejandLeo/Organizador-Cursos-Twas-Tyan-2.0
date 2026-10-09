@@ -45,19 +45,73 @@ const formatRelativo = (iso: string) => {
 
 // --- Tarjetas de stats ---
 const statCards = computed(() => [
-  { label: 'Eventos', value: stats.value.eventos, icon: 'corporate_fare', color: 'from-red-600 to-rose-700', route: 'admin-eventos' },
-  { label: 'Actividades', value: stats.value.actividades, icon: 'school', color: 'from-orange-600 to-amber-700', route: 'admin-actividades' },
-  { label: 'Usuarios', value: stats.value.usuarios, icon: 'manage_accounts', color: 'from-purple-600 to-violet-700', route: 'admin-usuarios' },
-  { label: 'Solicitudes', value: stats.value.inscripciones, icon: 'how_to_reg', color: 'from-blue-600 to-indigo-700', route: 'admin-solicitudes' },
-  { label: 'Ponentes', value: stats.value.ponentes, icon: 'record_voice_over', color: 'from-emerald-600 to-teal-700', route: 'admin-ponentes' },
-  { label: 'Estudiantes', value: stats.value.estudiantes, icon: 'groups', color: 'from-cyan-600 to-sky-700', route: 'admin-estudiantes' },
+  { label: 'Eventos', value: stats.value.eventos, icon: 'corporate_fare', color: 'from-[#003B71] to-[#0070BB]', route: 'admin-eventos' },
+  { label: 'Actividades', value: stats.value.actividades, icon: 'school', color: 'from-[#0070BB] to-sky-500', route: 'admin-actividades' },
+  { label: 'Usuarios', value: stats.value.usuarios, icon: 'manage_accounts', color: 'from-sky-600 to-sky-400', route: 'admin-usuarios' },
+  { label: 'Solicitudes', value: stats.value.inscripciones, icon: 'how_to_reg', color: 'from-teal-700 to-teal-500', route: 'admin-solicitudes' },
+  { label: 'Ponentes', value: stats.value.ponentes, icon: 'record_voice_over', color: 'from-[#0E7490] to-cyan-400', route: 'admin-ponentes' },
+  { label: 'Estudiantes', value: stats.value.estudiantes, icon: 'groups', color: 'from-emerald-700 to-emerald-500', route: 'admin-estudiantes' },
 ]);
 
 // --- Otros datos ---
-const accionesHoy = computed(() => {
-  const hoy = new Date().toDateString();
-  return historialStore.registros.filter(r => new Date(r.fecha_creacion).toDateString() === hoy).length;
-});
+const accionesHoyTotal = ref(0);
+const accionesHoy = computed(() => accionesHoyTotal.value);
+
+const STAFF_ROLES = ['coordinador', 'super usuario', 'super administrador', 'administrador', 'logistica', 'logística'];
+
+const rolesDe = (u: any): string[] => {
+  const desdeRelacion = (u.usuariosRoles || [])
+    .map((ur: any) => ur?.rol?.nombre_rol)
+    .filter((nombre): nombre is string => Boolean(nombre));
+  if (desdeRelacion.length) return desdeRelacion;
+  if (u.rol) return [String(u.rol)];
+  return [];
+};
+
+const tieneRol = (roles: string[], nombre: string) =>
+  roles.some((rol) => rol.toLowerCase() === nombre.toLowerCase());
+
+const esStaff = (roles: string[]) =>
+  roles.some((rol) => STAFF_ROLES.includes(rol.toLowerCase()));
+
+const esPonente = (u: any) =>
+  tieneRol(u.roles, 'Ponente') || (u.imparticiones || []).length > 0;
+
+const esEstudiante = (u: any) =>
+  tieneRol(u.roles, 'Estudiante') || (u.inscripciones || []).length > 0;
+
+const categoriaDe = (roles: string[]) => {
+  if (tieneRol(roles, 'Ponente')) return 'PONENTE';
+  if (tieneRol(roles, 'Estudiante')) return 'ESTUDIANTE';
+  if (esStaff(roles)) return 'STAFF';
+  return 'USUARIO';
+};
+
+const fechaCorta = (value: unknown) => {
+  if (!value) return '—';
+  const texto = String(value);
+  return texto.length >= 10 ? texto.substring(0, 10) : texto;
+};
+
+const inscritosDeEvento = (evento: any) => {
+  const ids = new Set<number | string>();
+  for (const actividad of evento.actividades || []) {
+    for (const inscripcion of actividad.inscripciones || []) {
+      const id = inscripcion.id_usuario ?? inscripcion.usuario?.id ?? inscripcion.id;
+      if (id != null) ids.add(id);
+    }
+  }
+  return ids.size;
+};
+
+const modalidadDeEvento = (evento: any) => {
+  const tipos = new Set<string>();
+  for (const actividad of evento.actividades || []) {
+    const tipo = actividad.modalidad || actividad.modalidades?.[0]?.tipo;
+    if (tipo) tipos.add(String(tipo));
+  }
+  return tipos.size ? Array.from(tipos).join(', ') : '—';
+};
 
 // --- Estado Extendido Maestro ---
 const stats = ref({ eventos: 0, actividades: 0, usuarios: 0, inscripciones: 0, ponentes: 0, estudiantes: 0, coordinadores: 0 });
@@ -66,46 +120,76 @@ const eventosDetalle = ref<any[]>([]);
 const actividadesDetalle = ref<any[]>([]);
 const isLoading = ref(true);
 
+const hoyISO = () => {
+  const hoy = new Date();
+  const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+  const dia = String(hoy.getDate()).padStart(2, '0');
+  return `${hoy.getFullYear()}-${mes}-${dia}`;
+};
+
 // --- Fetch data ---
 onMounted(async () => {
+  const fecha = hoyISO();
   try {
-    const [eventosRes, actividadesRes, usuariosRes] = await Promise.allSettled([
+    const [eventosRes, actividadesRes, usuariosRes, solicitudesRes, historialHoyRes] = await Promise.allSettled([
       api.get('/eventos'),
       api.get('/actividades-academicas'),
-      api.get('/usuarios?soloActivos=false'),
+      api.get('/usuarios', { params: { soloActivos: 'false', page: 1, limit: 5000 } }),
+      api.get('/usuarios/solicitudes/pendientes'),
+      api.get('/audit-log', { params: { fechaDesde: fecha, fechaHasta: fecha, limit: 1 } }),
+      historialStore.cargar({ limit: 100 }),
     ]);
     
     if (eventosRes.status === 'fulfilled') {
       const eData = eventosRes.value.data?.data || eventosRes.value.data || [];
-      eventosDetalle.value = Array.isArray(eData) ? eData : [];
+      const lista = Array.isArray(eData) ? eData : [];
+      eventosDetalle.value = lista.map((evento: any) => ({
+        ...evento,
+        modalidadTexto: modalidadDeEvento(evento),
+        inscritos: inscritosDeEvento(evento),
+      }));
       stats.value.eventos = eventosDetalle.value.length;
     }
 
     if (actividadesRes.status === 'fulfilled') {
-      const aData = actividadesRes.value.data || [];
+      const aData = actividadesRes.value.data?.data || actividadesRes.value.data || [];
       actividadesDetalle.value = Array.isArray(aData) ? aData : [];
       stats.value.actividades = actividadesDetalle.value.length;
     }
     
     if (usuariosRes.status === 'fulfilled') {
-      // Extraer datos asegurando que sea un array
-      const rawUsers = Array.isArray(usuariosRes.value.data) ? usuariosRes.value.data : (usuariosRes.value.data?.data || []);
+      const payload = usuariosRes.value.data;
+      const rawUsers = Array.isArray(payload) ? payload : (payload?.data || []);
       
-      usuariosDetalle.value = rawUsers.map((u: any) => ({
-        ...u,
-        nombreFull: u.persona 
-          ? `${u.persona.nombres || ''} ${u.persona.primer_apellido || ''} ${u.persona.segundo_apellido || ''}`.trim() 
-          : u.email,
-        rolNombre: u.usuariosRoles?.[0]?.rol?.nombre_rol || (u.rol === 'Super Usuario' ? 'Super Administrador' : 'Usuario')
-      }));
+      usuariosDetalle.value = rawUsers.map((u: any) => {
+        const roles = rolesDe(u);
+        const usuario = {
+          ...u,
+          roles,
+          nombreFull: u.persona 
+            ? `${u.persona.nombres || ''} ${u.persona.primer_apellido || ''} ${u.persona.segundo_apellido || ''}`.trim() 
+            : u.email,
+          rolNombre: roles.join(', ') || ( (u.imparticiones || []).length ? 'Ponente' : (u.inscripciones || []).length ? 'Estudiante' : 'Usuario'),
+          categoria: categoriaDe(roles),
+        };
+        if (!roles.length && (u.imparticiones || []).length) usuario.categoria = 'PONENTE';
+        else if (!roles.length && (u.inscripciones || []).length) usuario.categoria = 'ESTUDIANTE';
+        return usuario;
+      });
       
-      stats.value.usuarios = usuariosDetalle.value.length;
-      stats.value.ponentes = usuariosDetalle.value.filter(u => u.rolNombre === 'Ponente').length;
-      stats.value.estudiantes = usuariosDetalle.value.filter(u => u.rolNombre === 'Estudiante').length;
-      stats.value.inscripciones = usuariosDetalle.value.filter(u => ['Coordinador', 'Super Usuario', 'Administrador'].includes(u.rolNombre)).length;
-      (stats.value as any).coordinadores = stats.value.inscripciones;
-      stats.value.coordinadores = usuariosDetalle.value.filter(u => ['Coordinador', 'Super Usuario', 'Administrador'].includes(u.rolNombre)).length;
-      stats.value.inscripciones = stats.value.coordinadores;
+      stats.value.usuarios = Number(payload?.total || usuariosDetalle.value.length);
+      stats.value.ponentes = usuariosDetalle.value.filter(esPonente).length;
+      stats.value.estudiantes = usuariosDetalle.value.filter(esEstudiante).length;
+      stats.value.coordinadores = usuariosDetalle.value.filter(u => esStaff(u.roles)).length;
+    }
+
+    if (solicitudesRes.status === 'fulfilled') {
+      const pendientes = solicitudesRes.value.data?.data || solicitudesRes.value.data || [];
+      stats.value.inscripciones = Array.isArray(pendientes) ? pendientes.length : 0;
+    }
+
+    if (historialHoyRes.status === 'fulfilled') {
+      accionesHoyTotal.value = Number(historialHoyRes.value.data?.total || 0);
     }
   } catch (e) {
     console.error('Error en carga maestra:', e);
@@ -119,19 +203,42 @@ const estadoLabel = (e: number) =>
   e === 1 ? 'ACTIVO' : e === 2 ? 'PLANIFICACIÓN' : e === 0 ? 'CONCLUIDO' : 'BORRADOR';
 
 // --- Gráficos en Tiempo Real (UI) ---
+const COLORES_UMSA = {
+  marino: '#003B71',
+  azul: '#0070BB',
+  celeste: '#38BDF8',
+  verde: '#0F766E',
+};
+
 const pieUrl = computed(() => {
   const config = {
-    type: 'pie',
+    type: 'horizontalBar',
     data: {
       labels: ['Ponentes', 'Estudiantes', 'Staff'],
-      datasets: [{ data: [stats.value.ponentes, stats.value.estudiantes, (stats.value as any).coordinadores || 0] }]
+      datasets: [{
+        data: [stats.value.ponentes, stats.value.estudiantes, stats.value.coordinadores || 0],
+        backgroundColor: [COLORES_UMSA.marino, COLORES_UMSA.celeste, COLORES_UMSA.azul],
+        barThickness: 28,
+      }],
     },
-    options: { 
-      title: { display: true, text: 'Distribución de Roles', fontColor: '#64748b' },
-      legend: { position: 'bottom' }
-    }
+    options: {
+      legend: { display: false },
+      layout: { padding: { right: 36 } },
+      plugins: {
+        datalabels: {
+          anchor: 'end',
+          align: 'end',
+          color: '#003B71',
+          font: { weight: 'bold', size: 13 },
+        },
+      },
+      scales: {
+        xAxes: [{ ticks: { beginAtZero: true, fontColor: '#64748b' }, gridLines: { color: '#e2e8f0' } }],
+        yAxes: [{ ticks: { fontColor: '#0f172a', fontStyle: 'bold' }, gridLines: { display: false } }],
+      },
+    },
   };
-  return `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(config))}&w=400&h=250`;
+  return `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(config))}&w=520&h=260`;
 });
 
 const barUrl = computed(() => {
@@ -139,166 +246,101 @@ const barUrl = computed(() => {
     type: 'bar',
     data: {
       labels: ['Eventos', 'Actividades', 'Usuarios'],
-      datasets: [{ label: 'Total', backgroundColor: '#dc2626', data: [stats.value.eventos, stats.value.actividades, stats.value.usuarios] }]
+      datasets: [{
+        label: 'Total',
+        backgroundColor: [COLORES_UMSA.marino, COLORES_UMSA.azul, COLORES_UMSA.celeste],
+        data: [stats.value.eventos, stats.value.actividades, stats.value.usuarios],
+      }]
     },
     options: { 
-      title: { display: true, text: 'Comparativa de Gestión', fontColor: '#64748b' },
-      scales: { yAxes: [{ ticks: { beginAtZero: true } }] }
+      title: { display: true, text: 'Comparativa de Gestión', fontColor: '#334155' },
+      legend: { labels: { fontColor: '#334155' } },
+      scales: { yAxes: [{ ticks: { beginAtZero: true, fontColor: '#64748b' } }], xAxes: [{ ticks: { fontColor: '#334155' } }] }
     }
   };
   return `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(config))}&w=500&h=250`;
 });
 
-// ─── EXPORTAR EXCEL (Format PREMIUM Dashboard) ────────
-const exportarExcelGlobal = async () => {
+const csvCell = (value: unknown) => {
+  const texto = value == null || value === '' ? '' : String(value);
+  if (/[",\n\r]/.test(texto)) return `"${texto.replace(/"/g, '""')}"`;
+  return texto;
+};
+
+const csvFila = (celdas: unknown[]) => celdas.map(csvCell).join(',');
+
+const descargarCsv = (nombre: string, filas: unknown[][]) => {
+  const contenido = ['sep=,', ...filas.map(csvFila)].join('\r\n');
+  const blob = new Blob(['\uFEFF', contenido], { type: 'text/csv;charset=utf-8' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nombre;
+  a.click();
+  window.URL.revokeObjectURL(url);
+};
+
+// ─── EXPORTAR CSV (mismas secciones del informe gerencial) ────────
+const exportarCsvGlobal = () => {
   try {
-    const fileName = `INFORME_EJECUTIVO_SGEA_${new Date().toISOString().slice(0, 10)}.xls`;
+    const fileName = `INFORME_EJECUTIVO_SGEA_${new Date().toISOString().slice(0, 10)}.csv`;
+    const filas: unknown[][] = [
+      ['SISTEMA DE GESTIÓN DE EVENTOS Y ACTIVIDADES (SGEA)'],
+      ['INFORME GERENCIAL Y AUDITORÍA DE GESTIÓN ACADÉMICA'],
+      [`Generado automáticamente: ${new Date().toLocaleString()}`],
+      [],
+      ['INDICADORES DE GESTIÓN'],
+      ['Métrica', 'Total'],
+      ['Eventos', stats.value.eventos],
+      ['Actividades', stats.value.actividades],
+      ['Usuarios', stats.value.usuarios],
+      ['Solicitudes pendientes', stats.value.inscripciones],
+      ['Ponentes y expositores', stats.value.ponentes],
+      ['Estudiantes y alumnos', stats.value.estudiantes],
+      ['Staff', stats.value.coordinadores],
+      [],
+      ['ANÁLISIS ESTADÍSTICO DE PARTICIPACIÓN'],
+      ['Distribución de roles', 'Total'],
+      ['Ponentes', stats.value.ponentes],
+      ['Estudiantes', stats.value.estudiantes],
+      ['Staff', stats.value.coordinadores],
+      [],
+      ['Comparativa de gestión', 'Total'],
+      ['Eventos', stats.value.eventos],
+      ['Actividades', stats.value.actividades],
+      ['Usuarios', stats.value.usuarios],
+      [],
+      ['DESGLOSE DE PROYECTOS Y EVENTOS'],
+      ['Título del evento', 'Modalidad', 'Fecha inicio', 'Inscritos', 'Estado'],
+      ...eventosDetalle.value.map((e) => [
+        e.nombre || e.titulo || '—',
+        e.modalidadTexto || '—',
+        fechaCorta(e.fecha_inicio),
+        e.inscritos ?? 0,
+        estadoLabel(e.estado),
+      ]),
+      [],
+      ['DIRECTORIO INTEGRAL DE PERSONAL (DOCENTES Y ALUMNOS)'],
+      ['Nombre completo', 'Correo institucional', 'Rol', 'Categoría', 'Fecha registro'],
+      ...usuariosDetalle.value.map((u) => [
+        u.nombreFull || '—',
+        u.email || '—',
+        u.rolNombre,
+        u.categoria,
+        fechaCorta(u.fecha_creacion),
+      ]),
+    ];
 
-    const pieConfig = {
-      type: 'pie',
-      data: {
-        labels: ['Ponentes', 'Estudiantes', 'Staff'],
-        datasets: [{ data: [stats.value.ponentes, stats.value.estudiantes, (stats.value as any).coordinadores || 0] }]
-      },
-      options: { title: { display: true, text: 'Distribución de Roles' } }
-    };
-    
-    const barConfig = {
-      type: 'bar',
-      data: {
-        labels: ['Eventos', 'Actividades', 'Usuarios'],
-        datasets: [{ label: 'Total', backgroundColor: '#003B71', data: [stats.value.eventos, stats.value.actividades, stats.value.usuarios] }]
-      },
-      options: { title: { display: true, text: 'Comparativa de Gestión' } }
-    };
-
-    const pieUrl = `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(pieConfig))}&w=280&h=180`;
-    const barUrl = `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(barConfig))}&w=350&h=180`;
-
-    let html = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-      <head>
-        <meta charset="utf-8">
-        <style>
-          .main-title { background-color: #003B71; color: #ffffff; font-size: 20pt; font-weight: bold; text-align: center; height: 50px; border: 2px solid #00264d; }
-          .sub-title { background-color: #0070b4; color: #ffffff; font-size: 12pt; text-align: center; height: 25px; }
-          .section-banner { background-color: #f1f5f9; color: #0f172a; font-weight: bold; font-size: 11pt; border-bottom: 2px solid #003B71; padding: 10px; }
-          
-          .card-box { border: 4px solid #ffffff; color: #ffffff; text-align: center; font-weight: bold; vertical-align: middle; }
-          .card-eventos { background-color: #dc2626; }
-          .card-actividades { background-color: #f59e0b; }
-          .card-usuarios { background-color: #7c3aed; }
-          .card-ponentes { background-color: #059669; }
-          .card-estudiantes { background-color: #0ea5e9; }
-          
-          .card-val { font-size: 22pt; }
-          .card-lbl { font-size: 9pt; text-transform: uppercase; opacity: 0.9; }
-
-          .th-master { background-color: #1e293b; color: #ffffff; font-weight: bold; border: 1px solid #000000; text-align: center; font-size: 10pt; }
-          .td-row { border: 1px solid #cbd5e1; font-size: 9pt; padding: 5px; }
-          .td-alt { background-color: #f8fafc; border: 1px solid #cbd5e1; font-size: 9pt; }
-        </style>
-      </head>
-      <body>
-        <table>
-          <tr><td colspan="7" class="main-title">SISTEMA DE GESTIÓN DE EVENTOS Y ACTIVIDADES (SGEA)</td></tr>
-          <tr><td colspan="7" class="sub-title">INFORME GERENCIAL Y AUDITORÍA DE GESTIÓN ACADÉMICA</td></tr>
-          <tr><td colspan="7" style="text-align: center; font-size: 9pt; color: #64748b;">Generado automáticamente: ${new Date().toLocaleString()}</td></tr>
-          <tr><td colspan="7"></td></tr>
-
-          <tr>
-            <td colspan="2" class="card-box card-eventos" height="70">
-              <span class="card-lbl">EVENTOS</span><br><span class="card-val">${stats.value.eventos}</span>
-            </td>
-            <td colspan="3" class="card-box card-actividades" height="70">
-              <span class="card-lbl">ACTIVIDADES</span><br><span class="card-val">${stats.value.actividades}</span>
-            </td>
-            <td colspan="2" class="card-box card-usuarios" height="70">
-              <span class="card-lbl">USUARIOS</span><br><span class="card-val">${stats.value.usuarios}</span>
-            </td>
-          </tr>
-          <tr>
-            <td colspan="4" class="card-box card-ponentes" height="60">
-              <span class="card-lbl">PONENTES Y EXPOSITORES</span><br><span class="card-val">${stats.value.ponentes}</span>
-            </td>
-            <td colspan="3" class="card-box card-estudiantes" height="60">
-              <span class="card-lbl">ESTUDIANTES Y ALUMNOS</span><br><span class="card-val">${stats.value.estudiantes}</span>
-            </td>
-          </tr>
-          <tr><td colspan="7"></td></tr>
-
-          <tr><td colspan="7" class="section-banner">📊 ANÁLISIS ESTADÍSTICO DE PARTICIPACIÓN</td></tr>
-          <tr>
-            <td colspan="3" style="text-align: center; background-color: #ffffff; padding: 15px;">
-              <img src="${pieUrl}" width="280" height="180">
-            </td>
-            <td colspan="4" style="text-align: center; background-color: #ffffff; padding: 15px;">
-              <img src="${barUrl}" width="350" height="180">
-            </td>
-          </tr>
-          <tr><td colspan="7"></td></tr>
-
-
-
-          <tr><td colspan="7" class="section-banner">📋 DESGLOSE DE PROYECTOS Y EVENTOS</td></tr>
-          <tr class="th-master">
-            <td colspan="3">Título del Evento</td>
-            <td>Modalidad</td>
-            <td>Fecha Inicio</td>
-            <td>Inscritos</td>
-            <td>Estado</td>
-          </tr>
-          ${eventosDetalle.value.map((e, i) => `
-            <tr>
-              <td colspan="3" class="${i % 2 === 0 ? 'td-row' : 'td-alt'}">${e.nombre || e.titulo || '—'}</td>
-              <td class="${i % 2 === 0 ? 'td-row' : 'td-alt'}" style="text-align: center;">${e.modalidad || '—'}</td>
-              <td class="${i % 2 === 0 ? 'td-row' : 'td-alt'}" style="text-align: center;">${e.fecha_inicio ? e.fecha_inicio.substring(0, 10) : '—'}</td>
-              <td class="${i % 2 === 0 ? 'td-row' : 'td-alt'}" style="text-align: center;">${e._count?.inscripciones || 0}</td>
-              <td class="${i % 2 === 0 ? 'td-row' : 'td-alt'}" style="text-align: center; color: #0369a1; font-weight: bold;">${estadoLabel(e.estado)}</td>
-            </tr>
-          `).join('')}
-          <tr><td colspan="7"></td></tr>
-
-          <tr><td colspan="7" class="section-banner">👤 DIRECTORIO INTEGRAL DE PERSONAL (DOCENTES Y ALUMNOS)</td></tr>
-          <tr class="th-master">
-            <td colspan="2">Nombre Completo</td>
-            <td colspan="2">Correo Institucional</td>
-            <td>Rol</td>
-            <td>Categoría</td>
-            <td>Fecha Registro</td>
-          </tr>
-          ${usuariosDetalle.value.slice(0, 500).map((u, i) => `
-            <tr>
-              <td colspan="2" class="${i % 2 === 0 ? 'td-row' : 'td-alt'}">${u.nombreFull || '—'}</td>
-              <td colspan="2" class="${i % 2 === 0 ? 'td-row' : 'td-alt'}">${u.email || '—'}</td>
-              <td class="${i % 2 === 0 ? 'td-row' : 'td-alt'}" style="text-align: center; font-weight: bold;">${u.rolNombre}</td>
-              <td class="${i % 2 === 0 ? 'td-row' : 'td-alt'}" style="text-align: center;">${u.rolNombre === 'Estudiante' ? 'ESTUDIANTE' : u.rolNombre === 'Ponente' ? 'PONENTE' : 'ADMINISTRATIVO'}</td>
-              <td class="${i % 2 === 0 ? 'td-row' : 'td-alt'}" style="text-align: center;">${u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}</td>
-            </tr>
-          `).join('')}
-        </table>
-      </body>
-      </html>
-    `;
-
-    const blob = new Blob(['\uFEFF', html], { type: 'application/vnd.ms-excel' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    a.click();
-    window.URL.revokeObjectURL(url);
-
-    Swal.close();
-    Swal.fire({ 
-      icon: 'success', 
-      title: 'Reporte Premium Generado', 
-      text: 'Se ha creado un dashboard visual de alta gama para auditoría con gráficas incrustadas.',
-      confirmButtonColor: '#003B71'
+    descargarCsv(fileName, filas);
+    Swal.fire({
+      icon: 'success',
+      title: 'CSV generado',
+      text: 'El informe gerencial conserva las mismas secciones, ahora en columnas que Excel puede abrir sin superponer las tablas.',
+      confirmButtonColor: '#003B71',
     });
   } catch (e) {
     console.error(e);
-    Swal.fire('Error', 'No se pudo generar el reporte premium.', 'error');
+    Swal.fire('Error', 'No se pudo generar el CSV.', 'error');
   }
 };
 
@@ -354,8 +396,10 @@ const exportarPDFGlobal = async () => {
         ['Eventos Totales', stats.value.eventos.toString(), 'Auditado'],
         ['Actividades Académicas', stats.value.actividades.toString(), 'Verificado'],
         ['Directorio de Usuarios', stats.value.usuarios.toString(), 'Actualizado'],
+        ['Solicitudes pendientes', stats.value.inscripciones.toString(), 'Auditado'],
         ['Cuerpo de Ponentes', stats.value.ponentes.toString(), 'Activo'],
         ['Alumnado Registrado', stats.value.estudiantes.toString(), 'Activo'],
+        ['Staff', stats.value.coordinadores.toString(), 'Activo'],
       ],
       headStyles: { fillColor: AZUL_CORP },
       styles: { fontSize: 10, cellPadding: 4 }
@@ -366,18 +410,29 @@ const exportarPDFGlobal = async () => {
     doc.text('II. ANÁLISIS ESTADÍSTICO DE PARTICIPACIÓN', 15, currentY);
     try {
       const pieConfig = {
-        type: 'pie',
+        type: 'horizontalBar',
         data: {
           labels: ['Ponentes', 'Estudiantes', 'Staff'],
-          datasets: [{ data: [stats.value.ponentes, stats.value.estudiantes, (stats.value as any).coordinadores || 0] }]
-        }
+          datasets: [{
+            data: [stats.value.ponentes, stats.value.estudiantes, stats.value.coordinadores || 0],
+            backgroundColor: [COLORES_UMSA.marino, COLORES_UMSA.celeste, COLORES_UMSA.azul],
+          }],
+        },
+        options: {
+          legend: { display: false },
+          plugins: { datalabels: { anchor: 'end', align: 'end', color: '#003B71' } },
+        },
       };
       
       const barConfig = {
         type: 'bar',
         data: {
           labels: ['Eventos', 'Actividades', 'Usuarios'],
-          datasets: [{ label: 'Total', backgroundColor: '#003B71', data: [stats.value.eventos, stats.value.actividades, stats.value.usuarios] }]
+          datasets: [{
+            label: 'Total',
+            backgroundColor: [COLORES_UMSA.marino, COLORES_UMSA.azul, COLORES_UMSA.celeste],
+            data: [stats.value.eventos, stats.value.actividades, stats.value.usuarios],
+          }]
         }
       };
 
@@ -411,11 +466,12 @@ const exportarPDFGlobal = async () => {
     drawHeader('III. DESGLOSE DE EVENTOS INSTITUCIONALES');
     autoTable(doc, {
       startY: 50,
-      head: [['Título del Evento', 'Modalidad', 'Inicio', 'Estado']],
+      head: [['Título del Evento', 'Modalidad', 'Inicio', 'Inscritos', 'Estado']],
       body: eventosDetalle.value.map((e: any) => [
-        e.nombre || e.titulo || '—', 
-        e.modalidad || '—', 
-        e.fecha_inicio ? e.fecha_inicio.substring(0, 10) : '—', 
+        e.nombre || e.titulo || '—',
+        e.modalidadTexto || '—',
+        fechaCorta(e.fecha_inicio),
+        String(e.inscritos ?? 0),
         estadoLabel(e.estado)
       ]),
       headStyles: { fillColor: AZUL_CORP },
@@ -428,7 +484,7 @@ const exportarPDFGlobal = async () => {
     autoTable(doc, {
       startY: 50,
       head: [['Nombre Completo', 'Correo', 'Rol', 'Categoría']],
-      body: usuariosDetalle.value.slice(0, 500).map(u => [u.nombreFull, u.email, u.rolNombre, u.rolNombre === 'Estudiante' ? 'ALUMNO' : 'DOCENTE/STAFF']),
+      body: usuariosDetalle.value.map(u => [u.nombreFull, u.email, u.rolNombre, u.categoria]),
       headStyles: { fillColor: [51, 65, 85] },
       styles: { fontSize: 8 }
     });
@@ -463,11 +519,11 @@ const handleNavigation = (card: any) => {
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
         <div class="flex items-center gap-3 mb-2">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-rose-800 flex items-center justify-center shadow-lg shadow-red-900/50">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#003B71] to-[#0070BB] flex items-center justify-center shadow-lg shadow-[#003B71]/30">
             <span class="material-symbols-outlined text-white text-[22px]">monitoring</span>
           </div>
           <div>
-            <p class="text-[10px] font-black text-red-600 dark:text-red-500 uppercase tracking-widest leading-none">
+            <p class="text-[10px] font-black text-umsa-blue dark:text-sky-400 uppercase tracking-widest leading-none">
               {{ authStore.esSuperUsuario ? 'Super Administrador' : 'Gestión Académica' }}
             </p>
             <h1 class="text-2xl font-black text-slate-800 dark:text-white tracking-tight uppercase italic">
@@ -483,24 +539,24 @@ const handleNavigation = (card: any) => {
         <!-- BOTONES DE REPORTE TOP -->
         <div v-if="authStore.esSuperUsuario" class="flex items-center gap-2 mr-4 bg-slate-100 dark:bg-white/5 p-1.5 rounded-2xl border border-slate-200 dark:border-white/10">
           <button @click="exportarPDFGlobal" 
-                  class="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl transition-all shadow-lg shadow-red-900/30 group">
+                  class="flex items-center gap-2 px-4 py-2.5 bg-umsa-blue hover:bg-[#005a96] text-white rounded-xl transition-all shadow-lg shadow-[#0070BB]/30 group">
             <span class="material-symbols-outlined text-[18px] group-hover:rotate-12 transition-transform">picture_as_pdf</span>
             <span class="text-[10px] font-black uppercase tracking-widest">PDF Auditoría</span>
           </button>
-          <button @click="exportarExcelGlobal" 
+          <button @click="exportarCsvGlobal" 
                   class="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all shadow-lg shadow-emerald-900/30 group">
             <span class="material-symbols-outlined text-[18px] group-hover:scale-110 transition-transform">table_chart</span>
-            <span class="text-[10px] font-black uppercase tracking-widest">Excel Gerencial</span>
+            <span class="text-[10px] font-black uppercase tracking-widest">CSV Gerencial</span>
           </button>
         </div>
 
-        <div class="px-4 py-2 bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-700/30 rounded-xl text-center min-w-[100px]">
-          <p class="text-[9px] text-red-600 dark:text-red-500 uppercase tracking-widest font-bold">Acciones hoy</p>
+        <div class="px-4 py-2 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-700/30 rounded-xl text-center min-w-[100px]">
+          <p class="text-[9px] text-umsa-blue dark:text-sky-400 uppercase tracking-widest font-bold">Acciones hoy</p>
           <p class="text-2xl font-black text-slate-800 dark:text-white leading-none mt-1">{{ accionesHoy }}</p>
         </div>
         <div class="px-4 py-2 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-center min-w-[100px]">
           <p class="text-[9px] text-slate-500 uppercase tracking-widest font-bold">Total historial</p>
-          <p class="text-2xl font-black text-slate-800 dark:text-white leading-none mt-1">{{ historialStore.registros.length }}</p>
+          <p class="text-2xl font-black text-slate-800 dark:text-white leading-none mt-1">{{ historialStore.total }}</p>
         </div>
       </div>
     </div>
@@ -509,7 +565,7 @@ const handleNavigation = (card: any) => {
     <div class="grid grid-cols-2 lg:grid-cols-6 gap-4">
       <div v-for="card in statCards" :key="card.label"
            @click="handleNavigation(card)"
-           class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-2xl p-5 cursor-pointer hover:border-red-500/50 hover:-translate-y-1 transition-all duration-300 group shadow-sm dark:shadow-none">
+           class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-2xl p-5 cursor-pointer hover:border-umsa-blue/40 hover:-translate-y-1 transition-all duration-300 group shadow-sm dark:shadow-none">
         <div :class="`w-10 h-10 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform`">
           <span class="material-symbols-outlined text-white text-[20px]">{{ card.icon }}</span>
         </div>
@@ -523,10 +579,10 @@ const handleNavigation = (card: any) => {
 
     <!-- VISUAL CHARTS SECTION (UI) -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in slide-in-from-bottom-6 duration-1000">
-      <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-8 shadow-sm dark:shadow-none group hover:border-red-500/30 transition-all">
+      <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-8 shadow-sm dark:shadow-none group hover:border-sky-400/50 transition-all">
         <div class="flex items-center gap-2 mb-6">
-          <div class="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
-            <span class="material-symbols-outlined text-red-600 text-lg">pie_chart</span>
+          <div class="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-900/25 flex items-center justify-center">
+            <span class="material-symbols-outlined text-umsa-blue text-lg">leaderboard</span>
           </div>
           <h3 class="text-[10px] font-black text-slate-800 dark:text-slate-300 uppercase tracking-widest italic">Análisis de Participación</h3>
         </div>
@@ -535,10 +591,10 @@ const handleNavigation = (card: any) => {
         </div>
       </div>
 
-      <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-8 shadow-sm dark:shadow-none group hover:border-red-500/30 transition-all">
+      <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-8 shadow-sm dark:shadow-none group hover:border-sky-400/50 transition-all">
         <div class="flex items-center gap-2 mb-6">
-          <div class="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
-            <span class="material-symbols-outlined text-red-600 text-lg">bar_chart</span>
+          <div class="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-900/25 flex items-center justify-center">
+            <span class="material-symbols-outlined text-umsa-blue text-lg">bar_chart</span>
           </div>
           <h3 class="text-[10px] font-black text-slate-800 dark:text-slate-300 uppercase tracking-widest italic">Métricas de Gestión</h3>
         </div>
@@ -553,11 +609,11 @@ const handleNavigation = (card: any) => {
       <div class="lg:col-span-2 space-y-4">
         <div class="flex items-center justify-between px-2">
           <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-red-600">history</span>
+            <span class="material-symbols-outlined text-umsa-blue">history</span>
             <h2 class="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest italic">Actividad Reciente</h2>
           </div>
           <button @click="router.push('/admin/historial')" 
-                  class="text-[9px] font-black text-red-600 dark:text-red-500 uppercase tracking-widest flex items-center gap-1 group">
+                  class="text-[9px] font-black text-umsa-blue dark:text-sky-400 uppercase tracking-widest flex items-center gap-1 group">
             Ver todo <span class="material-symbols-outlined text-[14px] group-hover:translate-x-1 transition-transform">trending_flat</span>
           </button>
         </div>
@@ -580,10 +636,10 @@ const handleNavigation = (card: any) => {
                   <span class="text-[8px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded border border-slate-200 dark:border-white/10">
                     {{ moduloConfig[log.modulo]?.label || log.modulo }}
                   </span>
-                  <div v-if="!log.leido" class="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></div>
+                  <div v-if="!log.leido" class="w-1.5 h-1.5 rounded-full bg-umsa-blue animate-pulse"></div>
                 </div>
                 <p class="text-xs font-black text-slate-700 dark:text-slate-300 truncate">{{ log.descripcion }}</p>
-                <p v-if="log.entidad_nombre" class="text-[9px] text-red-600 dark:text-red-400 font-bold italic truncate mt-0.5">→ {{ log.entidad_nombre }}</p>
+                <p v-if="log.entidad_nombre" class="text-[9px] text-umsa-blue dark:text-sky-300 font-bold italic truncate mt-0.5">→ {{ log.entidad_nombre }}</p>
               </div>
               <p class="text-[9px] font-black text-slate-400 dark:text-slate-600 shrink-0 italic">{{ formatRelativo(log.fecha_creacion) }}</p>
             </div>
@@ -596,18 +652,18 @@ const handleNavigation = (card: any) => {
         <!-- QUICK LINKS -->
         <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-6 shadow-sm dark:shadow-none">
           <div class="flex items-center gap-2 mb-6">
-            <span class="material-symbols-outlined text-red-600">bolt</span>
+            <span class="material-symbols-outlined text-umsa-blue">bolt</span>
             <h2 class="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest italic">Accesos Rápidos</h2>
           </div>
           <div class="space-y-3">
             <button @click="router.push({ name: 'admin-gestion', query: { tab: 'eventos' } })"
-                    class="w-full flex items-center gap-3 p-4 bg-slate-50 dark:bg-black/30 border border-slate-200 dark:border-white/5 rounded-2xl hover:border-red-500/50 hover:bg-slate-100 dark:hover:bg-red-900/10 transition-all group text-left">
-              <span class="material-symbols-outlined text-slate-400 dark:text-slate-600 group-hover:text-red-600 transition-colors">corporate_fare</span>
+                    class="w-full flex items-center gap-3 p-4 bg-slate-50 dark:bg-black/30 border border-slate-200 dark:border-white/5 rounded-2xl hover:border-umsa-blue/40 hover:bg-slate-100 dark:hover:bg-sky-900/15 transition-all group text-left">
+              <span class="material-symbols-outlined text-slate-400 dark:text-slate-600 group-hover:text-umsa-blue transition-colors">corporate_fare</span>
               <span class="text-[10px] font-black text-slate-700 dark:text-slate-400 uppercase tracking-widest">Gestionar Eventos</span>
             </button>
             <button @click="router.push({ name: 'admin-gestion', query: { tab: 'actividades' } })"
-                    class="w-full flex items-center gap-3 p-4 bg-slate-50 dark:bg-black/30 border border-slate-200 dark:border-white/5 rounded-2xl hover:border-red-500/50 hover:bg-slate-100 dark:hover:bg-red-900/10 transition-all group text-left">
-              <span class="material-symbols-outlined text-slate-400 dark:text-slate-600 group-hover:text-red-600 transition-colors">school</span>
+                    class="w-full flex items-center gap-3 p-4 bg-slate-50 dark:bg-black/30 border border-slate-200 dark:border-white/5 rounded-2xl hover:border-umsa-blue/40 hover:bg-slate-100 dark:hover:bg-sky-900/15 transition-all group text-left">
+              <span class="material-symbols-outlined text-slate-400 dark:text-slate-600 group-hover:text-umsa-blue transition-colors">school</span>
               <span class="text-[10px] font-black text-slate-700 dark:text-slate-400 uppercase tracking-widest">Actividades Académicas</span>
             </button>
           </div>
@@ -617,7 +673,7 @@ const handleNavigation = (card: any) => {
 
         <!-- ACTIVITY BY MODULE (Only Super User) -->
         <div v-if="authStore.esSuperUsuario" class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-6 shadow-sm dark:shadow-none">
-          <div class="flex items-center gap-2 mb-6 text-red-600">
+          <div class="flex items-center gap-2 mb-6 text-umsa-blue">
             <span class="material-symbols-outlined">analytics</span>
             <h2 class="text-xs font-black dark:text-white uppercase tracking-widest italic">Actividad por Módulo</h2>
           </div>
@@ -632,7 +688,7 @@ const handleNavigation = (card: any) => {
                   <span class="text-[10px] font-black text-slate-800 dark:text-white">{{ count }}</span>
                 </div>
                 <div class="h-1.5 w-full bg-slate-100 dark:bg-black/50 rounded-full overflow-hidden">
-                  <div class="h-full bg-red-600 transition-all duration-1000" :style="{ width: (count / (historialStore.registros.length || 1) * 100) + '%' }"></div>
+                  <div class="h-full bg-umsa-blue transition-all duration-1000" :style="{ width: (count / (historialStore.registros.length || 1) * 100) + '%' }"></div>
                 </div>
               </div>
             </template>
