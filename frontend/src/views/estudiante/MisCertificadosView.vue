@@ -46,7 +46,8 @@ onMounted(() => {
           <tbody class="divide-y divide-slate-100 dark:divide-gray-800 text-xs">
             <tr v-for="cert in certificadosStore.misCertificados" :key="cert.id" class="hover:bg-slate-50/50 dark:hover:bg-gray-800/30 transition-colors">
               <td class="px-6 py-4">
-                <p class="font-black text-sm text-umsa-blue dark:text-white mb-0.5">{{ cert.evento?.nombre || cert.evento?.nombre_evento || 'Evento Desconocido' }}</p>
+                <p class="font-black text-sm text-umsa-blue dark:text-white mb-0.5">{{ cert.evento?.nombre || 'Evento sin nombre' }}</p>
+                <p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">{{ cert.actividad?.nombre || cert.actividadAcademica?.nombre }}</p>
                 <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">{{ cert.evento?.gestion || '2026' }}</p>
               </td>
               <td class="px-6 py-4 text-center">

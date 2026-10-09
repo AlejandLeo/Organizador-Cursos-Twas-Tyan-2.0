@@ -115,7 +115,6 @@ const eliminarAlerta = (id: string | number) => {
 
 const fetchStudentNotifications = async () => {
   if (!isStudent.value) return;
-  console.log('--- ATTEMPTING TO FETCH STUDENT NOTIFICATIONS');
   try {
     const res = await api.get('/usuarios/alertas/estudiante');
     const dismissed = JSON.parse(localStorage.getItem('dismissedNotifications') || '[]');
@@ -164,7 +163,6 @@ watch(() => isCoordinadorOrAdmin.value, (val) => {
 }, { immediate: true });
 
 watch(() => isStudent.value, (val) => {
-  console.log('--- IS STUDENT:', val);
   if (val) {
     fetchStudentNotifications();
     setInterval(fetchStudentNotifications, 60000);

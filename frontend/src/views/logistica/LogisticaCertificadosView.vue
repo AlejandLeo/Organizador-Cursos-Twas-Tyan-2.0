@@ -12,7 +12,8 @@ const fetchMisCertificados = async () => {
   try {
     loading.value = true;
     const res = await api.get('/logistica/certificados/mis-certificados');
-    certificados.value = Array.isArray(res.data) ? res.data : [];
+    const lista = Array.isArray(res.data) ? res.data : [];
+    certificados.value = lista.filter((c: any) => Number(c.tipo) === 3);
   } catch (err) {
     console.error('Error fetching certificados', err);
   } finally {

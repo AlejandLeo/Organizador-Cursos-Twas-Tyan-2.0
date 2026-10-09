@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { certificadosService } from '@/services/certificados.service';
 import api from '@/services/api';
 import Swal from 'sweetalert2';
 import CertificadoRender from '@/components/common/CertificadoRender.vue';
 
 const route = useRoute();
+const router = useRouter();
 
 // ── Tabs ──────────────────────────────────────────────────────
 const activeTab = ref<'trazabilidad' | 'emision' | 'auditoria'>('trazabilidad');
@@ -18,6 +19,8 @@ interface Certificado {
   fecha_ultimo_envio?: string | null;
   log_error_envio?: string | null;
   reintentos?: number;
+  envios?: number;
+  uuid_archivo?: string;
   usuario?: {
     id: number;
     email: string;
@@ -95,6 +98,52 @@ const totalFallidos = computed(() =>
 );
 
 // ── Carga de datos ────────────────────────────────────────────
+const vecesEnviado = (cert: Certificado) => {
+  if ((cert.envios || 0) > 0) return cert.envios || 0;
+  return cert.estado_envio === 'enviado' ? 1 : 0;
+};
+
+const visorPdf = ref<{ url: string; titulo: string } | null>(null);
+
+const cerrarVisorPdf = () => {
+  if (visorPdf.value?.url) URL.revokeObjectURL(visorPdf.value.url);
+  visorPdf.value = null;
+};
+
+const verVerificacion = (cert: Certificado) => {
+  if (!cert.uuid_archivo) {
+    Swal.fire('Sin verificación', 'Este certificado no tiene un código público para comprobarlo.', 'info');
+    return;
+  }
+  const href = router.resolve({ name: 'verificar-certificado', params: { uuid: cert.uuid_archivo } }).href;
+  window.open(href, '_blank', 'noopener');
+};
+
+const verPdfCertificado = async (cert: Certificado) => {
+  const esPdf = async (blob: Blob) => {
+    if (blob.type.includes('pdf')) return true;
+    const inicio = await blob.slice(0, 5).text();
+    return inicio.startsWith('%PDF');
+  };
+  for (const ruta of [`/admin/certificados/${cert.id}/pdf`, `/me/certificados/${cert.id}/download`]) {
+    try {
+      const res = await api.get(ruta, { responseType: 'blob' });
+      if (await esPdf(res.data)) {
+        cerrarVisorPdf();
+        const nombre = `${cert.usuario?.persona?.nombres || ''} ${cert.usuario?.persona?.primer_apellido || ''}`.trim();
+        visorPdf.value = {
+          url: URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' })),
+          titulo: nombre || cert.codigo_certificado,
+        };
+        return;
+      }
+    } catch {
+      /* intentar la otra ruta */
+    }
+  }
+  Swal.fire('Sin certificado', 'No se pudo generar el PDF de este certificado.', 'error');
+};
+
 const fetchCertificados = async () => {
   try {
     isLoading.value = true;
@@ -739,6 +788,7 @@ onMounted(() => {
                 <th class="px-6 py-4">Usuario / Email</th>
                 <th class="px-6 py-4">Evento / Actividad</th>
                 <th class="px-6 py-4 text-center">Estado</th>
+                <th class="px-6 py-4 text-center">Envíos</th>
                 <th class="px-6 py-4">Último Intento</th>
                 <th class="px-6 py-4 text-right">Acciones</th>
               </tr>
@@ -791,10 +841,16 @@ onMounted(() => {
                     }" class="px-2.5 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-widest">
                       {{ cert.estado_envio }}
                     </span>
-                    <span v-if="(cert.reintentos || 0) > 0" class="text-[8px] text-slate-400">
-                      {{ cert.reintentos }} intento{{ cert.reintentos !== 1 ? 's' : '' }}
+                    <span v-if="(cert.reintentos || 0) > 0" class="text-[8px] text-rose-400">
+                      {{ cert.reintentos }} fallo{{ cert.reintentos !== 1 ? 's' : '' }}
                     </span>
                   </div>
+                </td>
+
+                <td class="px-6 py-4 text-center">
+                  <span class="inline-flex items-center justify-center min-w-8 px-2 py-1 rounded-full bg-sky-50 text-[#003B71] text-xs font-black">
+                    {{ vecesEnviado(cert) }}
+                  </span>
                 </td>
 
                 <!-- Último intento -->
@@ -808,6 +864,18 @@ onMounted(() => {
               <td class="px-6 py-4">
                 <div class="flex items-center justify-end gap-1">
                   <!-- Validar envío / Trazabilidad -->
+                  <button @click="verPdfCertificado(cert)"
+                          title="Ver PDF del certificado"
+                          class="p-2 rounded-lg hover:bg-sky-50 dark:hover:bg-sky-900/20 text-sky-500 hover:text-[#003B71] transition-all">
+                    <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+                  </button>
+
+                  <button @click="verVerificacion(cert)"
+                          title="Verificar autenticidad"
+                          class="p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-emerald-500 hover:text-emerald-700 transition-all">
+                    <span class="material-symbols-outlined text-[18px]">verified</span>
+                  </button>
+
                   <button @click="abrirMailTrace(cert.id)"
                           title="Ver traza de envío"
                           class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-all">
@@ -845,7 +913,7 @@ onMounted(() => {
             </tr>
 
             <tr v-if="filteredCertificados.length === 0">
-              <td colspan="6" class="py-20 text-center text-slate-400 italic text-sm">
+              <td colspan="7" class="py-20 text-center text-slate-400 italic text-sm">
                 No se encontraron certificados para los filtros aplicados.
               </td>
             </tr>
@@ -1344,6 +1412,16 @@ onMounted(() => {
           </div>
         </div>
       </Transition>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="visorPdf" class="fixed inset-0 z-[80] flex flex-col bg-slate-900/80 p-4 md:p-8">
+        <div class="flex items-center justify-between gap-4 mb-3 text-white">
+          <p class="text-sm font-black uppercase tracking-widest">{{ visorPdf.titulo }}</p>
+          <button @click="cerrarVisorPdf" class="px-4 py-2 rounded-xl bg-white text-[#003B71] text-[10px] font-black uppercase">Cerrar</button>
+        </div>
+        <iframe :src="visorPdf.url" class="flex-1 w-full rounded-2xl bg-white" title="Certificado"></iframe>
+      </div>
     </Teleport>
   </div>
 </template>

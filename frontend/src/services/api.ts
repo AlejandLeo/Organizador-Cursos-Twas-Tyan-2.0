@@ -1,12 +1,16 @@
 import axios from 'axios';
 
 import { useUIStore } from '@/stores/ui';
+import { SIN_IMAGEN } from '@/utils/imageFallback';
 
 export const getApiBaseUrl = (): string => {
   const envUrl = import.meta.env.VITE_API_URL as string | undefined;
   if (envUrl) return envUrl.replace(/\/$/, '');
+  // En `vite` el origen es el puerto del frontend (5173). Sin VITE_API_URL
+  // las llamadas caían ahí y el home interpretaba el HTML como “sin eventos”.
+  if (import.meta.env.DEV) return 'http://localhost:3000';
   if (typeof window !== 'undefined') return window.location.origin;
-  return 'https://localhost:3000';
+  return 'http://localhost:3000';
 };
 
 // Mantener por compatibilidad si es requerido por algún módulo
@@ -18,9 +22,6 @@ export const getBaseUrl = getApiBaseUrl;
  */
 export const resolveMediaUrl = (url: string | null | undefined, fallback = ''): string => {
   if (!url) return fallback;
-
-  const defaultFallback =
-    'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?w=1600&q=80';
 
   const base = getApiBaseUrl();
 
@@ -44,7 +45,28 @@ export const resolveMediaUrl = (url: string | null | undefined, fallback = ''): 
     return `${base}${url}`;
   }
 
-  return url || fallback || defaultFallback;
+  return url || fallback || SIN_IMAGEN;
+};
+
+const urlGuardada = (valor: string | null | undefined, carpeta: string) => {
+  if (!valor) return '';
+  return getImageUrl(carpeta, valor, '');
+};
+
+/** Imagen del evento: el fondo guardado y, si no hay, el logo. */
+export const imagenEvento = (evento: any): string => {
+  if (!evento) return SIN_IMAGEN;
+  return urlGuardada(evento.imagen_fondo, 'fondos')
+    || urlGuardada(evento.logo, 'logo')
+    || SIN_IMAGEN;
+};
+
+/** Imagen de la actividad y, si no tiene, la del evento al que pertenece. */
+export const imagenActividad = (actividad: any): string => {
+  if (!actividad) return SIN_IMAGEN;
+  const propia = urlGuardada(actividad.imagen, 'cursos');
+  if (propia) return propia;
+  return imagenEvento(actividad.evento);
 };
 
 const api = axios.create({
@@ -95,12 +117,16 @@ api.interceptors.response.use(
  */
 export const getImageUrl = (carpeta: string, nombreArchivo: string, fallback = '') => {
   if (!nombreArchivo) return fallback;
-  if (nombreArchivo.startsWith('http') || nombreArchivo.startsWith('/uploads/')) {
-    return resolveMediaUrl(nombreArchivo, fallback);
+
+  const uploadsAt = nombreArchivo.indexOf('/uploads/');
+  if (nombreArchivo.startsWith('http') || uploadsAt >= 0) {
+    const path = uploadsAt > 0 && !nombreArchivo.startsWith('http')
+      ? nombreArchivo.slice(uploadsAt)
+      : nombreArchivo;
+    return resolveMediaUrl(path, fallback);
   }
 
   const baseUrl = api.defaults.baseURL || window.location.origin;
-  // Decodificamos varias veces por si viene con doble codificación desde el backend (ej: %2520 -> %20 -> " ")
   let cleanName = nombreArchivo;
   try {
     cleanName = decodeURIComponent(decodeURIComponent(nombreArchivo));
@@ -109,7 +135,10 @@ export const getImageUrl = (carpeta: string, nombreArchivo: string, fallback = '
       cleanName = decodeURIComponent(nombreArchivo);
     } catch (e2) { }
   }
-  return `${baseUrl}/uploads/${carpeta}/${cleanName}`;
+  if (cleanName.includes('/')) {
+    cleanName = cleanName.split('/').pop() || cleanName;
+  }
+  return `${baseUrl}/uploads/${carpeta}/${encodeURIComponent(cleanName)}`;
 };
 
 export default api;

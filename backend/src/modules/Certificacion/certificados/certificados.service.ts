@@ -269,9 +269,51 @@ export class CertificadosService {
     return this.certificadoRepository.save(this.certificadoRepository.create(data));
   }
 
-  findAll() {
-    return this.certificadoRepository.find({
-      relations: ['usuario', 'usuario.persona', 'actividadAcademica'],
+  async findAll() {
+    const certs = await this.certificadoRepository.find({
+      relations: ['usuario', 'usuario.persona', 'actividadAcademica', 'actividadAcademica.evento'],
+      order: { fecha_emision: 'DESC' },
+    });
+
+    const logs = await this.mailLogRepository
+      .createQueryBuilder('log')
+      .select('LOWER(log.destinatario)', 'destinatario')
+      .addSelect('LOWER(log.asunto)', 'asunto')
+      .addSelect('COUNT(*)', 'total')
+      .where('log.estado = :estado', { estado: 'enviado' })
+      .andWhere('log.asunto ILIKE :prefijo', { prefijo: 'Tu Certificado:%' })
+      .groupBy('LOWER(log.destinatario)')
+      .addGroupBy('LOWER(log.asunto)')
+      .getRawMany<{ destinatario: string; asunto: string; total: string }>();
+
+    const enviadosPorCorreo = new Map<string, number>();
+    for (const row of logs) {
+      enviadosPorCorreo.set(`${row.destinatario}|${row.asunto}`, Number(row.total) || 0);
+    }
+
+    const clave = (cert: Certificado) => {
+      const email = cert.usuario?.email?.toLowerCase() || '';
+      const asunto = `tu certificado: ${(cert.actividadAcademica?.nombre || '').toLowerCase()}`;
+      return `${email}|${asunto}`;
+    };
+    const enviadosPorClave = new Map<string, number>();
+    for (const cert of certs) {
+      if (cert.estado_envio !== 'enviado') continue;
+      const key = clave(cert);
+      enviadosPorClave.set(key, (enviadosPorClave.get(key) || 0) + 1);
+    }
+
+    return certs.map((cert) => {
+      const key = clave(cert);
+      const desdeHistorial = enviadosPorCorreo.get(key) || 0;
+      const guardados = cert.envios || 0;
+      const unicoEnviado = cert.estado_envio === 'enviado' && enviadosPorClave.get(key) === 1;
+      const envios = unicoEnviado
+        ? Math.max(guardados, desdeHistorial, 1)
+        : cert.estado_envio === 'enviado'
+          ? Math.max(guardados, 1)
+          : guardados;
+      return { ...cert, envios };
     });
   }
 
