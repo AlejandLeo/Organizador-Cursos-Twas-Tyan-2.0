@@ -103,7 +103,6 @@ export class InscripcionesExcelController {
     file: Express.Multer.File,
     @Body('notificar') notificar?: string,
     @Body('id_actividad') idActividad?: string,
-    @Body('ids_actividades') idsActividades?: string,
     @Body('id_evento') idEvento?: string,
     @Body('crear_usuarios') crearUsuarios?: string,
     @Body('modo') modo?: 'verificar' | 'guardar',
@@ -115,10 +114,6 @@ export class InscripcionesExcelController {
       notificar === 'true',
       idActividad ? Number(idActividad) : undefined,
       idEvento ? Number(idEvento) : undefined,
-      (idsActividades || '')
-        .split(',')
-        .map((valor) => Number(valor))
-        .filter((valor) => Number.isInteger(valor) && valor > 0),
       modo || 'guardar',
       crearUsuarios === 'true',
       idTemplate ? Number(idTemplate) : undefined

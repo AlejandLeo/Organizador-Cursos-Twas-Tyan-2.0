@@ -68,7 +68,8 @@ export class CertificadosEnvioService {
       const tiposMap: Record<number, string> = {
         1: 'Asistente',
         2: 'Expositor',
-        3: 'Logística',
+        3: 'Organizador',
+        4: 'Docente',
       };
       const tipoLabel = tiposMap[cert.tipo] ?? 'Participante';
 
@@ -117,7 +118,6 @@ export class CertificadosEnvioService {
         fecha_ultimo_envio: new Date(),
         log_error_envio: null,
       });
-      await this.certificadoRepository.increment({ id }, 'envios', 1);
 
       this.logger.log(`✓ Certificado #${id} enviado con éxito a ${email}`);
     } catch (error) {

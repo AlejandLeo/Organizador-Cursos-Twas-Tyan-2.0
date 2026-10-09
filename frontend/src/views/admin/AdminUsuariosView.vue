@@ -98,7 +98,7 @@ const formUsuario = ref({
 const fetchUsuarios = async () => {
   try {
     isLoading.value = true;
-    const res = await usuariosService.getAll({ soloActivos: 'false', limit: 1000 });
+    const res = await usuariosService.getAll({ soloActivos: 'false', limit: 1000 } as any);
     const data = (res.data as any)?.data ?? res.data;
     usuarios.value = Array.isArray(data) ? data : [];
   } catch (error) {
@@ -215,6 +215,9 @@ const abrirGestionRoles = (user: any) => {
   // Filtrar entradas con rol null (FK huérfana) antes de mapear
   const rolesValidos = (user.usuariosRoles || []).filter((ur: any) => ur.rol != null && ur.rol.id != null);
   rolesTemp.value = rolesValidos.map((ur: any) => ur.rol.id);
+  console.log('[PERMISOS] Abriendo gestión de roles para:', user.email);
+  console.log('[PERMISOS] usuariosRoles raw:', JSON.stringify(user.usuariosRoles));
+  console.log('[PERMISOS] rolesTemp cargados:', rolesTemp.value);
   notificarRoles.value = true;
   isGestionandoRoles.value = true;
 };
@@ -574,11 +577,11 @@ onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
         <div class="flex items-center gap-3 mb-2">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#003B71] to-[#0070BB] flex items-center justify-center shadow-lg shadow-[#003B71]/30">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-rose-800 flex items-center justify-center shadow-lg shadow-red-900/50">
             <span class="material-symbols-outlined text-white text-[22px]">manage_accounts</span>
           </div>
           <div>
-            <p class="text-[10px] font-black text-umsa-blue dark:text-sky-400 uppercase tracking-widest leading-none">Administración</p>
+            <p class="text-[10px] font-black text-red-600 dark:text-red-500 uppercase tracking-widest leading-none">Administración</p>
             <h1 class="text-2xl font-black text-slate-800 dark:text-white tracking-tight uppercase italic">Directorio de Usuarios</h1>
             <p v-if="!isLoading" class="text-[9px] font-bold text-slate-500 mt-1 uppercase tracking-tighter">
               Total: {{ usuarios.length }} | Filtrados: {{ usuariosFiltrados.length }}
@@ -601,7 +604,7 @@ onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
           </button>
         </div>
         <button @click="isCreating = true"
-                class="flex items-center gap-2 px-6 py-3 bg-umsa-blue text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-[#0070BB]/20 hover:-translate-y-1 transition-all">
+                class="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-red-600/20 hover:-translate-y-1 transition-all">
           <span class="material-symbols-outlined text-[18px]">person_add</span>
           Nuevo Usuario
         </button>
@@ -614,7 +617,7 @@ onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
         <div class="flex-1 min-w-[250px] relative">
           <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400">search</span>
           <input v-model="filtroTexto" type="text" placeholder="Buscar usuario..."
-                 class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm outline-none focus:border-umsa-blue/50 transition-all" />
+                 class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm outline-none focus:border-red-600/50 transition-all" />
         </div>
         <select v-model="filtroRol" class="px-4 py-2.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold uppercase outline-none">
           <option value="">Todos los roles</option>
@@ -635,7 +638,7 @@ onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
     <!-- TABLA -->
     <div class="bg-white dark:bg-[#13131f] border border-slate-200 dark:border-white/5 rounded-[2rem] overflow-hidden">
       <div v-if="isLoading" class="flex justify-center items-center py-16">
-        <span class="material-symbols-outlined animate-spin text-3xl text-umsa-blue">progress_activity</span>
+        <span class="material-symbols-outlined animate-spin text-3xl text-red-600">progress_activity</span>
       </div>
       <div v-else class="overflow-x-auto">
         <table class="w-full text-left">
@@ -652,7 +655,7 @@ onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
             <tr v-for="user in paginatedUsuarios" :key="user.id" class="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
               <td class="px-6 py-4">
                 <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 rounded-full bg-sky-100 dark:bg-sky-900/30 text-umsa-blue flex items-center justify-center font-black text-sm">
+                  <div class="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 flex items-center justify-center font-black text-sm">
                     {{ user.persona?.nombres?.charAt(0) || '?' }}
                   </div>
                   <div>
@@ -670,10 +673,10 @@ onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
                 <div class="flex gap-1 flex-wrap">
                   <span v-for="nombre in getRoles(user)" :key="nombre"
                         :class="[
-                          nombre === 'Super Usuario' ? 'bg-umsa-blue text-white border-red-700 shadow-sm' :
+                          nombre === 'Super Usuario' ? 'bg-red-600 text-white border-red-700 shadow-sm' :
                           nombre === 'Coordinador' ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800' :
                           nombre === 'Ponente' ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800' :
-                          nombre === 'Logística' || nombre === 'Logistica' ? 'bg-teal-100 text-teal-700 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-800' :
+                          nombre === 'Logística' ? 'bg-teal-100 text-teal-700 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-800' :
                           'bg-slate-100 text-slate-600 border-slate-200 dark:bg-white/5 dark:text-slate-400 dark:border-white/10'
                         ]"
                         class="px-2 py-0.5 rounded border text-[9px] font-black uppercase tracking-wider">
@@ -688,7 +691,7 @@ onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
                         class="text-[9px] font-black uppercase px-2 py-1 rounded-full">
                     {{ user.estado === 1 ? 'ACTIVO' : 'INACTIVO' }}
                   </span>
-                  <span v-if="user.fecha_eliminacion" class="text-[8px] bg-umsa-blue text-white px-2 py-0.5 rounded-full font-black animate-pulse uppercase">
+                  <span v-if="user.fecha_eliminacion" class="text-[8px] bg-red-600 text-white px-2 py-0.5 rounded-full font-black animate-pulse uppercase">
                     Pendiente Borrado
                   </span>
                 </div>
@@ -778,43 +781,43 @@ onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
             <div class="grid grid-cols-2 gap-4">
               <div class="space-y-1">
                 <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Nombres *</label>
-                <input v-model="formUsuario.nombres" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-umsa-blue/50" />
+                <input v-model="formUsuario.nombres" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-red-600/50" />
               </div>
               <div class="space-y-1">
                 <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Primer Apellido *</label>
-                <input v-model="formUsuario.primer_apellido" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-umsa-blue/50" />
+                <input v-model="formUsuario.primer_apellido" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-red-600/50" />
               </div>
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div class="space-y-1">
                 <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Segundo Apellido</label>
-                <input v-model="formUsuario.segundo_apellido" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-umsa-blue/50" />
+                <input v-model="formUsuario.segundo_apellido" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-red-600/50" />
               </div>
               <div class="space-y-1">
                 <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Cédula / CI</label>
-                <input v-model="formUsuario.documento_identidad" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-umsa-blue/50" />
+                <input v-model="formUsuario.documento_identidad" type="text" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-red-600/50" />
               </div>
             </div>
             <div class="space-y-1">
               <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Rol del Sistema *</label>
-              <select v-model="formUsuario.id_rol" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-umsa-blue/50 font-bold uppercase">
+              <select v-model="formUsuario.id_rol" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-red-600/50 font-bold uppercase">
                 <option v-for="rol in rolesDisponiblesParaAsignar" :key="rol.id" :value="rol.id">{{ rol.nombre }}</option>
               </select>
             </div>
             <div class="space-y-1">
               <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Correo Electrónico *</label>
-              <input v-model="formUsuario.email" type="email" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-umsa-blue/50" />
+              <input v-model="formUsuario.email" type="email" class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-red-600/50" />
             </div>
             <div class="space-y-1">
               <label class="text-[10px] font-black text-slate-500 uppercase ml-2">Contraseña Temporal *</label>
               <input v-model="formUsuario.password" type="password" placeholder="••••••••"
-                     class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-umsa-blue/50" />
+                     class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm dark:text-white outline-none focus:border-red-600/50" />
             </div>
 
             <!-- Notificar checkbox -->
             <div class="col-span-1 md:col-span-2 pt-2 border-t border-slate-100 dark:border-white/5">
               <div class="flex items-center gap-2 cursor-pointer w-fit" @click="formUsuario.notificar = !formUsuario.notificar">
-                <div :class="formUsuario.notificar ? 'bg-umsa-blue border-umsa-blue' : 'bg-transparent border-slate-300 dark:border-slate-600'" 
+                <div :class="formUsuario.notificar ? 'bg-red-600 border-red-600' : 'bg-transparent border-slate-300 dark:border-slate-600'" 
                      class="w-5 h-5 rounded border flex items-center justify-center transition-colors">
                   <span v-if="formUsuario.notificar" class="material-symbols-outlined text-white text-[14px] font-bold">check</span>
                 </div>
@@ -873,7 +876,7 @@ onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
                  @click="toggleRolLocal(rol.id)"
                  :class="[
                    rolesTemp.includes(rol.id) 
-                    ? 'border-umsa-blue bg-sky-50 dark:bg-sky-900/20 text-[#003B71] dark:text-red-300' 
+                    ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300' 
                     : 'border-slate-100 dark:border-white/5 bg-white dark:bg-white/3 text-slate-400 hover:border-red-200'
                  ]"
                  class="flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all group">
@@ -898,14 +901,14 @@ onMounted(() => { fetchUsuarios(); fetchPlantillas(); });
           <div class="flex items-center gap-3 p-4 bg-slate-50 dark:bg-white/5 rounded-2xl mb-8 border border-slate-100 dark:border-white/5">
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" v-model="notificarRoles" class="sr-only peer">
-              <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-white/10 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-umsa-blue"></div>
+              <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-white/10 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-red-600"></div>
             </label>
             <span class="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-tight">Notificar cambios por correo</span>
           </div>
 
           <div class="flex gap-3">
             <button @click="guardarRoles" :disabled="rolesCargando"
-                    class="flex-1 py-4 bg-umsa-blue text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-xl hover:-translate-y-1 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                    class="flex-1 py-4 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-xl hover:-translate-y-1 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
               <span v-if="rolesCargando" class="material-symbols-outlined animate-spin text-[16px]">refresh</span>
               Listo, Guardar Cambios
             </button>

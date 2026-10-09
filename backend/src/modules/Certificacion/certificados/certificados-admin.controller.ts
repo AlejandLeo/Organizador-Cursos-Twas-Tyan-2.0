@@ -7,10 +7,9 @@ import {
   Delete,
   Query,
   ParseIntPipe,
-  Res,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiProduces, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { CertificadosService } from './certificados.service';
 import { EmitirLoteDto } from './dto/emitir-lote.dto';
 import { EmitirLoteTipoDto } from './dto/emitir-lote-tipo.dto';
@@ -19,7 +18,6 @@ import { JwtAuthGuard } from '../../Seguridad/auth/jwt-auth.guard';
 import { RolesGuard } from '../../Seguridad/auth/roles.guard';
 import { Roles } from '../../Seguridad/auth/roles.decorator';
 import { CertificadosQueueService } from './certificados-queue.service';
-import { CertificadosPdfService } from './certificados-pdf.service';
 
 
 @ApiTags('Certificados (Admin)')
@@ -31,7 +29,6 @@ export class CertificadosAdminController {
   constructor(
     private readonly service: CertificadosService,
     private readonly queueService: CertificadosQueueService,
-    private readonly pdfService: CertificadosPdfService,
   ) { }
 
   // ── Envío masivo ────────────────────────────────────────────
@@ -121,19 +118,6 @@ export class CertificadosAdminController {
   @ApiOperation({ summary: 'Obtener la lista de firmantes (Coordinadores y Ponentes) para un evento' })
   async getFirmantesEvento(@Param('id', ParseIntPipe) id: number) {
     return this.service.obtenerFirmantesEvento(id);
-  }
-
-  @Get(':id/pdf')
-  @ApiOperation({ summary: 'Abrir el PDF de un certificado emitido' })
-  @ApiProduces('application/pdf')
-  async verPdf(@Param('id', ParseIntPipe) id: number, @Res() res: any) {
-    const buffer = await this.pdfService.generarPdfBuffer(id, 0);
-    res.set({
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename="certificado_${id}.pdf"`,
-      'Content-Length': buffer.length,
-    });
-    res.end(buffer);
   }
 
   @Get(':id')

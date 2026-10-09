@@ -76,25 +76,37 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('rolActivo', nuevoRol);
   }
 
-  /** Entra al portal del rol de mayor jerarquía. Estudiante no tapa a Coordinador, Logística ni Ponente. */
+  /** Determina la ruta de inicio según el rol activo o el rol de mayor jerarquía.
+   * Modificado: Ahora prioriza el portal de estudiante por defecto para usuarios mixtos.
+   */
   function getRutaInicio(): string {
+    if (esSuperUsuario.value) return '/admin';
+    if (userRoles.value.includes('Coordinador')) return '/coordinador';
     const roles = userRoles.value;
+    const persona = user.value?.persona as any;
 
+    // Si ya hay un rol activo seleccionado, lo respetamos
     if (rolActivo.value && roles.includes(rolActivo.value)) {
-      if (rolActivo.value === 'Super Usuario') return '/admin';
-      if (rolActivo.value === 'Coordinador') return '/coordinador';
-      if (rolActivo.value === 'Logística') return '/logistica';
       if (rolActivo.value === 'Ponente') return '/ponente';
       if (rolActivo.value === 'Estudiante') return '/estudiante';
+      if (rolActivo.value === 'Coordinador') return '/coordinador';
+      if (rolActivo.value === 'Logística') return '/logistica';
     }
 
-    if (esSuperUsuario.value) return '/admin';
+    // PRIORIDAD: Si es Ponente y ya está configurado, va a /ponente
+    if (roles.includes('Ponente') && persona?.ponente_configurado) {
+      return '/ponente';
+    }
+
+    // Por defecto, si es estudiante va a /estudiante
+    if (roles.includes('Estudiante')) return '/estudiante';
+
+    // Si solo es ponente (no configurado aún) o coordinador
     if (roles.includes('Coordinador')) return '/coordinador';
     if (roles.includes('Logística')) return '/logistica';
     if (roles.includes('Ponente')) return '/ponente';
-    if (roles.includes('Estudiante')) return '/estudiante';
 
-    return '/';
+    return '/estudiante';
   }
 
   /** Control de notificación de nuevo rol de ponente (específico por usuario) */

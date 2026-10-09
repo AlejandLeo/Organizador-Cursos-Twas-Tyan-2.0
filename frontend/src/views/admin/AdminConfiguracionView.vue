@@ -141,7 +141,7 @@ onMounted(fetchConfigs);
                 Exportar
               </button>
               <button @click="updateConfig(config)"
-                      class="px-4 py-2 bg-umsa-blue text-white text-[10px] font-black uppercase rounded-lg shadow-lg shadow-[#0070BB]/20 hover:bg-[#005a96] transition-all">
+                      class="px-4 py-2 bg-red-600 text-white text-[10px] font-black uppercase rounded-lg shadow-lg shadow-red-600/20 hover:bg-red-700 transition-all">
                 Guardar Cambios
               </button>
             </div>
@@ -149,9 +149,9 @@ onMounted(fetchConfigs);
           
           <textarea v-if="config.clave.includes('BODY') || config.clave.includes('LAYOUT')" 
                     v-model="config.valor" rows="12"
-                    class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-xs font-mono outline-none focus:border-umsa-blue/50 transition-all shadow-inner"></textarea>
+                    class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-xs font-mono outline-none focus:border-red-600/50 transition-all shadow-inner"></textarea>
           <input v-else v-model="config.valor" type="text"
-                 class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-sm font-bold outline-none focus:border-umsa-blue/50 transition-all" />
+                 class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-sm font-bold outline-none focus:border-red-600/50 transition-all" />
           
           <div v-if="config.clave === 'WELCOME_MESSAGE_BODY'" class="mt-4 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/30">
             <div class="flex items-center gap-2 mb-3">

@@ -234,7 +234,7 @@ const limpiarFiltros = () => {
             <span class="material-symbols-outlined text-white text-[22px]">gavel</span>
           </div>
           <div>
-            <p class="text-[10px] font-black text-umsa-blue dark:text-sky-400 uppercase tracking-widest leading-none">Auditoría del Sistema</p>
+            <p class="text-[10px] font-black text-red-600 dark:text-red-500 uppercase tracking-widest leading-none">Auditoría del Sistema</p>
             <h1 class="text-xl sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight uppercase italic">Bitácora de Cambios</h1>
           </div>
         </div>
@@ -251,7 +251,7 @@ const limpiarFiltros = () => {
           Excel
         </button>
         <button @click="exportarPDF()"
-                class="flex items-center gap-1.5 px-4 py-2.5 bg-umsa-blue text-white rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#0070BB]/20 hover:bg-[#005a96] transition-all">
+                class="flex items-center gap-1.5 px-4 py-2.5 bg-red-600 text-white rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest shadow-lg shadow-red-600/20 hover:bg-red-700 transition-all">
           <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>
           PDF
         </button>
@@ -270,7 +270,7 @@ const limpiarFiltros = () => {
         <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[18px]">search</span>
         <input v-model="busqueda" @input="onBusquedaChange" type="text" 
                placeholder="Buscar en descripción, entidad o usuario..."
-               class="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm outline-none focus:border-umsa-blue/50 text-slate-800 dark:text-white transition-all" />
+               class="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm outline-none focus:border-red-600/50 text-slate-800 dark:text-white transition-all" />
       </div>
 
       <!-- Filtros de módulo/acción + fechas -->
@@ -442,7 +442,7 @@ const limpiarFiltros = () => {
           <span class="material-symbols-outlined text-[18px] text-slate-500">chevron_left</span>
         </button>
         <button v-for="p in paginasVisibles" :key="p" @click="irAPagina(p)"
-                :class="p === historialStore.page ? 'bg-umsa-blue text-white shadow-md' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:bg-slate-200'"
+                :class="p === historialStore.page ? 'bg-red-600 text-white shadow-md' : 'bg-slate-100 dark:bg-white/5 text-slate-500 hover:bg-slate-200'"
                 class="w-8 h-8 rounded-lg text-[10px] font-black transition-all">
           {{ p }}
         </button>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import api, { imagenActividad, imagenEvento } from '@/services/api';
+import api, { getImageUrl } from '@/services/api'; // Import api instance
 
 const router = useRouter();
 const eventosPublicados = ref<any[]>([]);
@@ -22,21 +22,20 @@ const fetchEventos = async () => {
       nombreLargo: evento.nombre,
       version: evento.gestion || 'Última versión',
       descripcion: evento.descripcion || 'Sin descripción',
-      imagen: imagenEvento(evento),
+      imagen: (evento.imagen_fondo && evento.imagen_fondo.startsWith('http')) 
+        ? evento.imagen_fondo 
+        : (evento.imagen_fondo 
+            ? getImageUrl('fondos', evento.imagen_fondo)
+            : getImageUrl('eventos', evento.logo, 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1600&q=80')),
       estado: evento.estado == 1 ? 'Activo' : 'Próximamente',
       colorEstado: evento.estado == 1 ? 'bg-emerald-500 text-white border-emerald-400/30' : 'bg-slate-500 text-white border-slate-400/30',
       mostrarActividades: true,
       actividades: (evento.actividades || []).filter((act: any) => Number(act.estado) !== -1).map((act: any) => {
         const found = misInsc.find((i: any) => i.actividadAcademica?.id === act.id);
         let myStatus = 'Disponible';
-        const fin = String(act.fecha_fin || evento.fecha_fin || '').slice(0, 10);
-        const hoy = new Date();
-        const isoHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
-        const concluida = Number(act.estado) === 0 || Number(evento.estado) === 0 || Number(evento.fase) >= 4 || (!!fin && fin < isoHoy);
-        if (concluida) myStatus = 'Finalizado';
-        else if (found) {
-          if (found.estado === 3) myStatus = 'Finalizado';
-          else if (found.estado === 1) myStatus = 'Inscrito';
+        if (found) {
+          if (found.estado === 1) myStatus = 'Inscrito';
+          else if (found.estado === 3) myStatus = 'Finalizado';
           else if (found.estado === 2) myStatus = 'Rechazado';
           else myStatus = 'Pre-Inscrito';
         }
@@ -48,7 +47,7 @@ const fetchEventos = async () => {
           type: act.tipo || 'General',
           date: `${act.fecha_inicio ? new Date(act.fecha_inicio).toLocaleDateString() : 'Por definir'}`,
           modules: 1,
-          image: imagenActividad({ ...act, evento })
+          image: getImageUrl('cursos', act.imagen, 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&q=80')
         };
       })
     }));

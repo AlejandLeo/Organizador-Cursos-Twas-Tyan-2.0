@@ -622,6 +622,7 @@ const inhabilitarActividad = async (id: number, nombre: string) => {
             if (!inhabilitadosLocal.value.includes(idStr)) {
                 inhabilitadosLocal.value.push(idStr);
             }
+            console.log("Actividades Inhabilitadas Localmente:", inhabilitadosLocal.value);
             
             await api.patch(`/actividades-academicas/${id}`, { 
                 estado: -1, // Estado inhabilitado

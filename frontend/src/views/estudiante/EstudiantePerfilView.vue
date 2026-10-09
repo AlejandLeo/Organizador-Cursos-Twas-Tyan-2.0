@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
-import { useRoute } from 'vue-router';
+import { ref, onMounted } from 'vue';
 import api from '@/services/api';
 import Swal from 'sweetalert2';
 import { useAuthStore } from '@/stores/auth';
 
 const authStore = useAuthStore();
-const route = useRoute();
-const mostrarFirma = computed(() => route.path.startsWith('/ponente') || route.path.startsWith('/coordinador'));
 
 const loading = ref(false);
 const error = ref('');
@@ -27,6 +24,7 @@ const formData = ref({
   afiliaciones: [] as any[]
 });
 
+const isCoordinator = ref(false);
 const firmaUrl = ref('');
 const isDraggingFirma = ref(false);
 
@@ -101,6 +99,10 @@ const loadProfile = async () => {
       }));
     }
 
+    // Detectar si es Coordinador, Super Usuario o Ponente para mostrar la firma (case-insensitive)
+    const roles = res.data?.usuariosRoles?.map((ur: any) => (ur.rol?.nombre_rol || '').toLowerCase()) || [];
+    isCoordinator.value = roles.includes('coordinador') || roles.includes('super usuario') || roles.includes('admin') || roles.includes('ponente');
+    
     // Si no hay afiliaciones, añadir una vacía por defecto para que no se vea vacío
     if (formData.value.afiliaciones.length === 0 && !isCompleted.value) {
       addAfiliacion();
@@ -109,7 +111,7 @@ const loadProfile = async () => {
     originalData.value = { ...formData.value };
     
     await loadPhoto();
-    if (mostrarFirma.value) await loadFirma();
+    if (isCoordinator.value) await loadFirma();
   } catch (err) {
     console.error('Error loading profile', err);
   }
@@ -432,7 +434,7 @@ onMounted(() => {
     </div>
 
     <!-- Alerta de Firma Digital Faltante -->
-    <div v-if="mostrarFirma && !firmaUrl && !loading" class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 md:p-6 rounded-2xl flex items-start gap-3 md:gap-4 shadow-sm animate-pulse">
+    <div v-if="isCoordinator && !firmaUrl && !loading" class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 md:p-6 rounded-2xl flex items-start gap-3 md:gap-4 shadow-sm animate-pulse">
       <span class="material-symbols-outlined text-amber-500 dark:text-amber-400 text-2xl md:text-3xl shrink-0">warning</span>
       <div>
         <h4 class="text-amber-800 dark:text-amber-300 font-black uppercase text-xs md:text-sm">Firma Digital Faltante</h4>
@@ -479,7 +481,7 @@ onMounted(() => {
         </div>
 
         <!-- Firma Digital (Solo Coordinadores/Admin/Ponente) -->
-        <div v-if="mostrarFirma" 
+        <div v-if="isCoordinator" 
           @dragenter.prevent="isDraggingFirma = true"
           @dragover.prevent="isDraggingFirma = true"
           @dragleave.prevent="isDraggingFirma = false"

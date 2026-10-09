@@ -16,28 +16,12 @@ export class UploadsController {
       throw new NotFoundException('Carpeta no válida');
     }
 
-    const nombres = new Set<string>();
-    const base = nombreArchivo.split(/[/\\]/).pop() || nombreArchivo;
-    for (const candidato of [nombreArchivo, base]) {
-      if (!candidato || candidato.includes('..')) continue;
-      nombres.add(candidato);
-      try {
-        nombres.add(decodeURIComponent(candidato));
-      } catch {
-        /* nombre sin codificar */
-      }
+    const imagePath = join(process.cwd(), 'uploads', carpeta, nombreArchivo);
+    
+    if (existsSync(imagePath)) {
+      return res.sendFile(imagePath);
+    } else {
+      throw new NotFoundException('Imagen no encontrada');
     }
-
-    const carpetas = [carpeta, ...validFolders.filter((folder) => folder !== carpeta)];
-    for (const folder of carpetas) {
-      for (const nombre of nombres) {
-        const imagePath = join(process.cwd(), 'uploads', folder, nombre);
-        if (existsSync(imagePath)) {
-          return res.sendFile(imagePath);
-        }
-      }
-    }
-
-    throw new NotFoundException('Imagen no encontrada');
   }
 }

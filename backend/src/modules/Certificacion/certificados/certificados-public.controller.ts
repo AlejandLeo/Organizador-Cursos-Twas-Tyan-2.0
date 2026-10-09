@@ -74,10 +74,6 @@ export class CertificadosPublicController {
         nombre: eventoNombre,
         fecha_inicio: fechaInicio,
         fecha_fin: fechaFin,
-        direccion: certificado.actividadAcademica?.evento?.direccion || certificado.actividadAcademica?.evento?.ubicacion || null,
-        telefono: certificado.actividadAcademica?.evento?.telefono || null,
-        email: certificado.actividadAcademica?.evento?.email || null,
-        organizadores: certificado.actividadAcademica?.evento?.organizadores || null,
       }
     };
   }

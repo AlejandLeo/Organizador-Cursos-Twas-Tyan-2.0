@@ -15,9 +15,6 @@ const crearUsuarios = ref(false);
 
 const eventos = ref<any[]>([]);
 const selectedEventoId = ref<string>('');
-const actividadesEvento = ref<any[]>([]);
-const selectedActividadIds = ref<number[]>([]);
-const cargandoActividades = ref(false);
 const isLoadingSelects = ref(false);
 const searchQuery = ref('');
 
@@ -125,27 +122,6 @@ onMounted(() => {
   fetchEventos();
   fetchPlantillas();
 });
-
-watch(selectedEventoId, async (id) => {
-  selectedActividadIds.value = [];
-  actividadesEvento.value = [];
-  if (!id) return;
-  cargandoActividades.value = true;
-  try {
-    const res = await api.get(`/admin/eventos/${id}/actividades-academicas`);
-    actividadesEvento.value = Array.isArray(res.data) ? res.data : [];
-  } catch {
-    actividadesEvento.value = [];
-  } finally {
-    cargandoActividades.value = false;
-  }
-});
-
-const toggleActividad = (id: number) => {
-  selectedActividadIds.value = selectedActividadIds.value.includes(id)
-    ? selectedActividadIds.value.filter((actual) => actual !== id)
-    : [...selectedActividadIds.value, id];
-};
 
 watch(activeTab, () => {
   selectedTemplateId.value = '';
@@ -305,10 +281,6 @@ const importar = async (modo: 'verificar' | 'guardar') => {
     Swal.fire('Atención', 'Debes seleccionar al menos un evento para continuar.', 'warning');
     return;
   }
-  if (activeTab.value === 'inscripciones' && selectedActividadIds.value.length === 0) {
-    Swal.fire('Atención', 'Selecciona la actividad donde se inscribirán los estudiantes.', 'warning');
-    return;
-  }
 
   isUploading.value = true;
   const formData = new FormData();
@@ -318,9 +290,6 @@ const importar = async (modo: 'verificar' | 'guardar') => {
   
   if ((activeTab.value === 'inscripciones' || activeTab.value === 'ponentes') && selectedEventoId.value) {
     formData.append('id_evento', selectedEventoId.value);
-  }
-  if (activeTab.value === 'inscripciones' && selectedActividadIds.value.length) {
-    formData.append('ids_actividades', selectedActividadIds.value.join(','));
   }
   if (selectedTemplateId.value) {
     formData.append('id_template', selectedTemplateId.value);
@@ -585,31 +554,6 @@ const getStatusIcon = (status: string) => {
                 <p class="text-[9px] text-emerald-600 font-black uppercase">Evento seleccionado: <span class="text-slate-700 dark:text-white underline decoration-emerald-500/50">{{ eventos.find(e => String(e.id) === selectedEventoId)?.nombre }}</span></p>
               </div>
               <p class="text-[8px] text-slate-400 font-bold uppercase">{{ filteredEventos.length }} eventos encontrados</p>
-            </div>
-
-            <div v-if="activeTab === 'inscripciones' && selectedEventoId" class="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900 p-4">
-              <h3 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Actividades del evento</h3>
-              <p class="mt-1 text-[10px] font-bold text-slate-500">Los estudiantes quedan inscritos en las actividades que marques, no solo en el evento.</p>
-              <p v-if="cargandoActividades" class="mt-4 text-xs font-bold text-slate-400">Cargando actividades...</p>
-              <p v-else-if="actividadesEvento.length === 0" class="mt-4 text-xs font-bold text-amber-600">Este evento no tiene actividades. Crea una antes de inscribir.</p>
-              <div v-else class="mt-4 grid gap-2">
-                <button
-                  v-for="act in actividadesEvento"
-                  :key="act.id"
-                  type="button"
-                  @click="toggleActividad(act.id)"
-                  :class="selectedActividadIds.includes(act.id) ? 'border-[#0070BB] bg-sky-50 dark:bg-sky-950/30' : 'border-slate-200 dark:border-white/10'"
-                  class="flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left"
-                >
-                  <span>
-                    <span class="block text-sm font-black text-slate-800 dark:text-white">{{ act.nombre }}</span>
-                    <span class="block text-[10px] font-bold uppercase text-slate-400">{{ act.tipo || act.modalidad || 'Actividad' }}</span>
-                  </span>
-                  <span class="material-symbols-outlined" :class="selectedActividadIds.includes(act.id) ? 'text-[#0070BB]' : 'text-slate-300'">
-                    {{ selectedActividadIds.includes(act.id) ? 'check_circle' : 'radio_button_unchecked' }}
-                  </span>
-                </button>
-              </div>
             </div>
           </div>
 

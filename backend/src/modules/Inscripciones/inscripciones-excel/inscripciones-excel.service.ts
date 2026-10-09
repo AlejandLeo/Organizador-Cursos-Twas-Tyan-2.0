@@ -281,7 +281,6 @@ export class InscripcionesExcelService implements OnModuleInit {
     notificar = false,
     idActividad?: number,
     idEvento?: number,
-    idsActividades: number[] = [],
     modo: 'verificar' | 'guardar' = 'guardar',
     crearUsuarios = false,
     templateId?: number
@@ -383,66 +382,30 @@ export class InscripcionesExcelService implements OnModuleInit {
           }
 
           if (!idEvento) throw new Error('Evento no seleccionado.');
-          const destinos: ActividadAcademica[] = [];
-          if (nombreActividad) {
-            const cacheKey = `ev_${idEvento}_${nombreActividad.toLowerCase()}`;
-            let actividad = actividadCache.get(cacheKey);
-            if (actividad === undefined) {
-              actividad = await queryRunner.manager.findOne(ActividadAcademica, {
-                where: { nombre: ILike(nombreActividad), evento: { id: idEvento } },
-                relations: ['evento'],
-              });
-              actividadCache.set(cacheKey, actividad ?? null);
-            }
-            if (!actividad) throw new Error(`Actividad "${nombreActividad}" no encontrada en el evento.`);
-            destinos.push(actividad);
-          } else {
-            const ids = idsActividades.length ? idsActividades : (idActividad ? [idActividad] : []);
-            if (!ids.length) {
-              throw new Error('Selecciona la actividad del evento. La inscripción se registra en la actividad, no solo en el evento.');
-            }
-            for (const actividadId of ids) {
-              const cacheKey = `id_${idEvento}_${actividadId}`;
-              let actividad = actividadCache.get(cacheKey);
-              if (actividad === undefined) {
-                actividad = await queryRunner.manager.findOne(ActividadAcademica, {
-                  where: { id: actividadId, evento: { id: idEvento } },
-                  relations: ['evento'],
-                });
-                actividadCache.set(cacheKey, actividad ?? null);
-              }
-              if (!actividad) throw new Error(`La actividad ${actividadId} no pertenece al evento seleccionado.`);
-              destinos.push(actividad);
-            }
-          }
-
-          const nuevas: string[] = [];
-          const yaInscritas: string[] = [];
-          for (const actividad of destinos) {
-            const inscripcionExistente = await queryRunner.manager.findOne(Inscripcion, {
-              where: { usuario: { id: usuario.id }, actividadAcademica: { id: actividad.id } },
+          const cacheKey = `ev_${idEvento}_${nombreActividad.toLowerCase()}`;
+          let actividad = actividadCache.get(cacheKey);
+          if (actividad === undefined) {
+            actividad = await queryRunner.manager.findOne(ActividadAcademica, {
+              where: { nombre: ILike(nombreActividad), evento: { id: idEvento } },
+              relations: ['evento'],
             });
-            if (inscripcionExistente) {
-              yaInscritas.push(actividad.nombre);
-              continue;
-            }
-            await queryRunner.manager.save(queryRunner.manager.create(Inscripcion, {
-              usuario,
-              actividadAcademica: actividad,
-              estado: 1,
-              miembro_tyan: 0,
-            }));
-            nuevas.push(actividad.nombre);
+            actividadCache.set(cacheKey, actividad);
           }
 
-          if (!nuevas.length) {
-            detalle.push({ fila: numFila, email, estado: 'omitido', mensaje: `Ya inscrito en "${yaInscritas.join(', ')}".` });
+          if (!actividad) throw new Error(`Actividad "${nombreActividad}" no encontrada.`);
+
+          const inscripcionExistente = await queryRunner.manager.findOne(Inscripcion, {
+            where: { usuario: { id: usuario.id }, actividadAcademica: { id: actividad.id } },
+          });
+
+          if (inscripcionExistente) {
+            detalle.push({ fila: numFila, email, estado: 'omitido', mensaje: `Ya inscrito en "${actividad.nombre}".` });
             omitidos++;
             await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
             continue;
           }
 
-          const actividad = destinos[0];
+          await queryRunner.manager.save(queryRunner.manager.create(Inscripcion, { usuario, actividadAcademica: actividad, estado: 1, miembro_tyan: 0 }));
 
           let correoEnviado = false;
           let correoAdvertencia: string | undefined;
@@ -469,14 +432,12 @@ export class InscripcionesExcelService implements OnModuleInit {
             fila: numFila,
             email,
             estado: modo === 'verificar' ? 'omitido' : (fueCreado ? 'creado' : 'inscrito'),
-            mensaje: modo === 'verificar'
-              ? `Válido para: ${nuevas.join(', ')}.`
-              : `Inscrito en: ${nuevas.join(', ')}.`,
+            mensaje: modo === 'verificar' ? 'Válido.' : 'Procesado correctamente.',
             correoEnviado,
             correoAdvertencia,
           });
           if (fueCreado) creados++;
-          inscritos += nuevas.length;
+          inscritos++;
         } catch (error) {
           await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
           detalle.push({ fila: numFila, email, estado: 'error', mensaje: error.message });

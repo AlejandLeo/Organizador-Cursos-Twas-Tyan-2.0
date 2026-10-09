@@ -10,6 +10,11 @@ const authStore = useAuthStore();
 const uiStore = useUIStore();
 const eventoStore = useEventoStore();
 
+console.log("=== DEBUG ROLES ===");
+console.log("User:", authStore.user);
+console.log("User Roles from store:", authStore.userRoles);
+console.log("Tiene múltiples roles:", authStore.tieneMultiplesRoles);
+
 const navigate = (routeName: string) => {
   uiStore.closeSidebar();
   router.push({ name: routeName });

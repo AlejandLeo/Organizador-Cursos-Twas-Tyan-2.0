@@ -22,9 +22,9 @@ npm-debug.log*
 yarn-debug.log*
 tmp/
 temp/
+scratch/
 *.bak
 *.old
-herramientas/
 
 # Otros
 .DS_Store
