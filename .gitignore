@@ -25,6 +25,10 @@ temp/
 scratch/
 *.bak
 *.old
+videos/
+~$*.docx
+~$*.html
+t-token.txt
 
 # Otros
 .DS_Store

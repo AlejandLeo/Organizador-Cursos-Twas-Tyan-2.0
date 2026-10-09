@@ -1,4 +1,6 @@
+import './silenceConsole'
 import './style.css' // Importar Tailwindimport './style.css'
+import './utils/imageFallback'
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { i18n } from './i18n'

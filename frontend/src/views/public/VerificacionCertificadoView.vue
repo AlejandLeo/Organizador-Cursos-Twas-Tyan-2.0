@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '@/services/api'
 
@@ -9,6 +9,29 @@ const uuid = route.params.uuid as string
 const loading = ref(true)
 const resultado = ref<any>(null)
 const errorMsg = ref('')
+
+const sedeInstitucional = 'Campus de Cota Cota, calle 27, Edificio de la Facultad de Ciencias Puras y Naturales, La Paz, Bolivia'
+
+const organizadoresEvento = computed(() => {
+    const raw = resultado.value?.evento?.organizadores
+    if (raw == null) return []
+    const texto = String(raw).trim()
+    if (!texto || texto === '[]' || texto === 'null') return []
+    try {
+        const parsed = JSON.parse(texto)
+        if (Array.isArray(parsed)) {
+            return parsed
+                .map((item) => (typeof item === 'string' ? item : item?.nombre))
+                .map((item) => String(item || '').trim())
+                .filter(Boolean)
+        }
+    } catch {
+        /* texto plano */
+    }
+    return texto.split(/[,;\n]/).map((item) => item.trim()).filter(Boolean)
+})
+
+const sedeEvento = computed(() => resultado.value?.evento?.direccion || sedeInstitucional)
 
 onMounted(async () => {
     try {
@@ -105,10 +128,29 @@ onMounted(async () => {
             </button>
         </div>
 
-        <!-- Footer -->
-        <div class="mt-12 text-center opacity-50 flex items-center gap-2">
-            <span class="material-symbols-outlined text-[16px]">security</span>
-            <span class="text-[10px] font-bold uppercase tracking-widest">Documento protegido criptográficamente</span>
-        </div>
+        <footer class="w-full max-w-5xl mt-12 rounded-3xl bg-[#003B71] text-white px-6 py-8 md:px-10">
+            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-sky-200 mb-6">
+                Validado por la Universidad Mayor de San Andrés y la Facultad de Ciencias Puras y Naturales
+            </p>
+            <div class="grid md:grid-cols-3 gap-8 text-sm">
+                <div>
+                    <h2 class="font-black text-xs uppercase tracking-widest border-b border-sky-400 pb-2 mb-3 inline-block">Sede del evento</h2>
+                    <p class="text-sky-100 leading-relaxed">{{ sedeEvento }}</p>
+                </div>
+                <div>
+                    <h2 class="font-black text-xs uppercase tracking-widest border-b border-sky-400 pb-2 mb-3 inline-block">Contacto del evento</h2>
+                    <p v-if="resultado?.evento?.telefono" class="text-sky-100">Teléfono: {{ resultado.evento.telefono }}</p>
+                    <p v-if="resultado?.evento?.email" class="text-sky-100">Correo: {{ resultado.evento.email }}</p>
+                    <p v-if="!resultado?.evento?.telefono && !resultado?.evento?.email" class="text-sky-100 leading-relaxed">
+                        Universidad Mayor de San Andrés<br>www.umsa.bo · www.fcpn.edu.bo
+                    </p>
+                </div>
+                <div>
+                    <h2 class="font-black text-xs uppercase tracking-widest border-b border-sky-400 pb-2 mb-3 inline-block">Organización del evento</h2>
+                    <p v-if="organizadoresEvento.length" class="text-sky-100 leading-relaxed">{{ organizadoresEvento.join(' · ') }}</p>
+                    <p v-else class="text-sky-100 leading-relaxed">Universidad Mayor de San Andrés · Facultad de Ciencias Puras y Naturales</p>
+                </div>
+            </div>
+        </footer>
     </div>
 </template>

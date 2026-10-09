@@ -117,6 +117,7 @@ export class CertificadosEnvioService {
         fecha_ultimo_envio: new Date(),
         log_error_envio: null,
       });
+      await this.certificadoRepository.increment({ id }, 'envios', 1);
 
       this.logger.log(`✓ Certificado #${id} enviado con éxito a ${email}`);
     } catch (error) {
