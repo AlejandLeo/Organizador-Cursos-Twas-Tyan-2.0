@@ -11,12 +11,6 @@ const authStore = useAuthStore();
 const userRoles = computed(() => authStore.userRoles);
 const historialStore = useAdminHistorialStore();
 
-onMounted(() => {
-  console.log('--- DEBUG ADMIN VIEW ---');
-  console.log('User roles:', userRoles.value);
-  console.log('Es Super Usuario:', authStore.esSuperUsuario);
-});
-
 // --- Gestión de Coordinadores ---
 const showModalCoordinadores = ref(false);
 const eventoParaCoordinadores = ref<any>(null);
@@ -69,10 +63,6 @@ const abrirCoordinadores = async (evento: any) => {
 };
 
 const asignarCoordinador = async (usuario: any) => {
-  console.log('--- ASIGNANDO RESPONSABLE ---');
-  console.log('Evento ID:', eventoParaCoordinadores.value?.id);
-  console.log('Usuario ID:', usuario.id);
-  
   if (!eventoParaCoordinadores.value?.id) {
     Swal.fire('Error', 'No se ha seleccionado un evento válido.', 'error');
     return;
@@ -292,11 +282,11 @@ onMounted(fetchEventos);
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
         <div class="flex items-center gap-3 mb-2">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-rose-800 flex items-center justify-center shadow-lg">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#003B71] to-[#0070BB] flex items-center justify-center shadow-lg">
             <span class="material-symbols-outlined text-white text-[22px]">corporate_fare</span>
           </div>
           <div>
-            <p class="text-[10px] font-black text-red-600 dark:text-red-500 uppercase tracking-widest leading-none">Módulo SGEA</p>
+            <p class="text-[10px] font-black text-umsa-blue dark:text-sky-400 uppercase tracking-widest leading-none">Módulo SGEA</p>
             <h1 class="text-2xl font-black text-slate-800 dark:text-white tracking-tight uppercase italic">Gestión de Eventos</h1>
           </div>
         </div>
@@ -304,7 +294,7 @@ onMounted(fetchEventos);
       </div>
 
       <button @click="abrirCrear()"
-              class="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 group">
+              class="flex items-center gap-2 px-6 py-3 bg-umsa-blue text-white rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-[#005a96] transition-all shadow-lg shadow-[#0070BB]/20 group">
         <span class="material-symbols-outlined text-[18px] group-hover:rotate-90 transition-transform">add</span>
         Nuevo Evento
       </button>
@@ -316,7 +306,7 @@ onMounted(fetchEventos);
         <div class="flex-1 min-w-[220px] relative">
           <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[18px]">search</span>
           <input v-model="filtroTexto" type="text" placeholder="Buscar evento..."
-                 class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm outline-none focus:border-red-600/50 transition-all text-slate-800 dark:text-white" />
+                 class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm outline-none focus:border-umsa-blue/50 transition-all text-slate-800 dark:text-white" />
         </div>
         <div class="flex gap-2 flex-wrap">
           <button v-for="(cfg, estado) in estadoConfig" :key="estado"
@@ -434,25 +424,25 @@ onMounted(fetchEventos);
               <div class="space-y-1">
                 <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre del Evento</label>
                 <input v-model="formEvento.nombre" type="text"
-                       class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-red-600/50 transition-all" />
+                       class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-umsa-blue/50 transition-all" />
               </div>
 
               <div class="space-y-1">
                 <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Descripción</label>
                 <textarea v-model="formEvento.descripcion" rows="3"
-                          class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-red-600/50 transition-all resize-none"></textarea>
+                          class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-umsa-blue/50 transition-all resize-none"></textarea>
               </div>
 
               <div class="grid grid-cols-2 gap-4">
                 <div class="space-y-1">
                   <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Fecha Inicio</label>
                   <input v-model="formEvento.fecha_inicio" type="date"
-                         class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-red-600/50 transition-all" />
+                         class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-umsa-blue/50 transition-all" />
                 </div>
                 <div class="space-y-1">
                   <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Fecha Fin</label>
                   <input v-model="formEvento.fecha_fin" type="date"
-                         class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-red-600/50 transition-all" />
+                         class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-umsa-blue/50 transition-all" />
                 </div>
               </div>
 
@@ -460,12 +450,12 @@ onMounted(fetchEventos);
                 <div class="space-y-1">
                   <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Ubicación</label>
                   <input v-model="formEvento.ubicacion" type="text"
-                         class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-red-600/50 transition-all" />
+                         class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-umsa-blue/50 transition-all" />
                 </div>
                 <div class="space-y-1">
                   <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Estado</label>
                   <select v-model="formEvento.estado"
-                          class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-red-600/50 transition-all font-bold">
+                          class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-umsa-blue/50 transition-all font-bold">
                     <option v-for="(cfg, est) in estadoConfig" :key="est" :value="Number(est)">{{ cfg.label }}</option>
                   </select>
                 </div>
@@ -476,29 +466,29 @@ onMounted(fetchEventos);
                 <div class="space-y-1">
                   <label class="text-[10px] font-black text-red-600 uppercase ml-2">Teléfono de Contacto</label>
                   <input v-model="formEvento.telefono" type="text" placeholder="+591 ..."
-                         class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-red-600/50 transition-all" />
+                         class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-umsa-blue/50 transition-all" />
                 </div>
                 <div class="space-y-1">
                   <label class="text-[10px] font-black text-red-600 uppercase ml-2">Email de Contacto</label>
                   <input v-model="formEvento.email" type="email" placeholder="ejemplo@correo.com"
-                         class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-red-600/50 transition-all" />
+                         class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-umsa-blue/50 transition-all" />
                 </div>
               </div>
 
               <div class="space-y-1">
                 <label class="text-[10px] font-black text-red-600 uppercase ml-2">Dirección Exacta (Para el Footer)</label>
                 <input v-model="formEvento.direccion" type="text" placeholder="Calle, Número, Edificio..."
-                       class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-red-600/50 transition-all" />
+                       class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-umsa-blue/50 transition-all" />
               </div>
 
               <div class="space-y-1">
                 <label class="text-[10px] font-black text-red-600 uppercase ml-2">Organización y Auspicio (Lista de nombres)</label>
                 <textarea v-model="formEvento.organizadores" rows="2" placeholder="TWAS, TYAN, UMSA, FCPN..."
-                          class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-red-600/50 transition-all resize-none"></textarea>
+                          class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm text-slate-800 dark:text-white outline-none focus:border-umsa-blue/50 transition-all resize-none"></textarea>
               </div>
 
               <div class="space-y-1">
-                <label class="text-[10px] font-black text-red-600 uppercase ml-2">Logo del Evento (Imagen)</label>
+                <label class="text-[10px] font-black text-umsa-blue uppercase ml-2">Logo del Evento (Imagen)</label>
                 <input type="file" @change="(e: any) => formEvento.logo_file = e.target.files[0]" accept="image/*"
                        class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-red-50 file:text-red-700 hover:file:bg-red-100 transition-all cursor-pointer" />
               </div>
@@ -510,7 +500,7 @@ onMounted(fetchEventos);
                 Cancelar
               </button>
               <button @click="guardar()"
-                      class="flex-1 py-4 bg-red-600 text-[10px] font-black text-white uppercase rounded-2xl shadow-lg shadow-red-600/20 hover:bg-red-700 transition-all">
+                      class="flex-1 py-4 bg-umsa-blue text-[10px] font-black text-white uppercase rounded-2xl shadow-lg shadow-[#0070BB]/20 hover:bg-[#005a96] transition-all">
                 {{ isEditing ? 'Guardar Cambios' : 'Crear Evento' }}
               </button>
             </div>
@@ -582,7 +572,7 @@ onMounted(fetchEventos);
                 <div class="relative">
                   <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[18px]">search</span>
                   <input v-model="queryCandidato" type="text" placeholder="Buscar por nombre o email..."
-                         class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-[11px] outline-none focus:border-red-600/50 transition-all" />
+                         class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-[11px] outline-none focus:border-umsa-blue/50 transition-all" />
                 </div>
 
                 <div class="space-y-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">

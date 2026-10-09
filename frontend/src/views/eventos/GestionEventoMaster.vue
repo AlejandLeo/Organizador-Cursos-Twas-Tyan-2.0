@@ -57,10 +57,10 @@ const totalSteps = 7;
 const slideDir = ref<'forward' | 'backward'>('forward');
 const isSuperAdminTheme = computed(() => authStore.esSuperUsuario);
 
-const themeColor = computed(() => isSuperAdminTheme.value ? 'red' : 'blue');
-const themeBg = computed(() => isSuperAdminTheme.value ? 'bg-red-600' : 'bg-blue-600');
-const themeShadow = computed(() => isSuperAdminTheme.value ? 'shadow-red-500/20' : 'shadow-blue-500/20');
-const themeHover = computed(() => isSuperAdminTheme.value ? 'hover:bg-red-700' : 'hover:bg-blue-700');
+const themeColor = computed(() => isSuperAdminTheme.value ? 'sky' : 'blue');
+const themeBg = computed(() => isSuperAdminTheme.value ? 'bg-umsa-blue' : 'bg-blue-600');
+const themeShadow = computed(() => isSuperAdminTheme.value ? 'shadow-[#0070BB]/20' : 'shadow-blue-500/20');
+const themeHover = computed(() => isSuperAdminTheme.value ? 'hover:bg-[#005a96]' : 'hover:bg-blue-700');
 
 const previewTransition = computed(() =>
     slideDir.value === 'forward' ? 'preview-slide-forward' : 'preview-slide-backward'
@@ -2005,7 +2005,7 @@ const changeStep = (delta: number) => {
 
     <!-- PANEL FUSIÓN: CLON LITERAL DE GESTIÓN DE EVENTOS -->
     <div v-if="isCreatingEvento" :class="isAdminContext ? 'shadow-red-900/10 border-red-100' : 'shadow-umsa-blue/10 border-blue-100'" class="bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl dark:shadow-black/50 border dark:border-gray-800 animate-in slide-in-from-top-4 duration-500 overflow-hidden relative mb-20">
-        <div :class="isAdminContext ? 'from-red-600 to-red-800' : 'from-umsa-blue to-emerald-500'" class="bg-gradient-to-r p-8 pb-10 relative overflow-hidden">
+        <div :class="isAdminContext ? 'from-[#003B71] to-[#0070BB]' : 'from-umsa-blue to-emerald-500'" class="bg-gradient-to-r p-8 pb-10 relative overflow-hidden">
             <span class="material-symbols-outlined absolute -right-4 -top-8 text-[120px] text-white/10 rotate-12">design_services</span>
             <div class="flex justify-between items-start relative z-20">
                 <h3 class="text-2xl md:text-3xl font-black text-white uppercase italic tracking-tighter drop-shadow-md flex items-center gap-3">
@@ -2524,10 +2524,10 @@ const changeStep = (delta: number) => {
                                 <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Configurar para (Rol)</label>
                                 <select v-model="tipoCertificado" class="w-full bg-slate-50 dark:bg-gray-800 border-2 border-slate-100 dark:border-gray-700 rounded-xl py-3.5 px-5 font-bold text-xs text-primary-dark dark:text-white focus:ring-2 focus:ring-umsa-gold outline-none transition-all cursor-pointer shadow-sm">
                                     <option :value="null" disabled>-- Selecciona un Rol para Configurar Certificado --</option>
-                                    <option :value="1">Logística</option>
+                                    <option :value="1">Asistente</option>
                                     <option :value="2">Expositor</option>
-                                    <option :value="3">Organizador</option>
-                                    <option :value="4">Asistente</option>
+                                    <option :value="3">Logística</option>
+                                    <option :value="4">Docente</option>
                                 </select>
                             </div>
 
@@ -2970,6 +2970,7 @@ const changeStep = (delta: number) => {
                             class="bg-primary-dark dark:bg-gray-900 rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-800 animate-in fade-in duration-500 ring-4 ring-primary-dark/40 ring-offset-2 flex flex-col justify-end"
                         >
                              <div class="p-6 text-white text-[7px] font-sans">
+                                <p class="text-[7px] font-black uppercase tracking-widest text-sky-200 mb-4">Validado por la Universidad Mayor de San Andrés y la Facultad de Ciencias Puras y Naturales</p>
                                 <div class="grid grid-cols-3 gap-4 mb-6">
                                     <div>
                                         <h4 class="font-bold text-[8px] mb-3 border-b border-umsa-blue pb-1 inline-block">Dónde estamos</h4>
@@ -3009,7 +3010,7 @@ const changeStep = (delta: number) => {
                                     <div class="flex items-center gap-2 mb-1">
                                         <div class="h-1 w-4 bg-umsa-gold rounded-full"></div>
                                         <span class="text-[8px] font-black text-umsa-gold uppercase tracking-widest">
-                                            Certificado para: {{ tipoCertificado === null ? 'Ninguno' : (tipoCertificado === 1 ? 'Logística' : tipoCertificado === 2 ? 'Expositor' : tipoCertificado === 3 ? 'Organizador' : 'Asistente') }}
+                                            Certificado para: {{ tipoCertificado === null ? 'Ninguno' : (tipoCertificado === 1 ? 'Asistente' : tipoCertificado === 2 ? 'Expositor' : tipoCertificado === 3 ? 'Logística' : 'Docente') }}
                                         </span>
                                         <div class="h-1 w-4 bg-umsa-gold rounded-full"></div>
                                     </div>
@@ -3072,7 +3073,7 @@ const changeStep = (delta: number) => {
                                 
                                 <div class="mt-6 bg-slate-50 dark:bg-gray-900/50 p-4 rounded-2xl border border-slate-100 dark:border-gray-800">
                                     <p class="text-[8px] font-bold text-slate-500 uppercase tracking-widest text-center leading-tight">
-                                        <span class="text-umsa-gold">Nota:</span> Estás editando la versión para <span class="text-primary-dark dark:text-white underline">{{ tipoCertificado === null ? 'Ninguno' : (tipoCertificado === 1 ? 'Logística' : tipoCertificado === 2 ? 'Expositor' : tipoCertificado === 3 ? 'Organizador' : 'Asistente') }}</span>. Los cambios se guardan por separado para cada rol.
+                                        <span class="text-umsa-gold">Nota:</span> Estás editando la versión para <span class="text-primary-dark dark:text-white underline">{{ tipoCertificado === null ? 'Ninguno' : (tipoCertificado === 1 ? 'Asistente' : tipoCertificado === 2 ? 'Expositor' : tipoCertificado === 3 ? 'Logística' : 'Docente') }}</span>. Los cambios se guardan por separado para cada rol.
                                     </p>
                                 </div>
                              </div>

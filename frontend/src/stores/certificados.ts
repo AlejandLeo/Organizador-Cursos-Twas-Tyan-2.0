@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import api from '@/services/api';
+import api, { imagenActividad, imagenEvento } from '@/services/api';
 import Swal from 'sweetalert2';
 
 export const useCertificadosStore = defineStore('certificados', () => {
@@ -11,7 +11,16 @@ export const useCertificadosStore = defineStore('certificados', () => {
     loading.value = true;
     try {
       const response = await api.get('/me/certificados');
-      misCertificados.value = response.data;
+      misCertificados.value = (response.data || []).map((cert: any) => {
+        const actividad = cert.actividadAcademica || null;
+        const evento = cert.evento || actividad?.evento || null;
+        return {
+          ...cert,
+          actividad,
+          evento,
+          imagen: actividad?.imagen ? imagenActividad(actividad) : imagenEvento(evento),
+        };
+      });
     } catch (error) {
       console.error('Error fetching mis certificados:', error);
       Swal.fire('Error', 'No se pudieron cargar tus certificados.', 'error');

@@ -21,25 +21,26 @@ export class CertificadosPdfService {
       throw new NotFoundException('Certificado no encontrado');
     }
 
-    if (!certificado.infoCertificado || !certificado.infoCertificado.configuracion) {
-      throw new NotFoundException('El certificado no tiene un diseño configurado en el Workplace.');
-    }
-
     // Parseamos la configuración visual del certificado
+    const rawConfig = certificado.infoCertificado?.configuracion;
     let configuracion: any[] = [];
-    try {
-      configuracion = typeof certificado.infoCertificado.configuracion === 'string'
-        ? JSON.parse(certificado.infoCertificado.configuracion)
-        : certificado.infoCertificado.configuracion;
-    } catch (e) {
-      configuracion = [];
+    if (Array.isArray(rawConfig)) {
+      configuracion = rawConfig;
+    } else if (typeof rawConfig === 'string' && rawConfig.trim()) {
+      try {
+        const parsed = JSON.parse(rawConfig);
+        configuracion = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        configuracion = [];
+      }
     }
 
     // 2. Generar PDF
     const doc = new jsPDF({
       orientation: 'landscape', // Certificados horizontales por defecto
       unit: 'pt', // Usaremos puntos para que coincida con px/percentages
-      format: 'letter' // 792 x 612 pt
+      format: 'letter', // 792 x 612 pt
+      compress: true
     });
 
     const pdfWidth = doc.internal.pageSize.getWidth();
@@ -54,7 +55,7 @@ export class CertificadosPdfService {
         if (fs.existsSync(localFondoPath)) {
           const ext = (localFondoPath.split('.').pop() || 'JPG').toUpperCase();
           const imgData = fs.readFileSync(localFondoPath).toString('base64');
-          doc.addImage(imgData, ext as any, 0, 0, pdfWidth, pdfHeight);
+          doc.addImage(imgData, ext as any, 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
         } else {
           console.warn(`No se encontró la imagen de fondo localmente: ${localFondoPath}`);
         }
@@ -80,6 +81,14 @@ export class CertificadosPdfService {
       ? `${grado ? grado + ' ' : ''}${primerApellido} ${segundoApellido} ${nombres}`.replace(/\s+/g, ' ').trim()
       : 'Usuario Desconocido';
 
+    const nombresApellidosSinGrado = persona
+      ? `${nombres} ${primerApellido} ${segundoApellido}`.replace(/\s+/g, ' ').trim()
+      : 'Usuario Desconocido';
+      
+    const apellidosNombresSinGrado = persona
+      ? `${primerApellido} ${segundoApellido} ${nombres}`.replace(/\s+/g, ' ').trim()
+      : 'Usuario Desconocido';
+
     const afiliacion = certificado.usuario?.afiliaciones?.[0];
     const areaTematica = (afiliacion?.area_tematica || '').toUpperCase().trim();
     const disciplinaCientifica = (afiliacion?.disciplina_cientifica || '').toUpperCase().trim();
@@ -90,7 +99,7 @@ export class CertificadosPdfService {
       || (certificado.actividadAcademica as any)?.nombre
       || 'Evento Desconocido';
 
-    const tiposStr = { 1: 'Asistente', 2: 'Ponente', 3: 'Logística', 4: 'Docente' };
+    const tiposStr: Record<number, string> = { 1: 'Asistente', 2: 'Expositor', 3: 'Logística' };
     const rolParticipacion = tiposStr[certificado.tipo] || 'Participante';
 
     const fechaEmision = certificado.fecha_emision
@@ -111,6 +120,8 @@ export class CertificadosPdfService {
       '{NOMBRE_ESTUDIANTE}': nombreCompleto2,
       '{NOMBRE_COMPLETO_1}': nombreCompleto1,
       '{NOMBRE_COMPLETO_2}': nombreCompleto2,
+      '{NOMBRES_APELLIDOS_SIN_GRADO}': nombresApellidosSinGrado,
+      '{APELLIDOS_NOMBRES_SIN_GRADO}': apellidosNombresSinGrado,
       '{NOMBRE}': nombreCompleto2,
       '{NOMBRES}': nombreCompleto2,
       '{PRIMER_APELLIDO}': primerApellido,
@@ -130,6 +141,78 @@ export class CertificadosPdfService {
       '{TEMATICA}': tematica || '',
     };
 
+    const aplicarVariables = (texto: string) => {
+      let resultado = texto || '';
+      for (const [variable, valor] of Object.entries(variablesReales)) {
+        resultado = resultado.split(variable).join(valor);
+        const varClean = variable.replace(/[\{\}]/g, '');
+        resultado = resultado.split(`[${varClean}]`).join(valor);
+        resultado = resultado.split(`{{${varClean}}}`).join(valor);
+      }
+      return resultado;
+    };
+
+    if (!configuracion.length) {
+      const actividadNombre = (certificado.actividadAcademica as any)?.nombre || '';
+      const titulo = aplicarVariables(info?.cabecera || 'CERTIFICADO');
+      const cuerpo = aplicarVariables(info?.tenor || 'Se otorga el presente certificado a:');
+      doc.setDrawColor(0, 59, 113);
+      doc.setLineWidth(10);
+      doc.rect(16, 16, pdfWidth - 32, pdfHeight - 32);
+      doc.setDrawColor(188, 156, 49);
+      doc.setLineWidth(1.2);
+      doc.rect(28, 28, pdfWidth - 56, pdfHeight - 56);
+
+      doc.setFont('times', 'bold');
+      doc.setFontSize(22);
+      doc.setTextColor(0, 59, 113);
+      doc.text(titulo, pdfWidth / 2, 110, { align: 'center', maxWidth: pdfWidth - 140 });
+
+      doc.setFont('times', 'italic');
+      doc.setFontSize(13);
+      doc.setTextColor(51, 65, 85);
+      const cuerpoLineas = doc.splitTextToSize(cuerpo, pdfWidth - 160);
+      doc.text(cuerpoLineas, pdfWidth / 2, 160, { align: 'center' });
+
+      doc.setFont('times', 'bold');
+      doc.setFontSize(26);
+      doc.setTextColor(15, 23, 42);
+      doc.text(nombreCompleto2, pdfWidth / 2, 250, { align: 'center', maxWidth: pdfWidth - 140 });
+
+      doc.setFont('times', 'normal');
+      doc.setFontSize(13);
+      doc.setTextColor(51, 65, 85);
+      doc.text(actividadNombre, pdfWidth / 2, 300, { align: 'center', maxWidth: pdfWidth - 140 });
+      doc.text(eventoNombre, pdfWidth / 2, 322, { align: 'center', maxWidth: pdfWidth - 140 });
+      if (rolParticipacion) {
+        doc.setFontSize(11);
+        doc.text(rolParticipacion, pdfWidth / 2, 348, { align: 'center' });
+      }
+
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Código ${certificado.codigo_certificado || ''}`, pdfWidth / 2, 400, { align: 'center' });
+      doc.text(`Emitido el ${fechaEmision}`, pdfWidth / 2, 416, { align: 'center' });
+
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const qrDataUrl = await QRCode.toDataURL(
+        `${frontendUrl}/verificar-certificado/${certificado.uuid_archivo}`,
+        { errorCorrectionLevel: 'M', margin: 1 },
+      );
+      doc.addImage(qrDataUrl, 'PNG', pdfWidth / 2 - 36, 430, 64, 64);
+      doc.setFont('times', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(0, 59, 113);
+      doc.text(
+        'Validado por la Universidad Mayor de San Andrés — Facultad de Ciencias Puras y Naturales',
+        pdfWidth / 2,
+        pdfHeight - 42,
+        { align: 'center' },
+      );
+
+      return Buffer.from(doc.output('arraybuffer'));
+    }
+
     // --- Dibujar elementos ---
     // El editor de Vue usa CSS donde x e y representan la esquina SUPERIOR IZQUIERDA del elemento.
     const CANVAS_W = 1024;
@@ -148,6 +231,14 @@ export class CertificadosPdfService {
           const varClean = variable.replace(/[\{\}]/g, '');
           textoFinal = textoFinal.split(`[${varClean}]`).join(valor);
           textoFinal = textoFinal.split(`{{${varClean}}}`).join(valor);
+        }
+
+        if (el.textTransform) {
+          if (el.textTransform === 'uppercase') textoFinal = textoFinal.toUpperCase();
+          else if (el.textTransform === 'lowercase') textoFinal = textoFinal.toLowerCase();
+          else if (el.textTransform === 'capitalize') {
+             textoFinal = textoFinal.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+          }
         }
 
         const fontSize = el.fontSize || 12;
@@ -195,6 +286,12 @@ export class CertificadosPdfService {
         }
 
         let textoFinal = el.valor || '';
+        if (el.tipo === 'cabecera' && info.cabecera !== undefined) {
+          textoFinal = info.cabecera || '';
+        } else if (el.tipo === 'tenor' && info.tenor !== undefined) {
+          textoFinal = info.tenor || '';
+        }
+        
         // Reemplazar variables dinámicas usando split.join de forma segura
         for (const [variable, valor] of Object.entries(variablesReales)) {
           textoFinal = textoFinal.split(variable).join(valor);

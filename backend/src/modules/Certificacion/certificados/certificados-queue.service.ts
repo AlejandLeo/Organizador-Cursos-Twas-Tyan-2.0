@@ -37,7 +37,7 @@ export class CertificadosQueueService implements OnModuleInit {
     private readonly certificadoRepository: Repository<Certificado>,
     private readonly configService: ConfigService,
     private readonly schedulerRegistry: SchedulerRegistry,
-  ) {}
+  ) { }
 
   onModuleInit() {
     const cronTime = this.configService.get<string>('CERT_QUEUE_CRON') || CronExpression.EVERY_MINUTE;
@@ -125,6 +125,21 @@ export class CertificadosQueueService implements OnModuleInit {
 
       let creadosCount = 0;
 
+      // 0. Precargar configuraciones mínimas de modalidades por actividad académica
+      const actividadesConfig = await queryRunner.manager.find(ActividadAcademica, {
+        where: { evento: { id: eventoId } },
+        relations: ['modalidades']
+      });
+      const actividadConfigMap = new Map<number, { minNota: number, minAsistencia: number }>();
+      for (const act of actividadesConfig) {
+        if (act.modalidades && act.modalidades.length > 0) {
+          actividadConfigMap.set(act.id, {
+            minNota: act.modalidades[0].min_nota ?? 0,
+            minAsistencia: act.modalidades[0].min_asistencia ?? 0
+          });
+        }
+      }
+
       // ─── A) PROCESAR ESTUDIANTES (INSCRIPCIONES) ─────────────────
       const inscripciones = await queryRunner.manager.find(Inscripcion, {
         where: {
@@ -135,6 +150,7 @@ export class CertificadosQueueService implements OnModuleInit {
           'usuario',
           'usuario.persona',
           'actividadAcademica',
+          'actividadAcademica.modalidades',
           'modalidades',
           'modalidades.cursoModalidad',
         ],
@@ -143,34 +159,58 @@ export class CertificadosQueueService implements OnModuleInit {
       for (const ins of inscripciones) {
         if (!ins.usuario) continue;
 
-        // Evaluar aprobación en base a las modalidades registradas
-        let esAprobado = false;
+        // Todo inscrito (estado=1) recibe al menos el certificado regular (Asistencia)
+        let esAprobadoParaCertificado = true;
+        let esParaExcelencia = false;
         let notaEstudiante = 0;
 
         if (ins.modalidades && ins.modalidades.length > 0) {
           for (const im of ins.modalidades) {
             const minNota = im.cursoModalidad?.min_nota ?? 0;
             const minAsistencia = im.cursoModalidad?.min_asistencia ?? 0;
-            
-            const imAprobado = im.aprobado === 1 || (im.nota >= minNota && im.num_asistencia >= minAsistencia);
-            if (imAprobado) {
-              esAprobado = true;
-              if (im.nota > notaEstudiante) {
-                notaEstudiante = im.nota;
-              }
+
+            const nota = im.nota ?? 0;
+            const asistencia = im.num_asistencia ?? 0;
+
+            const cumpleAsistencia = asistencia >= minAsistencia;
+            const cumpleNota = nota >= minNota;
+
+            if (nota > notaEstudiante) {
+              notaEstudiante = nota;
+            }
+
+            // Recibe certificado de excelencia (Aprobación) si cumple ambos
+            if (im.aprobado === 1 || (cumpleAsistencia && cumpleNota)) {
+              esParaExcelencia = true;
             }
           }
-        } else if (ins.nota_principal !== null && ins.nota_principal >= 51) {
-          esAprobado = true;
-          notaEstudiante = ins.nota_principal;
+        } else {
+          // Fallback si no tiene modalidades
+          const nota = ins.nota_principal ?? 0;
+          const asistencia = 0; // Inscripción base no tiene registro global de asistencia
+          let minNota = 51;
+          let minAsistencia = 0;
+
+          const configMap = actividadConfigMap.get(ins.actividadAcademica.id);
+          if (configMap) {
+            minNota = configMap.minNota;
+            minAsistencia = configMap.minAsistencia;
+          } else if (ins.actividadAcademica?.modalidades?.length > 0) {
+            minNota = ins.actividadAcademica.modalidades[0].min_nota ?? 0;
+            minAsistencia = ins.actividadAcademica.modalidades[0].min_asistencia ?? 0;
+          }
+
+          if (nota >= minNota && asistencia >= minAsistencia) {
+            esParaExcelencia = true;
+            notaEstudiante = nota;
+          }
         }
 
-        if (!esAprobado) continue;
+        if (!esAprobadoParaCertificado) continue;
 
-        // Determinar excelencia académica (calificación >= 90)
-        const requiereExcelencia = notaEstudiante >= 90;
-        const plantillaDestino = requiereExcelencia 
-          ? (plantillaEstudianteExcelencia || plantillaEstudianteRegular) 
+        // Determinar excelencia académica usando la nota mínima de la BD
+        const plantillaDestino = esParaExcelencia
+          ? (plantillaEstudianteExcelencia || plantillaEstudianteRegular)
           : plantillaEstudianteRegular;
 
         if (!plantillaDestino) continue;
@@ -192,7 +232,7 @@ export class CertificadosQueueService implements OnModuleInit {
             infoCertificado: { id: plantillaDestino.id },
             actividadAcademica: { id: ins.actividadAcademica.id },
             usuario: { id: ins.usuario.id },
-            tipo: 4, // Asistente (Estudiante)
+            tipo: 1, // Asistente (Estudiante)
             codigo_certificado: codigoCertificado,
             uuid_archivo: uuidArchivo,
             hash_integridad: 'PENDIENTE',
@@ -276,7 +316,7 @@ export class CertificadosQueueService implements OnModuleInit {
           for (const coord of coordinaciones) {
             if (!coord.usuario) continue;
 
-            const esLogistica = coord.usuario.usuariosRoles?.some(ur => 
+            const esLogistica = coord.usuario.usuariosRoles?.some(ur =>
               ur.rol && (ur.rol.id === 3 || ur.rol.nombre_rol.toLowerCase().includes('logis'))
             );
 
@@ -298,7 +338,7 @@ export class CertificadosQueueService implements OnModuleInit {
                 infoCertificado: { id: plantillaLogistica.id },
                 actividadAcademica: { id: unaActividad.id },
                 usuario: { id: coord.usuario.id },
-                tipo: 1, // Logística
+                tipo: 3, // Logística
                 codigo_certificado: codigoCertificado,
                 uuid_archivo: uuidArchivo,
                 hash_integridad: 'PENDIENTE',
@@ -382,7 +422,7 @@ export class CertificadosQueueService implements OnModuleInit {
           // El servicio se encarga de guardar en DB el éxito (enviado) o fracaso (error) y los reintentos
           await this.envioService.enviarCertificado(cert.id);
           this.logger.log(`[Worker DB] ✓ Certificado #${cert.id} enviado.`);
-          
+
           // Pausa configurada entre correos
           if (delayMs > 0) {
             await new Promise<void>((resolve) => setTimeout(resolve, delayMs));

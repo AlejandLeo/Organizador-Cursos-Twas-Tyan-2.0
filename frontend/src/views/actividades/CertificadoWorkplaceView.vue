@@ -21,6 +21,8 @@ const resolvePreviewVariables = (text: string) => {
         .replace(/{NOMBRE_COMPLETO_2}/g, 'Lic. Diego Michael Dai Maldonado')
         .replace(/{NOMBRE}/g, 'Lic. Diego Michael Dai Maldonado')
         .replace(/{NOMBRES}/g, 'Lic. Diego Michael Dai Maldonado')
+        .replace(/{NOMBRES_APELLIDOS_SIN_GRADO}/g, 'Diego Michael Dai Maldonado')
+        .replace(/{APELLIDOS_NOMBRES_SIN_GRADO}/g, 'Maldonado Dai Diego Michael')
         .replace(/{PRIMER_APELLIDO}/g, 'Maldonado')
         .replace(/{SEGUNDO_APELLIDO}/g, 'Dai')
         .replace(/{AREA_TEMATICA}/g, 'CIENCIAS DE LA VIDA Y DE LA TIERRA')
@@ -62,6 +64,7 @@ interface ElementoLienzo {
   fontFamily: string
   alineacion?: 'left' | 'center' | 'right' | string
   id_usuario?: number
+  textTransform?: string
 }
 
 const getElementStyle = (el: ElementoLienzo) => {
@@ -641,6 +644,16 @@ const guardarDiseno = async () => {
                             <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} NOMBRE_COMPLETO_2 {{ '}' }}</span>
                             <span class="material-symbols-outlined text-xs text-slate-400">person</span>
                         </div>
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{NOMBRES_APELLIDOS_SIN_GRADO}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                            <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
+                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} NOMBRES_APELLIDOS_SIN_GRADO {{ '}' }}</span>
+                            <span class="material-symbols-outlined text-xs text-slate-400">person</span>
+                        </div>
+                        <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{APELLIDOS_NOMBRES_SIN_GRADO}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
+                            <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
+                            <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} APELLIDOS_NOMBRES_SIN_GRADO {{ '}' }}</span>
+                            <span class="material-symbols-outlined text-xs text-slate-400">person</span>
+                        </div>
                         <div draggable="true" @dragstart="e => onDragStartPalette(e, 'texto', '{PRIMER_APELLIDO}')" class="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:border-emerald-500 transition-colors cursor-move group">
                             <span class="material-symbols-outlined text-slate-300 text-[14px]">drag_indicator</span>
                             <span class="text-[10px] font-black font-mono text-primary-dark dark:text-white flex-1">{{ '{' }} PRIMER_APELLIDO {{ '}' }}</span>
@@ -958,6 +971,16 @@ const guardarDiseno = async () => {
                             <span class="material-symbols-outlined text-[18px]">format_align_right</span>
                         </button>
                     </div>
+                </div>
+
+                <div v-if="selectedElementData.tipo === 'texto'">
+                    <label class="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 block">Transformación de texto</label>
+                    <select v-model="selectedElementData.textTransform" class="w-full bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl py-2.5 px-3 font-bold text-xs text-primary-dark dark:text-white focus:border-umsa-gold outline-none transition-all">
+                        <option value="">Ninguno (Por defecto)</option>
+                        <option value="uppercase">MAYÚSCULAS</option>
+                        <option value="lowercase">minúsculas</option>
+                        <option value="capitalize">Capitalizado</option>
+                    </select>
                 </div>
             </div>
         </aside>

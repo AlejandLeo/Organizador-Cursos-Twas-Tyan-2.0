@@ -63,53 +63,35 @@ export class InscripcionesExcelService implements OnModuleInit {
     }
   }
 
-  private getFilaVal(fila: Record<string, any>, keywords: string[]): string {
-    for (const key of Object.keys(fila)) {
-      const norm = key.toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9]/g, "")
-        .trim();
-
-      for (const kw of keywords) {
-        if (norm.includes(kw)) {
-          return String(fila[key] || '').trim();
-        }
+  /**
+   * Lee un campo del Excel de forma estricta: primero busca el nombre exacto de columna,
+   * luego intenta aliases alternativos (solo para campos como email donde hay variantes comunes).
+   * NO usa búsqueda por substring para evitar colisiones entre columnas.
+   */
+  private getFieldStrict(fila: Record<string, any>, exactNames: string[]): string {
+    for (const name of exactNames) {
+      const val = fila[name];
+      if (val !== undefined && val !== null && String(val).trim() !== '') {
+        return String(val).trim();
       }
     }
     return '';
   }
 
   private getInstitucionValue(fila: any): string {
-    return this.getFilaVal(fila, ['institucion', 'afiliacion', 'universidad', 'entidad', 'centro']) || String(fila['institucion'] || '').trim();
+    return this.getFieldStrict(fila, ['institucion', 'afiliacion', 'universidad', 'entidad', 'centro']);
   }
 
   private getDisciplinaValue(fila: any): string {
-    return this.getFilaVal(fila, ['disciplina', 'especialidad', 'trabajo', 'exposicion', 'titulo']) || String(fila['disciplina'] || fila['especialidad'] || fila['disciplina_cientifica'] || '').trim();
+    return this.getFieldStrict(fila, ['disciplina_cientifica', 'disciplina', 'especialidad']);
   }
 
   private getAreaValue(fila: any): string {
-    return this.getFilaVal(fila, ['areatematica', 'area']) || String(fila['area_tematica'] || '').trim();
+    return this.getFieldStrict(fila, ['area_tematica', 'area']);
   }
 
   private getGradoAcademicoValue(fila: any): string {
-    for (const key of Object.keys(fila)) {
-      const norm = key.toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9]/g, "")
-        .trim();
-
-      // Si la columna es de trabajo o exposición, no debe asignarse al grado académico
-      if (norm.includes('trabajo') || norm.includes('exposicion') || norm.includes('ponencia') || norm.includes('proyecto') || norm.includes('investigacion') || norm.includes('tema')) {
-        continue;
-      }
-
-      if (norm.includes('gradoacademico') || norm.includes('grado') || norm.includes('titulo')) {
-        return String(fila[key] || '').trim();
-      }
-    }
-    return String(fila['grado_academico'] || fila['grado'] || '').trim();
+    return this.getFieldStrict(fila, ['grado_academico', 'grado']);
   }
 
   constructor(
@@ -163,7 +145,7 @@ export class InscripcionesExcelService implements OnModuleInit {
       for (let i = 0; i < filas.length; i++) {
         const fila = filas[i];
         const numFila = i + 2;
-        const email = this.sanitizeInput(this.getFilaVal(fila, ['email', 'correo', 'mail']) || fila['email'], 'email');
+        const email = this.sanitizeInput(this.getFieldStrict(fila, ['email', 'correo', 'mail']), 'email');
 
         if (!email) {
           detalle.push({ fila: numFila, estado: 'error', mensaje: 'Email vacío o inválido.' });
@@ -198,15 +180,15 @@ export class InscripcionesExcelService implements OnModuleInit {
           });
           const usuarioGuardado = await queryRunner.manager.save(usuario);
 
-          const nombres = this.sanitizeInput(this.getFilaVal(fila, ['nombres', 'nombre']) || fila['nombres'], 'name');
-          const primerApellido = this.sanitizeInput(this.getFilaVal(fila, ['primerapellido', 'apellidos', 'apellido']) || fila['primer_apellido'], 'name');
+          const nombres = this.sanitizeInput(this.getFieldStrict(fila, ['nombres', 'nombre']), 'name');
+          const primerApellido = this.sanitizeInput(this.getFieldStrict(fila, ['primer_apellido', 'apellido', 'apellidos']), 'name');
 
           const persona = queryRunner.manager.create(Persona, {
             nombres: nombres || undefined,
             primer_apellido: primerApellido || undefined,
-            segundo_apellido: this.sanitizeInput(this.getFilaVal(fila, ['segundoapellido']) || fila['segundo_apellido'], 'name') || undefined,
-            documento_identidad: this.sanitizeInput(this.getFilaVal(fila, ['documentoidentidad', 'ci', 'documento', 'identidad']) || fila['documento_identidad'], 'document') || undefined,
-            celular: this.sanitizeInput(this.getFilaVal(fila, ['celular', 'telefono', 'movil']) || fila['celular']) || undefined,
+            segundo_apellido: this.sanitizeInput(this.getFieldStrict(fila, ['segundo_apellido']), 'name') || undefined,
+            documento_identidad: this.sanitizeInput(this.getFieldStrict(fila, ['documento_identidad', 'ci', 'documento']), 'document') || undefined,
+            celular: this.sanitizeInput(this.getFieldStrict(fila, ['celular', 'telefono', 'movil'])) || undefined,
             grado_academico: this.sanitizeInput(this.getGradoAcademicoValue(fila), 'sentence') || undefined,
             usuario: usuarioGuardado,
           });
@@ -299,6 +281,7 @@ export class InscripcionesExcelService implements OnModuleInit {
     notificar = false,
     idActividad?: number,
     idEvento?: number,
+    idsActividades: number[] = [],
     modo: 'verificar' | 'guardar' = 'guardar',
     crearUsuarios = false,
     templateId?: number
@@ -322,8 +305,9 @@ export class InscripcionesExcelService implements OnModuleInit {
       for (let i = 0; i < filas.length; i++) {
         const fila = filas[i];
         const numFila = i + 2;
-        const email = this.sanitizeInput(this.getFilaVal(fila, ['email', 'correo', 'mail']) || fila['email'], 'email');
-        const nombreActividad = this.sanitizeInput(this.getFilaVal(fila, ['actividad', 'curso', 'nombreactividad']) || fila['nombre_actividad_academica'], 'sentence');
+        const email = this.sanitizeInput(this.getFieldStrict(fila, ['email', 'correo', 'mail']), 'email');
+        // Lee el nombre de actividad SOLO del campo exacto de la plantilla, sin búsqueda fuzzy
+        const nombreActividad = this.sanitizeInput(this.getFieldStrict(fila, ['nombre_actividad_academica']), 'sentence');
 
         if (!email) {
           detalle.push({ fila: numFila, estado: 'error', mensaje: 'Email vacío.' });
@@ -352,10 +336,10 @@ export class InscripcionesExcelService implements OnModuleInit {
             const userSaved = await queryRunner.manager.save(usuario);
 
             const persona = queryRunner.manager.create(Persona, {
-              nombres: this.sanitizeInput(this.getFilaVal(fila, ['nombres', 'nombre']) || fila['nombres'], 'name') || 'Estudiante',
-              primer_apellido: this.sanitizeInput(this.getFilaVal(fila, ['primerapellido', 'apellidos', 'apellido']) || fila['primer_apellido'], 'name') || 'Nuevo',
-              segundo_apellido: this.sanitizeInput(this.getFilaVal(fila, ['segundoapellido']) || fila['segundo_apellido'], 'name') || undefined,
-              documento_identidad: this.sanitizeInput(this.getFilaVal(fila, ['documentoidentidad', 'ci', 'documento', 'identidad']) || fila['documento_identidad'], 'document') || undefined,
+              nombres: this.sanitizeInput(this.getFieldStrict(fila, ['nombres', 'nombre']), 'name') || 'Estudiante',
+              primer_apellido: this.sanitizeInput(this.getFieldStrict(fila, ['primer_apellido', 'apellido', 'apellidos']), 'name') || 'Nuevo',
+              segundo_apellido: this.sanitizeInput(this.getFieldStrict(fila, ['segundo_apellido']), 'name') || undefined,
+              documento_identidad: this.sanitizeInput(this.getFieldStrict(fila, ['documento_identidad', 'ci', 'documento']), 'document') || undefined,
               grado_academico: this.sanitizeInput(this.getGradoAcademicoValue(fila), 'sentence') || undefined,
               usuario: userSaved,
             });
@@ -399,30 +383,66 @@ export class InscripcionesExcelService implements OnModuleInit {
           }
 
           if (!idEvento) throw new Error('Evento no seleccionado.');
-          const cacheKey = `ev_${idEvento}_${nombreActividad.toLowerCase()}`;
-          let actividad = actividadCache.get(cacheKey);
-          if (actividad === undefined) {
-            actividad = await queryRunner.manager.findOne(ActividadAcademica, {
-              where: { nombre: ILike(nombreActividad), evento: { id: idEvento } },
-              relations: ['evento'],
-            });
-            actividadCache.set(cacheKey, actividad);
+          const destinos: ActividadAcademica[] = [];
+          if (nombreActividad) {
+            const cacheKey = `ev_${idEvento}_${nombreActividad.toLowerCase()}`;
+            let actividad = actividadCache.get(cacheKey);
+            if (actividad === undefined) {
+              actividad = await queryRunner.manager.findOne(ActividadAcademica, {
+                where: { nombre: ILike(nombreActividad), evento: { id: idEvento } },
+                relations: ['evento'],
+              });
+              actividadCache.set(cacheKey, actividad ?? null);
+            }
+            if (!actividad) throw new Error(`Actividad "${nombreActividad}" no encontrada en el evento.`);
+            destinos.push(actividad);
+          } else {
+            const ids = idsActividades.length ? idsActividades : (idActividad ? [idActividad] : []);
+            if (!ids.length) {
+              throw new Error('Selecciona la actividad del evento. La inscripción se registra en la actividad, no solo en el evento.');
+            }
+            for (const actividadId of ids) {
+              const cacheKey = `id_${idEvento}_${actividadId}`;
+              let actividad = actividadCache.get(cacheKey);
+              if (actividad === undefined) {
+                actividad = await queryRunner.manager.findOne(ActividadAcademica, {
+                  where: { id: actividadId, evento: { id: idEvento } },
+                  relations: ['evento'],
+                });
+                actividadCache.set(cacheKey, actividad ?? null);
+              }
+              if (!actividad) throw new Error(`La actividad ${actividadId} no pertenece al evento seleccionado.`);
+              destinos.push(actividad);
+            }
           }
 
-          if (!actividad) throw new Error(`Actividad "${nombreActividad}" no encontrada.`);
+          const nuevas: string[] = [];
+          const yaInscritas: string[] = [];
+          for (const actividad of destinos) {
+            const inscripcionExistente = await queryRunner.manager.findOne(Inscripcion, {
+              where: { usuario: { id: usuario.id }, actividadAcademica: { id: actividad.id } },
+            });
+            if (inscripcionExistente) {
+              yaInscritas.push(actividad.nombre);
+              continue;
+            }
+            await queryRunner.manager.save(queryRunner.manager.create(Inscripcion, {
+              usuario,
+              actividadAcademica: actividad,
+              estado: 1,
+              miembro_tyan: 0,
+            }));
+            nuevas.push(actividad.nombre);
+          }
 
-          const inscripcionExistente = await queryRunner.manager.findOne(Inscripcion, {
-            where: { usuario: { id: usuario.id }, actividadAcademica: { id: actividad.id } },
-          });
-
-          if (inscripcionExistente) {
-            detalle.push({ fila: numFila, email, estado: 'omitido', mensaje: `Ya inscrito en "${actividad.nombre}".` });
+          if (!nuevas.length) {
+            detalle.push({ fila: numFila, email, estado: 'omitido', mensaje: `Ya inscrito en "${yaInscritas.join(', ')}".` });
             omitidos++;
             await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
             continue;
           }
 
-          await queryRunner.manager.save(queryRunner.manager.create(Inscripcion, { usuario, actividadAcademica: actividad, estado: 1, miembro_tyan: 0 }));
+          const actividad = destinos[0];
 
           let correoEnviado = false;
           let correoAdvertencia: string | undefined;
@@ -449,12 +469,14 @@ export class InscripcionesExcelService implements OnModuleInit {
             fila: numFila,
             email,
             estado: modo === 'verificar' ? 'omitido' : (fueCreado ? 'creado' : 'inscrito'),
-            mensaje: modo === 'verificar' ? 'Válido.' : 'Procesado correctamente.',
+            mensaje: modo === 'verificar'
+              ? `Válido para: ${nuevas.join(', ')}.`
+              : `Inscrito en: ${nuevas.join(', ')}.`,
             correoEnviado,
             correoAdvertencia,
           });
           if (fueCreado) creados++;
-          inscritos++;
+          inscritos += nuevas.length;
         } catch (error) {
           await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
           detalle.push({ fila: numFila, email, estado: 'error', mensaje: error.message });
@@ -504,9 +526,10 @@ export class InscripcionesExcelService implements OnModuleInit {
       for (let i = 0; i < filas.length; i++) {
         const fila = filas[i];
         const numFila = i + 2;
-        const email = this.sanitizeInput(this.getFilaVal(fila, ['email', 'correo', 'mail']) || fila['email'], 'email');
-        const nombreActividad = this.sanitizeInput(this.getFilaVal(fila, ['actividad', 'curso', 'nombreactividad']) || fila['nombre_actividad_academica'], 'sentence');
-        const tematica = this.sanitizeInput(this.getFilaVal(fila, ['tematica', 'tema']) || fila['tematica'], 'sentence');
+        const email = this.sanitizeInput(this.getFieldStrict(fila, ['email', 'correo', 'mail']), 'email');
+        // Lee el nombre de actividad SOLO del campo exacto de la plantilla, sin búsqueda fuzzy
+        const nombreActividad = this.sanitizeInput(this.getFieldStrict(fila, ['nombre_actividad_academica']), 'sentence');
+        const tematica = this.sanitizeInput(this.getFieldStrict(fila, ['tematica', 'tema']), 'sentence');
 
         if (!email || !nombreActividad) {
           detalle.push({ fila: numFila, estado: 'error', mensaje: 'Email o nombre de actividad vacío.' });
@@ -534,10 +557,10 @@ export class InscripcionesExcelService implements OnModuleInit {
             usuario = queryRunner.manager.create(Usuario, { email, password: hash, estado: 1, requiere_cambio_password: true });
             const userSaved = await queryRunner.manager.save(usuario);
             const persona = queryRunner.manager.create(Persona, {
-              nombres: this.sanitizeInput(this.getFilaVal(fila, ['nombres', 'nombre']) || fila['nombres'], 'name') || 'Ponente',
-              primer_apellido: this.sanitizeInput(this.getFilaVal(fila, ['primerapellido', 'apellidos', 'apellido']) || fila['primer_apellido'], 'name') || 'Nuevo',
-              segundo_apellido: this.sanitizeInput(this.getFilaVal(fila, ['segundoapellido']) || fila['segundo_apellido'], 'name') || undefined,
-              documento_identidad: this.sanitizeInput(this.getFilaVal(fila, ['documentoidentidad', 'ci', 'documento', 'identidad']) || fila['documento_identidad'], 'document') || undefined,
+              nombres: this.sanitizeInput(this.getFieldStrict(fila, ['nombres', 'nombre']), 'name') || 'Ponente',
+              primer_apellido: this.sanitizeInput(this.getFieldStrict(fila, ['primer_apellido', 'apellido', 'apellidos']), 'name') || 'Nuevo',
+              segundo_apellido: this.sanitizeInput(this.getFieldStrict(fila, ['segundo_apellido']), 'name') || undefined,
+              documento_identidad: this.sanitizeInput(this.getFieldStrict(fila, ['documento_identidad', 'ci', 'documento']), 'document') || undefined,
               grado_academico: this.sanitizeInput(this.getGradoAcademicoValue(fila), 'sentence') || undefined,
               usuario: userSaved,
             });

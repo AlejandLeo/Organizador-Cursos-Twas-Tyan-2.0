@@ -305,7 +305,6 @@ const guardarCambios = async () => {
         }
         if (imagenArchivo.value) formData.append('imagen', imagenArchivo.value);
 
-        console.log('Enviando datos de actualización para ID:', actividad.value.id);
         await api.put(`/actividades-academicas/${actividad.value.id}`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
@@ -317,7 +316,6 @@ const guardarCambios = async () => {
         Swal.fire('Éxito', 'Actividad actualizada correctamente', 'success');
     } catch (error: any) {
         console.error('Error al actualizar actividad:', error);
-        console.error('Detalle del error:', error.response?.data);
         
         // Formatear error de class-validator (array de strings) o string normal
         let errorMsg = 'No se pudo actualizar la actividad';
