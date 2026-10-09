@@ -12,11 +12,11 @@ const router = useRouter();
 const route = useRoute();
 
 const isSuperAdminTheme = computed(() => authStore.esSuperUsuario);
-const themeBorder = computed(() => isSuperAdminTheme.value ? 'dark:border-sky-900/40' : 'dark:border-blue-900/30');
-const themeText = computed(() => isSuperAdminTheme.value ? 'text-sky-700 dark:text-sky-300' : 'text-blue-400');
-const themeHover = computed(() => isSuperAdminTheme.value ? 'hover:bg-sky-50 dark:hover:bg-sky-900/20' : 'hover:bg-blue-900/20');
-const themeGradient = computed(() => isSuperAdminTheme.value ? 'from-[#003B71] to-[#0070BB] shadow-[#003B71]/40' : 'from-blue-600 to-sky-700 shadow-blue-900/50');
-const themeLogoText = computed(() => isSuperAdminTheme.value ? 'text-umsa-blue dark:text-sky-400' : 'text-blue-600 dark:text-blue-400');
+const themeBorder = computed(() => isSuperAdminTheme.value ? 'dark:border-red-900/30' : 'dark:border-blue-900/30');
+const themeText = computed(() => isSuperAdminTheme.value ? 'text-red-400' : 'text-blue-400');
+const themeHover = computed(() => isSuperAdminTheme.value ? 'hover:bg-red-900/20' : 'hover:bg-blue-900/20');
+const themeGradient = computed(() => isSuperAdminTheme.value ? 'from-red-600 to-rose-800 shadow-red-900/50' : 'from-blue-600 to-sky-700 shadow-blue-900/50');
+const themeLogoText = computed(() => isSuperAdminTheme.value ? 'text-red-600 dark:text-red-500' : 'text-blue-600 dark:text-blue-400');
 
 // --- LÓGICA DE NOTIFICACIONES ---
 interface CoordinatorActivity {
@@ -214,7 +214,7 @@ onUnmounted(() => {
                 <span class="material-symbols-outlined text-[18px]">badge</span>
                 Mi Perfil
               </button>
-              <button v-if="authStore.esSuperUsuario" @click="$router.push({ name: 'admin-configuracion' }); isProfileOpen = false" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800 hover:text-umsa-blue transition-colors flex items-center gap-3">
+              <button v-if="authStore.esSuperUsuario" @click="$router.push({ name: 'admin-configuracion' }); isProfileOpen = false" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800 hover:text-red-600 transition-colors flex items-center gap-3">
                 <span class="material-symbols-outlined text-[18px]">settings</span>
                 Configuración del Sistema
               </button>
@@ -228,9 +228,9 @@ onUnmounted(() => {
         </div>
 
         <div v-if="authStore.esSuperUsuario" 
-             class="px-3 py-1.5 bg-sky-50 dark:bg-sky-900/30 border border-sky-200 dark:border-sky-700/40 rounded-full hidden lg:flex items-center gap-2">
-          <div class="w-2 h-2 rounded-full bg-umsa-blue animate-pulse"></div>
-          <span class="text-[9px] font-black text-[#003B71] dark:text-sky-300 uppercase tracking-widest">Acceso Total</span>
+             class="px-3 py-1.5 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-700/40 rounded-full hidden lg:flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+          <span class="text-[9px] font-black text-red-700 dark:text-red-400 uppercase tracking-widest">Acceso Total</span>
         </div>
       </div>
     </header>

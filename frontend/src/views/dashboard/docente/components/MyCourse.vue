@@ -15,9 +15,13 @@ const curso = ref({
 
 const isEditing = ref(false);
 
-const updateGrade = (_id: number, _val: number) => {};
+const updateGrade = (id: number, val: number) => {
+  console.log(`Actualizando nota estudiante ${id} a ${val}`);
+};
 
-const updateAttendance = (_id: number, _status: string) => {};
+const updateAttendance = (id: number, status: string) => {
+  console.log(`Actualizando asistencia estudiante ${id} a ${status}`);
+};
 
 </script>
 

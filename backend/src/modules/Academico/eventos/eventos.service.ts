@@ -44,13 +44,7 @@ export class EventosService {
 
   async findAll() {
     const eventos = await this.eventoRepository.find({
-      relations: [
-        'actividades',
-        'actividades.modalidades',
-        'actividades.inscripciones',
-        'actividades.inscripciones.usuario',
-        'actividades.inscripciones.usuario.persona',
-      ],
+      relations: ['actividades', 'actividades.modalidades', 'actividades.inscripciones'],
       order: { prioridad: 'ASC', fecha_creacion: 'DESC' }
     });
     return eventos.map(evento => ({
@@ -62,14 +56,6 @@ export class EventosService {
           const firstMod = act.modalidades?.[0];
           return {
             ...act,
-            inscripciones: (act.inscripciones || []).map((ins) => {
-              const usuario = ins.usuario as any;
-              if (usuario) {
-                delete usuario.password;
-                delete usuario.password_ponente;
-              }
-              return ins;
-            }),
             estado: Number(act.estado),
             min_nota: firstMod ? firstMod.min_nota : 51,
             min_asistencia: firstMod ? firstMod.min_asistencia : 80,

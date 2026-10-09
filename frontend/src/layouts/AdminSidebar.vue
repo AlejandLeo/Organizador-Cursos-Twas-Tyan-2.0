@@ -23,10 +23,10 @@ const logout = () => {
 const isActive = (name: string) => route.name === name;
 
 // Definimos el color temático según el rol
-const themeColor = authStore.esSuperUsuario ? 'bg-umsa-blue' : 'bg-blue-600';
-const themeText = authStore.esSuperUsuario ? 'text-umsa-blue' : 'text-blue-600';
-const themeHover = authStore.esSuperUsuario ? 'hover:bg-sky-50 dark:hover:bg-sky-900/20' : 'hover:bg-blue-50 dark:hover:bg-blue-900/10';
-const themeBorder = authStore.esSuperUsuario ? 'border-sky-100 dark:border-sky-900/30' : 'border-blue-100 dark:border-blue-900/20';
+const themeColor = authStore.esSuperUsuario ? 'bg-red-600' : 'bg-blue-600';
+const themeText = authStore.esSuperUsuario ? 'text-red-600' : 'text-blue-600';
+const themeHover = authStore.esSuperUsuario ? 'hover:bg-red-50 dark:hover:bg-red-900/10' : 'hover:bg-blue-50 dark:hover:bg-blue-900/10';
+const themeBorder = authStore.esSuperUsuario ? 'border-red-100 dark:border-red-900/20' : 'border-blue-100 dark:border-blue-900/20';
 </script>
 
 <template>
@@ -36,7 +36,7 @@ const themeBorder = authStore.esSuperUsuario ? 'border-sky-100 dark:border-sky-9
   ]">
 
     <!-- Perfil Dinámico -->
-    <div :class="authStore.esSuperUsuario ? 'bg-sky-50 dark:bg-sky-900/15 border-sky-100 dark:border-sky-900/30' : 'bg-blue-50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/20'" 
+    <div :class="authStore.esSuperUsuario ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/20' : 'bg-blue-50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/20'" 
          class="mb-8 p-4 rounded-2xl border transition-colors duration-500">
       <div class="flex items-center gap-3 mb-2">
         <div :class="themeColor" class="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-colors">
@@ -79,7 +79,7 @@ const themeBorder = authStore.esSuperUsuario ? 'border-sky-100 dark:border-sky-9
 
       <!-- HISTORIAL (Solo Superadmin) -->
       <button v-if="authStore.esSuperUsuario" @click="navigate('admin-historial')"
-        :class="[isActive('admin-historial') ? 'bg-umsa-blue text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-sky-50 dark:hover:bg-sky-900/20']"
+        :class="[isActive('admin-historial') ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/10']"
         class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold">
         <div class="flex items-center gap-3">
           <span class="material-symbols-outlined text-[20px]">history</span>
@@ -92,7 +92,7 @@ const themeBorder = authStore.esSuperUsuario ? 'border-sky-100 dark:border-sky-9
 
       <template v-if="authStore.esSuperUsuario">
         <button @click="navigate('admin-gestion')"
-          :class="[isActive('admin-gestion') ? 'bg-umsa-blue text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-sky-50 dark:hover:bg-sky-900/20']"
+          :class="[isActive('admin-gestion') ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/10']"
           class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold">
           <div class="flex items-center gap-3">
             <span class="material-symbols-outlined text-[20px]">settings_suggest</span>
@@ -101,7 +101,7 @@ const themeBorder = authStore.esSuperUsuario ? 'border-sky-100 dark:border-sky-9
         </button>
 
         <button @click="navigate('admin-certificados-envio')"
-          :class="[isActive('admin-certificados-envio') ? 'bg-umsa-blue text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-sky-50 dark:hover:bg-sky-900/20']"
+          :class="[isActive('admin-certificados-envio') ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/10']"
           class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold">
           <div class="flex items-center gap-3">
             <span class="material-symbols-outlined text-[20px]">workspace_premium</span>
@@ -147,7 +147,7 @@ const themeBorder = authStore.esSuperUsuario ? 'border-sky-100 dark:border-sky-9
         <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 mt-6 pl-2">Sistema</p>
 
         <button @click="navigate('admin-usuarios')"
-          :class="[isActive('admin-usuarios') ? `bg-umsa-blue text-white shadow-md` : `text-slate-600 dark:text-slate-400 hover:bg-sky-50 dark:hover:bg-sky-900/20`]"
+          :class="[isActive('admin-usuarios') ? `bg-red-600 text-white shadow-md` : `text-slate-600 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/10`]"
           class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold">
           <div class="flex items-center gap-3">
             <span class="material-symbols-outlined text-[20px]">manage_accounts</span>
@@ -156,7 +156,7 @@ const themeBorder = authStore.esSuperUsuario ? 'border-sky-100 dark:border-sky-9
         </button>
 
         <button @click="navigate('admin-grados-administrativos')"
-          :class="[isActive('admin-grados-administrativos') ? `bg-umsa-blue text-white shadow-md` : `text-slate-600 dark:text-slate-400 hover:bg-sky-50 dark:hover:bg-sky-900/20`]"
+          :class="[isActive('admin-grados-administrativos') ? `bg-red-600 text-white shadow-md` : `text-slate-600 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/10`]"
           class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold">
           <div class="flex items-center gap-3">
             <span class="material-symbols-outlined text-[20px]">badge</span>
@@ -165,7 +165,7 @@ const themeBorder = authStore.esSuperUsuario ? 'border-sky-100 dark:border-sky-9
         </button>
 
         <button @click="navigate('admin-inscripciones-excel')"
-          :class="[isActive('admin-inscripciones-excel') ? `bg-umsa-blue text-white shadow-md` : `text-slate-600 dark:text-slate-400 hover:bg-sky-50 dark:hover:bg-sky-900/20`]"
+          :class="[isActive('admin-inscripciones-excel') ? `bg-red-600 text-white shadow-md` : `text-slate-600 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/10`]"
           class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold">
           <div class="flex items-center gap-3">
             <span class="material-symbols-outlined text-[20px]">upload_file</span>
@@ -174,7 +174,7 @@ const themeBorder = authStore.esSuperUsuario ? 'border-sky-100 dark:border-sky-9
         </button>
 
         <button @click="navigate('admin-mail-templates')"
-          :class="[isActive('admin-mail-templates') ? `bg-umsa-blue text-white shadow-md` : `text-slate-600 dark:text-slate-400 hover:bg-sky-50 dark:hover:bg-sky-900/20`]"
+          :class="[isActive('admin-mail-templates') ? `bg-red-600 text-white shadow-md` : `text-slate-600 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/10`]"
           class="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group font-bold">
           <div class="flex items-center gap-3">
             <span class="material-symbols-outlined text-[20px]">mail</span>

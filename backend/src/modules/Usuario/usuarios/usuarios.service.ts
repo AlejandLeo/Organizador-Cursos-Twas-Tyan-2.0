@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository, LessThanOrEqual } from 'typeorm';
+import { DataSource, Repository, LessThanOrEqual } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 
 import { Usuario } from './entities/usuario.entity';
@@ -413,7 +413,7 @@ export class UsuariosService {
 
     if (!usuario) throw new NotFoundException('Usuario no encontrado');
 
-    const rolesActuales = (usuario.usuariosRoles || []).filter((ur) => ur.rol?.id != null);
+    const rolesActuales = usuario.usuariosRoles || [];
     const idsActuales = rolesActuales.map(ur => ur.rol.id);
 
     const idsParaAnadir = nuevosRolIds.filter(id => !idsActuales.includes(id));
@@ -444,14 +444,7 @@ export class UsuariosService {
 
       // 2. Añadir roles
       if (idsParaAnadir.length > 0) {
-        const rolesNuevos = await queryRunner.manager.find(Rol, {
-          where: { id: In(idsParaAnadir) },
-        });
-        const encontrados = new Set(rolesNuevos.map((rol) => rol.id));
-        const faltantes = idsParaAnadir.filter((rolId) => !encontrados.has(rolId));
-        if (faltantes.length > 0) {
-          throw new NotFoundException(`No existen los roles ${faltantes.join(', ')}.`);
-        }
+        const rolesNuevos = await queryRunner.manager.findByIds(Rol, idsParaAnadir);
         for (const rol of rolesNuevos) {
           rolesAnadidosNombres.push(rol.nombre_rol);
           const ur = queryRunner.manager.create(UsuarioRol, {

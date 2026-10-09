@@ -78,13 +78,9 @@ export class Certificado {
   @Column({ type: 'text', nullable: true })
   log_error_envio: string | null;
 
-  /** Contador de intentos fallidos de envío */
+  /** Contador de intentos de envío */
   @Column({ type: 'integer', default: 0 })
   reintentos: number;
-
-  /** Veces que el correo del certificado se envió con éxito */
-  @Column({ type: 'integer', default: 0 })
-  envios: number;
 
   // ── Relaciones ────────────────────────────────────────────────────────────
 

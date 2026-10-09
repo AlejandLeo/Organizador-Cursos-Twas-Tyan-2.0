@@ -2,7 +2,7 @@ import api from './api';
 import type { Usuario } from '@/types';
 
 export const usuariosService = {
-  getAll(params?: { rol?: string; q?: string; soloActivos?: string; limit?: number; page?: number }) {
+  getAll(params?: { rol?: string; q?: string; soloActivos?: string }) {
     return api.get<{ data: Usuario[]; total: number } | Usuario[]>('/usuarios', { params });
   },
 
